@@ -3,3 +3,4 @@
 @plugin "daisyui";
 
 @source "../../src/";
+@source "../../node_modules/@mairie360/lib-components/dist/";
