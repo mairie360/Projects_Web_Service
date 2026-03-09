@@ -29,6 +29,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 USER nextjs
 ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
-ENV PORT=5000
+ENV PORT=5001
 
 CMD ["node", "server.js"]
