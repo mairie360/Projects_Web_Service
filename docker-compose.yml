@@ -154,16 +154,18 @@ services:
     container_name: bff-project-projects-front
     image: ghcr.io/mairie360/bff-project:dev-latest
     ports:
-      - "4000:4000"
+      - "4001:4001"
     networks:
       - backend
       - frontend
     environment:
       CORE_API_URL: "core" 
       CORE_API_PORT: 3000
+      PROJECT_API_URL: "project-api" 
+      PROJECT_API_PORT: 3001
       PORT: 4001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -176,7 +178,7 @@ services:
       secrets:
         - NODE_AUTH_TOKEN
     ports:
-      - "3002:3000" # On map le 3000 interne sur 3001 pour éviter le conflit avec 'core'
+      - "5001:3000" # On map le 3000 interne sur 3001 pour éviter le conflit avec 'core'
     develop:
       watch:
         - action: sync
