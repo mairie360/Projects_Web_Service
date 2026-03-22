@@ -12,7 +12,7 @@
     "@mairie360/lib-components": "0.1.12",
     "@mairie360/bff-project-openapi": "0.2.1",
     "daisyui": "^5.0.0",
-    "next": "15.5.13",
+    "next": "15.5.14",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
