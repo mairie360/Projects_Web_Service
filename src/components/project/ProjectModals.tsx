@@ -58,24 +58,24 @@ export function CreateProjectModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
       <form
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
         onSubmit={onSubmit}
       >
-        <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-5 py-3">
-          <h2 className="text-base font-semibold text-[#24292f]">{isEditMode ? 'Modifier le projet' : 'Nouveau projet'}</h2>
-          <ToolTip text="Fermer">
-            <button
-              type="button"
-              aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" strokeWidth={2} />
-            </button>
-          </ToolTip>
+        <div className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#2b2b2b] px-5 py-3">
+          <h2 className="truncate text-base font-semibold text-white">
+            {isEditMode ? 'Modifier le projet' : 'Nouveau projet'}
+          </h2>
+          <button
+            type="button"
+            aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#d7e3e7] transition hover:bg-[#3a3a3a] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6aada9]/45"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-white p-5">
+        <div className="min-h-0 overflow-y-auto bg-[#f6f4f1] p-5">
           {error && (
             <div className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
               {error}
@@ -84,7 +84,7 @@ export function CreateProjectModal({
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <section className="space-y-4">
-              <div className="rounded-md border border-[#d0d7de] bg-white p-4">
+              <div className="rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                 <FormField
                   id="project-title"
                   label="Titre"
@@ -95,8 +95,8 @@ export function CreateProjectModal({
                 />
               </div>
 
-              <div className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
-                <div className="flex h-10 items-center border-b border-[#d8dee4] bg-[#f6f8fa] px-3">
+              <div className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
+                <div className="flex h-10 items-center border-b border-[#dedbd6] bg-[#f1eee9] px-3">
                   <span className="rounded-md border border-[#d0d7de] bg-white px-3 py-1 text-xs font-semibold text-[#24292f]">
                     Écrire
                   </span>
@@ -121,7 +121,7 @@ export function CreateProjectModal({
               />
             </section>
 
-            <aside className="space-y-4 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-4">
+            <aside className="space-y-4 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
                 <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
@@ -188,11 +188,11 @@ export function CreateProjectModal({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-[#d0d7de] bg-white px-3 py-2">
+                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
                   <div className="text-xs font-semibold text-[#57606a]">Terminées</div>
                   <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.completedTasks}</div>
                 </div>
-                <div className="rounded-md border border-[#d0d7de] bg-white px-3 py-2">
+                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
                   <div className="text-xs font-semibold text-[#57606a]">Total</div>
                   <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.totalTasks}</div>
                 </div>
@@ -201,12 +201,12 @@ export function CreateProjectModal({
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-[#d8dee4] bg-[#f6f8fa] px-5 py-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
           <Button
             label="Annuler"
             type="button"
             onClick={onClose}
-            className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-[#f6f8fa] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
+            className="!h-9 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-[#fbfaf8] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#f1eee9]"
           />
           <Button
             label={isEditMode ? 'Enregistrer' : 'Créer le projet'}
@@ -333,8 +333,8 @@ export function ProjectDetailModal({
     <div className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
       <button type="button" aria-label="Fermer le projet" className="absolute inset-0" onClick={onClose} />
 
-      <section className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
-        <header className="flex items-start justify-between gap-4 border-b border-[#d8dee4] bg-[#f6f8fa] px-5 py-4">
+      <section className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
+        <header className="flex items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
           <div className="min-w-0">
             <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
             <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
@@ -360,10 +360,10 @@ export function ProjectDetailModal({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
-              <div className="mb-5 rounded-md border border-[#d0d7de] bg-white p-4">
+              <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
                   <CircleDot className="h-4 w-4 text-[#1a7f37]" strokeWidth={2} />
                   Ajouter une tâche
@@ -443,8 +443,8 @@ export function ProjectDetailModal({
                 </form>
               </div>
 
-              <section className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
-                <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-4 py-3">
+              <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
+                <div className="flex items-center justify-between border-b border-[#dedbd6] bg-[#f1eee9] px-4 py-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-[#24292f]">
                     <ListChecks className="h-4 w-4 text-[#57606a]" strokeWidth={1.8} />
                     Tâches
@@ -512,7 +512,7 @@ export function ProjectDetailModal({
               </section>
             </main>
 
-            <aside className="bg-[#f6f8fa] p-5">
+            <aside className="bg-[#fbfaf8] p-5">
               {editingProject ? (
                 <form className="space-y-4" onSubmit={submitProjectEdit}>
                   <div>

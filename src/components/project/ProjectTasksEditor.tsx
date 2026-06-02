@@ -179,8 +179,8 @@ export function ProjectTasksEditor({
   };
 
   return (
-    <section className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
-      <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-4 py-3">
+    <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
+      <div className="flex items-center justify-between border-b border-[#dedbd6] bg-[#f1eee9] px-4 py-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-[#24292f]">
           <ListChecks className="h-4 w-4 text-[#57606a]" strokeWidth={1.8} />
           Tâches
@@ -190,7 +190,7 @@ export function ProjectTasksEditor({
         </span>
       </div>
 
-      <div className="border-b border-[#d8dee4] p-4">
+      <div className="border-b border-[#dedbd6] p-4">
         <div className="space-y-3">
           <input
             value={taskForm.title}
