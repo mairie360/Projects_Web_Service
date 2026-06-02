@@ -284,7 +284,7 @@ function CompactMultiSelect({
         onClick={() => setOpen((current) => !current)}
       >
         <span className={selectedOptions.length > 0 ? 'truncate' : 'truncate text-[#6e7781]'}>
-          {selectedOptions.length > 0 ? `${selectedOptions.length} étiquette(s)` : label}
+          {selectedOptions.length > 0 ? `${selectedOptions.length} sélectionné(s)` : label}
         </span>
         <Tag className="h-3.5 w-3.5 shrink-0 text-[#57606a]" strokeWidth={1.8} />
       </button>
@@ -347,6 +347,11 @@ function RecentTasks({ tasks }: { tasks?: ProjectTask[] }) {
                 strokeWidth={1.8}
               />
               <span className="min-w-0 flex-1 truncate text-[#24292f]">{task.title}</span>
+              <span className="flex shrink-0 -space-x-1">
+                {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 2).map((assignee) => (
+                  <PersonAvatar key={assignee.name} name={assignee.name} />
+                ))}
+              </span>
               <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#57606a]">
                 {statusMeta[task.status].label}
               </span>
@@ -373,7 +378,7 @@ function TaskComposer({
   const [title, setTitle] = React.useState('');
   const [status, setStatus] = React.useState<Project['status']>(project.status);
   const [priority, setPriority] = React.useState<Project['priority']>(project.priority);
-  const [responsible, setResponsible] = React.useState(project.responsible.name);
+  const [assignees, setAssignees] = React.useState<string[]>([project.responsible.name]);
   const [labels, setLabels] = React.useState<string[]>([]);
   const [dueDate, setDueDate] = React.useState(project.dueDate);
   const [error, setError] = React.useState('');
@@ -383,7 +388,7 @@ function TaskComposer({
       setTitle('');
       setStatus(project.status);
       setPriority(project.priority);
-      setResponsible(project.responsible.name);
+      setAssignees([project.responsible.name]);
       setLabels([]);
       setDueDate(project.dueDate);
       setError('');
@@ -393,7 +398,7 @@ function TaskComposer({
   React.useEffect(() => {
     setStatus(project.status);
     setPriority(project.priority);
-    setResponsible(project.responsible.name);
+    setAssignees([project.responsible.name]);
     setDueDate(project.dueDate);
   }, [project.dueDate, project.priority, project.responsible.name, project.status]);
 
@@ -413,10 +418,13 @@ function TaskComposer({
       return;
     }
 
+    const assigneeNames = Array.from(new Set((assignees.length > 0 ? assignees : [project.responsible.name]).filter(Boolean)));
+
     onAddTask(project, {
       title: trimmedTitle,
       status,
-      responsible: { name: responsible || project.responsible.name },
+      responsible: { name: assigneeNames[0] || project.responsible.name },
+      assignees: assigneeNames.map((name) => ({ name })),
       priority,
       labels,
       dueDate,
@@ -490,14 +498,11 @@ function TaskComposer({
           <option value="medium">Moyenne</option>
           <option value="low">Basse</option>
         </select>
-        <select value={responsible} className={compactFieldClassName} onChange={(event) => setResponsible(event.target.value)}>
-          {availableMembers.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
         <input type="date" value={dueDate} className={compactFieldClassName} onChange={(event) => setDueDate(event.target.value)} />
+      </div>
+
+      <div className="mt-2">
+        <CompactMultiSelect label="Assignés" values={assignees} options={availableMembers} onChange={setAssignees} />
       </div>
 
       <div className="mt-2">

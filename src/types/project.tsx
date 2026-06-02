@@ -11,6 +11,10 @@ export interface ProjectTask {
     name: string;
     avatar?: string;
   };
+  assignees: {
+    name: string;
+    avatar?: string;
+  }[];
   priority: ProjectPriority;
   labels: string[];
   dueDate: string;

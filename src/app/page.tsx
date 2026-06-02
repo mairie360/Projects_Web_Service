@@ -58,7 +58,7 @@ type TaskFormState = {
   title: string;
   status: Project['status'];
   priority: Project['priority'];
-  responsible: string;
+  assignees: string[];
   labels: string[];
   dueDate: string;
 };
@@ -169,7 +169,7 @@ function createTaskFormState(project: Project): TaskFormState {
     title: '',
     status: project.status,
     priority: project.priority,
-    responsible: project.responsible.name,
+    assignees: [project.responsible.name],
     labels: [],
     dueDate: project.dueDate,
   };
@@ -187,6 +187,7 @@ function createInitialTaskItems(project: Project): ProjectTask[] {
       title: generatedTaskTitles[index % generatedTaskTitles.length],
       status: completed ? 'done' : project.status === 'done' ? 'todo' : project.status,
       responsible: { name: assignee.name },
+      assignees: [{ name: assignee.name }],
       priority: project.priority,
       labels: project.labels.slice(0, Math.min(project.labels.length, 2)),
       dueDate: project.dueDate,
@@ -510,9 +511,24 @@ function createTaskFormStateFromProjectForm(form: ProjectFormState, memberOption
     title: '',
     status: form.status,
     priority: form.priority,
-    responsible: form.responsible || memberOptions[0]?.value || '',
+    assignees: form.responsible ? [form.responsible] : memberOptions[0]?.value ? [memberOptions[0].value] : [],
     labels: [],
     dueDate: form.dueDate,
+  };
+}
+
+function taskToFormState(task: ProjectTask): TaskFormState {
+  const assigneeNames = task.assignees?.length
+    ? task.assignees.map((assignee) => assignee.name)
+    : [task.responsible.name];
+
+  return {
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    assignees: getUniqueValues(assigneeNames),
+    labels: task.labels,
+    dueDate: task.dueDate,
   };
 }
 
@@ -530,15 +546,22 @@ function ProjectTasksEditor({
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() =>
     createTaskFormStateFromProjectForm(form, memberOptions)
   );
+  const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
-  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
   React.useEffect(() => {
     setTaskForm((current) => ({
       ...current,
       status: current.title ? current.status : form.status,
       priority: current.title ? current.priority : form.priority,
-      responsible: current.responsible || form.responsible || memberOptions[0]?.value || '',
+      assignees:
+        current.assignees.length > 0
+          ? current.assignees
+          : form.responsible
+            ? [form.responsible]
+            : memberOptions[0]?.value
+              ? [memberOptions[0].value]
+              : [],
       dueDate: current.dueDate || form.dueDate,
     }));
   }, [form.dueDate, form.priority, form.responsible, form.status, memberOptions]);
@@ -552,19 +575,23 @@ function ProjectTasksEditor({
     onChange(createTaskSummaryPatch(taskItems));
   };
 
-  const addTask = () => {
+  const saveTask = () => {
     const title = taskForm.title.trim();
     if (!title) {
       setTaskFormError('Le titre de la tâche est obligatoire.');
       return;
     }
 
-    const responsibleName = taskForm.responsible || form.responsible || memberOptions[0]?.value || 'Non assigné';
+    const assigneeNames = getUniqueValues(
+      taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible || memberOptions[0]?.value || 'Non assigné']
+    );
+    const responsibleName = assigneeNames[0] || 'Non assigné';
     const task: ProjectTask = {
-      id: `task-${Date.now()}`,
+      id: editingTaskId ?? `task-${Date.now()}`,
       title,
       status: taskForm.status,
       responsible: { name: responsibleName },
+      assignees: assigneeNames.map((name) => ({ name })),
       priority: taskForm.priority,
       labels: taskForm.labels,
       dueDate: taskForm.dueDate,
@@ -572,12 +599,32 @@ function ProjectTasksEditor({
       createdAt: formatInputDate(new Date()),
     };
 
-    updateTasks([...form.taskItems, task]);
+    updateTasks(
+      editingTaskId
+        ? form.taskItems.map((currentTask) =>
+            currentTask.id === editingTaskId ? { ...task, createdAt: currentTask.createdAt } : currentTask
+          )
+        : [...form.taskItems, task]
+    );
     setTaskForm({
       ...taskForm,
       title: '',
+      assignees: form.responsible ? [form.responsible] : memberOptions[0]?.value ? [memberOptions[0].value] : [],
       labels: [],
     });
+    setEditingTaskId(null);
+    setTaskFormError('');
+  };
+
+  const editTask = (task: ProjectTask) => {
+    setEditingTaskId(task.id);
+    setTaskForm(taskToFormState(task));
+    setTaskFormError('');
+  };
+
+  const cancelTaskEdit = () => {
+    setEditingTaskId(null);
+    setTaskForm(createTaskFormStateFromProjectForm(form, memberOptions));
     setTaskFormError('');
   };
 
@@ -619,7 +666,7 @@ function ProjectTasksEditor({
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                addTask();
+                saveTask();
               }
             }}
           />
@@ -641,13 +688,6 @@ function ProjectTasksEditor({
               options={projectPriorityOptions}
               onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
             />
-            <SelectField
-              id="project-form-task-responsible"
-              label="Assigné"
-              value={taskForm.responsible}
-              options={responsibleOptions}
-              onChange={(responsible) => updateTaskForm({ responsible })}
-            />
             <div>
               <FieldLabel htmlFor="project-form-task-due-date" label="Échéance" />
               <input
@@ -661,6 +701,15 @@ function ProjectTasksEditor({
           </div>
 
           <MultiSelectField
+            id="project-form-task-assignees"
+            label="Assignés"
+            values={taskForm.assignees}
+            options={memberOptions}
+            placeholder="Choisir un ou plusieurs assignés"
+            onChange={(assignees) => updateTaskForm({ assignees })}
+          />
+
+          <MultiSelectField
             id="project-form-task-labels"
             label="Étiquettes"
             values={taskForm.labels}
@@ -669,12 +718,20 @@ function ProjectTasksEditor({
             onChange={(labels) => updateTaskForm({ labels })}
           />
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {editingTaskId && (
+              <Button
+                label="Annuler"
+                type="button"
+                onClick={cancelTaskEdit}
+                className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
+              />
+            )}
             <Button
-              label="Ajouter la tâche"
+              label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
               type="button"
               primary
-              onClick={addTask}
+              onClick={saveTask}
               className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
             />
           </div>
@@ -707,8 +764,12 @@ function ProjectTasksEditor({
                     <StatusPill status={task.status} />
                     <PriorityPill priority={task.priority} />
                     <span className="inline-flex items-center gap-1">
-                      <PersonAvatar name={task.responsible.name} />
-                      {task.responsible.name}
+                      {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 3).map((assignee) => (
+                        <PersonAvatar key={assignee.name} name={assignee.name} />
+                      ))}
+                      {(task.assignees?.length ? task.assignees : [task.responsible]).length > 3 && (
+                        <span>+{(task.assignees?.length ? task.assignees : [task.responsible]).length - 3}</span>
+                      )}
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -722,6 +783,13 @@ function ProjectTasksEditor({
                         {label}
                       </span>
                     ))}
+                    <button
+                      type="button"
+                      className="inline-flex h-6 items-center rounded-md border border-[#d0d7de] bg-white px-2 text-[11px] font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
+                      onClick={() => editTask(task)}
+                    >
+                      Modifier
+                    </button>
                   </div>
                 </div>
               </article>
@@ -928,6 +996,7 @@ function ProjectDetailModal({
   onClose,
   onUpdateProject,
   onAddTask,
+  onUpdateTask,
   onToggleTask,
 }: {
   project: Project;
@@ -937,12 +1006,14 @@ function ProjectDetailModal({
   onClose: () => void;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void;
+  onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void;
   onToggleTask: (projectId: string, taskId: string) => void;
 }) {
   const [editingProject, setEditingProject] = React.useState(false);
   const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [projectEditError, setProjectEditError] = React.useState('');
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
+  const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
@@ -951,6 +1022,7 @@ function ProjectDetailModal({
     setProjectEditError('');
     setEditingProject(false);
     setTaskForm(createTaskFormState(project));
+    setEditingTaskId(null);
     setTaskFormError('');
   }, [project]);
 
@@ -990,15 +1062,39 @@ function ProjectDetailModal({
       return;
     }
 
-    onAddTask(project, {
+    const assigneeNames = getUniqueValues(
+      taskForm.assignees.length > 0 ? taskForm.assignees : [project.responsible.name]
+    );
+    const taskDraft: ProjectTaskDraft = {
       title,
       status: taskForm.status,
-      responsible: { name: taskForm.responsible || project.responsible.name },
+      responsible: { name: assigneeNames[0] || project.responsible.name },
+      assignees: assigneeNames.map((name) => ({ name })),
       priority: taskForm.priority,
       labels: taskForm.labels,
       dueDate: taskForm.dueDate,
-    });
+    };
+
+    if (editingTaskId) {
+      onUpdateTask(project.id, editingTaskId, taskDraft);
+    } else {
+      onAddTask(project, taskDraft);
+    }
     setTaskForm(createTaskFormState(project));
+    setEditingTaskId(null);
+    setTaskFormError('');
+  };
+
+  const editTask = (task: ProjectTask) => {
+    setTaskForm(taskToFormState(task));
+    setEditingTaskId(task.id);
+    setTaskFormError('');
+  };
+
+  const cancelTaskEdit = () => {
+    setTaskForm(createTaskFormState(project));
+    setEditingTaskId(null);
+    setTaskFormError('');
   };
 
   return (
@@ -1051,7 +1147,7 @@ function ProjectDetailModal({
 
                   {taskFormError && <p className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
 
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <SelectField
                       id="detail-task-status"
                       label="Statut"
@@ -1066,13 +1162,6 @@ function ProjectDetailModal({
                       options={projectPriorityOptions}
                       onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
                     />
-                    <SelectField
-                      id="detail-task-responsible"
-                      label="Assigné"
-                      value={taskForm.responsible}
-                      options={responsibleOptions}
-                      onChange={(responsible) => updateTaskForm({ responsible })}
-                    />
                     <div>
                       <FieldLabel htmlFor="detail-task-due-date" label="Échéance" />
                       <input
@@ -1086,6 +1175,15 @@ function ProjectDetailModal({
                   </div>
 
                   <MultiSelectField
+                    id="detail-task-assignees"
+                    label="Assignés"
+                    values={taskForm.assignees}
+                    options={memberOptions}
+                    placeholder="Choisir un ou plusieurs assignés"
+                    onChange={(assignees) => updateTaskForm({ assignees })}
+                  />
+
+                  <MultiSelectField
                     id="detail-task-labels"
                     label="Étiquettes"
                     values={taskForm.labels}
@@ -1094,9 +1192,17 @@ function ProjectDetailModal({
                     onChange={(labels) => updateTaskForm({ labels })}
                   />
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    {editingTaskId && (
+                      <Button
+                        label="Annuler"
+                        type="button"
+                        onClick={cancelTaskEdit}
+                        className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
+                      />
+                    )}
                     <Button
-                      label="Ajouter la tâche"
+                      label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
                       primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
@@ -1142,8 +1248,12 @@ function ProjectDetailModal({
                               <StatusPill status={task.status} />
                               <PriorityPill priority={task.priority} />
                               <span className="inline-flex items-center gap-1">
-                                <PersonAvatar name={task.responsible.name} />
-                                {task.responsible.name}
+                                {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 3).map((assignee) => (
+                                  <PersonAvatar key={assignee.name} name={assignee.name} />
+                                ))}
+                                {(task.assignees?.length ? task.assignees : [task.responsible]).length > 3 && (
+                                  <span>+{(task.assignees?.length ? task.assignees : [task.responsible]).length - 3}</span>
+                                )}
                               </span>
                               <span className="inline-flex items-center gap-1">
                                 <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -1157,6 +1267,13 @@ function ProjectDetailModal({
                                   {label}
                                 </span>
                               ))}
+                              <button
+                                type="button"
+                                className="inline-flex h-6 items-center rounded-md border border-[#d0d7de] bg-white px-2 text-[11px] font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
+                                onClick={() => editTask(task)}
+                              >
+                                Modifier
+                              </button>
                             </div>
                           </div>
                         </article>
@@ -1638,10 +1755,6 @@ export default function ProjectsPage() {
     setAlert({ type: 'info', message });
   };
 
-  const showProject = (project: Project) => {
-    setSelectedProjectId(project.id);
-  };
-
   const openCreateProject = (status: Project['status'] = 'todo') => {
     setProjectForm(createProjectFormState(status));
     setEditingProjectId(null);
@@ -1716,6 +1829,7 @@ export default function ProjectsPage() {
     const taskItems = projectForm.taskItems.map((task) => ({
       ...task,
       responsible: { ...task.responsible },
+      assignees: task.assignees.map((assignee) => ({ ...assignee })),
       labels: [...task.labels],
     }));
     const totalTasks = taskItems.length;
@@ -1777,6 +1891,7 @@ export default function ProjectsPage() {
         ...task,
         id: `task-${Date.now()}-${index}`,
         responsible: { ...task.responsible },
+        assignees: task.assignees.map((assignee) => ({ ...assignee })),
         labels: [...task.labels],
       })),
       tasks: { ...project.tasks },
@@ -1806,6 +1921,9 @@ export default function ProjectsPage() {
 
     const task: ProjectTask = {
       ...taskDraft,
+      responsible: { ...taskDraft.responsible },
+      assignees: taskDraft.assignees.map((assignee) => ({ ...assignee })),
+      labels: [...taskDraft.labels],
       title,
       id: `task-${Date.now()}`,
       completed: taskDraft.status === 'done',
@@ -1834,6 +1952,44 @@ export default function ProjectsPage() {
     );
 
     setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
+  };
+
+  const updateProjectTask = (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
+    const title = taskDraft.title.trim();
+    if (!title) return;
+
+    setProjects((currentProjects) =>
+      currentProjects.map((project) => {
+        if (project.id !== projectId) return project;
+
+        const taskItems = createInitialTaskItems(project).map((task) => {
+          if (task.id !== taskId) return task;
+
+          return {
+            ...task,
+            ...taskDraft,
+            title,
+            responsible: { ...taskDraft.responsible },
+            assignees: taskDraft.assignees.map((assignee) => ({ ...assignee })),
+            labels: [...taskDraft.labels],
+            completed: taskDraft.status === 'done',
+          };
+        });
+        const completedTasks = taskItems.filter((task) => task.completed).length;
+
+        return {
+          ...project,
+          taskItems,
+          progress: calculateProjectProgress(taskItems),
+          tasks: {
+            total: taskItems.length,
+            completed: completedTasks,
+          },
+        };
+      })
+    );
+
+    setAlert({ type: 'success', message: `Tâche "${title}" modifiée.` });
   };
 
   const toggleProjectTask = (projectId: string, taskId: string) => {
@@ -1878,6 +2034,7 @@ export default function ProjectsPage() {
           onClose={() => setSelectedProjectId(null)}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
+          onUpdateTask={updateProjectTask}
           onToggleTask={toggleProjectTask}
         />
       )}
@@ -1998,7 +2155,7 @@ export default function ProjectsPage() {
                     projects={filteredProjects}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
-                    onProjectOpen={showProject}
+                    onProjectOpen={openEditProject}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
@@ -2012,7 +2169,7 @@ export default function ProjectsPage() {
                     projects={filteredProjects}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
-                    onProjectOpen={showProject}
+                    onProjectOpen={openEditProject}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
@@ -2023,7 +2180,7 @@ export default function ProjectsPage() {
                 {viewMode === 'table' && (
                   <TableView
                     projects={filteredProjects}
-                    onProjectOpen={showProject}
+                    onProjectOpen={openEditProject}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
