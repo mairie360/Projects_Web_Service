@@ -3,14 +3,19 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Button, Footer, Header, Sidebar, ToolTip } from '@mairie360/lib-components';
 import {
+  CalendarDays,
   Check,
+  CheckSquare2,
   ChevronDown,
+  CircleDot,
   Grid3X3,
   Kanban,
   List,
+  ListChecks,
   Plus,
   Search,
   Settings,
+  Square,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -25,7 +30,7 @@ import {
   ProjectActionsMenu,
   StatusPill,
 } from '../components/ProjectCard';
-import { mockProjects, type Project } from '../types/project';
+import { mockProjects, type Project, type ProjectTask, type ProjectTaskDraft } from '../types/project';
 
 type ViewMode = 'kanban' | 'grid' | 'table';
 
@@ -46,6 +51,16 @@ type ProjectFormState = {
   progress: number;
   totalTasks: number;
   completedTasks: number;
+  taskItems: ProjectTask[];
+};
+
+type TaskFormState = {
+  title: string;
+  status: Project['status'];
+  priority: Project['priority'];
+  responsible: string;
+  labels: string[];
+  dueDate: string;
 };
 
 const statusOptions: FilterOption[] = [
@@ -104,6 +119,19 @@ function createSelectOptions(values: string[]): FilterOption[] {
   return getUniqueValues(values).map((value) => ({ label: value, value }));
 }
 
+const generatedTaskTitles = [
+  'Cadrer le besoin avec les services',
+  'Préparer le dossier administratif',
+  'Valider le budget prévisionnel',
+  'Consulter les prestataires',
+  'Planifier les interventions',
+  'Informer les habitants',
+  'Contrôler les livrables',
+  'Rédiger le compte rendu',
+  'Mettre à jour le planning',
+  'Archiver les documents',
+];
+
 function formatInputDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -130,9 +158,48 @@ function createProjectFormState(status: Project['status'] = 'todo'): ProjectForm
     labels: [],
     dueDate: getDateWithOffset(30),
     progress: 0,
-    totalTasks: 1,
+    totalTasks: 0,
     completedTasks: 0,
+    taskItems: [],
   };
+}
+
+function createTaskFormState(project: Project): TaskFormState {
+  return {
+    title: '',
+    status: project.status,
+    priority: project.priority,
+    responsible: project.responsible.name,
+    labels: [],
+    dueDate: project.dueDate,
+  };
+}
+
+function createInitialTaskItems(project: Project): ProjectTask[] {
+  if (project.taskItems) return project.taskItems;
+
+  return Array.from({ length: project.tasks.total }, (_, index) => {
+    const completed = index < project.tasks.completed;
+    const assignee = project.assignees[index % Math.max(project.assignees.length, 1)] ?? project.responsible;
+
+    return {
+      id: `${project.id}-task-${index + 1}`,
+      title: generatedTaskTitles[index % generatedTaskTitles.length],
+      status: completed ? 'done' : project.status === 'done' ? 'todo' : project.status,
+      responsible: { name: assignee.name },
+      priority: project.priority,
+      labels: project.labels.slice(0, Math.min(project.labels.length, 2)),
+      dueDate: project.dueDate,
+      completed,
+      createdAt: project.createdAt,
+    };
+  });
+}
+
+function calculateProjectProgress(tasks: ProjectTask[]) {
+  if (tasks.length === 0) return 0;
+
+  return Math.round((tasks.filter((task) => task.completed).length / tasks.length) * 100);
 }
 
 function projectToFormState(project: Project): ProjectFormState {
@@ -151,6 +218,7 @@ function projectToFormState(project: Project): ProjectFormState {
     progress: project.progress,
     totalTasks: project.tasks.total,
     completedTasks: project.tasks.completed,
+    taskItems: createInitialTaskItems(project),
   };
 }
 
@@ -426,34 +494,242 @@ function MultiSelectField({
   );
 }
 
-function NumberField({
-  id,
-  label,
-  value,
-  min,
-  max,
+function createTaskSummaryPatch(taskItems: ProjectTask[]): Pick<ProjectFormState, 'taskItems' | 'totalTasks' | 'completedTasks' | 'progress'> {
+  const completedTasks = taskItems.filter((task) => task.completed).length;
+
+  return {
+    taskItems,
+    totalTasks: taskItems.length,
+    completedTasks,
+    progress: calculateProjectProgress(taskItems),
+  };
+}
+
+function createTaskFormStateFromProjectForm(form: ProjectFormState, memberOptions: FilterOption[]): TaskFormState {
+  return {
+    title: '',
+    status: form.status,
+    priority: form.priority,
+    responsible: form.responsible || memberOptions[0]?.value || '',
+    labels: [],
+    dueDate: form.dueDate,
+  };
+}
+
+function ProjectTasksEditor({
+  form,
+  memberOptions,
+  labelOptions,
   onChange,
 }: {
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
+  form: ProjectFormState;
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
+  onChange: (patch: Partial<ProjectFormState>) => void;
 }) {
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() =>
+    createTaskFormStateFromProjectForm(form, memberOptions)
+  );
+  const [taskFormError, setTaskFormError] = React.useState('');
+  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
+
+  React.useEffect(() => {
+    setTaskForm((current) => ({
+      ...current,
+      status: current.title ? current.status : form.status,
+      priority: current.title ? current.priority : form.priority,
+      responsible: current.responsible || form.responsible || memberOptions[0]?.value || '',
+      dueDate: current.dueDate || form.dueDate,
+    }));
+  }, [form.dueDate, form.priority, form.responsible, form.status, memberOptions]);
+
+  const updateTaskForm = (patch: Partial<TaskFormState>) => {
+    setTaskForm((current) => ({ ...current, ...patch }));
+    if (taskFormError) setTaskFormError('');
+  };
+
+  const updateTasks = (taskItems: ProjectTask[]) => {
+    onChange(createTaskSummaryPatch(taskItems));
+  };
+
+  const addTask = () => {
+    const title = taskForm.title.trim();
+    if (!title) {
+      setTaskFormError('Le titre de la tâche est obligatoire.');
+      return;
+    }
+
+    const responsibleName = taskForm.responsible || form.responsible || memberOptions[0]?.value || 'Non assigné';
+    const task: ProjectTask = {
+      id: `task-${Date.now()}`,
+      title,
+      status: taskForm.status,
+      responsible: { name: responsibleName },
+      priority: taskForm.priority,
+      labels: taskForm.labels,
+      dueDate: taskForm.dueDate,
+      completed: taskForm.status === 'done',
+      createdAt: formatInputDate(new Date()),
+    };
+
+    updateTasks([...form.taskItems, task]);
+    setTaskForm({
+      ...taskForm,
+      title: '',
+      labels: [],
+    });
+    setTaskFormError('');
+  };
+
+  const toggleTask = (taskId: string) => {
+    updateTasks(
+      form.taskItems.map((task) => {
+        if (task.id !== taskId) return task;
+
+        const completed = !task.completed;
+
+        return {
+          ...task,
+          completed,
+          status: (completed ? 'done' : 'todo') as Project['status'],
+        };
+      })
+    );
+  };
+
   return (
-    <div>
-      <FieldLabel htmlFor={id} label={label} />
-      <input
-        id={id}
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        className={fieldClassName}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </div>
+    <section className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
+      <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-4 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#24292f]">
+          <ListChecks className="h-4 w-4 text-[#57606a]" strokeWidth={1.8} />
+          Tâches
+        </div>
+        <span className="text-xs font-medium text-[#57606a]">
+          {form.completedTasks}/{form.totalTasks}
+        </span>
+      </div>
+
+      <div className="border-b border-[#d8dee4] p-4">
+        <div className="space-y-3">
+          <input
+            value={taskForm.title}
+            placeholder="Ajouter une tâche..."
+            className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
+            onChange={(event) => updateTaskForm({ title: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addTask();
+              }
+            }}
+          />
+
+          {taskFormError && <p className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <SelectField
+              id="project-form-task-status"
+              label="Statut"
+              value={taskForm.status}
+              options={projectStatusOptions}
+              onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
+            />
+            <SelectField
+              id="project-form-task-priority"
+              label="Priorité"
+              value={taskForm.priority}
+              options={projectPriorityOptions}
+              onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
+            />
+            <SelectField
+              id="project-form-task-responsible"
+              label="Assigné"
+              value={taskForm.responsible}
+              options={responsibleOptions}
+              onChange={(responsible) => updateTaskForm({ responsible })}
+            />
+            <div>
+              <FieldLabel htmlFor="project-form-task-due-date" label="Échéance" />
+              <input
+                id="project-form-task-due-date"
+                type="date"
+                value={taskForm.dueDate}
+                className={fieldClassName}
+                onChange={(event) => updateTaskForm({ dueDate: event.target.value })}
+              />
+            </div>
+          </div>
+
+          <MultiSelectField
+            id="project-form-task-labels"
+            label="Étiquettes"
+            values={taskForm.labels}
+            options={labelOptions}
+            placeholder="Choisir une ou plusieurs étiquettes"
+            onChange={(labels) => updateTaskForm({ labels })}
+          />
+
+          <div className="flex justify-end">
+            <Button
+              label="Ajouter la tâche"
+              type="button"
+              primary
+              onClick={addTask}
+              className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {form.taskItems.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-[#57606a]">Aucune tâche pour ce projet.</div>
+      ) : (
+        <div className="divide-y divide-[#d8dee4]">
+          {form.taskItems.map((task) => {
+            const TaskIcon = task.completed ? CheckSquare2 : Square;
+
+            return (
+              <article key={task.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#0969da] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
+                  aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
+                  onClick={() => toggleTask(task.id)}
+                >
+                  <TaskIcon
+                    className={`h-4 w-4 ${task.completed ? 'text-[#1a7f37]' : 'text-[#8c959f]'}`}
+                    strokeWidth={1.9}
+                  />
+                </button>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold leading-snug text-[#24292f]">{task.title}</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
+                    <StatusPill status={task.status} />
+                    <PriorityPill priority={task.priority} />
+                    <span className="inline-flex items-center gap-1">
+                      <PersonAvatar name={task.responsible.name} />
+                      {task.responsible.name}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
+                      {formatProjectDate(task.dueDate)}
+                    </span>
+                    {task.labels.map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex h-5 items-center rounded-full border border-[#d0d7de] bg-[#f6f8fa] px-2 text-[11px] font-semibold text-[#57606a]"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -482,7 +758,7 @@ function CreateProjectModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
       <form
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
         onSubmit={onSubmit}
       >
         <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-5 py-3">
@@ -536,6 +812,13 @@ function CreateProjectModal({
                   />
                 </div>
               </div>
+
+              <ProjectTasksEditor
+                form={form}
+                memberOptions={memberOptions}
+                labelOptions={labelOptions}
+                onChange={onChange}
+              />
             </section>
 
             <aside className="space-y-4 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-4">
@@ -599,32 +882,20 @@ function CreateProjectModal({
                 />
               </div>
 
-              <NumberField
-                id="project-progress"
-                label="Progression"
-                value={form.progress}
-                min={0}
-                max={100}
-                onChange={(progress) => onChange({ progress })}
-              />
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
+                <ProgressMeter value={form.progress} />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <NumberField
-                  id="project-completed-tasks"
-                  label="Terminées"
-                  value={form.completedTasks}
-                  min={0}
-                  max={999}
-                  onChange={(completedTasks) => onChange({ completedTasks })}
-                />
-                <NumberField
-                  id="project-total-tasks"
-                  label="Total"
-                  value={form.totalTasks}
-                  min={1}
-                  max={999}
-                  onChange={(totalTasks) => onChange({ totalTasks })}
-                />
+                <div className="rounded-md border border-[#d0d7de] bg-white px-3 py-2">
+                  <div className="text-xs font-semibold text-[#57606a]">Terminées</div>
+                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.completedTasks}</div>
+                </div>
+                <div className="rounded-md border border-[#d0d7de] bg-white px-3 py-2">
+                  <div className="text-xs font-semibold text-[#57606a]">Total</div>
+                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.totalTasks}</div>
+                </div>
               </div>
             </aside>
           </div>
@@ -645,6 +916,431 @@ function CreateProjectModal({
           />
         </div>
       </form>
+    </div>
+  );
+}
+
+function ProjectDetailModal({
+  project,
+  tasks,
+  memberOptions,
+  labelOptions,
+  onClose,
+  onUpdateProject,
+  onAddTask,
+  onToggleTask,
+}: {
+  project: Project;
+  tasks: ProjectTask[];
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
+  onClose: () => void;
+  onUpdateProject: (projectId: string, form: ProjectFormState) => void;
+  onAddTask: (project: Project, task: ProjectTaskDraft) => void;
+  onToggleTask: (projectId: string, taskId: string) => void;
+}) {
+  const [editingProject, setEditingProject] = React.useState(false);
+  const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
+  const [projectEditError, setProjectEditError] = React.useState('');
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
+  const [taskFormError, setTaskFormError] = React.useState('');
+  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
+
+  React.useEffect(() => {
+    setProjectEditForm(projectToFormState(project));
+    setProjectEditError('');
+    setEditingProject(false);
+    setTaskForm(createTaskFormState(project));
+    setTaskFormError('');
+  }, [project]);
+
+  const updateProjectEditForm = (patch: Partial<ProjectFormState>) => {
+    setProjectEditForm((current) => ({ ...current, ...patch }));
+    if (projectEditError) setProjectEditError('');
+  };
+
+  const updateTaskForm = (patch: Partial<TaskFormState>) => {
+    setTaskForm((current) => ({ ...current, ...patch }));
+    if (taskFormError) setTaskFormError('');
+  };
+
+  const submitProjectEdit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = projectEditForm.title.trim();
+    const description = projectEditForm.description.trim();
+    const responsibleName = projectEditForm.responsible.trim();
+    const dueDate = projectEditForm.dueDate;
+
+    if (!title || !description || !responsibleName || !dueDate) {
+      setProjectEditError('Les champs obligatoires doivent être renseignés.');
+      return;
+    }
+
+    onUpdateProject(project.id, projectEditForm);
+    setEditingProject(false);
+  };
+
+  const submitTask = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = taskForm.title.trim();
+    if (!title) {
+      setTaskFormError('Le titre de la tâche est obligatoire.');
+      return;
+    }
+
+    onAddTask(project, {
+      title,
+      status: taskForm.status,
+      responsible: { name: taskForm.responsible || project.responsible.name },
+      priority: taskForm.priority,
+      labels: taskForm.labels,
+      dueDate: taskForm.dueDate,
+    });
+    setTaskForm(createTaskFormState(project));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
+      <button type="button" aria-label="Fermer le projet" className="absolute inset-0" onClick={onClose} />
+
+      <section className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
+        <header className="flex items-start justify-between gap-4 border-b border-[#d8dee4] bg-[#f6f8fa] px-5 py-4">
+          <div className="min-w-0">
+            <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
+            <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
+              onClick={() => setEditingProject((current) => !current)}
+            >
+              {editingProject ? 'Annuler' : 'Modifier'}
+            </button>
+            <ToolTip text="Fermer">
+              <button
+                type="button"
+                aria-label="Fermer la fiche projet"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
+                onClick={onClose}
+              >
+                <X className="h-4 w-4" strokeWidth={2} />
+              </button>
+            </ToolTip>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <main className="min-w-0 border-r border-[#d8dee4] p-5">
+              <div className="mb-5 rounded-md border border-[#d0d7de] bg-white p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
+                  <CircleDot className="h-4 w-4 text-[#1a7f37]" strokeWidth={2} />
+                  Ajouter une tâche
+                </div>
+
+                <form className="space-y-3" onSubmit={submitTask}>
+                  <input
+                    value={taskForm.title}
+                    placeholder="Ajouter une tâche..."
+                    className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
+                    onChange={(event) => updateTaskForm({ title: event.target.value })}
+                  />
+
+                  {taskFormError && <p className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <SelectField
+                      id="detail-task-status"
+                      label="Statut"
+                      value={taskForm.status}
+                      options={projectStatusOptions}
+                      onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
+                    />
+                    <SelectField
+                      id="detail-task-priority"
+                      label="Priorité"
+                      value={taskForm.priority}
+                      options={projectPriorityOptions}
+                      onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
+                    />
+                    <SelectField
+                      id="detail-task-responsible"
+                      label="Assigné"
+                      value={taskForm.responsible}
+                      options={responsibleOptions}
+                      onChange={(responsible) => updateTaskForm({ responsible })}
+                    />
+                    <div>
+                      <FieldLabel htmlFor="detail-task-due-date" label="Échéance" />
+                      <input
+                        id="detail-task-due-date"
+                        type="date"
+                        value={taskForm.dueDate}
+                        className={fieldClassName}
+                        onChange={(event) => updateTaskForm({ dueDate: event.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <MultiSelectField
+                    id="detail-task-labels"
+                    label="Étiquettes"
+                    values={taskForm.labels}
+                    options={labelOptions}
+                    placeholder="Choisir une ou plusieurs étiquettes"
+                    onChange={(labels) => updateTaskForm({ labels })}
+                  />
+
+                  <div className="flex justify-end">
+                    <Button
+                      label="Ajouter la tâche"
+                      type="submit"
+                      primary
+                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+                    />
+                  </div>
+                </form>
+              </div>
+
+              <section className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
+                <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#24292f]">
+                    <ListChecks className="h-4 w-4 text-[#57606a]" strokeWidth={1.8} />
+                    Tâches
+                  </div>
+                  <span className="text-xs font-medium text-[#57606a]">
+                    {project.tasks.completed}/{project.tasks.total}
+                  </span>
+                </div>
+
+                {tasks.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-sm text-[#57606a]">Aucune tâche pour ce projet.</div>
+                ) : (
+                  <div className="divide-y divide-[#d8dee4]">
+                    {tasks.map((task) => {
+                      const TaskIcon = task.completed ? CheckSquare2 : Square;
+
+                      return (
+                        <article key={task.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
+                          <button
+                            type="button"
+                            className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#0969da] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
+                            aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
+                            onClick={() => onToggleTask(project.id, task.id)}
+                          >
+                            <TaskIcon
+                              className={`h-4 w-4 ${task.completed ? 'text-[#1a7f37]' : 'text-[#8c959f]'}`}
+                              strokeWidth={1.9}
+                            />
+                          </button>
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-semibold leading-snug text-[#24292f]">{task.title}</h3>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
+                              <StatusPill status={task.status} />
+                              <PriorityPill priority={task.priority} />
+                              <span className="inline-flex items-center gap-1">
+                                <PersonAvatar name={task.responsible.name} />
+                                {task.responsible.name}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
+                                {formatProjectDate(task.dueDate)}
+                              </span>
+                              {task.labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="inline-flex h-5 items-center rounded-full border border-[#d0d7de] bg-[#f6f8fa] px-2 text-[11px] font-semibold text-[#57606a]"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </main>
+
+            <aside className="bg-[#f6f8fa] p-5">
+              {editingProject ? (
+                <form className="space-y-4" onSubmit={submitProjectEdit}>
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#24292f]">Modifier le projet</h3>
+                    <p className="mt-1 text-xs text-[#57606a]">Les tâches restent visibles pendant l’édition.</p>
+                  </div>
+
+                  {projectEditError && (
+                    <div className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-3 py-2 text-xs font-medium text-[#cf222e]">
+                      {projectEditError}
+                    </div>
+                  )}
+
+                  <FormField
+                    id="detail-project-title"
+                    label="Titre"
+                    value={projectEditForm.title}
+                    required
+                    placeholder="Ajouter un titre..."
+                    onChange={(title) => updateProjectEditForm({ title })}
+                  />
+
+                  <TextAreaField
+                    id="detail-project-description"
+                    label="Description"
+                    value={projectEditForm.description}
+                    required
+                    placeholder="Ajouter une description..."
+                    onChange={(description) => updateProjectEditForm({ description })}
+                  />
+
+                  <SelectField
+                    id="detail-project-status"
+                    label="Statut"
+                    value={projectEditForm.status}
+                    options={projectStatusOptions}
+                    onChange={(status) => updateProjectEditForm({ status: status as Project['status'] })}
+                  />
+
+                  <SelectField
+                    id="detail-project-priority"
+                    label="Priorité"
+                    value={projectEditForm.priority}
+                    options={projectPriorityOptions}
+                    onChange={(priority) => updateProjectEditForm({ priority: priority as Project['priority'] })}
+                  />
+
+                  <SelectField
+                    id="detail-project-responsible"
+                    label="Assigné principal"
+                    value={projectEditForm.responsible}
+                    required
+                    options={responsibleOptions}
+                    onChange={(responsible) => updateProjectEditForm({ responsible })}
+                  />
+
+                  <MultiSelectField
+                    id="detail-project-assignees"
+                    label="Assignés"
+                    values={projectEditForm.assignees}
+                    options={memberOptions}
+                    placeholder="Choisir un ou plusieurs assignés"
+                    onChange={(assignees) => updateProjectEditForm({ assignees })}
+                  />
+
+                  <MultiSelectField
+                    id="detail-project-labels"
+                    label="Étiquettes"
+                    values={projectEditForm.labels}
+                    options={labelOptions}
+                    placeholder="Choisir une ou plusieurs étiquettes"
+                    onChange={(labels) => updateProjectEditForm({ labels })}
+                  />
+
+                  <div>
+                    <FieldLabel htmlFor="detail-project-due-date" label="Échéance" required />
+                    <input
+                      id="detail-project-due-date"
+                      type="date"
+                      value={projectEditForm.dueDate}
+                      required
+                      className={fieldClassName}
+                      onChange={(event) => updateProjectEditForm({ dueDate: event.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      label="Annuler"
+                      type="button"
+                      onClick={() => {
+                        setProjectEditForm(projectToFormState(project));
+                        setProjectEditError('');
+                        setEditingProject(false);
+                      }}
+                      className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
+                    />
+                    <Button
+                      label="Enregistrer"
+                      type="submit"
+                      primary
+                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+                    />
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-5">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#24292f]">Description</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[#57606a]">{project.description}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
+                    <ProgressMeter value={project.progress} />
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[#57606a]">Statut</span>
+                      <StatusPill status={project.status} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[#57606a]">Priorité</span>
+                      <PriorityPill priority={project.priority} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[#57606a]">Responsable</span>
+                      <span className="inline-flex min-w-0 items-center gap-2 font-medium text-[#24292f]">
+                        <PersonAvatar name={project.responsible.name} />
+                        <span className="truncate">{project.responsible.name}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[#57606a]">Échéance</span>
+                      <span className="font-medium text-[#24292f]">{formatProjectDate(project.dueDate)}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Assignés</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {project.assignees.map((assignee) => (
+                        <span
+                          key={assignee.name}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#d0d7de] bg-white px-2.5 py-1 text-xs font-medium text-[#24292f]"
+                        >
+                          <PersonAvatar name={assignee.name} />
+                          {assignee.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Étiquettes</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {project.labels.map((label) => (
+                        <span
+                          key={label}
+                          className="inline-flex h-6 items-center rounded-full border border-[#d0d7de] bg-white px-2.5 text-xs font-semibold text-[#57606a]"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -767,16 +1463,22 @@ function EmptyState() {
 
 function GridView({
   projects,
+  memberOptions,
+  labelOptions,
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
+  onProjectTaskAdd,
 }: {
   projects: Project[];
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  onProjectTaskAdd: (project: Project, task: ProjectTaskDraft) => void;
 }) {
   if (projects.length === 0) return <EmptyState />;
 
@@ -787,10 +1489,13 @@ function GridView({
           key={project.id}
           project={project}
           variant="grid"
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
           onOpen={onProjectOpen}
           onEdit={onProjectEdit}
           onDuplicate={onProjectDuplicate}
           onDelete={onProjectDelete}
+          onAddTask={onProjectTaskAdd}
         />
       ))}
     </div>
@@ -878,6 +1583,7 @@ function TableView({
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -907,6 +1613,11 @@ export default function ProjectsPage() {
     [projects]
   );
 
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  );
+
   const filteredProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -928,7 +1639,7 @@ export default function ProjectsPage() {
   };
 
   const showProject = (project: Project) => {
-    showInfo(`Projet : ${project.title}`);
+    setSelectedProjectId(project.id);
   };
 
   const openCreateProject = (status: Project['status'] = 'todo') => {
@@ -958,6 +1669,37 @@ export default function ProjectsPage() {
     if (projectFormError) setProjectFormError('');
   };
 
+  const updateProjectFromForm = (projectId: string, form: ProjectFormState) => {
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const responsibleName = form.responsible.trim();
+    const dueDate = form.dueDate;
+
+    if (!title || !description || !responsibleName || !dueDate) return;
+
+    const assigneeNames = getUniqueValues([responsibleName, ...form.assignees]);
+
+    setProjects((currentProjects) =>
+      currentProjects.map((project) => {
+        if (project.id !== projectId) return project;
+
+        return {
+          ...project,
+          title,
+          description,
+          status: form.status,
+          responsible: { name: responsibleName },
+          assignees: assigneeNames.map((name) => ({ name })),
+          dueDate,
+          priority: form.priority,
+          labels: getUniqueValues(form.labels),
+        };
+      })
+    );
+
+    setAlert({ type: 'success', message: `Projet "${title}" modifié.` });
+  };
+
   const saveProject = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -971,9 +1713,14 @@ export default function ProjectsPage() {
       return;
     }
 
-    const totalTasks = Math.max(1, Math.round(Number(projectForm.totalTasks) || 1));
-    const completedTasks = Math.min(totalTasks, Math.max(0, Math.round(Number(projectForm.completedTasks) || 0)));
-    const progress = Math.max(0, Math.min(100, Math.round(Number(projectForm.progress) || 0)));
+    const taskItems = projectForm.taskItems.map((task) => ({
+      ...task,
+      responsible: { ...task.responsible },
+      labels: [...task.labels],
+    }));
+    const totalTasks = taskItems.length;
+    const completedTasks = taskItems.filter((task) => task.completed).length;
+    const progress = calculateProjectProgress(taskItems);
     const assigneeNames = getUniqueValues([responsibleName, ...projectForm.assignees]);
 
     const projectFields = {
@@ -986,6 +1733,7 @@ export default function ProjectsPage() {
       dueDate,
       priority: projectForm.priority,
       labels: getUniqueValues(projectForm.labels),
+      taskItems,
       tasks: {
         total: totalTasks,
         completed: completedTasks,
@@ -1009,6 +1757,7 @@ export default function ProjectsPage() {
     };
 
     setProjects((currentProjects) => [newProject, ...currentProjects]);
+    setSelectedProjectId(newProject.id);
     setSearchTerm('');
     setStatusFilter('all');
     setPriorityFilter('all');
@@ -1024,6 +1773,12 @@ export default function ProjectsPage() {
       responsible: { ...project.responsible },
       assignees: project.assignees.map((assignee) => ({ ...assignee })),
       labels: [...project.labels],
+      taskItems: project.taskItems?.map((task, index) => ({
+        ...task,
+        id: `task-${Date.now()}-${index}`,
+        responsible: { ...task.responsible },
+        labels: [...task.labels],
+      })),
       tasks: { ...project.tasks },
       createdAt: formatInputDate(new Date()),
     };
@@ -1040,12 +1795,93 @@ export default function ProjectsPage() {
     if (!confirmed) return;
 
     setProjects((currentProjects) => currentProjects.filter((currentProject) => currentProject.id !== project.id));
+    if (selectedProjectId === project.id) setSelectedProjectId(null);
     if (editingProjectId === project.id) closeCreateProject();
     setAlert({ type: 'success', message: `Projet "${project.title}" supprimé.` });
   };
 
+  const addProjectTask = (project: Project, taskDraft: ProjectTaskDraft) => {
+    const title = taskDraft.title.trim();
+    if (!title) return;
+
+    const task: ProjectTask = {
+      ...taskDraft,
+      title,
+      id: `task-${Date.now()}`,
+      completed: taskDraft.status === 'done',
+      createdAt: formatInputDate(new Date()),
+    };
+
+    setProjects((currentProjects) =>
+      currentProjects.map((currentProject) => {
+        if (currentProject.id !== project.id) return currentProject;
+
+        const taskItems = [...createInitialTaskItems(currentProject), task];
+        const completedTasks = taskItems.filter((projectTask) => projectTask.completed).length;
+        const totalTasks = taskItems.length;
+        const progress = calculateProjectProgress(taskItems);
+
+        return {
+          ...currentProject,
+          taskItems,
+          tasks: {
+            total: totalTasks,
+            completed: completedTasks,
+          },
+          progress,
+        };
+      })
+    );
+
+    setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
+  };
+
+  const toggleProjectTask = (projectId: string, taskId: string) => {
+    setProjects((currentProjects) =>
+      currentProjects.map((project) => {
+        if (project.id !== projectId) return project;
+
+        const taskItems = createInitialTaskItems(project).map((task) => {
+          if (task.id !== taskId) return task;
+
+          const completed = !task.completed;
+
+          return {
+            ...task,
+            completed,
+            status: (completed ? 'done' : 'todo') as Project['status'],
+          };
+        });
+        const completedTasks = taskItems.filter((task) => task.completed).length;
+
+        return {
+          ...project,
+          taskItems,
+          progress: calculateProjectProgress(taskItems),
+          tasks: {
+            total: taskItems.length,
+            completed: completedTasks,
+          },
+        };
+      })
+    );
+  };
+
   return (
     <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
+      {selectedProject && (
+        <ProjectDetailModal
+          project={selectedProject}
+          tasks={createInitialTaskItems(selectedProject)}
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
+          onClose={() => setSelectedProjectId(null)}
+          onUpdateProject={updateProjectFromForm}
+          onAddTask={addProjectTask}
+          onToggleTask={toggleProjectTask}
+        />
+      )}
+
       {createProjectOpen && (
         <CreateProjectModal
           mode={editingProjectId ? 'edit' : 'create'}
@@ -1160,10 +1996,13 @@ export default function ProjectsPage() {
                 {viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
+                    memberOptions={memberOptions}
+                    labelOptions={labelOptions}
                     onProjectOpen={showProject}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
+                    onProjectTaskAdd={addProjectTask}
                     onAddProject={openCreateProject}
                   />
                 )}
@@ -1171,10 +2010,13 @@ export default function ProjectsPage() {
                 {viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
+                    memberOptions={memberOptions}
+                    labelOptions={labelOptions}
                     onProjectOpen={showProject}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
+                    onProjectTaskAdd={addProjectTask}
                   />
                 )}
 

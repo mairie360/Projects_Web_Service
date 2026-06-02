@@ -1,10 +1,30 @@
 import { AlertCircle, CheckCircle2, Clock, Eye } from 'lucide-react';
 
+export type ProjectStatus = 'todo' | 'in-progress' | 'review' | 'done';
+export type ProjectPriority = 'high' | 'medium' | 'low';
+
+export interface ProjectTask {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  responsible: {
+    name: string;
+    avatar?: string;
+  };
+  priority: ProjectPriority;
+  labels: string[];
+  dueDate: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export type ProjectTaskDraft = Omit<ProjectTask, 'id' | 'completed' | 'createdAt'>;
+
 export interface Project {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in-progress' | 'review' | 'done';
+  status: ProjectStatus;
   responsible: {
     name: string;
     avatar?: string;
@@ -15,8 +35,9 @@ export interface Project {
   }[];
   progress: number;
   dueDate: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: ProjectPriority;
   labels: string[];
+  taskItems?: ProjectTask[];
   tasks: {
     total: number;
     completed: number;

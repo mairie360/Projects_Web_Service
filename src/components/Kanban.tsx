@@ -6,14 +6,22 @@ import { AlertCircle, CheckCircle2, Clock3, Eye, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { ProjectCard } from './ProjectCard';
-import type { Project } from '../types/project';
+import type { Project, ProjectTaskDraft } from '../types/project';
+
+type SelectOption = {
+  label: string;
+  value: string;
+};
 
 type KanbanBoardProps = {
   projects: Project[];
+  memberOptions?: SelectOption[];
+  labelOptions?: SelectOption[];
   onProjectOpen?: (project: Project) => void;
   onProjectEdit?: (project: Project) => void;
   onProjectDuplicate?: (project: Project) => void;
   onProjectDelete?: (project: Project) => void;
+  onProjectTaskAdd?: (project: Project, task: ProjectTaskDraft) => void;
   onAddProject?: (status: Project['status']) => void;
 };
 
@@ -33,10 +41,13 @@ const columns: KanbanColumnConfig[] = [
 
 export function KanbanBoard({
   projects,
+  memberOptions,
+  labelOptions,
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
+  onProjectTaskAdd,
   onAddProject,
 }: KanbanBoardProps) {
   return (
@@ -72,10 +83,13 @@ export function KanbanBoard({
                 <ProjectCard
                   key={project.id}
                   project={project}
+                  memberOptions={memberOptions}
+                  labelOptions={labelOptions}
                   onOpen={onProjectOpen}
                   onEdit={onProjectEdit}
                   onDuplicate={onProjectDuplicate}
                   onDelete={onProjectDelete}
+                  onAddTask={onProjectTaskAdd}
                   variant="kanban"
                 />
               ))}
