@@ -1,70 +1,77 @@
 'use client';
 
-import * as React from 'react';
-import { useDrop } from 'react-dnd';
-import { AlertCircle, CheckCircle2, Clock, Eye, Plus } from 'lucide-react';
+import React from 'react';
+import { ToolTip } from '@mairie360/lib-components';
+import { AlertCircle, CheckCircle2, Clock3, Eye, Plus } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-import { Project } from '../types/project';
-import { Badge } from './ui/badge';
-import { Button } from '@mairie360/lib-components/button';
 import { ProjectCard } from './ProjectCard';
-import { statusConfig } from '../types/project';
+import type { Project } from '../types/project';
 
-interface KanbanColumnProps {
-  status: Project['status'];
+type KanbanBoardProps = {
   projects: Project[];
-  moveProject: (projectId: string, newStatus: Project['status']) => void;
-}
+  onProjectOpen?: (project: Project) => void;
+  onProjectEdit?: (project: Project) => void;
+  onAddProject?: (status: Project['status']) => void;
+};
 
-const KanbanColumn = ({ status, projects, moveProject }: KanbanColumnProps) => {
-  const [{ isOver }, drop] = useDrop({
-    accept: 'project',
-    drop: (item: { id: string; status: Project['status'] }) => {
-      if (item.status !== status) {
-        moveProject(item.id, status);
-      }
-    },
-    collect: (monitor) => ({
-      isOver: monitor.isOver(),
-    }),
-  });
+type KanbanColumnConfig = {
+  status: Project['status'];
+  label: string;
+  icon: LucideIcon;
+  iconClassName: string;
+};
 
-  const config = statusConfig[status];
-  
+const columns: KanbanColumnConfig[] = [
+  { status: 'todo', label: 'À faire', icon: AlertCircle, iconClassName: 'text-[#e60012]' },
+  { status: 'in-progress', label: 'En cours', icon: Clock3, iconClassName: 'text-[#1256a6]' },
+  { status: 'review', label: 'En révision', icon: Eye, iconClassName: 'text-[#1256a6]' },
+  { status: 'done', label: 'Terminé', icon: CheckCircle2, iconClassName: 'text-[#00a94f]' },
+];
+
+export function KanbanBoard({ projects, onProjectOpen, onProjectEdit, onAddProject }: KanbanBoardProps) {
   return (
-    <div
-      ref={drop}
-      className={`flex-1 min-w-80 ${isOver ? 'bg-blue-50' : ''} transition-colors rounded-lg`}
-    >
-      <div className={`rounded-lg border-2 border-dashed ${isOver ? 'border-blue-300' : 'border-transparent'} p-1`}>
-        <div className="bg-gray-50 rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className={`${config.color}`}>
-                {config.icon}
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+      {columns.map((column) => {
+        const Icon = column.icon;
+        const columnProjects = projects.filter((project) => project.status === column.status);
+
+        return (
+          <section key={column.status} className="min-w-0">
+            <div className="mb-4 flex h-16 items-center justify-between rounded-lg bg-[#fafafa] px-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+              <div className="flex min-w-0 items-center gap-2">
+                <Icon className={`h-4 w-4 shrink-0 ${column.iconClassName}`} strokeWidth={2} />
+                <h2 className="truncate text-base font-semibold text-[#172033]">{column.label}</h2>
+                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-[#4b908d] px-2 text-xs font-semibold text-white">
+                  {columnProjects.length}
+                </span>
               </div>
-              <h3 className="font-medium text-gray-900">{config.label}</h3>
-              <Badge variant="secondary" className="text-xs">
-                {projects.length}
-              </Badge>
+              <ToolTip text={`Ajouter dans ${column.label}`}>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#4c5258] transition hover:bg-[#ece9e4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+                  aria-label={`Ajouter un projet ${column.label}`}
+                  onClick={() => onAddProject?.(column.status)}
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </ToolTip>
             </div>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-        
-        <div className="space-y-3 px-2">
-          {projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              moveProject={moveProject}
-              viewMode="kanban"
-            />
-          ))}
-        </div>
-      </div>
+
+            <div className="space-y-3">
+              {columnProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onOpen={onProjectOpen}
+                  onEdit={onProjectEdit}
+                  variant="kanban"
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
-};
+}

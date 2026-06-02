@@ -1,143 +1,303 @@
-
 'use client';
 
 import React from 'react';
-import { Project } from '../types/project';
-// import { Avatar, AvatarFallback } from './ui/avatar';
-import { Badge } from './ui/badge';
-import { Button } from 'lib-components/button';
-import { Progress } from './ui/progress';
-import { Calendar, CheckCircle2, MoreHorizontal } from 'lucide-react';
-import { useDrag } from 'react-dnd';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import { Avatar, ToolTip } from '@mairie360/lib-components';
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Eye,
+  MoreHorizontal,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-interface ProjectCardProps {
-    project: Project;
-    moveProject: (projectId: string, newStatus: Project['status']) => void;
-    viewMode: 'kanban' | 'table' | 'grid';
-    labelColors: string[];
-    priorityConfig: {
-      [key in Project['priority']]: {
-        label: string;
-        color: string;
-        bg: string;
-        border: string;
-      };
-    };
+import type { Project } from '../types/project';
+
+type ProjectCardVariant = 'kanban' | 'grid';
+
+type ProjectCardProps = {
+  project: Project;
+  variant?: ProjectCardVariant;
+  onOpen?: (project: Project) => void;
+  onEdit?: (project: Project) => void;
+};
+
+type StatusMeta = {
+  label: string;
+  icon: LucideIcon;
+  className: string;
+  iconClassName: string;
+};
+
+const statusMeta: Record<Project['status'], StatusMeta> = {
+  todo: {
+    label: 'À faire',
+    icon: AlertCircle,
+    className: 'border-[#ffb5bd] bg-[#fff1f2] text-[#e60012]',
+    iconClassName: 'text-[#e60012]',
+  },
+  'in-progress': {
+    label: 'En cours',
+    icon: Clock3,
+    className: 'border-[#8fc8e7] bg-[#dceff8] text-[#1256a6]',
+    iconClassName: 'text-[#1256a6]',
+  },
+  review: {
+    label: 'En révision',
+    icon: Eye,
+    className: 'border-[#8fc8e7] bg-[#dceff8] text-[#1256a6]',
+    iconClassName: 'text-[#1256a6]',
+  },
+  done: {
+    label: 'Terminé',
+    icon: CheckCircle2,
+    className: 'border-[#98dfad] bg-[#e9fbef] text-[#00a94f]',
+    iconClassName: 'text-[#00a94f]',
+  },
+};
+
+const priorityMeta: Record<Project['priority'], { label: string; text: string; dot: string; pill: string }> = {
+  high: {
+    label: 'Haute',
+    text: 'text-[#e60012]',
+    dot: 'bg-[#e60012] border-[#e60012]',
+    pill: 'border-[#ff6b74] bg-[#fff7f7] text-[#e60012]',
+  },
+  medium: {
+    label: 'Moyenne',
+    text: 'text-[#3f908b]',
+    dot: 'bg-[#4b908d] border-[#4b908d]',
+    pill: 'border-[#4b908d] bg-[#e1f1f0] text-[#3f908b]',
+  },
+  low: {
+    label: 'Basse',
+    text: 'text-[#5d5d5d]',
+    dot: 'bg-[#d8d4cf] border-[#d8d4cf]',
+    pill: 'border-[#d8d4cf] bg-[#efeeeb] text-[#5d5d5d]',
+  },
+};
+
+const labelStyles = ['bg-[#1256a6] text-white', 'bg-[#4b908d] text-white', 'bg-[#2f3438] text-white'];
+
+export function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-const ProjectCard = ({ project, moveProject, viewMode, labelColors, priorityConfig }: ProjectCardProps) => {
-  const [{ isDragging }, drag] = useDrag({
-    type: 'project',
-    item: { id: project.id, status: project.status },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
+export function formatProjectDate(date: string, withYear = true) {
+  const [year, month, day] = date.split('-');
+  return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
+}
 
-  const getDaysUntilDue = (dueDate: string) => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+export function StatusPill({ status }: { status: Project['status'] }) {
+  const meta = statusMeta[status];
+  const Icon = meta.icon;
 
-  const daysUntilDue = getDaysUntilDue(project.dueDate);
-  const isOverdue = daysUntilDue < 0;
-  const isDueSoon = daysUntilDue <= 7 && daysUntilDue >= 0;
+  return (
+    <span
+      className={`inline-flex h-6 items-center gap-1 rounded-md border px-2 text-xs font-semibold leading-none ${meta.className}`}
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+      {meta.label}
+    </span>
+  );
+}
 
-  if (viewMode === 'kanban') {
-    return (
-      <div
-        ref={drag}
-        className={`bg-white border-2 border-[#d9d5d0] rounded-lg p-4 shadow-sm hover:shadow-lg hover:border-[#1256a6] transition-all duration-200 cursor-move ${
-          isDragging ? 'opacity-50 rotate-2 scale-105 border-[#4b908d]' : ''
-        }`}
+export function PriorityPill({ priority }: { priority: Project['priority'] }) {
+  const meta = priorityMeta[priority];
+
+  return (
+    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-semibold ${meta.pill}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+export function PriorityLabel({ priority }: { priority: Project['priority'] }) {
+  const meta = priorityMeta[priority];
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${meta.text}`}>
+      <span className={`h-2 w-2 rounded-full border ${meta.dot}`} aria-hidden="true" />
+      {meta.label}
+    </span>
+  );
+}
+
+export function PersonAvatar({ name, className = '' }: { name: string; className?: string }) {
+  return (
+    <Avatar
+      alt={name}
+      fallback={<span className="text-[10px] font-semibold leading-none text-white">{getInitials(name)}</span>}
+      className={`!h-6 !w-6 border border-white shadow-sm ${className}`}
+    />
+  );
+}
+
+export function ProgressMeter({
+  value,
+  showLabel = true,
+  compact = false,
+}: {
+  value: number;
+  showLabel?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className="w-full">
+      {showLabel && (
+        <div className="mb-2 flex items-center justify-between text-xs text-[#4c5965]">
+          <span>Progression</span>
+          <span className="font-semibold text-[#22272d]">{value}%</span>
+        </div>
+      )}
+      <div className={`w-full overflow-hidden rounded-full bg-[#cfdbed] ${compact ? 'h-1.5' : 'h-2'}`}>
+        <div className="h-full rounded-full bg-[#1256a6]" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ProjectLabels({ labels }: { labels: string[] }) {
+  if (labels.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {labels.slice(0, 2).map((label, index) => (
+        <span
+          key={label}
+          className={`rounded-md px-2 py-1 text-xs font-semibold leading-none ${labelStyles[index % labelStyles.length]}`}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function AvatarStack({ project }: { project: Project }) {
+  return (
+    <div className="flex -space-x-1.5">
+      {project.assignees.slice(0, 3).map((assignee) => (
+        <PersonAvatar key={assignee.name} name={assignee.name} />
+      ))}
+      {project.assignees.length > 3 && (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#ece9e4] text-[10px] font-semibold text-[#4c5258]">
+          +{project.assignees.length - 3}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CardActionButton({ onClick }: { onClick?: () => void }) {
+  return (
+    <ToolTip text="Actions">
+      <button
+        type="button"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#343a40] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+        aria-label="Actions du projet"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick?.();
+        }}
       >
-        <div className="flex items-start justify-between mb-3">
-          <h4 className="font-medium text-sm leading-tight text-gray-900 pr-2">{project.title}</h4>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                <MoreHorizontal className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Modifier</DropdownMenuItem>
-              <DropdownMenuItem>Dupliquer</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">Supprimer</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
+      </button>
+    </ToolTip>
+  );
+}
 
-        <p className="text-xs text-gray-600 mb-3 line-clamp-2">{project.description}</p>
+function KanbanProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
+  return (
+    <article
+      className="min-h-[218px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-4 shadow-[0_1px_3px_rgba(30,30,30,0.18)] transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.14)]"
+      onClick={() => onOpen?.(project)}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#172033]">{project.title}</h3>
+        <CardActionButton onClick={() => onEdit?.(project)} />
+      </div>
 
-        {/* Labels */}
-        {project.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {project.labels.slice(0, 2).map((label, index) => (
-              <Badge
-                key={label}
-                variant="secondary"
-                className={`text-xs px-2 py-0.5 ${labelColors[index % labelColors.length]}`}
-              >
-                {label}
-              </Badge>
-            ))}
-            {project.labels.length > 2 && (
-              <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600">
-                +{project.labels.length - 2}
-              </Badge>
-            )}
-          </div>
-        )}
+      <p className="mb-3 line-clamp-2 min-h-9 text-xs leading-relaxed text-[#536171]">{project.description}</p>
 
-        {/* Progress */}
-        <div className="mb-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-600">Progression</span>
-            <span className="font-medium">{project.progress}%</span>
-          </div>
-          <Progress value={project.progress} className="h-1.5" />
-        </div>
+      <div className="mb-4">
+        <ProjectLabels labels={project.labels} />
+      </div>
 
-        {/* Tasks */}
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-3">
-          <div className="flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" />
-            <span>{project.tasks.completed}/{project.tasks.total} tâches</span>
-          </div>
-          <div className={`flex items-center gap-1 ${priorityConfig[project.priority].color}`}>
-            <div className={`w-2 h-2 rounded-full ${priorityConfig[project.priority].bg} ${priorityConfig[project.priority].border} border`} />
-            <span className="font-medium">{priorityConfig[project.priority].label}</span>
-          </div>
-        </div>
+      <div className="mb-3">
+        <ProgressMeter value={project.progress} compact />
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between">
-          <div className="flex -space-x-1">
-            {/* {project.assignees.slice(0, 3).map((assignee, index) => (
-              <Avatar key={index} className="h-6 w-6 border-2 border-white">
-                <AvatarFallback className="text-xs bg-[#1256a6] text-white">
-                  {assignee.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-            ))} */}
-            {project.assignees.length > 3 && (
-              <div className="h-6 w-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
-                <span className="text-xs text-gray-600">+{project.assignees.length - 3}</span>
-              </div>
-            )}
-          </div>
-          <div className={`flex items-center gap-1 text-xs ${
-            isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-gray-500'
-          }`}>
-            <Calendar className="h-3 w-3" />
-            <span>{new Date(project.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>
-          </div>
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-[#536171]">
+        <span className="inline-flex items-center gap-1">
+          <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {project.tasks.completed}/{project.tasks.total} tâches
+        </span>
+        <PriorityLabel priority={project.priority} />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <AvatarStack project={project} />
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#e60012]">
+          <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {formatProjectDate(project.dueDate, false)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function GridProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
+  return (
+    <article
+      className="min-h-[274px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-6 shadow-sm transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.12)]"
+      onClick={() => onOpen?.(project)}
+    >
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <h3 className="min-w-0 text-lg font-medium leading-snug text-[#172033]">{project.title}</h3>
+        <div className="flex shrink-0 items-center gap-1">
+          <StatusPill status={project.status} />
+          <CardActionButton onClick={() => onEdit?.(project)} />
         </div>
       </div>
-    );
+
+      <p className="mb-8 line-clamp-2 min-h-12 text-sm leading-relaxed text-[#536171]">{project.description}</p>
+
+      <div className="mb-4">
+        <ProgressMeter value={project.progress} />
+      </div>
+
+      <div className="mb-5 flex items-center justify-between gap-4 text-sm text-[#3f4750]">
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <PersonAvatar name={project.responsible.name} className="shrink-0" />
+          <span className="truncate">{project.responsible.name}</span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-[#4c5258]">
+          <Users className="h-4 w-4" strokeWidth={1.7} />
+          {project.assignees.length}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <span className={priorityMeta[project.priority].text}>Priorité {priorityMeta[project.priority].label}</span>
+        <span className="text-[#68717b]">Échéance: {formatProjectDate(project.dueDate)}</span>
+      </div>
+    </article>
+  );
+}
+
+export function ProjectCard({ variant = 'kanban', ...props }: ProjectCardProps) {
+  if (variant === 'grid') {
+    return <GridProjectCard {...props} />;
   }
+
+  return <KanbanProjectCard {...props} />;
+}
