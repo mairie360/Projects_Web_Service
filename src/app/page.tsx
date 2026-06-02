@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   Avatar,
@@ -24,6 +24,11 @@ export default function ProjectsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [alert, setAlert] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const moveProject = (projectId: string, newStatus: Project['status']) => {
     setProjects(prev =>
@@ -68,6 +73,14 @@ export default function ProjectsPage() {
     if (status === 'done') return 'green';
     if (status === 'todo') return 'red';
     return 'blue';
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const year = d.getUTCFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const getPriorityVariant = (priority: Project['priority']): 'red' | 'blue' | 'dark' => {
@@ -173,7 +186,7 @@ export default function ProjectsPage() {
       <div className="flex-1 overflow-hidden bg-[#f5f3f0]">
 
         {/* Kanban View */}
-        {viewMode === 'kanban' && (
+        {viewMode === 'kanban' && mounted && (
           <div className="h-full p-4 sm:p-6">
             <div className="flex gap-6 h-full overflow-x-auto pb-6">
               {(Object.entries(groupedProjects) as [Project['status'], Project[]][]).map(([status, statusProjects]) => (
@@ -317,7 +330,7 @@ export default function ProjectsPage() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-1 text-sm text-[#6b6b6b]">
                             <Calendar className="h-3 w-3" />
-                            {new Date(project.dueDate).toLocaleDateString('fr-FR')}
+                            {formatDate(project.dueDate)}
                           </div>
                         </td>
                       </tr>
