@@ -47,18 +47,18 @@ export function KanbanBoard({
 
         return (
           <section key={column.status} className="min-w-0">
-            <div className="mb-4 flex h-16 items-center justify-between rounded-lg bg-[#fafafa] px-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+            <div className="mb-3 flex h-12 items-center justify-between rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Icon className={`h-4 w-4 shrink-0 ${column.iconClassName}`} strokeWidth={2} />
-                <h2 className="truncate text-base font-semibold text-[#172033]">{column.label}</h2>
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-[#4b908d] px-2 text-xs font-semibold text-white">
+                <h2 className="truncate text-sm font-semibold text-[#24292f]">{column.label}</h2>
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d8dee4] px-1.5 text-xs font-semibold text-[#57606a]">
                   {columnProjects.length}
                 </span>
               </div>
               <ToolTip text={`Ajouter dans ${column.label}`}>
                 <button
                   type="button"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#4c5258] transition hover:bg-[#ece9e4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                   aria-label={`Ajouter un projet ${column.label}`}
                   onClick={() => onAddProject?.(column.status)}
                 >
@@ -67,7 +67,7 @@ export function KanbanBoard({
               </ToolTip>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {columnProjects.map((project) => (
                 <ProjectCard
                   key={project.id}

@@ -6,9 +6,12 @@ import {
   AlertCircle,
   CalendarDays,
   CheckCircle2,
+  CircleDot,
   Clock3,
   Eye,
+  ListChecks,
   MoreHorizontal,
+  Tag,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -37,51 +40,57 @@ const statusMeta: Record<Project['status'], StatusMeta> = {
   todo: {
     label: 'À faire',
     icon: AlertCircle,
-    className: 'border-[#ffb5bd] bg-[#fff1f2] text-[#e60012]',
-    iconClassName: 'text-[#e60012]',
+    className: 'border-[#d0d7de] bg-[#f6f8fa] text-[#57606a]',
+    iconClassName: 'text-[#57606a]',
   },
   'in-progress': {
     label: 'En cours',
     icon: Clock3,
-    className: 'border-[#8fc8e7] bg-[#dceff8] text-[#1256a6]',
-    iconClassName: 'text-[#1256a6]',
+    className: 'border-[#bfdbfe] bg-[#ddf4ff] text-[#0969da]',
+    iconClassName: 'text-[#0969da]',
   },
   review: {
     label: 'En révision',
     icon: Eye,
-    className: 'border-[#8fc8e7] bg-[#dceff8] text-[#1256a6]',
-    iconClassName: 'text-[#1256a6]',
+    className: 'border-[#ffd8b5] bg-[#fff8c5] text-[#9a6700]',
+    iconClassName: 'text-[#9a6700]',
   },
   done: {
     label: 'Terminé',
     icon: CheckCircle2,
-    className: 'border-[#98dfad] bg-[#e9fbef] text-[#00a94f]',
-    iconClassName: 'text-[#00a94f]',
+    className: 'border-[#aceebb] bg-[#dafbe1] text-[#1a7f37]',
+    iconClassName: 'text-[#1a7f37]',
   },
 };
 
 const priorityMeta: Record<Project['priority'], { label: string; text: string; dot: string; pill: string }> = {
   high: {
     label: 'Haute',
-    text: 'text-[#e60012]',
-    dot: 'bg-[#e60012] border-[#e60012]',
-    pill: 'border-[#ff6b74] bg-[#fff7f7] text-[#e60012]',
+    text: 'text-[#cf222e]',
+    dot: 'bg-[#cf222e] border-[#cf222e]',
+    pill: 'border-[#ffebe9] bg-[#ffebe9] text-[#cf222e]',
   },
   medium: {
     label: 'Moyenne',
-    text: 'text-[#3f908b]',
-    dot: 'bg-[#4b908d] border-[#4b908d]',
-    pill: 'border-[#4b908d] bg-[#e1f1f0] text-[#3f908b]',
+    text: 'text-[#8250df]',
+    dot: 'bg-[#8250df] border-[#8250df]',
+    pill: 'border-[#f1e5ff] bg-[#f1e5ff] text-[#8250df]',
   },
   low: {
     label: 'Basse',
-    text: 'text-[#5d5d5d]',
-    dot: 'bg-[#d8d4cf] border-[#d8d4cf]',
-    pill: 'border-[#d8d4cf] bg-[#efeeeb] text-[#5d5d5d]',
+    text: 'text-[#57606a]',
+    dot: 'bg-[#8c959f] border-[#8c959f]',
+    pill: 'border-[#d8dee4] bg-[#f6f8fa] text-[#57606a]',
   },
 };
 
-const labelStyles = ['bg-[#1256a6] text-white', 'bg-[#4b908d] text-white', 'bg-[#2f3438] text-white'];
+const labelStyles = [
+  'border-[#bfdbfe] bg-[#ddf4ff] text-[#0969da]',
+  'border-[#aceebb] bg-[#dafbe1] text-[#1a7f37]',
+  'border-[#ffd8b5] bg-[#fff1e5] text-[#9a6700]',
+  'border-[#ffcecb] bg-[#ffebe9] text-[#cf222e]',
+  'border-[#e2d4ff] bg-[#f1e5ff] text-[#8250df]',
+];
 
 export function getInitials(name: string) {
   return name
@@ -96,6 +105,13 @@ export function getInitials(name: string) {
 export function formatProjectDate(date: string, withYear = true) {
   const [year, month, day] = date.split('-');
   return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
+}
+
+function getProjectNumber(project: Project) {
+  const numericId = Number(project.id);
+  if (Number.isFinite(numericId)) return `#${numericId}`;
+
+  return `#${project.id.replace(/\D/g, '').slice(-4) || '1'}`;
 }
 
 export function StatusPill({ status }: { status: Project['status'] }) {
@@ -138,7 +154,7 @@ export function PersonAvatar({ name, className = '' }: { name: string; className
     <Avatar
       alt={name}
       fallback={<span className="text-[10px] font-semibold leading-none text-white">{getInitials(name)}</span>}
-      className={`!h-6 !w-6 border border-white shadow-sm ${className}`}
+      className={`!h-5 !w-5 border border-white shadow-sm ${className}`}
     />
   );
 }
@@ -155,13 +171,13 @@ export function ProgressMeter({
   return (
     <div className="w-full">
       {showLabel && (
-        <div className="mb-2 flex items-center justify-between text-xs text-[#4c5965]">
+        <div className="mb-2 flex items-center justify-between text-xs text-[#57606a]">
           <span>Progression</span>
-          <span className="font-semibold text-[#22272d]">{value}%</span>
+          <span className="font-semibold text-[#24292f]">{value}%</span>
         </div>
       )}
-      <div className={`w-full overflow-hidden rounded-full bg-[#cfdbed] ${compact ? 'h-1.5' : 'h-2'}`}>
-        <div className="h-full rounded-full bg-[#1256a6]" style={{ width: `${value}%` }} />
+      <div className={`w-full overflow-hidden rounded-full bg-[#d8dee4] ${compact ? 'h-1.5' : 'h-2'}`}>
+        <div className="h-full rounded-full bg-[#0969da]" style={{ width: `${value}%` }} />
       </div>
     </div>
   );
@@ -175,7 +191,7 @@ function ProjectLabels({ labels }: { labels: string[] }) {
       {labels.slice(0, 2).map((label, index) => (
         <span
           key={label}
-          className={`rounded-md px-2 py-1 text-xs font-semibold leading-none ${labelStyles[index % labelStyles.length]}`}
+          className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-semibold leading-none ${labelStyles[index % labelStyles.length]}`}
         >
           {label}
         </span>
@@ -191,7 +207,7 @@ function AvatarStack({ project }: { project: Project }) {
         <PersonAvatar key={assignee.name} name={assignee.name} />
       ))}
       {project.assignees.length > 3 && (
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#ece9e4] text-[10px] font-semibold text-[#4c5258]">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#f6f8fa] text-[10px] font-semibold text-[#57606a]">
           +{project.assignees.length - 3}
         </span>
       )}
@@ -250,7 +266,7 @@ export function ProjectActionsMenu({
       <ToolTip text="Actions">
         <button
           type="button"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#343a40] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
           aria-label={`Actions pour ${project.title}`}
           aria-haspopup="menu"
           aria-expanded={open}
@@ -265,13 +281,13 @@ export function ProjectActionsMenu({
 
       {open && (
         <div
-          className="absolute right-0 top-[calc(100%+4px)] z-50 w-36 overflow-hidden rounded-md border border-[#d9d5d0] bg-white py-1 text-sm text-[#2f3438] shadow-[0_8px_20px_rgba(28,31,35,0.16)]"
+          className="absolute right-0 top-[calc(100%+4px)] z-50 w-36 overflow-hidden rounded-md border border-[#d0d7de] bg-white py-1 text-sm text-[#24292f] shadow-[0_8px_24px_rgba(140,149,159,0.2)]"
           role="menu"
         >
           <button
             type="button"
             role="menuitem"
-            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#f6f4f1]"
+            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
             onClick={runAction(onEdit)}
           >
             Modifier
@@ -279,16 +295,16 @@ export function ProjectActionsMenu({
           <button
             type="button"
             role="menuitem"
-            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#f6f4f1]"
+            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
             onClick={runAction(onDuplicate)}
           >
             Dupliquer
           </button>
-          <div className="my-1 border-t border-[#e3e0dc]" />
+          <div className="my-1 border-t border-[#d8dee4]" />
           <button
             type="button"
             role="menuitem"
-            className="flex h-9 w-full items-center px-3 text-left text-[#e60012] transition hover:bg-[#fff1f2]"
+            className="flex h-9 w-full items-center px-3 text-left text-[#cf222e] transition hover:bg-[#ffebe9]"
             onClick={runAction(onDelete)}
           >
             Supprimer
@@ -302,37 +318,51 @@ export function ProjectActionsMenu({
 function KanbanProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: ProjectCardProps) {
   return (
     <article
-      className="min-h-[218px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-4 shadow-[0_1px_3px_rgba(30,30,30,0.18)] transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.14)]"
+      className="cursor-pointer rounded-md border border-[#d0d7de] bg-white p-3 shadow-sm transition hover:border-[#8c959f] hover:shadow-[0_3px_10px_rgba(140,149,159,0.18)]"
       onClick={() => onOpen?.(project)}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#172033]">{project.title}</h3>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 gap-2">
+          <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-[#1a7f37]" strokeWidth={2} />
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[#24292f]">{project.title}</h3>
+            <p className="mt-1 truncate text-xs text-[#57606a]">Mairie360 / projets {getProjectNumber(project)}</p>
+          </div>
+        </div>
         <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
       </div>
 
-      <p className="mb-3 line-clamp-2 min-h-9 text-xs leading-relaxed text-[#536171]">{project.description}</p>
+      <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-[#57606a]">{project.description}</p>
 
       <div className="mb-4">
         <ProjectLabels labels={project.labels} />
       </div>
 
-      <div className="mb-3">
+      <div className="mb-3" aria-label={`Progression ${project.progress}%`}>
         <ProgressMeter value={project.progress} compact />
       </div>
 
-      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-[#536171]">
-        <span className="inline-flex items-center gap-1">
-          <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          {project.tasks.completed}/{project.tasks.total} tâches
+      <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-[#57606a]">
+        <span className="inline-flex min-w-0 items-center gap-1 truncate">
+          <Tag className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+          {statusMeta[project.status].label}
         </span>
         <PriorityLabel priority={project.priority} />
+        <span className="inline-flex min-w-0 items-center gap-1 truncate">
+          <ListChecks className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+          {project.tasks.completed}/{project.tasks.total}
+        </span>
+        <span className="inline-flex min-w-0 items-center gap-1 truncate">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+          {formatProjectDate(project.dueDate, false)}
+        </span>
       </div>
 
       <div className="flex items-center justify-between gap-3">
         <AvatarStack project={project} />
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#e60012]">
-          <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
-          {formatProjectDate(project.dueDate, false)}
+        <span className="inline-flex items-center gap-1 text-xs text-[#57606a]">
+          <Users className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {project.assignees.length}
         </span>
       </div>
     </article>
@@ -342,24 +372,46 @@ function KanbanProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: P
 function GridProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: ProjectCardProps) {
   return (
     <article
-      className="min-h-[274px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-6 shadow-sm transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.12)]"
+      className="min-h-[232px] cursor-pointer rounded-md border border-[#d0d7de] bg-white p-5 shadow-sm transition hover:border-[#8c959f] hover:shadow-[0_3px_10px_rgba(140,149,159,0.18)]"
       onClick={() => onOpen?.(project)}
     >
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <h3 className="min-w-0 text-lg font-medium leading-snug text-[#172033]">{project.title}</h3>
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 gap-2.5">
+          <CircleDot className="mt-1 h-4 w-4 shrink-0 text-[#1a7f37]" strokeWidth={2} />
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 text-base font-semibold leading-snug text-[#24292f]">{project.title}</h3>
+            <p className="mt-1 text-xs text-[#57606a]">Mairie360 / projets {getProjectNumber(project)}</p>
+          </div>
+        </div>
         <div className="flex shrink-0 items-center gap-1">
-          <StatusPill status={project.status} />
           <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
         </div>
       </div>
 
-      <p className="mb-8 line-clamp-2 min-h-12 text-sm leading-relaxed text-[#536171]">{project.description}</p>
+      <p className="mb-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-[#57606a]">{project.description}</p>
+
+      <div className="mb-4">
+        <ProjectLabels labels={project.labels} />
+      </div>
 
       <div className="mb-4">
         <ProgressMeter value={project.progress} />
       </div>
 
-      <div className="mb-5 flex items-center justify-between gap-4 text-sm text-[#3f4750]">
+      <div className="mb-4 grid grid-cols-2 gap-2 text-xs text-[#57606a]">
+        <StatusPill status={project.status} />
+        <PriorityPill priority={project.priority} />
+        <span className="inline-flex items-center gap-1">
+          <ListChecks className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {project.tasks.completed}/{project.tasks.total} tâches
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
+          {formatProjectDate(project.dueDate)}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 text-sm text-[#57606a]">
         <span className="inline-flex min-w-0 items-center gap-2">
           <PersonAvatar name={project.responsible.name} className="shrink-0" />
           <span className="truncate">{project.responsible.name}</span>
@@ -368,11 +420,6 @@ function GridProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: Pro
           <Users className="h-4 w-4" strokeWidth={1.7} />
           {project.assignees.length}
         </span>
-      </div>
-
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className={priorityMeta[project.priority].text}>Priorité {priorityMeta[project.priority].label}</span>
-        <span className="text-[#68717b]">Échéance: {formatProjectDate(project.dueDate)}</span>
       </div>
     </article>
   );

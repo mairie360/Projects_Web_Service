@@ -40,8 +40,8 @@ type ProjectFormState = {
   status: Project['status'];
   priority: Project['priority'];
   responsible: string;
-  assignees: string;
-  labels: string;
+  assignees: string[];
+  labels: string[];
   dueDate: string;
   progress: number;
   totalTasks: number;
@@ -71,6 +71,38 @@ const viewOptions: { value: ViewMode; label: string; icon: LucideIcon }[] = [
 
 const projectStatusOptions = statusOptions.filter((option) => option.value !== 'all');
 const projectPriorityOptions = priorityOptions.filter((option) => option.value !== 'all');
+const defaultProjectMembers = [
+  'Alex Moreau',
+  'Jean Dupont',
+  'Marie Dubois',
+  'Pierre Martin',
+  'Sophie Leroy',
+  'Thomas Bernard',
+];
+const defaultProjectLabels = [
+  'Administration',
+  'Archives',
+  'Communication',
+  'Énergie',
+  'Environnement',
+  'Espaces verts',
+  'Infrastructure',
+  'Loisirs',
+  'Numérique',
+  'Travaux',
+  'Urgent',
+  'Voirie',
+];
+
+function getUniqueValues(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b, 'fr')
+  );
+}
+
+function createSelectOptions(values: string[]): FilterOption[] {
+  return getUniqueValues(values).map((value) => ({ label: value, value }));
+}
 
 function formatInputDate(date: Date) {
   const year = date.getFullYear();
@@ -94,8 +126,8 @@ function createProjectFormState(status: Project['status'] = 'todo'): ProjectForm
     status,
     priority: 'medium',
     responsible: '',
-    assignees: '',
-    labels: '',
+    assignees: [],
+    labels: [],
     dueDate: getDateWithOffset(30),
     progress: 0,
     totalTasks: 1,
@@ -105,9 +137,7 @@ function createProjectFormState(status: Project['status'] = 'todo'): ProjectForm
 
 function projectToFormState(project: Project): ProjectFormState {
   const responsibleName = project.responsible.name;
-  const participantNames = project.assignees
-    .map((assignee) => assignee.name)
-    .filter((name) => name !== responsibleName);
+  const participantNames = getUniqueValues(project.assignees.map((assignee) => assignee.name));
 
   return {
     title: project.title,
@@ -115,24 +145,13 @@ function projectToFormState(project: Project): ProjectFormState {
     status: project.status,
     priority: project.priority,
     responsible: responsibleName,
-    assignees: participantNames.join(', '),
-    labels: project.labels.join(', '),
+    assignees: participantNames,
+    labels: project.labels,
     dueDate: project.dueDate,
     progress: project.progress,
     totalTasks: project.tasks.total,
     completedTasks: project.tasks.completed,
   };
-}
-
-function parseCommaList(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    )
-  );
 }
 
 function ActionButton({
@@ -170,15 +189,15 @@ function ActionButton({
 
 function FieldLabel({ htmlFor, label, required = false }: { htmlFor: string; label: string; required?: boolean }) {
   return (
-    <label htmlFor={htmlFor} className="text-sm font-semibold text-[#2f3438]">
+    <label htmlFor={htmlFor} className="text-xs font-semibold text-[#57606a]">
       {label}
-      {required && <span className="ml-1 text-[#e60012]">*</span>}
+      {required && <span className="ml-1 text-[#cf222e]">*</span>}
     </label>
   );
 }
 
 const fieldClassName =
-  'mt-2 h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm text-[#172033] shadow-sm outline-none transition placeholder:text-[#8a8f94] focus:border-[#4b908d] focus:ring-2 focus:ring-[#4b908d]/15';
+  'mt-2 h-9 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] shadow-sm outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20';
 
 function FormField({
   id,
@@ -232,7 +251,7 @@ function TextAreaField({
         id={id}
         value={value}
         required={required}
-        rows={3}
+        rows={8}
         placeholder={placeholder}
         className={`${fieldClassName} h-auto resize-none py-2`}
         onChange={(event) => onChange(event.target.value)}
@@ -246,24 +265,163 @@ function SelectField({
   label,
   value,
   options,
+  required = false,
   onChange,
 }: {
   id: string;
   label: string;
   value: string;
   options: FilterOption[];
+  required?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
     <div>
-      <FieldLabel htmlFor={id} label={label} />
-      <select id={id} value={value} className={fieldClassName} onChange={(event) => onChange(event.target.value)}>
+      <FieldLabel htmlFor={id} label={label} required={required} />
+      <select
+        id={id}
+        value={value}
+        required={required}
+        className={fieldClassName}
+        onChange={(event) => onChange(event.target.value)}
+      >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function MultiSelectField({
+  id,
+  label,
+  values,
+  options,
+  placeholder = 'Sélectionner...',
+  onChange,
+}: {
+  id: string;
+  label: string;
+  values: string[];
+  options: FilterOption[];
+  placeholder?: string;
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const fieldRef = React.useRef<HTMLDivElement>(null);
+  const selectedOptions = options.filter((option) => values.includes(option.value));
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (fieldRef.current && !fieldRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  const toggleValue = (value: string) => {
+    if (values.includes(value)) {
+      onChange(values.filter((currentValue) => currentValue !== value));
+      return;
+    }
+
+    onChange([...values, value]);
+  };
+
+  const removeValue = (value: string) => {
+    onChange(values.filter((currentValue) => currentValue !== value));
+  };
+
+  return (
+    <div ref={fieldRef}>
+      <FieldLabel htmlFor={id} label={label} />
+      <div className="relative">
+        <button
+          id={id}
+          type="button"
+          className="mt-2 flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 py-2 text-left text-sm text-[#24292f] shadow-sm transition hover:bg-white focus-visible:border-[#0969da] focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/20"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span className={selectedOptions.length > 0 ? 'text-[#24292f]' : 'text-[#6e7781]'}>
+            {selectedOptions.length > 0 ? `${selectedOptions.length} sélectionné(s)` : placeholder}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-[#57606a]" strokeWidth={1.8} />
+        </button>
+
+        {open && (
+          <div
+            className="absolute left-0 top-[calc(100%+6px)] z-[90] max-h-60 w-full overflow-y-auto rounded-md border border-[#d0d7de] bg-white py-1 shadow-[0_8px_24px_rgba(140,149,159,0.24)]"
+            role="listbox"
+            aria-multiselectable="true"
+            aria-label={label}
+          >
+            {options.map((option) => {
+              const selected = values.includes(option.value);
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  className="flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#24292f] transition hover:bg-[#f6f8fa]"
+                  onClick={() => toggleValue(option.value)}
+                >
+                  <span
+                    className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                      selected
+                        ? 'border-[#0969da] bg-[#0969da] text-white'
+                        : 'border-[#d0d7de] bg-white text-transparent'
+                    }`}
+                  >
+                    <Check className="h-3 w-3" strokeWidth={2.4} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {selectedOptions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {selectedOptions.map((option) => (
+            <span
+              key={option.value}
+              className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#d0d7de] bg-white px-2 py-1 text-xs font-medium text-[#24292f]"
+            >
+              <span className="truncate">{option.label}</span>
+              <button
+                type="button"
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[#57606a] hover:bg-[#d8dee4] hover:text-[#24292f]"
+                aria-label={`Retirer ${option.label}`}
+                onClick={() => removeValue(option.value)}
+              >
+                <X className="h-3 w-3" strokeWidth={2} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -303,6 +461,8 @@ function CreateProjectModal({
   mode,
   form,
   error,
+  memberOptions,
+  labelOptions,
   onChange,
   onClose,
   onSubmit,
@@ -310,25 +470,28 @@ function CreateProjectModal({
   mode: 'create' | 'edit';
   form: ProjectFormState;
   error: string;
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const isEditMode = mode === 'edit';
+  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
       <form
-        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-[#d9d5d0] bg-white shadow-[0_18px_50px_rgba(20,24,28,0.24)]"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-[#d0d7de] bg-white shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
         onSubmit={onSubmit}
       >
-        <div className="flex items-center justify-between border-b border-[#e3e0dc] px-6 py-4">
-          <h2 className="text-xl font-bold text-[#172033]">{isEditMode ? 'Modifier le projet' : 'Nouveau projet'}</h2>
+        <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-5 py-3">
+          <h2 className="text-base font-semibold text-[#24292f]">{isEditMode ? 'Modifier le projet' : 'Nouveau projet'}</h2>
           <ToolTip text="Fermer">
             <button
               type="button"
               aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#4c5258] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
               onClick={onClose}
             >
               <X className="h-4 w-4" strokeWidth={2} />
@@ -336,131 +499,149 @@ function CreateProjectModal({
           </ToolTip>
         </div>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 overflow-y-auto bg-white p-5">
           {error && (
-            <div className="mb-4 rounded-md border border-[#ffb5bd] bg-[#fff1f2] px-4 py-3 text-sm font-medium text-[#e60012]">
+            <div className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="md:col-span-2">
-              <FormField
-                id="project-title"
-                label="Nom du projet"
-                value={form.title}
-                required
-                placeholder="Ex. Extension de l'école municipale"
-                onChange={(title) => onChange({ title })}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <section className="space-y-4">
+              <div className="rounded-md border border-[#d0d7de] bg-white p-4">
+                <FormField
+                  id="project-title"
+                  label="Titre"
+                  value={form.title}
+                  required
+                  placeholder="Ajouter un titre..."
+                  onChange={(title) => onChange({ title })}
+                />
+              </div>
+
+              <div className="overflow-hidden rounded-md border border-[#d0d7de] bg-white">
+                <div className="flex h-10 items-center border-b border-[#d8dee4] bg-[#f6f8fa] px-3">
+                  <span className="rounded-md border border-[#d0d7de] bg-white px-3 py-1 text-xs font-semibold text-[#24292f]">
+                    Écrire
+                  </span>
+                </div>
+                <div className="p-4">
+                  <TextAreaField
+                    id="project-description"
+                    label="Description"
+                    value={form.description}
+                    required
+                    placeholder="Ajouter une description, des critères d'acceptation ou des notes..."
+                    onChange={(description) => onChange({ description })}
+                  />
+                </div>
+              </div>
+            </section>
+
+            <aside className="space-y-4 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
+                <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
+              </div>
+
+              <SelectField
+                id="project-status"
+                label="Statut"
+                value={form.status}
+                options={projectStatusOptions}
+                onChange={(status) => onChange({ status: status as Project['status'] })}
               />
-            </div>
 
-            <div className="md:col-span-2">
-              <TextAreaField
-                id="project-description"
-                label="Description"
-                value={form.description}
-                required
-                placeholder="Résumé court du projet"
-                onChange={(description) => onChange({ description })}
+              <SelectField
+                id="project-priority"
+                label="Priorité"
+                value={form.priority}
+                options={projectPriorityOptions}
+                onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
               />
-            </div>
 
-            <SelectField
-              id="project-status"
-              label="Statut"
-              value={form.status}
-              options={projectStatusOptions}
-              onChange={(status) => onChange({ status: status as Project['status'] })}
-            />
-
-            <SelectField
-              id="project-priority"
-              label="Priorité"
-              value={form.priority}
-              options={projectPriorityOptions}
-              onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
-            />
-
-            <FormField
-              id="project-responsible"
-              label="Responsable"
-              value={form.responsible}
-              required
-              placeholder="Ex. Marie Dubois"
-              onChange={(responsible) => onChange({ responsible })}
-            />
-
-            <FormField
-              id="project-assignees"
-              label="Participants"
-              value={form.assignees}
-              placeholder="Pierre Martin, Sophie Leroy"
-              onChange={(assignees) => onChange({ assignees })}
-            />
-
-            <FormField
-              id="project-labels"
-              label="Labels"
-              value={form.labels}
-              placeholder="Voirie, Travaux"
-              onChange={(labels) => onChange({ labels })}
-            />
-
-            <div>
-              <FieldLabel htmlFor="project-due-date" label="Échéance" required />
-              <input
-                id="project-due-date"
-                type="date"
-                value={form.dueDate}
+              <SelectField
+                id="project-responsible"
+                label="Assigné principal"
+                value={form.responsible}
                 required
-                className={fieldClassName}
-                onChange={(event) => onChange({ dueDate: event.target.value })}
+                options={responsibleOptions}
+                onChange={(responsible) => onChange({ responsible })}
               />
-            </div>
 
-            <NumberField
-              id="project-progress"
-              label="Progression"
-              value={form.progress}
-              min={0}
-              max={100}
-              onChange={(progress) => onChange({ progress })}
-            />
+              <MultiSelectField
+                id="project-assignees"
+                label="Assignés"
+                values={form.assignees}
+                options={memberOptions}
+                placeholder="Choisir un ou plusieurs assignés"
+                onChange={(assignees) => onChange({ assignees })}
+              />
 
-            <div className="grid grid-cols-2 gap-3">
+              <MultiSelectField
+                id="project-labels"
+                label="Étiquettes"
+                values={form.labels}
+                options={labelOptions}
+                placeholder="Choisir une ou plusieurs étiquettes"
+                onChange={(labels) => onChange({ labels })}
+              />
+
+              <div>
+                <FieldLabel htmlFor="project-due-date" label="Échéance" required />
+                <input
+                  id="project-due-date"
+                  type="date"
+                  value={form.dueDate}
+                  required
+                  className={fieldClassName}
+                  onChange={(event) => onChange({ dueDate: event.target.value })}
+                />
+              </div>
+
               <NumberField
-                id="project-completed-tasks"
-                label="Tâches faites"
-                value={form.completedTasks}
+                id="project-progress"
+                label="Progression"
+                value={form.progress}
                 min={0}
-                max={999}
-                onChange={(completedTasks) => onChange({ completedTasks })}
+                max={100}
+                onChange={(progress) => onChange({ progress })}
               />
-              <NumberField
-                id="project-total-tasks"
-                label="Total tâches"
-                value={form.totalTasks}
-                min={1}
-                max={999}
-                onChange={(totalTasks) => onChange({ totalTasks })}
-              />
-            </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <NumberField
+                  id="project-completed-tasks"
+                  label="Terminées"
+                  value={form.completedTasks}
+                  min={0}
+                  max={999}
+                  onChange={(completedTasks) => onChange({ completedTasks })}
+                />
+                <NumberField
+                  id="project-total-tasks"
+                  label="Total"
+                  value={form.totalTasks}
+                  min={1}
+                  max={999}
+                  onChange={(totalTasks) => onChange({ totalTasks })}
+                />
+              </div>
+            </aside>
           </div>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-[#e3e0dc] bg-[#fbfaf8] px-6 py-4 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-3 border-t border-[#d8dee4] bg-[#f6f8fa] px-5 py-3 sm:flex-row sm:justify-end">
           <Button
             label="Annuler"
             type="button"
             onClick={onClose}
-            className="!h-10 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-white !px-4 !text-sm !font-semibold !text-[#2f3438] hover:!border-[#b9d6d5] hover:!bg-[#fafafa]"
+            className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-[#f6f8fa] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
           />
           <Button
             label={isEditMode ? 'Enregistrer' : 'Créer le projet'}
             type="submit"
             primary
-            className="!h-10 !min-h-0 !rounded-md !border-[#1256a6] !bg-[#1256a6] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#0f4b92]"
+            className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
           />
         </div>
       </form>
@@ -709,6 +890,23 @@ export default function ProjectsPage() {
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
 
+  const memberOptions = useMemo(
+    () =>
+      createSelectOptions([
+        ...defaultProjectMembers,
+        ...projects.flatMap((project) => [
+          project.responsible.name,
+          ...project.assignees.map((assignee) => assignee.name),
+        ]),
+      ]),
+    [projects]
+  );
+
+  const labelOptions = useMemo(
+    () => createSelectOptions([...defaultProjectLabels, ...projects.flatMap((project) => project.labels)]),
+    [projects]
+  );
+
   const filteredProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -776,7 +974,7 @@ export default function ProjectsPage() {
     const totalTasks = Math.max(1, Math.round(Number(projectForm.totalTasks) || 1));
     const completedTasks = Math.min(totalTasks, Math.max(0, Math.round(Number(projectForm.completedTasks) || 0)));
     const progress = Math.max(0, Math.min(100, Math.round(Number(projectForm.progress) || 0)));
-    const assigneeNames = Array.from(new Set([responsibleName, ...parseCommaList(projectForm.assignees)]));
+    const assigneeNames = getUniqueValues([responsibleName, ...projectForm.assignees]);
 
     const projectFields = {
       title,
@@ -787,7 +985,7 @@ export default function ProjectsPage() {
       progress,
       dueDate,
       priority: projectForm.priority,
-      labels: parseCommaList(projectForm.labels),
+      labels: getUniqueValues(projectForm.labels),
       tasks: {
         total: totalTasks,
         completed: completedTasks,
@@ -853,6 +1051,8 @@ export default function ProjectsPage() {
           mode={editingProjectId ? 'edit' : 'create'}
           form={projectForm}
           error={projectFormError}
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
           onChange={updateProjectForm}
           onClose={closeCreateProject}
           onSubmit={saveProject}
