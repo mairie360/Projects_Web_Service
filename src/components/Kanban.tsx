@@ -12,6 +12,8 @@ type KanbanBoardProps = {
   projects: Project[];
   onProjectOpen?: (project: Project) => void;
   onProjectEdit?: (project: Project) => void;
+  onProjectDuplicate?: (project: Project) => void;
+  onProjectDelete?: (project: Project) => void;
   onAddProject?: (status: Project['status']) => void;
 };
 
@@ -29,7 +31,14 @@ const columns: KanbanColumnConfig[] = [
   { status: 'done', label: 'Terminé', icon: CheckCircle2, iconClassName: 'text-[#00a94f]' },
 ];
 
-export function KanbanBoard({ projects, onProjectOpen, onProjectEdit, onAddProject }: KanbanBoardProps) {
+export function KanbanBoard({
+  projects,
+  onProjectOpen,
+  onProjectEdit,
+  onProjectDuplicate,
+  onProjectDelete,
+  onAddProject,
+}: KanbanBoardProps) {
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
       {columns.map((column) => {
@@ -65,6 +74,8 @@ export function KanbanBoard({ projects, onProjectOpen, onProjectEdit, onAddProje
                   project={project}
                   onOpen={onProjectOpen}
                   onEdit={onProjectEdit}
+                  onDuplicate={onProjectDuplicate}
+                  onDelete={onProjectDelete}
                   variant="kanban"
                 />
               ))}

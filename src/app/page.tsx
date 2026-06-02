@@ -8,10 +8,10 @@ import {
   Grid3X3,
   Kanban,
   List,
-  MoreHorizontal,
   Plus,
   Search,
   Settings,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -22,6 +22,7 @@ import {
   PriorityPill,
   ProgressMeter,
   ProjectCard,
+  ProjectActionsMenu,
   StatusPill,
 } from '../components/ProjectCard';
 import { mockProjects, type Project } from '../types/project';
@@ -31,6 +32,20 @@ type ViewMode = 'kanban' | 'grid' | 'table';
 type FilterOption = {
   label: string;
   value: string;
+};
+
+type ProjectFormState = {
+  title: string;
+  description: string;
+  status: Project['status'];
+  priority: Project['priority'];
+  responsible: string;
+  assignees: string;
+  labels: string;
+  dueDate: string;
+  progress: number;
+  totalTasks: number;
+  completedTasks: number;
 };
 
 const statusOptions: FilterOption[] = [
@@ -53,6 +68,72 @@ const viewOptions: { value: ViewMode; label: string; icon: LucideIcon }[] = [
   { value: 'grid', label: 'Grille', icon: Grid3X3 },
   { value: 'table', label: 'Table', icon: List },
 ];
+
+const projectStatusOptions = statusOptions.filter((option) => option.value !== 'all');
+const projectPriorityOptions = priorityOptions.filter((option) => option.value !== 'all');
+
+function formatInputDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDateWithOffset(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+
+  return formatInputDate(date);
+}
+
+function createProjectFormState(status: Project['status'] = 'todo'): ProjectFormState {
+  return {
+    title: '',
+    description: '',
+    status,
+    priority: 'medium',
+    responsible: '',
+    assignees: '',
+    labels: '',
+    dueDate: getDateWithOffset(30),
+    progress: 0,
+    totalTasks: 1,
+    completedTasks: 0,
+  };
+}
+
+function projectToFormState(project: Project): ProjectFormState {
+  const responsibleName = project.responsible.name;
+  const participantNames = project.assignees
+    .map((assignee) => assignee.name)
+    .filter((name) => name !== responsibleName);
+
+  return {
+    title: project.title,
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    responsible: responsibleName,
+    assignees: participantNames.join(', '),
+    labels: project.labels.join(', '),
+    dueDate: project.dueDate,
+    progress: project.progress,
+    totalTasks: project.tasks.total,
+    completedTasks: project.tasks.completed,
+  };
+}
+
+function parseCommaList(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
 
 function ActionButton({
   label,
@@ -84,6 +165,306 @@ function ActionButton({
         }`}
       />
     </span>
+  );
+}
+
+function FieldLabel({ htmlFor, label, required = false }: { htmlFor: string; label: string; required?: boolean }) {
+  return (
+    <label htmlFor={htmlFor} className="text-sm font-semibold text-[#2f3438]">
+      {label}
+      {required && <span className="ml-1 text-[#e60012]">*</span>}
+    </label>
+  );
+}
+
+const fieldClassName =
+  'mt-2 h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm text-[#172033] shadow-sm outline-none transition placeholder:text-[#8a8f94] focus:border-[#4b908d] focus:ring-2 focus:ring-[#4b908d]/15';
+
+function FormField({
+  id,
+  label,
+  value,
+  required = false,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  required?: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id} label={label} required={required} />
+      <input
+        id={id}
+        value={value}
+        required={required}
+        placeholder={placeholder}
+        className={fieldClassName}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function TextAreaField({
+  id,
+  label,
+  value,
+  required = false,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  required?: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id} label={label} required={required} />
+      <textarea
+        id={id}
+        value={value}
+        required={required}
+        rows={3}
+        placeholder={placeholder}
+        className={`${fieldClassName} h-auto resize-none py-2`}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function SelectField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: FilterOption[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id} label={label} />
+      <select id={id} value={value} className={fieldClassName} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function NumberField({
+  id,
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id} label={label} />
+      <input
+        id={id}
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        className={fieldClassName}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </div>
+  );
+}
+
+function CreateProjectModal({
+  mode,
+  form,
+  error,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  mode: 'create' | 'edit';
+  form: ProjectFormState;
+  error: string;
+  onChange: (patch: Partial<ProjectFormState>) => void;
+  onClose: () => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  const isEditMode = mode === 'edit';
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
+      <form
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-[#d9d5d0] bg-white shadow-[0_18px_50px_rgba(20,24,28,0.24)]"
+        onSubmit={onSubmit}
+      >
+        <div className="flex items-center justify-between border-b border-[#e3e0dc] px-6 py-4">
+          <h2 className="text-xl font-bold text-[#172033]">{isEditMode ? 'Modifier le projet' : 'Nouveau projet'}</h2>
+          <ToolTip text="Fermer">
+            <button
+              type="button"
+              aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#4c5258] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" strokeWidth={2} />
+            </button>
+          </ToolTip>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto px-6 py-5">
+          {error && (
+            <div className="mb-4 rounded-md border border-[#ffb5bd] bg-[#fff1f2] px-4 py-3 text-sm font-medium text-[#e60012]">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <FormField
+                id="project-title"
+                label="Nom du projet"
+                value={form.title}
+                required
+                placeholder="Ex. Extension de l'école municipale"
+                onChange={(title) => onChange({ title })}
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <TextAreaField
+                id="project-description"
+                label="Description"
+                value={form.description}
+                required
+                placeholder="Résumé court du projet"
+                onChange={(description) => onChange({ description })}
+              />
+            </div>
+
+            <SelectField
+              id="project-status"
+              label="Statut"
+              value={form.status}
+              options={projectStatusOptions}
+              onChange={(status) => onChange({ status: status as Project['status'] })}
+            />
+
+            <SelectField
+              id="project-priority"
+              label="Priorité"
+              value={form.priority}
+              options={projectPriorityOptions}
+              onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
+            />
+
+            <FormField
+              id="project-responsible"
+              label="Responsable"
+              value={form.responsible}
+              required
+              placeholder="Ex. Marie Dubois"
+              onChange={(responsible) => onChange({ responsible })}
+            />
+
+            <FormField
+              id="project-assignees"
+              label="Participants"
+              value={form.assignees}
+              placeholder="Pierre Martin, Sophie Leroy"
+              onChange={(assignees) => onChange({ assignees })}
+            />
+
+            <FormField
+              id="project-labels"
+              label="Labels"
+              value={form.labels}
+              placeholder="Voirie, Travaux"
+              onChange={(labels) => onChange({ labels })}
+            />
+
+            <div>
+              <FieldLabel htmlFor="project-due-date" label="Échéance" required />
+              <input
+                id="project-due-date"
+                type="date"
+                value={form.dueDate}
+                required
+                className={fieldClassName}
+                onChange={(event) => onChange({ dueDate: event.target.value })}
+              />
+            </div>
+
+            <NumberField
+              id="project-progress"
+              label="Progression"
+              value={form.progress}
+              min={0}
+              max={100}
+              onChange={(progress) => onChange({ progress })}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <NumberField
+                id="project-completed-tasks"
+                label="Tâches faites"
+                value={form.completedTasks}
+                min={0}
+                max={999}
+                onChange={(completedTasks) => onChange({ completedTasks })}
+              />
+              <NumberField
+                id="project-total-tasks"
+                label="Total tâches"
+                value={form.totalTasks}
+                min={1}
+                max={999}
+                onChange={(totalTasks) => onChange({ totalTasks })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-[#e3e0dc] bg-[#fbfaf8] px-6 py-4 sm:flex-row sm:justify-end">
+          <Button
+            label="Annuler"
+            type="button"
+            onClick={onClose}
+            className="!h-10 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-white !px-4 !text-sm !font-semibold !text-[#2f3438] hover:!border-[#b9d6d5] hover:!bg-[#fafafa]"
+          />
+          <Button
+            label={isEditMode ? 'Enregistrer' : 'Créer le projet'}
+            type="submit"
+            primary
+            className="!h-10 !min-h-0 !rounded-md !border-[#1256a6] !bg-[#1256a6] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#0f4b92]"
+          />
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -207,10 +588,14 @@ function GridView({
   projects,
   onProjectOpen,
   onProjectEdit,
+  onProjectDuplicate,
+  onProjectDelete,
 }: {
   projects: Project[];
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
+  onProjectDuplicate: (project: Project) => void;
+  onProjectDelete: (project: Project) => void;
 }) {
   if (projects.length === 0) return <EmptyState />;
 
@@ -223,6 +608,8 @@ function GridView({
           variant="grid"
           onOpen={onProjectOpen}
           onEdit={onProjectEdit}
+          onDuplicate={onProjectDuplicate}
+          onDelete={onProjectDelete}
         />
       ))}
     </div>
@@ -233,10 +620,14 @@ function TableView({
   projects,
   onProjectOpen,
   onProjectEdit,
+  onProjectDuplicate,
+  onProjectDelete,
 }: {
   projects: Project[];
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
+  onProjectDuplicate: (project: Project) => void;
+  onProjectDelete: (project: Project) => void;
 }) {
   if (projects.length === 0) return <EmptyState />;
 
@@ -288,19 +679,12 @@ function TableView({
                 </td>
                 <td className="px-5 py-4 text-sm text-[#5e6873]">{formatProjectDate(project.dueDate)}</td>
                 <td className="px-5 py-4">
-                  <ToolTip text="Actions">
-                    <button
-                      type="button"
-                      aria-label={`Actions pour ${project.title}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#2f3438] transition hover:bg-[#ece9e4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onProjectEdit(project);
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
-                    </button>
-                  </ToolTip>
+                  <ProjectActionsMenu
+                    project={project}
+                    onEdit={onProjectEdit}
+                    onDuplicate={onProjectDuplicate}
+                    onDelete={onProjectDelete}
+                  />
                 </td>
               </tr>
             ))}
@@ -312,7 +696,7 @@ function TableView({
 }
 
 export default function ProjectsPage() {
-  const [projects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -320,6 +704,10 @@ export default function ProjectsPage() {
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
+  const [projectFormError, setProjectFormError] = useState('');
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -345,13 +733,132 @@ export default function ProjectsPage() {
     showInfo(`Projet : ${project.title}`);
   };
 
-  const addProject = (status?: Project['status']) => {
-    const suffix = status ? ` dans "${statusOptions.find((option) => option.value === status)?.label}"` : '';
-    setAlert({ type: 'success', message: `Nouveau projet${suffix}.` });
+  const openCreateProject = (status: Project['status'] = 'todo') => {
+    setProjectForm(createProjectFormState(status));
+    setEditingProjectId(null);
+    setProjectFormError('');
+    setOpenFilter(null);
+    setCreateProjectOpen(true);
+  };
+
+  const openEditProject = (project: Project) => {
+    setProjectForm(projectToFormState(project));
+    setEditingProjectId(project.id);
+    setProjectFormError('');
+    setOpenFilter(null);
+    setCreateProjectOpen(true);
+  };
+
+  const closeCreateProject = () => {
+    setCreateProjectOpen(false);
+    setEditingProjectId(null);
+    setProjectFormError('');
+  };
+
+  const updateProjectForm = (patch: Partial<ProjectFormState>) => {
+    setProjectForm((current) => ({ ...current, ...patch }));
+    if (projectFormError) setProjectFormError('');
+  };
+
+  const saveProject = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const title = projectForm.title.trim();
+    const description = projectForm.description.trim();
+    const responsibleName = projectForm.responsible.trim();
+    const dueDate = projectForm.dueDate;
+
+    if (!title || !description || !responsibleName || !dueDate) {
+      setProjectFormError('Les champs obligatoires doivent être renseignés.');
+      return;
+    }
+
+    const totalTasks = Math.max(1, Math.round(Number(projectForm.totalTasks) || 1));
+    const completedTasks = Math.min(totalTasks, Math.max(0, Math.round(Number(projectForm.completedTasks) || 0)));
+    const progress = Math.max(0, Math.min(100, Math.round(Number(projectForm.progress) || 0)));
+    const assigneeNames = Array.from(new Set([responsibleName, ...parseCommaList(projectForm.assignees)]));
+
+    const projectFields = {
+      title,
+      description,
+      status: projectForm.status,
+      responsible: { name: responsibleName },
+      assignees: assigneeNames.map((name) => ({ name })),
+      progress,
+      dueDate,
+      priority: projectForm.priority,
+      labels: parseCommaList(projectForm.labels),
+      tasks: {
+        total: totalTasks,
+        completed: completedTasks,
+      },
+    };
+
+    if (editingProjectId) {
+      setProjects((currentProjects) =>
+        currentProjects.map((project) => (project.id === editingProjectId ? { ...project, ...projectFields } : project))
+      );
+      setCreateProjectOpen(false);
+      setEditingProjectId(null);
+      setAlert({ type: 'success', message: `Projet "${title}" modifié.` });
+      return;
+    }
+
+    const newProject: Project = {
+      id: `project-${Date.now()}`,
+      ...projectFields,
+      createdAt: formatInputDate(new Date()),
+    };
+
+    setProjects((currentProjects) => [newProject, ...currentProjects]);
+    setSearchTerm('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setCreateProjectOpen(false);
+    setAlert({ type: 'success', message: `Projet "${newProject.title}" créé.` });
+  };
+
+  const duplicateProject = (project: Project) => {
+    const duplicatedProject: Project = {
+      ...project,
+      id: `project-${Date.now()}`,
+      title: `${project.title} (copie)`,
+      responsible: { ...project.responsible },
+      assignees: project.assignees.map((assignee) => ({ ...assignee })),
+      labels: [...project.labels],
+      tasks: { ...project.tasks },
+      createdAt: formatInputDate(new Date()),
+    };
+
+    setProjects((currentProjects) => [duplicatedProject, ...currentProjects]);
+    setSearchTerm('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setAlert({ type: 'success', message: `Projet "${duplicatedProject.title}" dupliqué.` });
+  };
+
+  const deleteProject = (project: Project) => {
+    const confirmed = window.confirm(`Supprimer le projet "${project.title}" ?`);
+    if (!confirmed) return;
+
+    setProjects((currentProjects) => currentProjects.filter((currentProject) => currentProject.id !== project.id));
+    if (editingProjectId === project.id) closeCreateProject();
+    setAlert({ type: 'success', message: `Projet "${project.title}" supprimé.` });
   };
 
   return (
     <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
+      {createProjectOpen && (
+        <CreateProjectModal
+          mode={editingProjectId ? 'edit' : 'create'}
+          form={projectForm}
+          error={projectFormError}
+          onChange={updateProjectForm}
+          onClose={closeCreateProject}
+          onSubmit={saveProject}
+        />
+      )}
+
       <div className="flex h-full">
         <div className="hidden shrink-0 lg:block">
           <Sidebar activeItem="projects" isAdmin brandLabel="Mairie360" brandInitial="M" />
@@ -410,7 +917,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <ActionButton label="Nouveau projet" icon={Plus} primary onClick={() => addProject()} />
+                    <ActionButton label="Nouveau projet" icon={Plus} primary onClick={() => openCreateProject()} />
                     <ActionButton
                       label="Paramètres"
                       icon={Settings}
@@ -454,8 +961,10 @@ export default function ProjectsPage() {
                   <KanbanBoard
                     projects={filteredProjects}
                     onProjectOpen={showProject}
-                    onProjectEdit={(project) => showInfo(`Actions : ${project.title}`)}
-                    onAddProject={addProject}
+                    onProjectEdit={openEditProject}
+                    onProjectDuplicate={duplicateProject}
+                    onProjectDelete={deleteProject}
+                    onAddProject={openCreateProject}
                   />
                 )}
 
@@ -463,7 +972,9 @@ export default function ProjectsPage() {
                   <GridView
                     projects={filteredProjects}
                     onProjectOpen={showProject}
-                    onProjectEdit={(project) => showInfo(`Actions : ${project.title}`)}
+                    onProjectEdit={openEditProject}
+                    onProjectDuplicate={duplicateProject}
+                    onProjectDelete={deleteProject}
                   />
                 )}
 
@@ -471,7 +982,9 @@ export default function ProjectsPage() {
                   <TableView
                     projects={filteredProjects}
                     onProjectOpen={showProject}
-                    onProjectEdit={(project) => showInfo(`Actions : ${project.title}`)}
+                    onProjectEdit={openEditProject}
+                    onProjectDuplicate={duplicateProject}
+                    onProjectDelete={deleteProject}
                   />
                 )}
               </section>

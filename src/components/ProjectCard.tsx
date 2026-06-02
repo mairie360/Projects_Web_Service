@@ -22,6 +22,8 @@ type ProjectCardProps = {
   variant?: ProjectCardVariant;
   onOpen?: (project: Project) => void;
   onEdit?: (project: Project) => void;
+  onDuplicate?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
 };
 
 type StatusMeta = {
@@ -197,25 +199,107 @@ function AvatarStack({ project }: { project: Project }) {
   );
 }
 
-function CardActionButton({ onClick }: { onClick?: () => void }) {
+export function ProjectActionsMenu({
+  project,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  project: Project;
+  onEdit?: (project: Project) => void;
+  onDuplicate?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  const runAction = (action?: (project: Project) => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setOpen(false);
+    action?.(project);
+  };
+
   return (
-    <ToolTip text="Actions">
-      <button
-        type="button"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#343a40] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
-        aria-label="Actions du projet"
-        onClick={(event) => {
-          event.stopPropagation();
-          onClick?.();
-        }}
-      >
-        <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
-      </button>
-    </ToolTip>
+    <div
+      ref={menuRef}
+      className="relative shrink-0"
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <ToolTip text="Actions">
+        <button
+          type="button"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#343a40] transition hover:bg-[#f1efeb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4b908d]/30"
+          aria-label={`Actions pour ${project.title}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={(event) => {
+            event.stopPropagation();
+            setOpen((current) => !current);
+          }}
+        >
+          <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
+        </button>
+      </ToolTip>
+
+      {open && (
+        <div
+          className="absolute right-0 top-[calc(100%+4px)] z-50 w-36 overflow-hidden rounded-md border border-[#d9d5d0] bg-white py-1 text-sm text-[#2f3438] shadow-[0_8px_20px_rgba(28,31,35,0.16)]"
+          role="menu"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#f6f4f1]"
+            onClick={runAction(onEdit)}
+          >
+            Modifier
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#f6f4f1]"
+            onClick={runAction(onDuplicate)}
+          >
+            Dupliquer
+          </button>
+          <div className="my-1 border-t border-[#e3e0dc]" />
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-9 w-full items-center px-3 text-left text-[#e60012] transition hover:bg-[#fff1f2]"
+            onClick={runAction(onDelete)}
+          >
+            Supprimer
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
-function KanbanProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
+function KanbanProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: ProjectCardProps) {
   return (
     <article
       className="min-h-[218px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-4 shadow-[0_1px_3px_rgba(30,30,30,0.18)] transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.14)]"
@@ -223,7 +307,7 @@ function KanbanProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#172033]">{project.title}</h3>
-        <CardActionButton onClick={() => onEdit?.(project)} />
+        <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
       </div>
 
       <p className="mb-3 line-clamp-2 min-h-9 text-xs leading-relaxed text-[#536171]">{project.description}</p>
@@ -255,7 +339,7 @@ function KanbanProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
   );
 }
 
-function GridProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
+function GridProjectCard({ project, onOpen, onEdit, onDuplicate, onDelete }: ProjectCardProps) {
   return (
     <article
       className="min-h-[274px] cursor-pointer rounded-lg border border-[#d9d5d0] bg-white p-6 shadow-sm transition hover:border-[#b9d6d5] hover:shadow-[0_5px_14px_rgba(30,30,30,0.12)]"
@@ -265,7 +349,7 @@ function GridProjectCard({ project, onOpen, onEdit }: ProjectCardProps) {
         <h3 className="min-w-0 text-lg font-medium leading-snug text-[#172033]">{project.title}</h3>
         <div className="flex shrink-0 items-center gap-1">
           <StatusPill status={project.status} />
-          <CardActionButton onClick={() => onEdit?.(project)} />
+          <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
         </div>
       </div>
 
