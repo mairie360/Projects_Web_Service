@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@mairie360/lib-components": "0.1.12",
+    "@mairie360/lib-components": "0.0.2",
     "@mairie360/bff-project-openapi": "0.2.1",
     "daisyui": "^5.0.0",
     "next": "15.5.19",
