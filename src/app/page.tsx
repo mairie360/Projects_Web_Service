@@ -3,11 +3,13 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Footer, Header, Sidebar } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { KanbanBoard } from '../components/Kanban';
 import { ActionButton } from '../components/project/ProjectFormControls';
 import { CreateProjectModal, ProjectDetailModal } from '../components/project/ProjectModals';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from '../components/project/ProjectViews';
+import { appSidebarItems, currentUser, getNavigationHref } from '../lib/appShell';
 import {
   calculateProjectProgress,
   createInitialTaskItems,
@@ -26,6 +28,7 @@ import {
 import { mockProjects, type Project, type ProjectTask, type ProjectTaskDraft } from '../types/project';
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
@@ -80,6 +83,29 @@ export default function ProjectsPage() {
 
   const showInfo = (message: string) => {
     setAlert({ type: 'info', message });
+  };
+
+  const handlePageChange = (page: string) => {
+    const href = getNavigationHref(page);
+
+    if (href) {
+      router.push(href);
+      return;
+    }
+
+    showInfo(`Navigation : ${page}`);
+  };
+
+  const handleSidebarItemSelect = (item: { id: string; label: string }) => {
+    const href = getNavigationHref(item.id);
+
+    if (href) {
+      router.push(href);
+    } else {
+      showInfo(`Navigation : ${item.label}`);
+    }
+
+    setSidebarOpen(false);
   };
 
   const openCreateProject = (status: Project['status'] = 'todo') => {
@@ -381,7 +407,14 @@ export default function ProjectsPage() {
 
       <div className="flex h-full">
         <div className="hidden shrink-0 lg:block">
-          <Sidebar activeItem="projects" isAdmin brandLabel="Mairie360" brandInitial="M" />
+          <Sidebar
+            activeItem="projects"
+            isAdmin
+            items={appSidebarItems}
+            brandLabel="Mairie360"
+            brandInitial="M"
+            onItemSelect={handleSidebarItemSelect}
+          />
         </div>
 
         {sidebarOpen && (
@@ -396,9 +429,10 @@ export default function ProjectsPage() {
               <Sidebar
                 activeItem="projects"
                 isAdmin
+                items={appSidebarItems}
                 brandLabel="Mairie360"
                 brandInitial="M"
-                onItemSelect={() => setSidebarOpen(false)}
+                onItemSelect={handleSidebarItemSelect}
               />
             </div>
           </div>
@@ -406,10 +440,11 @@ export default function ProjectsPage() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
-            user={{ name: 'Admin Système', email: 'admin@mairie360.fr', role: 'admin' }}
+            user={currentUser}
             isAdmin
             setSidebarOpen={setSidebarOpen}
-            onPageChange={(page) => showInfo(`Navigation : ${page}`)}
+            profileHref="/profile"
+            onPageChange={handlePageChange}
             onLogout={() => showInfo('Déconnexion en attente.')}
           />
 
