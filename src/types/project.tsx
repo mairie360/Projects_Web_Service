@@ -3,48 +3,64 @@ import { AlertCircle, CheckCircle2, Clock, Eye } from 'lucide-react';
 export type ProjectStatus = 'todo' | 'in-progress' | 'review' | 'done';
 export type ProjectPriority = 'high' | 'medium' | 'low';
 
+export interface Person {
+  id?: string;
+  name: string;
+  avatar?: string;
+  avatarUrl?: string | null;
+}
+
 export interface ProjectTask {
   id: string;
   title: string;
   status: ProjectStatus;
-  responsible: {
-    name: string;
-    avatar?: string;
-  };
-  assignees: {
-    name: string;
-    avatar?: string;
-  }[];
+  statusLabel?: string;
+  responsible: Person;
+  assignees: Person[];
   priority: ProjectPriority;
+  priorityLabel?: string;
   labels: string[];
   dueDate: string;
   completed: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
-export type ProjectTaskDraft = Omit<ProjectTask, 'id' | 'completed' | 'createdAt'>;
+export interface ProjectTaskDraft {
+  title: string;
+  status: ProjectStatus;
+  responsible: Person;
+  assignees: Person[];
+  priority: ProjectPriority;
+  labels: string[];
+  dueDate: string;
+}
 
 export interface Project {
   id: string;
   title: string;
   description: string;
   status: ProjectStatus;
-  responsible: {
-    name: string;
-    avatar?: string;
-  };
-  assignees: {
-    name: string;
-    avatar?: string;
-  }[];
+  statusLabel?: string;
+  responsible: Person;
+  assignees: Person[];
   progress: number;
   dueDate: string;
   priority: ProjectPriority;
+  priorityLabel?: string;
   labels: string[];
   taskItems?: ProjectTask[];
   tasks: {
     total: number;
     completed: number;
+  };
+  permissions?: {
+    canView?: boolean;
+    canEdit?: boolean;
+    canDuplicate?: boolean;
+    canDelete?: boolean;
+    canCreateTask?: boolean;
+    canEditTask?: boolean;
   };
   createdAt: string;
 }

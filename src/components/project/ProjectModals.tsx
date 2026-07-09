@@ -13,7 +13,9 @@ import {
 } from '../ProjectCard';
 import type { Project, ProjectTask, ProjectTaskDraft } from '../../types/project';
 import {
+  createPersonFromOptionValue,
   createTaskFormState,
+  getPersonValue,
   getUniqueValues,
   projectPriorityOptions,
   projectStatusOptions,
@@ -147,7 +149,6 @@ export function CreateProjectModal({
                 id="project-responsible"
                 label="Assigné principal"
                 value={form.responsible}
-                required
                 options={responsibleOptions}
                 onChange={(responsible) => onChange({ responsible })}
               />
@@ -273,10 +274,9 @@ export function ProjectDetailModal({
 
     const title = projectEditForm.title.trim();
     const description = projectEditForm.description.trim();
-    const responsibleName = projectEditForm.responsible.trim();
     const dueDate = projectEditForm.dueDate;
 
-    if (!title || !description || !responsibleName || !dueDate) {
+    if (!title || !description || !dueDate) {
       setProjectEditError('Les champs obligatoires doivent être renseignés.');
       return;
     }
@@ -294,14 +294,15 @@ export function ProjectDetailModal({
       return;
     }
 
-    const assigneeNames = getUniqueValues(
-      taskForm.assignees.length > 0 ? taskForm.assignees : [project.responsible.name]
+    const assigneeValues = getUniqueValues(
+      taskForm.assignees.length > 0 ? taskForm.assignees : [getPersonValue(project.responsible)]
     );
+    const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
       status: taskForm.status,
-      responsible: { name: assigneeNames[0] || project.responsible.name },
-      assignees: assigneeNames.map((name) => ({ name })),
+      responsible: assignees[0] ?? project.responsible,
+      assignees,
       priority: taskForm.priority,
       labels: taskForm.labels,
       dueDate: taskForm.dueDate,
@@ -564,7 +565,6 @@ export function ProjectDetailModal({
                     id="detail-project-responsible"
                     label="Assigné principal"
                     value={projectEditForm.responsible}
-                    required
                     options={responsibleOptions}
                     onChange={(responsible) => updateProjectEditForm({ responsible })}
                   />

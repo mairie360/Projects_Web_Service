@@ -4,6 +4,7 @@ import React from 'react';
 import { CheckCircle2, CircleDot, Plus, Tag } from 'lucide-react';
 
 import type { Project, ProjectTaskDraft } from '../../types/project';
+import { createPersonFromOptionValue, getPersonValue } from '../../lib/projectPageState';
 import type { SelectOption } from './types';
 
 const compactFieldClassName =
@@ -120,7 +121,7 @@ export function TaskComposer({
   const [title, setTitle] = React.useState('');
   const [status, setStatus] = React.useState<Project['status']>(project.status);
   const [priority, setPriority] = React.useState<Project['priority']>(project.priority);
-  const [assignees, setAssignees] = React.useState<string[]>([project.responsible.name]);
+  const [assignees, setAssignees] = React.useState<string[]>([getPersonValue(project.responsible)]);
   const [labels, setLabels] = React.useState<string[]>([]);
   const [dueDate, setDueDate] = React.useState(project.dueDate);
   const [error, setError] = React.useState('');
@@ -130,26 +131,26 @@ export function TaskComposer({
       setTitle('');
       setStatus(project.status);
       setPriority(project.priority);
-      setAssignees([project.responsible.name]);
+      setAssignees([getPersonValue(project.responsible)]);
       setLabels([]);
       setDueDate(project.dueDate);
       setError('');
     }
-  }, [open, project.dueDate, project.priority, project.responsible.name, project.status]);
+  }, [open, project.dueDate, project.priority, project.responsible, project.status]);
 
   React.useEffect(() => {
     setStatus(project.status);
     setPriority(project.priority);
-    setAssignees([project.responsible.name]);
+    setAssignees([getPersonValue(project.responsible)]);
     setDueDate(project.dueDate);
-  }, [project.dueDate, project.priority, project.responsible.name, project.status]);
+  }, [project.dueDate, project.priority, project.responsible, project.status]);
 
   if (!onAddTask) return null;
 
   const availableMembers =
     memberOptions.length > 0
       ? memberOptions
-      : project.assignees.map((assignee) => ({ label: assignee.name, value: assignee.name }));
+      : project.assignees.map((assignee) => ({ label: assignee.name, value: getPersonValue(assignee) }));
   const availableLabels =
     labelOptions.length > 0 ? labelOptions : project.labels.map((label) => ({ label, value: label }));
 
@@ -160,13 +161,16 @@ export function TaskComposer({
       return;
     }
 
-    const assigneeNames = Array.from(new Set((assignees.length > 0 ? assignees : [project.responsible.name]).filter(Boolean)));
+    const assigneeValues = Array.from(
+      new Set((assignees.length > 0 ? assignees : [getPersonValue(project.responsible)]).filter(Boolean))
+    );
+    const selectedAssignees = assigneeValues.map((value) => createPersonFromOptionValue(value, availableMembers));
 
     onAddTask(project, {
       title: trimmedTitle,
       status,
-      responsible: { name: assigneeNames[0] || project.responsible.name },
-      assignees: assigneeNames.map((name) => ({ name })),
+      responsible: selectedAssignees[0] ?? project.responsible,
+      assignees: selectedAssignees,
       priority,
       labels,
       dueDate,
@@ -269,4 +273,3 @@ export function TaskComposer({
     </form>
   );
 }
-

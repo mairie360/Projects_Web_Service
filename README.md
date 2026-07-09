@@ -10,6 +10,10 @@ This project is fully containerized for development. You’ll only need **Docker
 
 Le contrat Backend For Frontend attendu pour ce module est documenté dans [README_BFF.md](./README_BFF.md).
 
+## JWT BFF
+
+Les appels front vers `/api/bff/*` renvoient automatiquement le JWT stocké dans `localStorage` sous la clé commune `mairie360.auth.jwt`.
+
 ### 🐳 Run in Development Mode (with Hot Reload)
 
 1. Make sure Docker and Docker Compose are installed.

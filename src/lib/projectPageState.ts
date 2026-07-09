@@ -1,13 +1,15 @@
 import { Grid3X3, Kanban, List } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import type { Project, ProjectTask } from '../types/project';
+import type { Person, Project, ProjectTask } from '../types/project';
 
 export type ViewMode = 'kanban' | 'grid' | 'table';
 
 export type FilterOption = {
   label: string;
   value: string;
+  name?: string;
+  avatarUrl?: string | null;
 };
 
 export type ProjectFormState = {
@@ -90,6 +92,22 @@ export function createSelectOptions(values: string[]): FilterOption[] {
   return getUniqueValues(values).map((value) => ({ label: value, value }));
 }
 
+export function getPersonValue(person: Person) {
+  return person.id ?? person.name;
+}
+
+export function createPersonFromOptionValue(value: string, options: FilterOption[]): Person {
+  const option = options.find((currentOption) => currentOption.value === value);
+
+  if (!option) return { name: value };
+
+  return {
+    id: option.value,
+    name: option.name ?? option.label,
+    avatarUrl: option.avatarUrl ?? null,
+  };
+}
+
 const generatedTaskTitles = [
   'Cadrer le besoin avec les services',
   'Préparer le dossier administratif',
@@ -140,7 +158,7 @@ export function createTaskFormState(project: Project): TaskFormState {
     title: '',
     status: project.status,
     priority: project.priority,
-    assignees: [project.responsible.name],
+    assignees: [getPersonValue(project.responsible)],
     labels: [],
     dueDate: project.dueDate,
   };
@@ -157,8 +175,8 @@ export function createInitialTaskItems(project: Project): ProjectTask[] {
       id: `${project.id}-task-${index + 1}`,
       title: generatedTaskTitles[index % generatedTaskTitles.length],
       status: completed ? 'done' : project.status === 'done' ? 'todo' : project.status,
-      responsible: { name: assignee.name },
-      assignees: [{ name: assignee.name }],
+      responsible: { ...assignee },
+      assignees: [{ ...assignee }],
       priority: project.priority,
       labels: project.labels.slice(0, Math.min(project.labels.length, 2)),
       dueDate: project.dueDate,
@@ -175,16 +193,16 @@ export function calculateProjectProgress(tasks: ProjectTask[]) {
 }
 
 export function projectToFormState(project: Project): ProjectFormState {
-  const responsibleName = project.responsible.name;
-  const participantNames = getUniqueValues(project.assignees.map((assignee) => assignee.name));
+  const responsibleValue = getPersonValue(project.responsible);
+  const participantValues = getUniqueValues(project.assignees.map(getPersonValue));
 
   return {
     title: project.title,
     description: project.description,
     status: project.status,
     priority: project.priority,
-    responsible: responsibleName,
-    assignees: participantNames,
+    responsible: responsibleValue,
+    assignees: participantValues,
     labels: project.labels,
     dueDate: project.dueDate,
     progress: project.progress,
@@ -193,4 +211,3 @@ export function projectToFormState(project: Project): ProjectFormState {
     taskItems: createInitialTaskItems(project),
   };
 }
-
