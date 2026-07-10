@@ -11,6 +11,7 @@ Le rôle du BFF est de préparer les données dont le front a besoin pour affich
 - Préparer les agrégats utilisés par les cartes projet : progression, total de tâches, tâches terminées.
 - Retourner les options nécessaires aux selects : statuts, priorités, membres, étiquettes.
 - Centraliser les droits d'action : créer, modifier, dupliquer, supprimer, ajouter ou modifier une tâche.
+- Fournir les données de shell utilisées par le `Header` et la `Sidebar` : utilisateur courant, navigation et lien vers la page profil.
 - Exposer une spec OpenAPI pour générer les types TypeScript côté front via `@mairie360/bff-project-openapi`.
 
 ## Sources de données possibles
@@ -54,6 +55,37 @@ GET /projects-page
 
 ```json
 {
+  "shell": {
+    "currentUser": {
+      "id": "user-admin",
+      "name": "Admin Système",
+      "email": "admin@mairie360.fr",
+      "role": "admin",
+      "service": "Direction générale",
+      "position": "Administrateur système",
+      "phone": "+262 262 00 00 00",
+      "address": null,
+      "city": "Saint-Denis",
+      "avatarUrl": null,
+      "lastConnection": "2026-07-03T08:00:00.000+04:00"
+    },
+    "navigation": {
+      "activeItem": "projects",
+      "profileHref": "/profile",
+      "items": [
+        { "id": "dashboard", "label": "Tableau de bord", "href": null, "adminOnly": false, "badge": null },
+        { "id": "projects", "label": "Projets", "href": "/", "adminOnly": false, "badge": null },
+        { "id": "messages", "label": "Messagerie", "href": null, "adminOnly": false, "badge": null },
+        { "id": "emails", "label": "E-mails", "href": null, "adminOnly": false, "badge": null },
+        { "id": "files", "label": "Fichiers", "href": null, "adminOnly": false, "badge": null },
+        { "id": "training", "label": "Formation", "href": null, "adminOnly": false, "badge": null },
+        { "id": "calendar", "label": "Calendrier", "href": null, "adminOnly": false, "badge": null },
+        { "id": "admin", "label": "Administration", "href": null, "adminOnly": true, "badge": "Admin" },
+        { "id": "profile", "label": "Profil", "href": "/profile", "adminOnly": false, "badge": null },
+        { "id": "settings", "label": "Paramètres", "href": null, "adminOnly": false, "badge": null }
+      ]
+    }
+  },
   "page": {
     "title": "Projets",
     "subtitle": "Gérez vos projets municipaux avec des vues Kanban, tableau et grille",
@@ -154,6 +186,47 @@ GET /projects-page
     "limit": 50,
     "total": 6,
     "hasNextPage": false
+  }
+}
+```
+
+## Endpoint page profil
+
+```http
+GET /profile-page
+```
+
+Cet endpoint alimente la route front `/profile`. Il doit retourner le même bloc `shell` que `GET /projects-page`, avec `navigation.activeItem = "profile"`, et les informations détaillées de l'utilisateur courant.
+
+```json
+{
+  "shell": {
+    "currentUser": {
+      "id": "user-admin",
+      "name": "Admin Système",
+      "email": "admin@mairie360.fr",
+      "role": "admin",
+      "service": "Direction générale",
+      "position": "Administrateur système",
+      "phone": "+262 262 00 00 00",
+      "address": null,
+      "city": "Saint-Denis",
+      "avatarUrl": null,
+      "lastConnection": "2026-07-03T08:00:00.000+04:00"
+    },
+    "navigation": {
+      "activeItem": "profile",
+      "profileHref": "/profile",
+      "items": [
+        { "id": "projects", "label": "Projets", "href": "/", "adminOnly": false, "badge": null },
+        { "id": "profile", "label": "Profil", "href": "/profile", "adminOnly": false, "badge": null }
+      ]
+    }
+  },
+  "page": {
+    "title": "Profil utilisateur",
+    "subtitle": "Informations du compte connecté",
+    "editable": true
   }
 }
 ```
@@ -349,6 +422,41 @@ type ProjectPriority = 'high' | 'medium' | 'low';
 type ViewMode = 'kanban' | 'grid' | 'table';
 ```
 
+### Shell applicatif
+
+```ts
+type AppNavigationItem = {
+  id: string;
+  label: string;
+  href: string | null;
+  adminOnly: boolean;
+  badge: string | null;
+};
+
+type CurrentUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'manager' | 'user' | string;
+  service?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  avatarUrl?: string | null;
+  lastConnection?: string | null;
+};
+
+type AppShell = {
+  currentUser: CurrentUser;
+  navigation: {
+    activeItem: string;
+    profileHref: string;
+    items: AppNavigationItem[];
+  };
+};
+```
+
 ### Personne assignable
 
 ```ts
@@ -455,6 +563,9 @@ Le front actuel utilise les champs suivants :
 - `options.members` pour les selects `Assigné principal` et `Assignés`.
 - `options.labels` pour le select multiple `Étiquettes`.
 - `filters.statuses` et `filters.priorities` pour les filtres de la page.
+- `shell.currentUser` pour le `Header` et la page `/profile`.
+- `shell.navigation.items` pour la `Sidebar`. L'item `profile` doit être présent par défaut et pointer vers `/profile`.
+- `shell.navigation.profileHref` pour que le clic `Profil` du `Header` redirige vers la page profil.
 
 ## Critères d'acceptation
 
@@ -464,4 +575,6 @@ Le front actuel utilise les champs suivants :
 - Ajouter, modifier ou terminer une tâche recalcule la progression et les compteurs du projet.
 - Les selects multi-valeurs reçoivent toutes leurs options depuis le BFF.
 - Les labels affichés au front sont en français.
+- Le clic `Profil` dans le `Header` redirige vers `/profile`.
+- La `Sidebar` affiche l'item `Profil` par défaut, avec `activeItem = "profile"` sur la page profil.
 - Le front n'a pas besoin d'appeler directement les APIs Core, Project ou Users.
