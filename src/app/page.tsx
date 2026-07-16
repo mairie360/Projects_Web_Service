@@ -8,6 +8,7 @@ import { KanbanBoard } from '../components/Kanban';
 import { ActionButton } from '../components/project/ProjectFormControls';
 import { CreateProjectModal, ProjectDetailModal } from '../components/project/ProjectModals';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from '../components/project/ProjectViews';
+import { appSidebarItems } from '../lib/appShell';
 import {
   createProject,
   createProjectBodyFromForm,
@@ -420,6 +421,7 @@ export default function ProjectsPage() {
           <Sidebar
             activeItem="projects"
             isAdmin={session.isAdmin}
+            items={appSidebarItems}
             brandLabel="Mairie360"
             brandInitial="M"
             onItemSelect={(item) => handlePageChange(item.id)}
@@ -438,6 +440,7 @@ export default function ProjectsPage() {
               <Sidebar
                 activeItem="projects"
                 isAdmin={session.isAdmin}
+                items={appSidebarItems}
                 brandLabel="Mairie360"
                 brandInitial="M"
                 onItemSelect={(item) => handlePageChange(item.id)}
@@ -451,6 +454,7 @@ export default function ProjectsPage() {
             user={session.user}
             isAdmin={session.isAdmin}
             setSidebarOpen={setSidebarOpen}
+            profileHref="/profile"
             onPageChange={handlePageChange}
             onLogout={() => void logoutAndReload()}
           />

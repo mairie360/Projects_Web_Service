@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@mairie360/lib-components/dist/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
