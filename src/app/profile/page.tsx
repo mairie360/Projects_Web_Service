@@ -4,9 +4,11 @@ import { UserProfilePage } from '@mairie360/lib-components';
 import { useRouter } from 'next/navigation';
 
 import { appSidebarItems, currentUser, getNavigationHref } from '../../lib/appShell';
+import { logoutAndReload, useAuthSession } from '../../lib/auth-session';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const session = useAuthSession(currentUser);
 
   const handlePageChange = (page: string) => {
     const href = getNavigationHref(page);
@@ -16,12 +18,13 @@ export default function ProfilePage() {
 
   return (
     <UserProfilePage
-      user={currentUser}
-      isAdmin
+      user={session.user}
+      isAdmin={session.isAdmin}
       activeItem="profile"
       headerProps={{
         profileHref: '/profile',
         onPageChange: handlePageChange,
+        onLogout: () => void logoutAndReload(),
       }}
       sidebarProps={{
         items: appSidebarItems,
@@ -35,8 +38,10 @@ export default function ProfilePage() {
         className: 'shrink-0',
       }}
       profileProps={{
-        editable: true,
-        subtitle: 'Informations du compte connecté',
+        editable: false,
+        loading: session.loading,
+        error: session.error,
+        subtitle: 'Informations réelles du compte connecté',
       }}
     />
   );
