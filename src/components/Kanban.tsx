@@ -66,7 +66,7 @@ export function KanbanBoard({
                   {columnProjects.length}
                 </span>
               </div>
-              <ToolTip text={`Ajouter dans ${column.label}`}>
+              {onAddProject && <ToolTip text={`Ajouter dans ${column.label}`}>
                 <button
                   type="button"
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
@@ -75,7 +75,7 @@ export function KanbanBoard({
                 >
                   <Plus className="h-4 w-4" strokeWidth={2} />
                 </button>
-              </ToolTip>
+              </ToolTip>}
             </div>
 
             <div className="space-y-2.5">

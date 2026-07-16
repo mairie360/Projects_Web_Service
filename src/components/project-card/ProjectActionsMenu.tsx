@@ -17,6 +17,10 @@ export function ProjectActionsMenu({
   onDuplicate?: (project: Project) => void;
   onDelete?: (project: Project) => void;
 }) {
+  const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
+  const canDuplicate = project.permissions?.canDuplicate !== false && Boolean(onDuplicate);
+  const canDelete = project.permissions?.canDelete !== false && Boolean(onDelete);
+  const hasActions = canEdit || canDuplicate || canDelete;
   const [open, setOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -47,6 +51,8 @@ export function ProjectActionsMenu({
     action?.(project);
   };
 
+  if (!hasActions) return null;
+
   return (
     <div
       ref={menuRef}
@@ -75,34 +81,33 @@ export function ProjectActionsMenu({
           className="absolute right-0 top-[calc(100%+4px)] z-50 w-36 overflow-hidden rounded-md border border-[#d0d7de] bg-white py-1 text-sm text-[#24292f] shadow-[0_8px_24px_rgba(140,149,159,0.2)]"
           role="menu"
         >
-          <button
+          {canEdit && <button
             type="button"
             role="menuitem"
             className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
             onClick={runAction(onEdit)}
           >
             Modifier
-          </button>
-          <button
+          </button>}
+          {canDuplicate && <button
             type="button"
             role="menuitem"
             className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
             onClick={runAction(onDuplicate)}
           >
             Dupliquer
-          </button>
-          <div className="my-1 border-t border-[#d8dee4]" />
-          <button
+          </button>}
+          {canDelete && (canEdit || canDuplicate) && <div className="my-1 border-t border-[#d8dee4]" />}
+          {canDelete && <button
             type="button"
             role="menuitem"
             className="flex h-9 w-full items-center px-3 text-left text-[#cf222e] transition hover:bg-[#ffebe9]"
             onClick={runAction(onDelete)}
           >
             Supprimer
-          </button>
+          </button>}
         </div>
       )}
     </div>
   );
 }
-

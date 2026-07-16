@@ -152,7 +152,11 @@ services:
 
   bff-project:
     container_name: bff-project-projects-front
-    image: ghcr.io/mairie360/bff-project:dev-latest
+    build:
+      context: ../BFF_Project
+      dockerfile: development.Dockerfile
+      args:
+        NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN}
     ports:
       - "4001:4001"
     networks:
@@ -163,7 +167,11 @@ services:
       CORE_API_PORT: 3000
       PROJECT_API_URL: "project-api" 
       PROJECT_API_PORT: 3001
+      PROJECT_API_BASE_PATH: "http://project-api:3001"
       PORT: 4001
+    depends_on:
+      project-api:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
       interval: 10s
@@ -191,9 +199,16 @@ services:
     environment:
       <<: *common-env
       PORT: 3000
+      BFF_PROJECT_BASE_URL: http://bff-project:4001
+      USER_BFF_URL: ${USER_BFF_URL:-http://host.docker.internal:4000}
       # Force React/Vite à surveiller les fichiers correctement dans Docker
       WATCHPACK_POLLING: "true" 
       CHOKIDAR_USEPOLLING: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      bff-project:
+        condition: service_healthy
     networks:
       - frontend
     healthcheck:

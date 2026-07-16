@@ -145,7 +145,7 @@ export function TaskComposer({
     setDueDate(project.dueDate);
   }, [project.dueDate, project.priority, project.responsible, project.status]);
 
-  if (!onAddTask) return null;
+  if (!onAddTask || project.permissions?.canCreateTask === false) return null;
 
   const availableMembers =
     memberOptions.length > 0

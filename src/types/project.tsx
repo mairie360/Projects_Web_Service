@@ -24,6 +24,34 @@ export interface ProjectTask {
   completed: boolean;
   createdAt: string;
   updatedAt?: string;
+  permissions?: {
+    canView: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canUpdateStatus: boolean;
+    canComment: boolean;
+  };
+}
+
+export interface TaskComment {
+  id: string;
+  message: string;
+  author: { id: string; name: string };
+  createdAt: string;
+}
+
+export interface TaskHistoryEntry {
+  id: string;
+  action: string;
+  label: string;
+  author: { id: string; name: string };
+  createdAt: string;
+  changes?: Record<string, unknown>;
+}
+
+export interface TaskCollaboration {
+  comments: TaskComment[];
+  history: TaskHistoryEntry[];
 }
 
 export interface ProjectTaskDraft {
@@ -60,7 +88,8 @@ export interface Project {
     canDuplicate?: boolean;
     canDelete?: boolean;
     canCreateTask?: boolean;
-    canEditTask?: boolean;
+    canAssignMembers?: boolean;
+    canClose?: boolean;
   };
   createdAt: string;
 }
