@@ -38,6 +38,7 @@ import {
   type ProjectFormState,
   type ViewMode,
 } from '../lib/projectPageState';
+import { navigateToPage } from '../lib/navigation';
 import type { Project, ProjectTaskDraft } from '../types/project';
 
 type AlertState = {
@@ -79,6 +80,11 @@ export default function ProjectsPage() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+
+  const handlePageChange = (page: string) => {
+    navigateToPage(page);
+    setSidebarOpen(false);
+  };
 
   const memberOptions = useMemo<FilterOption[]>(
     () =>
@@ -403,7 +409,13 @@ export default function ProjectsPage() {
 
       <div className="flex h-full">
         <div className="hidden shrink-0 lg:block">
-          <Sidebar activeItem="projects" isAdmin brandLabel="Mairie360" brandInitial="M" />
+          <Sidebar
+            activeItem="projects"
+            isAdmin
+            brandLabel="Mairie360"
+            brandInitial="M"
+            onItemSelect={(item) => handlePageChange(item.id)}
+          />
         </div>
 
         {sidebarOpen && (
@@ -420,7 +432,7 @@ export default function ProjectsPage() {
                 isAdmin
                 brandLabel="Mairie360"
                 brandInitial="M"
-                onItemSelect={() => setSidebarOpen(false)}
+                onItemSelect={(item) => handlePageChange(item.id)}
               />
             </div>
           </div>
@@ -431,7 +443,7 @@ export default function ProjectsPage() {
             user={{ name: 'Admin Système', email: 'admin@mairie360.fr', role: 'admin' }}
             isAdmin
             setSidebarOpen={setSidebarOpen}
-            onPageChange={(page) => showInfo(`Navigation : ${page}`)}
+            onPageChange={handlePageChange}
             onLogout={() => showInfo('Déconnexion en attente.')}
           />
 
