@@ -7,6 +7,7 @@ const pageRoutes: Partial<Record<string, string>> = {
   training: process.env.ELEARNING_FRONT_URL,
   calendar: process.env.CALENDAR_FRONT_URL,
   admin: process.env.ADMINISTRATION_FRONT_URL,
+  profile: "/profile",
 };
 
 export function navigateToPage(page: string) {
