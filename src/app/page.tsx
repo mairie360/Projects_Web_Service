@@ -39,7 +39,14 @@ import {
   type ViewMode,
 } from '../lib/projectPageState';
 import { navigateToPage } from '../lib/navigation';
+import { logoutAndReload, useAuthSession } from '../lib/auth-session';
 import type { Project, ProjectTaskDraft } from '../types/project';
+
+const fallbackUser = {
+  name: 'Admin Système',
+  email: 'admin@mairie360.fr',
+  role: 'admin',
+};
 
 type AlertState = {
   type: 'success' | 'info' | 'error';
@@ -80,6 +87,7 @@ export default function ProjectsPage() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+  const session = useAuthSession(fallbackUser);
 
   const handlePageChange = (page: string) => {
     navigateToPage(page);
@@ -411,7 +419,7 @@ export default function ProjectsPage() {
         <div className="hidden shrink-0 lg:block">
           <Sidebar
             activeItem="projects"
-            isAdmin
+            isAdmin={session.isAdmin}
             brandLabel="Mairie360"
             brandInitial="M"
             onItemSelect={(item) => handlePageChange(item.id)}
@@ -429,7 +437,7 @@ export default function ProjectsPage() {
             <div className="relative z-10">
               <Sidebar
                 activeItem="projects"
-                isAdmin
+                isAdmin={session.isAdmin}
                 brandLabel="Mairie360"
                 brandInitial="M"
                 onItemSelect={(item) => handlePageChange(item.id)}
@@ -440,11 +448,11 @@ export default function ProjectsPage() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
-            user={{ name: 'Admin Système', email: 'admin@mairie360.fr', role: 'admin' }}
-            isAdmin
+            user={session.user}
+            isAdmin={session.isAdmin}
             setSidebarOpen={setSidebarOpen}
             onPageChange={handlePageChange}
-            onLogout={() => showInfo('Déconnexion en attente.')}
+            onLogout={() => void logoutAndReload()}
           />
 
           <main className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
