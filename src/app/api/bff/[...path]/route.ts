@@ -6,11 +6,12 @@ type RouteContext = {
   }>;
 };
 
-const DEFAULT_BFF_BASE_URL = 'http://localhost:4000';
+const DEFAULT_BFF_BASE_URL = 'http://localhost:4001';
 
 function getBffBaseUrl() {
   return (
     process.env.BFF_PROJECT_BASE_URL ??
+    process.env.PROJECT_BFF_URL ??
     process.env.NEXT_PUBLIC_BFF_PROJECT_BASE_URL ??
     DEFAULT_BFF_BASE_URL
   ).replace(/\/+$/, '');
@@ -18,11 +19,17 @@ function getBffBaseUrl() {
 
 function createProxyHeaders(request: NextRequest) {
   const headers = new Headers(request.headers);
+  const accessToken = request.cookies.get('accessToken')?.value;
 
   headers.delete('host');
   headers.delete('connection');
   headers.delete('content-length');
   headers.delete('accept-encoding');
+  headers.delete('cookie');
+
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
 
   return headers;
 }

@@ -2,7 +2,18 @@
 
 import React from 'react';
 import { Button, ToolTip } from '@mairie360/lib-components';
-import { CalendarDays, CheckSquare2, CircleDot, ListChecks, Square, X } from 'lucide-react';
+import {
+  CalendarDays,
+  CheckSquare2,
+  CircleDot,
+  History,
+  ListChecks,
+  MessageSquare,
+  Search,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react';
 
 import {
   formatProjectDate,
@@ -11,7 +22,14 @@ import {
   ProgressMeter,
   StatusPill,
 } from '../ProjectCard';
-import type { Project, ProjectTask, ProjectTaskDraft } from '../../types/project';
+import type {
+  Project,
+  ProjectStatus,
+  ProjectTask,
+  ProjectTaskDraft,
+  TaskCollaboration,
+} from '../../types/project';
+import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
 import {
   createPersonFromOptionValue,
   createTaskFormState,
@@ -19,6 +37,7 @@ import {
   getUniqueValues,
   projectPriorityOptions,
   projectStatusOptions,
+  taskStatusOptions,
   projectToFormState,
   type FilterOption,
   type ProjectFormState,
@@ -230,7 +249,9 @@ export function ProjectDetailModal({
   onUpdateProject,
   onAddTask,
   onUpdateTask,
-  onToggleTask,
+  onUpdateTaskStatus,
+  onDeleteTask,
+  onCloseProject,
 }: {
   project: Project;
   tasks: ProjectTask[];
@@ -240,7 +261,9 @@ export function ProjectDetailModal({
   onUpdateProject: (projectId: string, form: ProjectFormState) => void;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void;
-  onToggleTask: (projectId: string, taskId: string) => void;
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void;
+  onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
+  onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
 }) {
   const [editingProject, setEditingProject] = React.useState(false);
   const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
@@ -248,7 +271,32 @@ export function ProjectDetailModal({
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
+  const [taskSearch, setTaskSearch] = React.useState('');
+  const [taskStatusFilter, setTaskStatusFilter] = React.useState('all');
+  const [taskPriorityFilter, setTaskPriorityFilter] = React.useState('all');
+  const [taskDueFilter, setTaskDueFilter] = React.useState('');
+  const [deletingTaskId, setDeletingTaskId] = React.useState<string | null>(null);
+  const [collaborationTaskId, setCollaborationTaskId] = React.useState<string | null>(null);
+  const [collaboration, setCollaboration] = React.useState<TaskCollaboration | null>(null);
+  const [collaborationLoading, setCollaborationLoading] = React.useState(false);
+  const [collaborationError, setCollaborationError] = React.useState('');
+  const [commentMessage, setCommentMessage] = React.useState('');
+  const [commentSaving, setCommentSaving] = React.useState(false);
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
+
+  const filteredTasks = React.useMemo(() => {
+    const search = taskSearch.trim().toLowerCase();
+
+    return tasks.filter((task) => {
+      const matchesSearch = !search || task.title.toLowerCase().includes(search) ||
+        task.labels.some((label) => label.toLowerCase().includes(search));
+      const matchesStatus = taskStatusFilter === 'all' || task.status === taskStatusFilter;
+      const matchesPriority = taskPriorityFilter === 'all' || task.priority === taskPriorityFilter;
+      const matchesDueDate = !taskDueFilter || task.dueDate.slice(0, 10) <= taskDueFilter;
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesDueDate;
+    });
+  }, [taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
 
   React.useEffect(() => {
     setProjectEditForm(projectToFormState(project));
@@ -257,7 +305,54 @@ export function ProjectDetailModal({
     setTaskForm(createTaskFormState(project));
     setEditingTaskId(null);
     setTaskFormError('');
+    setTaskSearch('');
+    setTaskStatusFilter('all');
+    setTaskPriorityFilter('all');
+    setTaskDueFilter('');
+    setDeletingTaskId(null);
+    setCollaborationTaskId(null);
+    setCollaboration(null);
+    setCollaborationError('');
+    setCommentMessage('');
   }, [project]);
+
+  const openTaskCollaboration = async (taskId: string) => {
+    if (collaborationTaskId === taskId) {
+      setCollaborationTaskId(null);
+      return;
+    }
+
+    setCollaborationTaskId(taskId);
+    setCollaboration(null);
+    setCollaborationError('');
+    setCollaborationLoading(true);
+
+    try {
+      setCollaboration(await getTaskCollaboration(project.id, taskId));
+    } catch (error) {
+      setCollaborationError(getBffProjectErrorMessage(error));
+    } finally {
+      setCollaborationLoading(false);
+    }
+  };
+
+  const submitComment = async (event: React.FormEvent<HTMLFormElement>, taskId: string) => {
+    event.preventDefault();
+    const message = commentMessage.trim();
+    if (!message) return;
+
+    setCommentSaving(true);
+    setCollaborationError('');
+    try {
+      await addTaskComment(project.id, taskId, message);
+      setCommentMessage('');
+      setCollaboration(await getTaskCollaboration(project.id, taskId));
+    } catch (error) {
+      setCollaborationError(getBffProjectErrorMessage(error));
+    } finally {
+      setCommentSaving(false);
+    }
+  };
 
   const updateProjectEditForm = (patch: Partial<ProjectFormState>) => {
     setProjectEditForm((current) => ({ ...current, ...patch }));
@@ -341,13 +436,13 @@ export function ProjectDetailModal({
             <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            {project.permissions?.canEdit !== false && <button
               type="button"
               className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
               onClick={() => setEditingProject((current) => !current)}
             >
               {editingProject ? 'Annuler' : 'Modifier'}
-            </button>
+            </button>}
             <ToolTip text="Fermer">
               <button
                 type="button"
@@ -364,13 +459,14 @@ export function ProjectDetailModal({
         <div className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
-              <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
-                  <CircleDot className="h-4 w-4 text-[#1a7f37]" strokeWidth={2} />
-                  Ajouter une tâche
-                </div>
+              {project.permissions?.canCreateTask !== false && (
+                <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
+                    <CircleDot className="h-4 w-4 text-[#1a7f37]" strokeWidth={2} />
+                    {editingTaskId ? 'Modifier la tâche' : 'Ajouter une tâche'}
+                  </div>
 
-                <form className="space-y-3" onSubmit={submitTask}>
+                  <form className="space-y-3" onSubmit={submitTask}>
                   <input
                     value={taskForm.title}
                     placeholder="Ajouter une tâche..."
@@ -385,7 +481,7 @@ export function ProjectDetailModal({
                       id="detail-task-status"
                       label="Statut"
                       value={taskForm.status}
-                      options={projectStatusOptions}
+                      options={taskStatusOptions}
                       onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
                     />
                     <SelectField
@@ -441,8 +537,9 @@ export function ProjectDetailModal({
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
                   </div>
-                </form>
-              </div>
+                  </form>
+                </div>
+              )}
 
               <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
                 <div className="flex items-center justify-between border-b border-[#dedbd6] bg-[#f1eee9] px-4 py-3">
@@ -455,20 +552,73 @@ export function ProjectDetailModal({
                   </span>
                 </div>
 
+                {tasks.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 border-b border-[#dedbd6] bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <label className="relative sm:col-span-2 xl:col-span-1">
+                      <span className="sr-only">Rechercher une tâche</span>
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6e7781]" />
+                      <input
+                        type="search"
+                        value={taskSearch}
+                        placeholder="Rechercher une tâche"
+                        className="h-9 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] pl-9 pr-3 text-xs outline-none focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
+                        onChange={(event) => setTaskSearch(event.target.value)}
+                      />
+                    </label>
+                    <select
+                      aria-label="Filtrer les tâches par statut"
+                      value={taskStatusFilter}
+                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
+                      onChange={(event) => setTaskStatusFilter(event.target.value)}
+                    >
+                      <option value="all">Tous les statuts</option>
+                      {taskStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <select
+                      aria-label="Filtrer les tâches par priorité"
+                      value={taskPriorityFilter}
+                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
+                      onChange={(event) => setTaskPriorityFilter(event.target.value)}
+                    >
+                      <option value="all">Toutes les priorités</option>
+                      {projectPriorityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <input
+                      type="date"
+                      aria-label="Échéance maximale des tâches"
+                      value={taskDueFilter}
+                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
+                      onChange={(event) => setTaskDueFilter(event.target.value)}
+                    />
+                  </div>
+                )}
+
                 {tasks.length === 0 ? (
                   <div className="px-4 py-10 text-center text-sm text-[#57606a]">Aucune tâche pour ce projet.</div>
+                ) : filteredTasks.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-sm text-[#57606a]">Aucune tâche ne correspond aux filtres.</div>
                 ) : (
                   <div className="divide-y divide-[#d8dee4]">
-                    {tasks.map((task) => {
+                    {filteredTasks.map((task) => {
                       const TaskIcon = task.completed ? CheckSquare2 : Square;
+                      const canUpdateStatus = task.permissions?.canUpdateStatus !== false;
+                      const canEditTask = task.permissions?.canEdit !== false;
+                      const canDeleteTask = task.permissions?.canDelete !== false;
 
                       return (
                         <article key={task.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
                           <button
                             type="button"
-                            className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#0969da] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
+                            disabled={!canUpdateStatus}
+                            className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
-                            onClick={() => onToggleTask(project.id, task.id)}
+                            onClick={() =>
+                              onUpdateTaskStatus(
+                                project.id,
+                                task.id,
+                                task.completed || task.status === 'done' ? 'todo' : 'done'
+                              )
+                            }
                           >
                             <TaskIcon
                               className={`h-4 w-4 ${task.completed ? 'text-[#1a7f37]' : 'text-[#8c959f]'}`}
@@ -478,10 +628,54 @@ export function ProjectDetailModal({
                           <div className="min-w-0">
                             <div className="flex min-w-0 items-start justify-between gap-3">
                               <h3 className="min-w-0 text-sm font-semibold leading-snug text-[#24292f]">{task.title}</h3>
-                              <TaskEditButton onClick={() => editTask(task)} />
+                              <div className="flex shrink-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[#d0d7de] bg-white px-2 text-[11px] font-semibold text-[#57606a] hover:bg-[#f6f8fa]"
+                                  onClick={() => void openTaskCollaboration(task.id)}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  Suivi
+                                </button>
+                                {canEditTask && <TaskEditButton onClick={() => editTask(task)} />}
+                                {canDeleteTask && deletingTaskId !== task.id && (
+                                  <button
+                                    type="button"
+                                    aria-label={`Supprimer ${task.title}`}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
+                                    onClick={() => setDeletingTaskId(task.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
-                              <StatusPill status={task.status} />
+                              {canUpdateStatus ? (
+                                <label className="inline-flex items-center gap-1.5">
+                                  <span className="sr-only">Statut de {task.title}</span>
+                                  <select
+                                    aria-label={`Statut de ${task.title}`}
+                                    value={task.status}
+                                    className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
+                                    onChange={(event) =>
+                                      onUpdateTaskStatus(
+                                        project.id,
+                                        task.id,
+                                        event.target.value as ProjectStatus
+                                      )
+                                    }
+                                  >
+                                    {taskStatusOptions.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              ) : (
+                                <StatusPill status={task.status} />
+                              )}
                               <PriorityPill priority={task.priority} />
                               <span className="inline-flex items-center gap-1">
                                 {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 3).map((assignee) => (
@@ -504,6 +698,66 @@ export function ProjectDetailModal({
                                 </span>
                               ))}
                             </div>
+
+                            {deletingTaskId === task.id && (
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-2 text-xs text-[#cf222e]">
+                                <span>Supprimer définitivement cette tâche ?</span>
+                                <span className="flex gap-2">
+                                  <button type="button" className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 font-semibold text-[#24292f]" onClick={() => setDeletingTaskId(null)}>Annuler</button>
+                                  <button
+                                    type="button"
+                                    className="rounded-md bg-[#cf222e] px-2 py-1 font-semibold text-white"
+                                    onClick={() => {
+                                      setDeletingTaskId(null);
+                                      void onDeleteTask(project.id, task.id, task.title);
+                                    }}
+                                  >
+                                    Supprimer
+                                  </button>
+                                </span>
+                              </div>
+                            )}
+
+                            {collaborationTaskId === task.id && (
+                              <div className="mt-3 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
+                                {collaborationLoading && <p className="text-xs text-[#57606a]">Chargement du suivi...</p>}
+                                {collaborationError && <p className="text-xs font-medium text-[#cf222e]">{collaborationError}</p>}
+                                {collaboration && (
+                                  <div className="grid gap-4 lg:grid-cols-2">
+                                    <div>
+                                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><MessageSquare className="h-3.5 w-3.5" /> Commentaires</h4>
+                                      <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                                        {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
+                                        {collaboration.comments.map((comment) => (
+                                          <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
+                                            <div className="flex justify-between gap-2 font-semibold text-[#24292f]"><span>{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR')}</time></div>
+                                            <p className="mt-1 whitespace-pre-wrap text-[#57606a]">{comment.message}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {task.permissions?.canComment !== false && (
+                                        <form className="mt-2 flex gap-2" onSubmit={(event) => void submitComment(event, task.id)}>
+                                          <input value={commentMessage} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 flex-1 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da]" onChange={(event) => setCommentMessage(event.target.value)} />
+                                          <button type="submit" disabled={commentSaving || !commentMessage.trim()} className="rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
+                                        </form>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><History className="h-3.5 w-3.5" /> Historique</h4>
+                                      <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
+                                        {collaboration.history.length === 0 && <p className="text-xs text-[#6e7781]">Aucune modification enregistrée.</p>}
+                                        {collaboration.history.map((entry) => (
+                                          <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs">
+                                            <p className="font-medium text-[#24292f]">{entry.label}</p>
+                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR')}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </article>
                       );
@@ -680,6 +934,29 @@ export function ProjectDetailModal({
                       ))}
                     </div>
                   </div>
+
+                  {project.permissions?.canClose !== false && (
+                    <div className="border-t border-[#dedbd6] pt-4">
+                      <h3 className="text-sm font-semibold text-[#24292f]">Cycle de vie</h3>
+                      <p className="mt-1 text-xs text-[#57606a]">Clôturez le projet terminé ou suspendez-le temporairement.</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          className="h-9 rounded-md border border-[#d0d7de] bg-white text-xs font-semibold text-[#57606a] hover:bg-[#f1eee9]"
+                          onClick={() => void onCloseProject(project.id, 'review')}
+                        >
+                          Suspendre
+                        </button>
+                        <button
+                          type="button"
+                          className="h-9 rounded-md bg-[#1a7f37] text-xs font-semibold text-white hover:bg-[#116329]"
+                          onClick={() => void onCloseProject(project.id, 'done')}
+                        >
+                          Clôturer
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </aside>

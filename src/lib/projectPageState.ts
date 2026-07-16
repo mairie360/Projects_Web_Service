@@ -58,6 +58,7 @@ export const viewOptions: { value: ViewMode; label: string; icon: LucideIcon }[]
 ];
 
 export const projectStatusOptions = statusOptions.filter((option) => option.value !== 'all');
+export const taskStatusOptions = projectStatusOptions.filter((option) => option.value !== 'review');
 export const projectPriorityOptions = priorityOptions.filter((option) => option.value !== 'all');
 export const defaultProjectMembers = [
   'Alex Moreau',

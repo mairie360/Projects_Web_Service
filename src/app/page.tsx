@@ -13,7 +13,9 @@ import {
   createProject,
   createProjectBodyFromForm,
   createProjectTask,
+  closeProject as closeBffProject,
   deleteProject as deleteBffProject,
+  deleteProjectTask as deleteBffProjectTask,
   duplicateProject as duplicateBffProject,
   getBffProjectErrorMessage,
   getProjectDetails,
@@ -41,7 +43,7 @@ import {
 } from '../lib/projectPageState';
 import { navigateToPage } from '../lib/navigation';
 import { logoutAndReload, useAuthSession } from '../lib/auth-session';
-import type { Project, ProjectTaskDraft } from '../types/project';
+import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
 
 const fallbackUser = {
   name: 'Admin Système',
@@ -59,6 +61,7 @@ type RefreshProjectsOptions = {
   search?: string;
   status?: string;
   priority?: string;
+  dueBefore?: string;
   view?: ViewMode;
   silent?: boolean;
 };
@@ -68,7 +71,12 @@ function isAbortError(error: unknown) {
 }
 
 function validateProjectForm(form: ProjectFormState) {
-  return Boolean(form.title.trim() && form.description.trim() && form.dueDate);
+  return Boolean(
+    form.title.trim() &&
+      form.description.trim() &&
+      form.dueDate &&
+      (form.responsible.trim() || form.assignees.length > 0)
+  );
 }
 
 export default function ProjectsPage() {
@@ -78,6 +86,7 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [dueBeforeFilter, setDueBeforeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,6 +95,7 @@ export default function ProjectsPage() {
   const [pageError, setPageError] = useState('');
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
   const session = useAuthSession(fallbackUser);
@@ -115,8 +125,18 @@ export default function ProjectsPage() {
     [projects, projectsPage?.options.labels]
   );
 
-  const statusFilterOptions = projectsPage?.filters.statuses ?? statusOptions;
-  const priorityFilterOptions = projectsPage?.filters.priorities ?? priorityOptions;
+  const statusFilterOptions = useMemo(
+    () => (projectsPage?.filters.statuses ?? statusOptions).map((option) =>
+      option.value === 'all' ? { ...option, label: 'Tous les statuts' } : option
+    ),
+    [projectsPage?.filters.statuses]
+  );
+  const priorityFilterOptions = useMemo(
+    () => (projectsPage?.filters.priorities ?? priorityOptions).map((option) =>
+      option.value === 'all' ? { ...option, label: 'Toutes les priorités' } : option
+    ),
+    [projectsPage?.filters.priorities]
+  );
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -130,15 +150,18 @@ export default function ProjectsPage() {
         project.description.toLowerCase().includes(normalizedSearch) ||
         project.labels.some((label) => label.toLowerCase().includes(normalizedSearch));
 
-      return matchesStatus && matchesPriority && matchesSearch;
+      const matchesDueDate = !dueBeforeFilter || project.dueDate.slice(0, 10) <= dueBeforeFilter;
+
+      return matchesStatus && matchesPriority && matchesSearch && matchesDueDate;
     });
-  }, [priorityFilter, projects, searchTerm, statusFilter]);
+  }, [dueBeforeFilter, priorityFilter, projects, searchTerm, statusFilter]);
 
   const refreshProjectsPage = useCallback(
     async (options: RefreshProjectsOptions = {}) => {
       const nextSearch = options.search ?? searchTerm;
       const nextStatus = options.status ?? statusFilter;
       const nextPriority = options.priority ?? priorityFilter;
+      const nextDueBefore = options.dueBefore ?? dueBeforeFilter;
       const nextView = options.view ?? viewMode;
 
       if (!options.silent) {
@@ -151,6 +174,7 @@ export default function ProjectsPage() {
             q: nextSearch.trim() || undefined,
             status: nextStatus as Project['status'] | 'all',
             priority: nextPriority as Project['priority'] | 'all',
+            dueBefore: nextDueBefore || undefined,
             view: nextView,
             page: 1,
             limit: 50,
@@ -171,7 +195,7 @@ export default function ProjectsPage() {
         }
       }
     },
-    [priorityFilter, searchTerm, statusFilter, viewMode]
+    [dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]
   );
 
   useEffect(() => {
@@ -297,9 +321,10 @@ export default function ProjectsPage() {
       setSearchTerm('');
       setStatusFilter('all');
       setPriorityFilter('all');
+      setDueBeforeFilter('');
       setCreateProjectOpen(false);
       setSelectedProjectDetails(details);
-      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', silent: true });
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" créé.` });
     } catch (error) {
       showError(error);
@@ -313,7 +338,8 @@ export default function ProjectsPage() {
       setSearchTerm('');
       setStatusFilter('all');
       setPriorityFilter('all');
-      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', silent: true });
+      setDueBeforeFilter('');
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
       showError(error);
@@ -321,11 +347,16 @@ export default function ProjectsPage() {
   };
 
   const deleteProject = async (project: Project) => {
-    const confirmed = window.confirm(`Supprimer le projet "${project.title}" ?`);
-    if (!confirmed) return;
+    setProjectPendingDeletion(project);
+  };
+
+  const confirmProjectDeletion = async () => {
+    const project = projectPendingDeletion;
+    if (!project) return;
 
     try {
       await deleteBffProject(project.id);
+      setProjectPendingDeletion(null);
       if (selectedProjectDetails?.project.id === project.id) setSelectedProjectDetails(null);
       if (editingProjectId === project.id) closeCreateProject();
       await refreshProjectsPage({ silent: true });
@@ -363,19 +394,44 @@ export default function ProjectsPage() {
     }
   };
 
-  const toggleProjectTask = async (projectId: string, taskId: string) => {
-    const project =
-      selectedProjectDetails?.project.id === projectId
-        ? mergeProjectDetails(selectedProjectDetails)
-        : projects.find((currentProject) => currentProject.id === projectId);
-    const task = project?.taskItems?.find((currentTask) => currentTask.id === taskId);
-
-    if (!task) return;
-
+  const changeProjectTaskStatus = async (
+    projectId: string,
+    taskId: string,
+    status: ProjectStatus
+  ) => {
     try {
-      await updateProjectTaskStatus(projectId, taskId, task.completed || task.status === 'done' ? 'todo' : 'done');
+      const updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
       await refreshProjectDetails(projectId);
       await refreshProjectsPage({ silent: true });
+      setAlert({
+        type: 'success',
+        message: `Statut de la tâche "${updatedTask.title}" mis à jour : ${updatedTask.statusLabel ?? status}.`,
+      });
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const deleteProjectTask = async (projectId: string, taskId: string, taskTitle: string) => {
+    try {
+      await deleteBffProjectTask(projectId, taskId);
+      await refreshProjectDetails(projectId);
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const closeProject = async (projectId: string, status: 'done' | 'review') => {
+    try {
+      const details = await closeBffProject(projectId, status);
+      setSelectedProjectDetails(details);
+      await refreshProjectsPage({ silent: true });
+      setAlert({
+        type: 'success',
+        message: status === 'done' ? `Projet "${details.project.title}" clôturé.` : `Projet "${details.project.title}" suspendu.`,
+      });
     } catch (error) {
       showError(error);
     }
@@ -383,12 +439,34 @@ export default function ProjectsPage() {
 
   const selectedProject = selectedProjectDetails?.project ?? null;
   const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
+  const canCreateProject =
+    projectsPage?.access?.canCreateProject ??
+    (session.role === 'Admin' || session.role === 'Maire' || session.role === 'Responsable');
   const pageTitle = projectsPage?.page.title ?? 'Projets';
   const pageSubtitle =
     projectsPage?.page.subtitle ?? 'Gérez vos projets municipaux avec des vues Kanban, tableau et grille';
 
   return (
     <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
+      {projectPendingDeletion && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
+          <div className="w-full max-w-md overflow-hidden rounded-md border border-[#d0d7de] bg-[#fbfaf8] shadow-[0_18px_50px_rgba(27,31,36,0.28)]">
+            <div className="border-b border-[#dedbd6] bg-[#2b2b2b] px-5 py-4">
+              <h2 id="delete-project-title" className="text-base font-semibold text-white">Supprimer le projet</h2>
+            </div>
+            <div className="p-5">
+              <p className="text-sm leading-relaxed text-[#57606a]">
+                Le projet <strong className="text-[#24292f]">{projectPendingDeletion.title}</strong> et ses tâches seront supprimés définitivement.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" className="h-9 rounded-md border border-[#d0d7de] bg-white px-4 text-sm font-semibold text-[#24292f] hover:bg-[#f1eee9]" onClick={() => setProjectPendingDeletion(null)}>Annuler</button>
+                <button type="button" className="h-9 rounded-md bg-[#cf222e] px-4 text-sm font-semibold text-white hover:bg-[#a40e26]" onClick={() => void confirmProjectDeletion()}>Supprimer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedProject && (
         <ProjectDetailModal
           project={selectedProject}
@@ -399,7 +477,9 @@ export default function ProjectsPage() {
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
           onUpdateTask={updateProjectTask}
-          onToggleTask={toggleProjectTask}
+          onUpdateTaskStatus={changeProjectTaskStatus}
+          onDeleteTask={deleteProjectTask}
+          onCloseProject={closeProject}
         />
       )}
 
@@ -478,10 +558,17 @@ export default function ProjectsPage() {
                   <div>
                     <h1 className="text-2xl font-bold leading-tight text-[#172033]">{pageTitle}</h1>
                     <p className="mt-2 text-sm text-[#536171]">{pageSubtitle}</p>
+                    {projectsPage?.access && (
+                      <span className="mt-3 inline-flex rounded-full border border-[#b9d6d5] bg-[#d4eeee] px-3 py-1 text-xs font-semibold text-[#2b706c]">
+                        {projectsPage.access.scope === 'all' ? 'Tous les projets municipaux' : projectsPage.access.scope === 'team' ? 'Projets de mon équipe' : 'Mes projets assignés'}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <ActionButton label="Nouveau projet" icon={Plus} primary onClick={() => openCreateProject()} />
+                    {canCreateProject && (
+                      <ActionButton label="Nouveau projet" icon={Plus} primary onClick={() => openCreateProject()} />
+                    )}
                     <ActionButton
                       label="Paramètres"
                       icon={Settings}
@@ -493,9 +580,11 @@ export default function ProjectsPage() {
 
               <section className="border-b border-[#e3e0dc] py-7">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex flex-1 flex-col gap-3 md:flex-row">
-                    <SearchInput value={searchTerm} onChange={setSearchTerm} />
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center">
+                    <div className="w-full md:min-w-[280px] md:max-w-[448px] md:flex-1">
+                      <SearchInput value={searchTerm} onChange={setSearchTerm} />
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <FilterSelect
                         label="Filtrer par statut"
                         value={statusFilter}
@@ -513,6 +602,23 @@ export default function ProjectsPage() {
                         onOpenChange={(open) => setOpenFilter(open ? 'priority' : null)}
                         onChange={setPriorityFilter}
                       />
+                      <label className="relative block w-full sm:w-44" title="Filtrer par échéance maximale">
+                        <span className="sr-only">Échéance avant</span>
+                        <input
+                          type="date"
+                          aria-label="Échéance avant"
+                          value={dueBeforeFilter}
+                          className={`peer h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm font-normal shadow-sm outline-none transition focus:border-[#4b908d] focus:text-[#2f3438] focus:ring-2 focus:ring-[#4b908d]/15 ${
+                            dueBeforeFilter ? 'text-[#2f3438]' : 'text-transparent'
+                          }`}
+                          onChange={(event) => setDueBeforeFilter(event.target.value)}
+                        />
+                        {!dueBeforeFilter && (
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#2f3438] peer-focus:hidden">
+                            Échéance avant
+                          </span>
+                        )}
+                      </label>
                     </div>
                   </div>
 
@@ -543,7 +649,7 @@ export default function ProjectsPage() {
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
                     onProjectTaskAdd={addProjectTask}
-                    onAddProject={openCreateProject}
+                    onAddProject={canCreateProject ? openCreateProject : undefined}
                   />
                 )}
 

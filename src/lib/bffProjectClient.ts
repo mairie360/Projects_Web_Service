@@ -1,10 +1,19 @@
-import type { Project, ProjectPriority, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../types/project';
+import type {
+  Project,
+  ProjectPriority,
+  ProjectStatus,
+  ProjectTask,
+  ProjectTaskDraft,
+  TaskCollaboration,
+  TaskComment,
+} from '../types/project';
 import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
   getStoredAuthorizationHeader,
   storeAuthJwtToken,
 } from './auth-token';
+import { logoutAndReload } from './auth-session';
 import { getPersonValue, type ProjectFormState, type ViewMode } from './projectPageState';
 
 export type BffSelectOption = {
@@ -21,9 +30,20 @@ export type ProjectsPageQuery = {
   view?: ViewMode;
   page?: number;
   limit?: number;
+  dueBefore?: string;
+  dueAfter?: string;
 };
 
 export type ProjectsPageResponse = {
+  access?: {
+    role: 'Admin' | 'Maire' | 'Responsable' | 'User' | 'Guest';
+    scope: 'all' | 'team' | 'assigned';
+    canCreateProject: boolean;
+    canManageProjects: boolean;
+    canManageTasks: boolean;
+    canUpdateAssignedTaskStatus: boolean;
+    canCommentTasks: boolean;
+  };
   page: {
     title: string;
     subtitle: string;
@@ -76,7 +96,7 @@ export type CreateProjectBody = {
   description: string;
   status: ProjectStatus;
   priority: ProjectPriority;
-  responsibleId?: string;
+  responsibleId: string;
   assigneeIds: string[];
   labels: string[];
   dueDate: string;
@@ -233,6 +253,11 @@ async function requestBff<T>(path: string, init: RequestInit = {}) {
     headers: createRequestHeaders(init),
   });
 
+  if (response.status === 401) {
+    await logoutAndReload();
+    throw new BffProjectError('Votre session a expiré.', 401, 'UNAUTHORIZED');
+  }
+
   if (!response.ok) {
     await parseResponseError(response);
   }
@@ -327,6 +352,38 @@ export async function updateProjectTaskStatus(projectId: string, taskId: string,
   );
 }
 
+export function deleteProjectTask(projectId: string, taskId: string) {
+  return requestBff<void>(
+    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`,
+    { method: 'DELETE' }
+  );
+}
+
+export async function closeProject(projectId: string, status: 'done' | 'review') {
+  return normalizeProjectDetails(
+    await requestBff<ProjectDetailsResponse>(`/projects/${encodeURIComponent(projectId)}/close`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    })
+  );
+}
+
+export function getTaskCollaboration(projectId: string, taskId: string) {
+  return requestBff<TaskCollaboration>(
+    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/collaboration`
+  );
+}
+
+export function addTaskComment(projectId: string, taskId: string, message: string) {
+  return requestBff<TaskComment>(
+    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/comments`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }
+  );
+}
+
 export function mergeProjectDetails(details: ProjectDetailsResponse): Project {
   return {
     ...details.project,
@@ -336,15 +393,15 @@ export function mergeProjectDetails(details: ProjectDetailsResponse): Project {
 
 export function createProjectBodyFromForm(form: ProjectFormState): CreateProjectBody {
   const assigneeIds = uniquePreservingOrder(form.assignees);
-  const responsibleId = form.responsible.trim() || assigneeIds[0];
+  const responsibleId = form.responsible.trim() || assigneeIds[0] || '';
 
   return {
     title: form.title.trim(),
     description: form.description.trim(),
     status: form.status,
     priority: form.priority,
-    ...(responsibleId ? { responsibleId } : {}),
-    assigneeIds: uniquePreservingOrder([responsibleId ?? '', ...assigneeIds]),
+    responsibleId,
+    assigneeIds: uniquePreservingOrder([responsibleId, ...assigneeIds]),
     labels: uniquePreservingOrder(form.labels),
     dueDate: form.dueDate,
     taskItems: form.taskItems.map((task) => ({

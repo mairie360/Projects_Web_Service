@@ -18,7 +18,7 @@ import {
   getPersonValue,
   getUniqueValues,
   projectPriorityOptions,
-  projectStatusOptions,
+  taskStatusOptions,
   type FilterOption,
   type ProjectFormState,
   type TaskFormState,
@@ -215,7 +215,7 @@ export function ProjectTasksEditor({
               id="project-form-task-status"
               label="Statut"
               value={taskForm.status}
-              options={projectStatusOptions}
+              options={taskStatusOptions}
               onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
             />
             <SelectField
