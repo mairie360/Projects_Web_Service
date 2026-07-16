@@ -13,7 +13,9 @@ import {
 import type { Project, ProjectTask } from '../../types/project';
 import {
   calculateProjectProgress,
+  createPersonFromOptionValue,
   formatInputDate,
+  getPersonValue,
   getUniqueValues,
   projectPriorityOptions,
   projectStatusOptions,
@@ -53,8 +55,8 @@ function createTaskFormStateFromProjectForm(form: ProjectFormState, memberOption
 
 export function taskToFormState(task: ProjectTask): TaskFormState {
   const assigneeNames = task.assignees?.length
-    ? task.assignees.map((assignee) => assignee.name)
-    : [task.responsible.name];
+    ? task.assignees.map(getPersonValue)
+    : [getPersonValue(task.responsible)];
 
   return {
     title: task.title,
@@ -116,16 +118,17 @@ export function ProjectTasksEditor({
       return;
     }
 
-    const assigneeNames = getUniqueValues(
+    const assigneeValues = getUniqueValues(
       taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible || memberOptions[0]?.value || 'Non assigné']
     );
-    const responsibleName = assigneeNames[0] || 'Non assigné';
+    const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
+    const responsible = assignees[0] ?? { name: 'Non assigné' };
     const task: ProjectTask = {
       id: editingTaskId ?? `task-${Date.now()}`,
       title,
       status: taskForm.status,
-      responsible: { name: responsibleName },
-      assignees: assigneeNames.map((name) => ({ name })),
+      responsible,
+      assignees,
       priority: taskForm.priority,
       labels: taskForm.labels,
       dueDate: taskForm.dueDate,

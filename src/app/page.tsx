@@ -1,50 +1,103 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Footer, Header, Sidebar } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 import { KanbanBoard } from '../components/Kanban';
 import { ActionButton } from '../components/project/ProjectFormControls';
 import { CreateProjectModal, ProjectDetailModal } from '../components/project/ProjectModals';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from '../components/project/ProjectViews';
-import { appSidebarItems, currentUser, getNavigationHref } from '../lib/appShell';
+import { appSidebarItems } from '../lib/appShell';
 import {
-  calculateProjectProgress,
-  createInitialTaskItems,
+  createProject,
+  createProjectBodyFromForm,
+  createProjectTask,
+  deleteProject as deleteBffProject,
+  duplicateProject as duplicateBffProject,
+  getBffProjectErrorMessage,
+  getProjectDetails,
+  getProjectsPage,
+  mergeProjectDetails,
+  taskBodyFromDraft,
+  updateProject,
+  updateProjectBodyFromForm,
+  updateProjectTask as updateBffProjectTask,
+  updateProjectTaskStatus,
+  type ProjectDetailsResponse,
+  type ProjectsPageResponse,
+} from '../lib/bffProjectClient';
+import {
   createProjectFormState,
   createSelectOptions,
   defaultProjectLabels,
   defaultProjectMembers,
-  formatInputDate,
-  getUniqueValues,
   priorityOptions,
   projectToFormState,
   statusOptions,
+  type FilterOption,
   type ProjectFormState,
   type ViewMode,
 } from '../lib/projectPageState';
-import { mockProjects, type Project, type ProjectTask, type ProjectTaskDraft } from '../types/project';
+import { navigateToPage } from '../lib/navigation';
+import { logoutAndReload, useAuthSession } from '../lib/auth-session';
+import type { Project, ProjectTaskDraft } from '../types/project';
+
+const fallbackUser = {
+  name: 'Admin Système',
+  email: 'admin@mairie360.fr',
+  role: 'admin',
+};
+
+type AlertState = {
+  type: 'success' | 'info' | 'error';
+  message: string;
+};
+
+type RefreshProjectsOptions = {
+  signal?: AbortSignal;
+  search?: string;
+  status?: string;
+  priority?: string;
+  view?: ViewMode;
+  silent?: boolean;
+};
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function validateProjectForm(form: ProjectFormState) {
+  return Boolean(form.title.trim() && form.description.trim() && form.dueDate);
+}
 
 export default function ProjectsPage() {
-  const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectDetails, setSelectedProjectDetails] = useState<ProjectDetailsResponse | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [alert, setAlert] = useState<{ type: 'success' | 'info'; message: string } | null>(null);
+  const [alert, setAlert] = useState<AlertState | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [pageError, setPageError] = useState('');
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+  const session = useAuthSession(fallbackUser);
 
-  const memberOptions = useMemo(
+  const handlePageChange = (page: string) => {
+    navigateToPage(page);
+    setSidebarOpen(false);
+  };
+
+  const memberOptions = useMemo<FilterOption[]>(
     () =>
+      projectsPage?.options.members ??
       createSelectOptions([
         ...defaultProjectMembers,
         ...projects.flatMap((project) => [
@@ -52,18 +105,18 @@ export default function ProjectsPage() {
           ...project.assignees.map((assignee) => assignee.name),
         ]),
       ]),
-    [projects]
+    [projects, projectsPage?.options.members]
   );
 
-  const labelOptions = useMemo(
-    () => createSelectOptions([...defaultProjectLabels, ...projects.flatMap((project) => project.labels)]),
-    [projects]
+  const labelOptions = useMemo<FilterOption[]>(
+    () =>
+      projectsPage?.options.labels ??
+      createSelectOptions([...defaultProjectLabels, ...projects.flatMap((project) => project.labels)]),
+    [projects, projectsPage?.options.labels]
   );
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId]
-  );
+  const statusFilterOptions = projectsPage?.filters.statuses ?? statusOptions;
+  const priorityFilterOptions = projectsPage?.filters.priorities ?? priorityOptions;
 
   const filteredProjects = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -81,31 +134,79 @@ export default function ProjectsPage() {
     });
   }, [priorityFilter, projects, searchTerm, statusFilter]);
 
+  const refreshProjectsPage = useCallback(
+    async (options: RefreshProjectsOptions = {}) => {
+      const nextSearch = options.search ?? searchTerm;
+      const nextStatus = options.status ?? statusFilter;
+      const nextPriority = options.priority ?? priorityFilter;
+      const nextView = options.view ?? viewMode;
+
+      if (!options.silent) {
+        setPageLoading(true);
+      }
+
+      try {
+        const response = await getProjectsPage(
+          {
+            q: nextSearch.trim() || undefined,
+            status: nextStatus as Project['status'] | 'all',
+            priority: nextPriority as Project['priority'] | 'all',
+            view: nextView,
+            page: 1,
+            limit: 50,
+          },
+          options.signal
+        );
+
+        setProjectsPage(response);
+        setProjects(response.projects);
+        setPageError('');
+      } catch (error) {
+        if (isAbortError(error)) return;
+
+        setPageError(getBffProjectErrorMessage(error));
+      } finally {
+        if (!options.signal?.aborted) {
+          setPageLoading(false);
+        }
+      }
+    },
+    [priorityFilter, searchTerm, statusFilter, viewMode]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void refreshProjectsPage({ signal: controller.signal });
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [refreshProjectsPage]);
+
   const showInfo = (message: string) => {
     setAlert({ type: 'info', message });
   };
 
-  const handlePageChange = (page: string) => {
-    const href = getNavigationHref(page);
-
-    if (href) {
-      router.push(href);
-      return;
-    }
-
-    showInfo(`Navigation : ${page}`);
+  const showError = (error: unknown) => {
+    setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
   };
 
-  const handleSidebarItemSelect = (item: { id: string; label: string }) => {
-    const href = getNavigationHref(item.id);
+  const refreshProjectDetails = async (projectId: string) => {
+    const details = await getProjectDetails(projectId);
+    const projectWithTasks = mergeProjectDetails(details);
 
-    if (href) {
-      router.push(href);
-    } else {
-      showInfo(`Navigation : ${item.label}`);
+    setProjects((currentProjects) =>
+      currentProjects.map((project) => (project.id === projectId ? { ...project, ...projectWithTasks } : project))
+    );
+
+    if (selectedProjectDetails?.project.id === projectId) {
+      setSelectedProjectDetails(details);
     }
 
-    setSidebarOpen(false);
+    return details;
   };
 
   const openCreateProject = (status: Project['status'] = 'todo') => {
@@ -116,11 +217,29 @@ export default function ProjectsPage() {
     setCreateProjectOpen(true);
   };
 
-  const openEditProject = (project: Project) => {
-    setProjectForm(projectToFormState(project));
+  const openProjectDetails = async (project: Project) => {
+    setOpenFilter(null);
+
+    try {
+      setSelectedProjectDetails(await getProjectDetails(project.id));
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const openEditProject = async (project: Project) => {
     setEditingProjectId(project.id);
     setProjectFormError('');
     setOpenFilter(null);
+
+    try {
+      const details = await getProjectDetails(project.id);
+      setProjectForm(projectToFormState(mergeProjectDetails(details)));
+    } catch (error) {
+      setProjectForm(projectToFormState(project));
+      showError(error);
+    }
+
     setCreateProjectOpen(true);
   };
 
@@ -135,256 +254,148 @@ export default function ProjectsPage() {
     if (projectFormError) setProjectFormError('');
   };
 
-  const updateProjectFromForm = (projectId: string, form: ProjectFormState) => {
-    const title = form.title.trim();
-    const description = form.description.trim();
-    const responsibleName = form.responsible.trim();
-    const dueDate = form.dueDate;
+  const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
+    if (!validateProjectForm(form)) {
+      setAlert({ type: 'error', message: 'Les champs obligatoires doivent être renseignés.' });
+      return;
+    }
 
-    if (!title || !description || !responsibleName || !dueDate) return;
-
-    const assigneeNames = getUniqueValues([responsibleName, ...form.assignees]);
-
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== projectId) return project;
-
-        return {
-          ...project,
-          title,
-          description,
-          status: form.status,
-          responsible: { name: responsibleName },
-          assignees: assigneeNames.map((name) => ({ name })),
-          dueDate,
-          priority: form.priority,
-          labels: getUniqueValues(form.labels),
-        };
-      })
-    );
-
-    setAlert({ type: 'success', message: `Projet "${title}" modifié.` });
+    try {
+      const details = await updateProject(projectId, updateProjectBodyFromForm(form));
+      setSelectedProjectDetails(details);
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+    } catch (error) {
+      showError(error);
+    }
   };
 
-  const saveProject = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const title = projectForm.title.trim();
-    const description = projectForm.description.trim();
-    const responsibleName = projectForm.responsible.trim();
-    const dueDate = projectForm.dueDate;
-
-    if (!title || !description || !responsibleName || !dueDate) {
+    if (!validateProjectForm(projectForm)) {
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
       return;
     }
 
-    const taskItems = projectForm.taskItems.map((task) => ({
-      ...task,
-      responsible: { ...task.responsible },
-      assignees: task.assignees.map((assignee) => ({ ...assignee })),
-      labels: [...task.labels],
-    }));
-    const totalTasks = taskItems.length;
-    const completedTasks = taskItems.filter((task) => task.completed).length;
-    const progress = calculateProjectProgress(taskItems);
-    const assigneeNames = getUniqueValues([responsibleName, ...projectForm.assignees]);
+    try {
+      if (editingProjectId) {
+        const details = await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm));
 
-    const projectFields = {
-      title,
-      description,
-      status: projectForm.status,
-      responsible: { name: responsibleName },
-      assignees: assigneeNames.map((name) => ({ name })),
-      progress,
-      dueDate,
-      priority: projectForm.priority,
-      labels: getUniqueValues(projectForm.labels),
-      taskItems,
-      tasks: {
-        total: totalTasks,
-        completed: completedTasks,
-      },
-    };
+        setCreateProjectOpen(false);
+        setEditingProjectId(null);
+        setSelectedProjectDetails((currentDetails) =>
+          currentDetails?.project.id === editingProjectId ? details : currentDetails
+        );
+        await refreshProjectsPage({ silent: true });
+        setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+        return;
+      }
 
-    if (editingProjectId) {
-      setProjects((currentProjects) =>
-        currentProjects.map((project) => (project.id === editingProjectId ? { ...project, ...projectFields } : project))
-      );
+      const details = await createProject(createProjectBodyFromForm(projectForm));
+
+      setSearchTerm('');
+      setStatusFilter('all');
+      setPriorityFilter('all');
       setCreateProjectOpen(false);
-      setEditingProjectId(null);
-      setAlert({ type: 'success', message: `Projet "${title}" modifié.` });
-      return;
+      setSelectedProjectDetails(details);
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', silent: true });
+      setAlert({ type: 'success', message: `Projet "${details.project.title}" créé.` });
+    } catch (error) {
+      showError(error);
     }
-
-    const newProject: Project = {
-      id: `project-${Date.now()}`,
-      ...projectFields,
-      createdAt: formatInputDate(new Date()),
-    };
-
-    setProjects((currentProjects) => [newProject, ...currentProjects]);
-    setSelectedProjectId(newProject.id);
-    setSearchTerm('');
-    setStatusFilter('all');
-    setPriorityFilter('all');
-    setCreateProjectOpen(false);
-    setAlert({ type: 'success', message: `Projet "${newProject.title}" créé.` });
   };
 
-  const duplicateProject = (project: Project) => {
-    const duplicatedProject: Project = {
-      ...project,
-      id: `project-${Date.now()}`,
-      title: `${project.title} (copie)`,
-      responsible: { ...project.responsible },
-      assignees: project.assignees.map((assignee) => ({ ...assignee })),
-      labels: [...project.labels],
-      taskItems: project.taskItems?.map((task, index) => ({
-        ...task,
-        id: `task-${Date.now()}-${index}`,
-        responsible: { ...task.responsible },
-        assignees: task.assignees.map((assignee) => ({ ...assignee })),
-        labels: [...task.labels],
-      })),
-      tasks: { ...project.tasks },
-      createdAt: formatInputDate(new Date()),
-    };
+  const duplicateProject = async (project: Project) => {
+    try {
+      const details = await duplicateBffProject(project.id);
 
-    setProjects((currentProjects) => [duplicatedProject, ...currentProjects]);
-    setSearchTerm('');
-    setStatusFilter('all');
-    setPriorityFilter('all');
-    setAlert({ type: 'success', message: `Projet "${duplicatedProject.title}" dupliqué.` });
+      setSearchTerm('');
+      setStatusFilter('all');
+      setPriorityFilter('all');
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', silent: true });
+      setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
+    } catch (error) {
+      showError(error);
+    }
   };
 
-  const deleteProject = (project: Project) => {
+  const deleteProject = async (project: Project) => {
     const confirmed = window.confirm(`Supprimer le projet "${project.title}" ?`);
     if (!confirmed) return;
 
-    setProjects((currentProjects) => currentProjects.filter((currentProject) => currentProject.id !== project.id));
-    if (selectedProjectId === project.id) setSelectedProjectId(null);
-    if (editingProjectId === project.id) closeCreateProject();
-    setAlert({ type: 'success', message: `Projet "${project.title}" supprimé.` });
+    try {
+      await deleteBffProject(project.id);
+      if (selectedProjectDetails?.project.id === project.id) setSelectedProjectDetails(null);
+      if (editingProjectId === project.id) closeCreateProject();
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Projet "${project.title}" supprimé.` });
+    } catch (error) {
+      showError(error);
+    }
   };
 
-  const addProjectTask = (project: Project, taskDraft: ProjectTaskDraft) => {
+  const addProjectTask = async (project: Project, taskDraft: ProjectTaskDraft) => {
     const title = taskDraft.title.trim();
     if (!title) return;
 
-    const task: ProjectTask = {
-      ...taskDraft,
-      responsible: { ...taskDraft.responsible },
-      assignees: taskDraft.assignees.map((assignee) => ({ ...assignee })),
-      labels: [...taskDraft.labels],
-      title,
-      id: `task-${Date.now()}`,
-      completed: taskDraft.status === 'done',
-      createdAt: formatInputDate(new Date()),
-    };
-
-    setProjects((currentProjects) =>
-      currentProjects.map((currentProject) => {
-        if (currentProject.id !== project.id) return currentProject;
-
-        const taskItems = [...createInitialTaskItems(currentProject), task];
-        const completedTasks = taskItems.filter((projectTask) => projectTask.completed).length;
-        const totalTasks = taskItems.length;
-        const progress = calculateProjectProgress(taskItems);
-
-        return {
-          ...currentProject,
-          taskItems,
-          tasks: {
-            total: totalTasks,
-            completed: completedTasks,
-          },
-          progress,
-        };
-      })
-    );
-
-    setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
+    try {
+      await createProjectTask(project.id, taskBodyFromDraft(taskDraft));
+      await refreshProjectDetails(project.id);
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
+    } catch (error) {
+      showError(error);
+    }
   };
 
-  const updateProjectTask = (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
+  const updateProjectTask = async (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
     const title = taskDraft.title.trim();
     if (!title) return;
 
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== projectId) return project;
-
-        const taskItems = createInitialTaskItems(project).map((task) => {
-          if (task.id !== taskId) return task;
-
-          return {
-            ...task,
-            ...taskDraft,
-            title,
-            responsible: { ...taskDraft.responsible },
-            assignees: taskDraft.assignees.map((assignee) => ({ ...assignee })),
-            labels: [...taskDraft.labels],
-            completed: taskDraft.status === 'done',
-          };
-        });
-        const completedTasks = taskItems.filter((task) => task.completed).length;
-
-        return {
-          ...project,
-          taskItems,
-          progress: calculateProjectProgress(taskItems),
-          tasks: {
-            total: taskItems.length,
-            completed: completedTasks,
-          },
-        };
-      })
-    );
-
-    setAlert({ type: 'success', message: `Tâche "${title}" modifiée.` });
+    try {
+      await updateBffProjectTask(projectId, taskId, taskBodyFromDraft(taskDraft));
+      await refreshProjectDetails(projectId);
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Tâche "${title}" modifiée.` });
+    } catch (error) {
+      showError(error);
+    }
   };
 
-  const toggleProjectTask = (projectId: string, taskId: string) => {
-    setProjects((currentProjects) =>
-      currentProjects.map((project) => {
-        if (project.id !== projectId) return project;
+  const toggleProjectTask = async (projectId: string, taskId: string) => {
+    const project =
+      selectedProjectDetails?.project.id === projectId
+        ? mergeProjectDetails(selectedProjectDetails)
+        : projects.find((currentProject) => currentProject.id === projectId);
+    const task = project?.taskItems?.find((currentTask) => currentTask.id === taskId);
 
-        const taskItems = createInitialTaskItems(project).map((task) => {
-          if (task.id !== taskId) return task;
+    if (!task) return;
 
-          const completed = !task.completed;
-
-          return {
-            ...task,
-            completed,
-            status: (completed ? 'done' : 'todo') as Project['status'],
-          };
-        });
-        const completedTasks = taskItems.filter((task) => task.completed).length;
-
-        return {
-          ...project,
-          taskItems,
-          progress: calculateProjectProgress(taskItems),
-          tasks: {
-            total: taskItems.length,
-            completed: completedTasks,
-          },
-        };
-      })
-    );
+    try {
+      await updateProjectTaskStatus(projectId, taskId, task.completed || task.status === 'done' ? 'todo' : 'done');
+      await refreshProjectDetails(projectId);
+      await refreshProjectsPage({ silent: true });
+    } catch (error) {
+      showError(error);
+    }
   };
+
+  const selectedProject = selectedProjectDetails?.project ?? null;
+  const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
+  const pageTitle = projectsPage?.page.title ?? 'Projets';
+  const pageSubtitle =
+    projectsPage?.page.subtitle ?? 'Gérez vos projets municipaux avec des vues Kanban, tableau et grille';
 
   return (
     <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
       {selectedProject && (
         <ProjectDetailModal
           project={selectedProject}
-          tasks={createInitialTaskItems(selectedProject)}
+          tasks={selectedProjectTasks}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
-          onClose={() => setSelectedProjectId(null)}
+          onClose={() => setSelectedProjectDetails(null)}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
           onUpdateTask={updateProjectTask}
@@ -409,11 +420,11 @@ export default function ProjectsPage() {
         <div className="hidden shrink-0 lg:block">
           <Sidebar
             activeItem="projects"
-            isAdmin
+            isAdmin={session.isAdmin}
             items={appSidebarItems}
             brandLabel="Mairie360"
             brandInitial="M"
-            onItemSelect={handleSidebarItemSelect}
+            onItemSelect={(item) => handlePageChange(item.id)}
           />
         </div>
 
@@ -428,11 +439,11 @@ export default function ProjectsPage() {
             <div className="relative z-10">
               <Sidebar
                 activeItem="projects"
-                isAdmin
+                isAdmin={session.isAdmin}
                 items={appSidebarItems}
                 brandLabel="Mairie360"
                 brandInitial="M"
-                onItemSelect={handleSidebarItemSelect}
+                onItemSelect={(item) => handlePageChange(item.id)}
               />
             </div>
           </div>
@@ -440,12 +451,12 @@ export default function ProjectsPage() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
-            user={currentUser}
-            isAdmin
+            user={session.user}
+            isAdmin={session.isAdmin}
             setSidebarOpen={setSidebarOpen}
             profileHref="/profile"
             onPageChange={handlePageChange}
-            onLogout={() => showInfo('Déconnexion en attente.')}
+            onLogout={() => void logoutAndReload()}
           />
 
           <main className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
@@ -465,10 +476,8 @@ export default function ProjectsPage() {
               <section className="border-b border-[#dedbd6] pb-8">
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h1 className="text-2xl font-bold leading-tight text-[#172033]">Projets</h1>
-                    <p className="mt-2 text-sm text-[#536171]">
-                      Gérez vos projets municipaux avec des vues Kanban, tableau et grille
-                    </p>
+                    <h1 className="text-2xl font-bold leading-tight text-[#172033]">{pageTitle}</h1>
+                    <p className="mt-2 text-sm text-[#536171]">{pageSubtitle}</p>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
@@ -490,7 +499,7 @@ export default function ProjectsPage() {
                       <FilterSelect
                         label="Filtrer par statut"
                         value={statusFilter}
-                        options={statusOptions}
+                        options={statusFilterOptions}
                         open={openFilter === 'status'}
                         onOpenChange={(open) => setOpenFilter(open ? 'status' : null)}
                         onChange={setStatusFilter}
@@ -498,7 +507,7 @@ export default function ProjectsPage() {
                       <FilterSelect
                         label="Filtrer par priorité"
                         value={priorityFilter}
-                        options={priorityOptions}
+                        options={priorityFilterOptions}
                         open={openFilter === 'priority'}
                         widthClassName="sm:w-48"
                         onOpenChange={(open) => setOpenFilter(open ? 'priority' : null)}
@@ -512,12 +521,24 @@ export default function ProjectsPage() {
               </section>
 
               <section className="pt-8">
-                {viewMode === 'kanban' && (
+                {pageLoading && projects.length === 0 && (
+                  <div className="rounded-md border border-[#d9d5d0] bg-white px-5 py-8 text-sm font-medium text-[#57606a]">
+                    Chargement des projets...
+                  </div>
+                )}
+
+                {pageError && projects.length === 0 && !pageLoading && (
+                  <div className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-5 py-4 text-sm font-medium text-[#cf222e]">
+                    {pageError}
+                  </div>
+                )}
+
+                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
-                    onProjectOpen={openEditProject}
+                    onProjectOpen={openProjectDetails}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
@@ -526,12 +547,12 @@ export default function ProjectsPage() {
                   />
                 )}
 
-                {viewMode === 'grid' && (
+                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
-                    onProjectOpen={openEditProject}
+                    onProjectOpen={openProjectDetails}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
@@ -539,10 +560,10 @@ export default function ProjectsPage() {
                   />
                 )}
 
-                {viewMode === 'table' && (
+                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'table' && (
                   <TableView
                     projects={filteredProjects}
-                    onProjectOpen={openEditProject}
+                    onProjectOpen={openProjectDetails}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
