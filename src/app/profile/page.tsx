@@ -39,8 +39,8 @@ export default function ProfilePage() {
       }}
       profileProps={{
         editable: false,
-        loading: session.loading,
-        error: session.error,
+        // loading: session.loading,
+        // error: session.error,
         subtitle: 'Informations réelles du compte connecté',
       }}
     />
