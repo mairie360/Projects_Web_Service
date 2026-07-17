@@ -13,7 +13,14 @@ export default function ProfilePage() {
   const handlePageChange = (page: string) => {
     const href = getNavigationHref(page);
 
-    if (href) router.push(href);
+    if (!href) return;
+
+    if (href.startsWith('/')) {
+      router.push(href);
+      return;
+    }
+
+    window.location.assign(href);
   };
 
   return (

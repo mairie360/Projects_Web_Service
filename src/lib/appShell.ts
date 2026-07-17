@@ -12,6 +12,8 @@ import {
   UserRound,
 } from 'lucide-react';
 
+export { getNavigationHref } from './navigation';
+
 export type AppNavigationItem = {
   id: string;
   label: string;
@@ -43,10 +45,3 @@ export const appSidebarItems: AppNavigationItem[] = [
   { id: 'profile', label: 'Profil', icon: UserRound },
   { id: 'settings', label: 'Paramètres', icon: Settings },
 ];
-
-export function getNavigationHref(page: string) {
-  if (page === 'projects') return '/';
-  if (page === 'profile') return '/profile';
-
-  return null;
-}

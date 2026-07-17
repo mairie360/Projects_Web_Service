@@ -10,8 +10,12 @@ const pageRoutes: Partial<Record<string, string>> = {
   profile: "/profile",
 };
 
+export function getNavigationHref(page: string) {
+  return pageRoutes[page] ?? null;
+}
+
 export function navigateToPage(page: string) {
-  const href = pageRoutes[page];
+  const href = getNavigationHref(page);
 
   if (href) {
     window.location.assign(href);
