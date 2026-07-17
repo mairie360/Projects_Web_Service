@@ -12,7 +12,7 @@ Le contrat Backend For Frontend attendu pour ce module est documenté dans [READ
 
 ## JWT BFF
 
-Les appels front vers `/api/bff/*` renvoient automatiquement le JWT stocké dans `localStorage` sous la clé commune `mairie360.auth.jwt`.
+Les appels front vers les routes du BFF renvoient automatiquement le JWT stocké dans `localStorage` sous la clé commune `mairie360.auth.jwt`.
 
 ### 🐳 Run in Development Mode (with Hot Reload)
 

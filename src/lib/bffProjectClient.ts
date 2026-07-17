@@ -248,7 +248,7 @@ async function parseResponseError(response: Response) {
 }
 
 async function requestBff<T>(path: string, init: RequestInit = {}) {
-  const response = await fetch(`/api/bff${path}`, {
+  const response = await fetch(path, {
     ...init,
     headers: createRequestHeaders(init),
   });
