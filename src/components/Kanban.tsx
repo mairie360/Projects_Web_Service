@@ -15,6 +15,7 @@ type SelectOption = {
 
 type KanbanBoardProps = {
   projects: Project[];
+  columns: Array<{ status: Project['status']; label: string }>;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
   onProjectOpen?: (project: Project) => void;
@@ -25,22 +26,21 @@ type KanbanBoardProps = {
   onAddProject?: (status: Project['status']) => void;
 };
 
-type KanbanColumnConfig = {
-  status: Project['status'];
-  label: string;
+type KanbanColumnPresentation = {
   icon: LucideIcon;
   iconClassName: string;
 };
 
-const columns: KanbanColumnConfig[] = [
-  { status: 'todo', label: 'À faire', icon: AlertCircle, iconClassName: 'text-[#e60012]' },
-  { status: 'in-progress', label: 'En cours', icon: Clock3, iconClassName: 'text-[#1256a6]' },
-  { status: 'review', label: 'En révision', icon: Eye, iconClassName: 'text-[#1256a6]' },
-  { status: 'done', label: 'Terminé', icon: CheckCircle2, iconClassName: 'text-[#00a94f]' },
-];
+const columnPresentation: Record<Project['status'], KanbanColumnPresentation> = {
+  todo: { icon: AlertCircle, iconClassName: 'text-[#e60012]' },
+  'in-progress': { icon: Clock3, iconClassName: 'text-[#1256a6]' },
+  review: { icon: Eye, iconClassName: 'text-[#1256a6]' },
+  done: { icon: CheckCircle2, iconClassName: 'text-[#00a94f]' },
+};
 
 export function KanbanBoard({
   projects,
+  columns,
   memberOptions,
   labelOptions,
   onProjectOpen,
@@ -53,14 +53,15 @@ export function KanbanBoard({
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
       {columns.map((column) => {
-        const Icon = column.icon;
+        const presentation = columnPresentation[column.status];
+        const Icon = presentation.icon;
         const columnProjects = projects.filter((project) => project.status === column.status);
 
         return (
           <section key={column.status} className="min-w-0">
             <div className="mb-3 flex h-12 items-center justify-between rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3">
               <div className="flex min-w-0 items-center gap-2">
-                <Icon className={`h-4 w-4 shrink-0 ${column.iconClassName}`} strokeWidth={2} />
+                <Icon className={`h-4 w-4 shrink-0 ${presentation.iconClassName}`} strokeWidth={2} />
                 <h2 className="truncate text-sm font-semibold text-[#24292f]">{column.label}</h2>
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d8dee4] px-1.5 text-xs font-semibold text-[#57606a]">
                   {columnProjects.length}

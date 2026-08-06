@@ -22,17 +22,6 @@ export type AppNavigationItem = {
   badge?: string;
 };
 
-export const currentUser = {
-  name: 'Admin Système',
-  email: 'admin@mairie360.fr',
-  role: 'admin',
-  service: 'Direction générale',
-  position: 'Administrateur système',
-  phone: '+262 262 00 00 00',
-  city: 'Saint-Denis',
-  lastConnection: 'Aujourd’hui',
-} as const;
-
 export const appSidebarItems: AppNavigationItem[] = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'projects', label: 'Projets', icon: BriefcaseBusiness },

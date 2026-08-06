@@ -32,11 +32,7 @@ import {
 import {
   createProjectFormState,
   createSelectOptions,
-  defaultProjectLabels,
-  defaultProjectMembers,
-  priorityOptions,
   projectToFormState,
-  statusOptions,
   type FilterOption,
   type ProjectFormState,
   type ViewMode,
@@ -44,12 +40,6 @@ import {
 import { navigateToPage } from '../lib/navigation';
 import { logoutAndReload, useAuthSession } from '../lib/auth-session';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
-
-const fallbackUser = {
-  name: 'Admin Système',
-  email: 'admin@mairie360.fr',
-  role: 'admin',
-};
 
 type AlertState = {
   type: 'success' | 'info' | 'error';
@@ -98,7 +88,7 @@ export default function ProjectsPage() {
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
-  const session = useAuthSession(fallbackUser);
+  const session = useAuthSession();
 
   const handlePageChange = (page: string) => {
     navigateToPage(page);
@@ -109,7 +99,6 @@ export default function ProjectsPage() {
     () =>
       projectsPage?.options.members ??
       createSelectOptions([
-        ...defaultProjectMembers,
         ...projects.flatMap((project) => [
           project.responsible.name,
           ...project.assignees.map((assignee) => assignee.name),
@@ -121,21 +110,29 @@ export default function ProjectsPage() {
   const labelOptions = useMemo<FilterOption[]>(
     () =>
       projectsPage?.options.labels ??
-      createSelectOptions([...defaultProjectLabels, ...projects.flatMap((project) => project.labels)]),
+      createSelectOptions(projects.flatMap((project) => project.labels)),
     [projects, projectsPage?.options.labels]
   );
 
   const statusFilterOptions = useMemo(
-    () => (projectsPage?.filters.statuses ?? statusOptions).map((option) =>
+    () => (projectsPage?.filters.statuses ?? []).map((option) =>
       option.value === 'all' ? { ...option, label: 'Tous les statuts' } : option
     ),
     [projectsPage?.filters.statuses]
   );
   const priorityFilterOptions = useMemo(
-    () => (projectsPage?.filters.priorities ?? priorityOptions).map((option) =>
+    () => (projectsPage?.filters.priorities ?? []).map((option) =>
       option.value === 'all' ? { ...option, label: 'Toutes les priorités' } : option
     ),
     [projectsPage?.filters.priorities]
+  );
+  const projectStatusOptions = useMemo(
+    () => statusFilterOptions.filter((option) => option.value !== 'all'),
+    [statusFilterOptions]
+  );
+  const projectPriorityOptions = useMemo(
+    () => priorityFilterOptions.filter((option) => option.value !== 'all'),
+    [priorityFilterOptions]
   );
 
   const filteredProjects = useMemo(() => {
@@ -440,11 +437,9 @@ export default function ProjectsPage() {
   const selectedProject = selectedProjectDetails?.project ?? null;
   const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
   const canCreateProject =
-    projectsPage?.access?.canCreateProject ??
-    (session.role === 'Admin' || session.role === 'Maire' || session.role === 'Responsable');
+    projectsPage?.access?.canCreateProject ?? false;
   const pageTitle = projectsPage?.page.title ?? 'Projets';
-  const pageSubtitle =
-    projectsPage?.page.subtitle ?? 'Gérez vos projets municipaux avec des vues Kanban, tableau et grille';
+  const pageSubtitle = projectsPage?.page.subtitle ?? '';
 
   return (
     <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
@@ -473,6 +468,8 @@ export default function ProjectsPage() {
           tasks={selectedProjectTasks}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
+          statusOptions={projectStatusOptions}
+          priorityOptions={projectPriorityOptions}
           onClose={() => setSelectedProjectDetails(null)}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
@@ -490,6 +487,8 @@ export default function ProjectsPage() {
           error={projectFormError}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
+          statusOptions={projectStatusOptions}
+          priorityOptions={projectPriorityOptions}
           onChange={updateProjectForm}
           onClose={closeCreateProject}
           onSubmit={saveProject}
@@ -622,7 +621,11 @@ export default function ProjectsPage() {
                     </div>
                   </div>
 
-                  <ViewToggle value={viewMode} onChange={setViewMode} />
+                  <ViewToggle
+                    value={viewMode}
+                    options={projectsPage?.page.views ?? []}
+                    onChange={setViewMode}
+                  />
                 </div>
               </section>
 
@@ -642,6 +645,7 @@ export default function ProjectsPage() {
                 {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
+                    columns={projectsPage?.kanban.columns ?? []}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
                     onProjectOpen={openProjectDetails}

@@ -3,12 +3,12 @@
 import { UserProfilePage } from '@mairie360/lib-components';
 import { useRouter } from 'next/navigation';
 
-import { appSidebarItems, currentUser, getNavigationHref } from '../../lib/appShell';
+import { appSidebarItems, getNavigationHref } from '../../lib/appShell';
 import { logoutAndReload, useAuthSession } from '../../lib/auth-session';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const session = useAuthSession(currentUser);
+  const session = useAuthSession();
 
   const handlePageChange = (page: string) => {
     const href = getNavigationHref(page);

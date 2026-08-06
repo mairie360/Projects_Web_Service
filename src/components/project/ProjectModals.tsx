@@ -35,9 +35,6 @@ import {
   createTaskFormState,
   getPersonValue,
   getUniqueValues,
-  projectPriorityOptions,
-  projectStatusOptions,
-  taskStatusOptions,
   projectToFormState,
   type FilterOption,
   type ProjectFormState,
@@ -60,6 +57,8 @@ export function CreateProjectModal({
   error,
   memberOptions,
   labelOptions,
+  statusOptions,
+  priorityOptions,
   onChange,
   onClose,
   onSubmit,
@@ -69,6 +68,8 @@ export function CreateProjectModal({
   error: string;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  statusOptions: FilterOption[];
+  priorityOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -138,6 +139,8 @@ export function CreateProjectModal({
                 form={form}
                 memberOptions={memberOptions}
                 labelOptions={labelOptions}
+                statusOptions={statusOptions}
+                priorityOptions={priorityOptions}
                 onChange={onChange}
               />
             </section>
@@ -152,7 +155,7 @@ export function CreateProjectModal({
                 id="project-status"
                 label="Statut"
                 value={form.status}
-                options={projectStatusOptions}
+                options={statusOptions}
                 onChange={(status) => onChange({ status: status as Project['status'] })}
               />
 
@@ -160,7 +163,7 @@ export function CreateProjectModal({
                 id="project-priority"
                 label="Priorité"
                 value={form.priority}
-                options={projectPriorityOptions}
+                options={priorityOptions}
                 onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
               />
 
@@ -245,6 +248,8 @@ export function ProjectDetailModal({
   tasks,
   memberOptions,
   labelOptions,
+  statusOptions,
+  priorityOptions,
   onClose,
   onUpdateProject,
   onAddTask,
@@ -257,6 +262,8 @@ export function ProjectDetailModal({
   tasks: ProjectTask[];
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  statusOptions: FilterOption[];
+  priorityOptions: FilterOption[];
   onClose: () => void;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void;
@@ -481,14 +488,14 @@ export function ProjectDetailModal({
                       id="detail-task-status"
                       label="Statut"
                       value={taskForm.status}
-                      options={taskStatusOptions}
+                      options={statusOptions}
                       onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
                     />
                     <SelectField
                       id="detail-task-priority"
                       label="Priorité"
                       value={taskForm.priority}
-                      options={projectPriorityOptions}
+                      options={priorityOptions}
                       onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
                     />
                     <div>
@@ -572,7 +579,7 @@ export function ProjectDetailModal({
                       onChange={(event) => setTaskStatusFilter(event.target.value)}
                     >
                       <option value="all">Tous les statuts</option>
-                      {taskStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                     <select
                       aria-label="Filtrer les tâches par priorité"
@@ -581,7 +588,7 @@ export function ProjectDetailModal({
                       onChange={(event) => setTaskPriorityFilter(event.target.value)}
                     >
                       <option value="all">Toutes les priorités</option>
-                      {projectPriorityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      {priorityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                     <input
                       type="date"
@@ -666,7 +673,7 @@ export function ProjectDetailModal({
                                       )
                                     }
                                   >
-                                    {taskStatusOptions.map((option) => (
+                                    {statusOptions.map((option) => (
                                       <option key={option.value} value={option.value}>
                                         {option.label}
                                       </option>
@@ -803,7 +810,7 @@ export function ProjectDetailModal({
                     id="detail-project-status"
                     label="Statut"
                     value={projectEditForm.status}
-                    options={projectStatusOptions}
+                    options={statusOptions}
                     onChange={(status) => updateProjectEditForm({ status: status as Project['status'] })}
                   />
 
@@ -811,7 +818,7 @@ export function ProjectDetailModal({
                     id="detail-project-priority"
                     label="Priorité"
                     value={projectEditForm.priority}
-                    options={projectPriorityOptions}
+                    options={priorityOptions}
                     onChange={(priority) => updateProjectEditForm({ priority: priority as Project['priority'] })}
                   />
 

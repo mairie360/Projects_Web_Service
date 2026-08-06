@@ -17,8 +17,6 @@ import {
   formatInputDate,
   getPersonValue,
   getUniqueValues,
-  projectPriorityOptions,
-  taskStatusOptions,
   type FilterOption,
   type ProjectFormState,
   type TaskFormState,
@@ -72,11 +70,15 @@ export function ProjectTasksEditor({
   form,
   memberOptions,
   labelOptions,
+  statusOptions,
+  priorityOptions,
   onChange,
 }: {
   form: ProjectFormState;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  statusOptions: FilterOption[];
+  priorityOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
 }) {
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() =>
@@ -215,14 +217,14 @@ export function ProjectTasksEditor({
               id="project-form-task-status"
               label="Statut"
               value={taskForm.status}
-              options={taskStatusOptions}
+              options={statusOptions}
               onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
             />
             <SelectField
               id="project-form-task-priority"
               label="Priorité"
               value={taskForm.priority}
-              options={projectPriorityOptions}
+              options={priorityOptions}
               onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
             />
             <div>

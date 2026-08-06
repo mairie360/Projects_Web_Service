@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, ChevronDown, Search } from 'lucide-react';
+import { Check, ChevronDown, Grid3X3, Kanban, List, Search } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import {
   formatProjectDate,
@@ -12,7 +13,13 @@ import {
   StatusPill,
 } from '../ProjectCard';
 import type { Project, ProjectTaskDraft } from '../../types/project';
-import { viewOptions, type FilterOption, type ViewMode } from '../../lib/projectPageState';
+import { type FilterOption, type ViewMode } from '../../lib/projectPageState';
+
+const viewIcons: Record<ViewMode, LucideIcon> = {
+  kanban: Kanban,
+  grid: Grid3X3,
+  table: List,
+};
 
 export function FilterSelect({
   label,
@@ -31,6 +38,8 @@ export function FilterSelect({
   onOpenChange: (open: boolean) => void;
   onChange: (value: string) => void;
 }) {
+  if (options.length === 0) return null;
+
   const selected = options.find((option) => option.value === value) ?? options[0];
 
   return (
@@ -80,11 +89,19 @@ export function FilterSelect({
   );
 }
 
-export function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (value: ViewMode) => void }) {
+export function ViewToggle({
+  value,
+  options,
+  onChange,
+}: {
+  value: ViewMode;
+  options: Array<{ value: ViewMode; label: string }>;
+  onChange: (value: ViewMode) => void;
+}) {
   return (
     <div className="inline-flex h-10 rounded-lg bg-[#ebe9e6] p-1" role="tablist" aria-label="Vue des projets">
-      {viewOptions.map((option) => {
-        const Icon = option.icon;
+      {options.map((option) => {
+        const Icon = viewIcons[option.value];
         const active = value === option.value;
 
         return (
