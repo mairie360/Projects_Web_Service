@@ -1,3 +1,7 @@
+## Contrats de données
+
+[BFF.md](BFF.md) décrit les routes et données nécessaires au front ; [BACKEND.md](BACKEND.md) liste les tables et routes backend correspondantes. Les contrats communs sont harmonisés entre les dix Web Services et distinguent l'existant des propositions.
+
 # Projects
 
 The **Projects** module of the project — responsible for managing the projects of the Mairie 360 application.
