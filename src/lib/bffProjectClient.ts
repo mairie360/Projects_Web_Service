@@ -1,3 +1,5 @@
+import type { components } from '@/contracts/bff';
+type Schemas = components['schemas'];
 import type {
   Project,
   ProjectPriority,
@@ -34,95 +36,17 @@ export type ProjectsPageQuery = {
   dueAfter?: string;
 };
 
-export type ProjectsPageResponse = {
-  access?: {
-    role: 'Admin' | 'Maire' | 'Responsable' | 'User' | 'Guest';
-    scope: 'all' | 'team' | 'assigned';
-    canCreateProject: boolean;
-    canManageProjects: boolean;
-    canManageTasks: boolean;
-    canUpdateAssignedTaskStatus: boolean;
-    canCommentTasks: boolean;
-  };
-  page: {
-    title: string;
-    subtitle: string;
-    defaultView: ViewMode;
-    views: {
-      value: ViewMode;
-      label: string;
-    }[];
-  };
-  filters: {
-    search: string | null;
-    status: string;
-    priority: string;
-    statuses: BffSelectOption[];
-    priorities: BffSelectOption[];
-  };
-  options: {
-    members: BffSelectOption[];
-    labels: BffSelectOption[];
-  };
-  summary: {
-    totalProjects: number;
-    projectsByStatus: Record<string, number>;
-    projectsByPriority: Record<string, number>;
-  };
-  kanban: {
-    columns: {
-      status: ProjectStatus;
-      label: string;
-      projectIds: string[];
-      count: number;
-    }[];
-  };
-  projects: Project[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    hasNextPage: boolean;
-  };
-};
+export type ProjectsPageResponse = Schemas['ProjectsPageResponse'];
 
-export type ProjectDetailsResponse = {
-  project: Project;
-  taskItems: ProjectTask[];
-};
+export type ProjectDetailsResponse = Schemas['ProjectDetailsResponse'];
 
-export type CreateProjectBody = {
-  title: string;
-  description: string;
-  status: ProjectStatus;
-  priority: ProjectPriority;
-  responsibleId: string;
-  assigneeIds: string[];
-  labels: string[];
-  dueDate: string;
-  taskItems?: {
-    title: string;
-    status: ProjectStatus;
-    priority: ProjectPriority;
-    assigneeIds: string[];
-    labels: string[];
-    dueDate: string;
-  }[];
-};
+export type CreateProjectBody = Schemas['CreateProjectBody'];
 
-export type UpdateProjectBody = Partial<CreateProjectBody>;
+export type UpdateProjectBody = Schemas['UpdateProjectBody'];
 
-export type CreateTaskBody = {
-  title: string;
-  status: ProjectStatus;
-  priority: ProjectPriority;
-  responsibleId: string;
-  assigneeIds: string[];
-  labels: string[];
-  dueDate: string;
-};
+export type CreateTaskBody = Schemas['CreateTaskBody'];
 
-export type UpdateTaskBody = Partial<CreateTaskBody>;
+export type UpdateTaskBody = Schemas['UpdateTaskBody'];
 
 type ApiErrorBody = {
   error?: {
@@ -154,7 +78,7 @@ function toDateInputValue(value: string) {
   return value.includes('T') ? value.slice(0, 10) : value;
 }
 
-function normalizeProjectTask(task: ProjectTask): ProjectTask {
+function normalizeProjectTask<T extends ProjectTask>(task: T): T {
   return {
     ...task,
     dueDate: toDateInputValue(task.dueDate),
@@ -163,7 +87,7 @@ function normalizeProjectTask(task: ProjectTask): ProjectTask {
   };
 }
 
-function normalizeProject(project: Project): Project {
+function normalizeProject<T extends Project>(project: T): T {
   return {
     ...project,
     dueDate: toDateInputValue(project.dueDate),
