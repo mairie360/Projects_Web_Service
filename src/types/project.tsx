@@ -1,7 +1,9 @@
+import type { components } from '@/contracts/bff';
+type Schemas = components['schemas'];
 import { AlertCircle, CheckCircle2, Clock, Eye } from 'lucide-react';
 
-export type ProjectStatus = 'todo' | 'in-progress' | 'review' | 'done';
-export type ProjectPriority = 'high' | 'medium' | 'low';
+export type ProjectStatus = Schemas['ProjectStatus'];
+export type ProjectPriority = Schemas['ProjectPriority'];
 
 export interface Person {
   id?: string;
@@ -33,26 +35,11 @@ export interface ProjectTask {
   };
 }
 
-export interface TaskComment {
-  id: string;
-  message: string;
-  author: { id: string; name: string };
-  createdAt: string;
-}
+export type TaskComment = Schemas['TaskComment'];
 
-export interface TaskHistoryEntry {
-  id: string;
-  action: string;
-  label: string;
-  author: { id: string; name: string };
-  createdAt: string;
-  changes?: Record<string, unknown>;
-}
+export type TaskHistoryEntry = Schemas['TaskHistoryEntry'];
 
-export interface TaskCollaboration {
-  comments: TaskComment[];
-  history: TaskHistoryEntry[];
-}
+export type TaskCollaboration = Schemas['TaskCollaborationResponse'];
 
 export interface ProjectTaskDraft {
   title: string;
