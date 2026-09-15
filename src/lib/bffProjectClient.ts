@@ -1,5 +1,11 @@
-import type { components } from '@/contracts/bff';
-type Schemas = components['schemas'];
+import type {
+  CreateProjectBody as ContractCreateProjectBody,
+  CreateTaskBody as ContractCreateTaskBody,
+  ProjectDetailsResponse as ContractProjectDetailsResponse,
+  ProjectsPageResponse as ContractProjectsPageResponse,
+  UpdateProjectBody as ContractUpdateProjectBody,
+  UpdateTaskBody as ContractUpdateTaskBody,
+} from '@mairie360/bff-project-openapi/model';
 import type {
   Project,
   ProjectPriority,
@@ -13,9 +19,9 @@ import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
   getStoredAuthorizationHeader,
+  logoutAndReload,
   storeAuthJwtToken,
 } from './auth-token';
-import { logoutAndReload } from './auth-session';
 import { getPersonValue, type ProjectFormState, type ViewMode } from './projectPageState';
 
 export type BffSelectOption = {
@@ -36,17 +42,17 @@ export type ProjectsPageQuery = {
   dueAfter?: string;
 };
 
-export type ProjectsPageResponse = Schemas['ProjectsPageResponse'];
+export type ProjectsPageResponse = ContractProjectsPageResponse;
 
-export type ProjectDetailsResponse = Schemas['ProjectDetailsResponse'];
+export type ProjectDetailsResponse = ContractProjectDetailsResponse;
 
-export type CreateProjectBody = Schemas['CreateProjectBody'];
+export type CreateProjectBody = ContractCreateProjectBody;
 
-export type UpdateProjectBody = Schemas['UpdateProjectBody'];
+export type UpdateProjectBody = ContractUpdateProjectBody;
 
-export type CreateTaskBody = Schemas['CreateTaskBody'];
+export type CreateTaskBody = ContractCreateTaskBody;
 
-export type UpdateTaskBody = Schemas['UpdateTaskBody'];
+export type UpdateTaskBody = ContractUpdateTaskBody;
 
 type ApiErrorBody = {
   error?: {

@@ -4,8 +4,8 @@ const ts = require('typescript');
 const { root } = require('./typescript.cjs');
 
 // Inventaire statique (AST TypeScript) de tout ce qui peut émettre une requête réseau dans `src/` :
-// appels `fetch`, appels du client `requestBff`, cibles des adaptateurs `userBffRequest`, et primitives
-// réseau interdites côté front (XMLHttpRequest, WebSocket, EventSource, sendBeacon, clients HTTP).
+// appels `fetch`, appels du client `requestBff`, appelants de la passerelle serveur `forwardToBff`, et
+// primitives réseau interdites côté front (XMLHttpRequest, WebSocket, EventSource, sendBeacon, clients HTTP).
 
 const FORBIDDEN_CONSTRUCTORS = new Set(['XMLHttpRequest', 'EventSource', 'WebSocket']);
 const FORBIDDEN_MODULES = new Set(['axios', 'ky', 'got', 'superagent', 'undici', 'http', 'https', 'node:http', 'node:https', 'net', 'node:net']);
@@ -72,7 +72,7 @@ function methodOf(init) {
 function analyseNetworkCalls() {
   const fetchCalls = [];
   const bffCalls = [];
-  const userBffTargets = [];
+  const forwardCalls = [];
   const forbidden = [];
 
   for (const file of sourceFiles()) {
@@ -102,13 +102,10 @@ function analyseNetworkCalls() {
         const [target, init] = node.arguments;
         bffCalls.push({ file, location, method: methodOf(init), target: target && pathOf(target) });
       }
-      if (name === 'userBffRequest') {
-        const target = node.arguments[1];
-        userBffTargets.push({ file, location, method: enclosingFunctionName(node), target: target && pathOf(target) });
-      }
+      if (name === 'forwardToBff') forwardCalls.push({ file, location, function: enclosingFunctionName(node) });
     });
   }
-  return { fetchCalls, bffCalls, userBffTargets, forbidden };
+  return { fetchCalls, bffCalls, forwardCalls, forbidden };
 }
 
 module.exports = { analyseNetworkCalls, sourceFiles, parse, visit };

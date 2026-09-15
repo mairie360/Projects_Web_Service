@@ -8,11 +8,12 @@ const fixtures = require('./support/bff-fixtures.cjs');
 
 // Client BFF_Project du navigateur (src/lib/bffProjectClient.ts) testé de bout en bout sans stub de fetch
 // applicatif : fonction du client → route catch-all Next.js → proxy contractuel → vrai serveur HTTP
-// simulant BFF_Project à partir de contracts/openapi.json. Le mock refuse tout chemin, méthode, paramètre
-// ou corps absent du contrat et valide chaque réponse ; le harnais refuse tout autre appel réseau.
+// simulant BFF_Project à partir du contrat publié @mairie360/bff-project-openapi. Le mock refuse tout chemin,
+// méthode, paramètre ou corps absent du contrat et valide chaque réponse ; le harnais refuse tout autre
+// appel réseau, BFF_Project étant le seul service que le front a le droit de joindre.
 
 const harness = createFrontHarness();
-const { bffProject, bffUser } = harness;
+const { bffProject } = harness;
 let client;
 
 before(async () => {
@@ -249,7 +250,7 @@ describe('erreurs du BFF', () => {
       [502, () => client.getProjectsPage(), 'get', '/projects-page', fixtures.apiError('BAD_GATEWAY', 'Service amont indisponible')],
     ];
     for (const [status, call, method, template, body] of cases) {
-      bffProject.on(method, template, { status, body });
+      bffProject.on(method, template, harness.errorReply(status, body));
       await assert.rejects(call(), (error) => {
         assert.ok(error instanceof client.BffProjectError);
         assert.deepEqual([error.status, error.code, error.message, error.details], [status, body.error.code, body.error.message, body.error.details]);
@@ -276,14 +277,13 @@ describe('erreurs du BFF', () => {
     assert.deepEqual(bffProject.requests, []);
   });
 
-  test('un 401 déconnecte via BFF User POST /auth/logout, vide le stockage et recharge la page', async () => {
+  test('un 401 déconnecte localement sans autre BFF, vide le stockage et recharge la page', async () => {
     client.storeBffProjectJwtToken('stale-session');
-    bffProject.on('get', '/projects-page', { status: 401, body: fixtures.apiError('UNAUTHORIZED', 'Session expirée') });
-    bffUser.on('post', '/auth/logout', { body: { message: 'Déconnecté' }, headers: { 'Set-Cookie': 'accessToken=; Max-Age=0; Path=/; HttpOnly' } });
+    bffProject.on('get', '/projects-page', harness.errorReply(401, fixtures.apiError('UNAUTHORIZED', 'Session expirée')));
 
     await assert.rejects(client.getProjectsPage(), { status: 401, code: 'UNAUTHORIZED', message: 'Votre session a expiré.' });
 
-    assert.equal(bffUser.calls('/auth/logout', 'post')[0].headers.authorization, bearer());
+    assert.equal(bffProject.requests.length, 1);
     assert.equal(harness.storage.length, 0);
     assert.equal(harness.cookies.has('accessToken'), false);
     assert.equal(harness.location.reloads, 1);
@@ -312,9 +312,8 @@ describe('frontière contractuelle du proxy', () => {
     const traversal = await fetch('/projects/a%2F..%2Fadmin');
 
     assert.deepEqual([unknown.status, wrongMethod.status, traversal.status], [404, 405, 400]);
-    assert.equal(wrongMethod.headers.get('Allow'), 'DELETE, PATCH, GET, HEAD');
+    assert.deepEqual(wrongMethod.headers.get('Allow').split(', ').sort(), ['DELETE', 'GET', 'HEAD', 'PATCH']);
     assert.deepEqual(bffProject.requests, []);
-    assert.deepEqual(bffUser.requests, []);
   });
 
   test('un appel direct vers une autre origine est refusé par le harnais', async () => {
