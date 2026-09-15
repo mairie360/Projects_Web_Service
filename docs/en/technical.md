@@ -135,7 +135,9 @@ npm run lint
 npm run build
 ```
 
-`contracts:sync` copies the BFF contract and regenerates `src/contracts/bff.d.ts`. `contracts:check` also compares a neighboring BFF when present; in an isolated checkout, it checks types against the local committed snapshot. `test:contracts` runs the Node proxy tests.
+`contracts:sync` copies the BFF contract and regenerates `src/contracts/bff.d.ts`. `contracts:check` also compares a neighboring BFF when present; in an isolated checkout, it checks types against the local committed snapshot. `test:contracts` runs the Node tests without coverage; `npm test` runs them with the 60% threshold (lines, branches, functions) on the loaded `src/**/*.ts` modules, source-mapped to the TypeScript lines.
+
+The tests follow the BFFs' contract-driven mocks: `tests/support/contract-mock-server.ts`, `openapi-contract.ts` and `orval-contract.ts` are verbatim copies of the BFF helpers. Real local HTTP servers stand in for BFF_Project (from `contracts/openapi.json`) and BFF User (rebuilt from the installed `@mairie360/bff-user-openapi` devDependency); they reject any path, method, parameter or body outside the contract and validate mocked responses. `tests/support/front-harness.cjs` routes the browser's same-origin `fetch` to the real `src/app/**/route.ts` handlers and only lets the server-side proxy reach those mocks. `tests/network-contract.test.cjs` statically inventories every network call in `src/` and fails if one bypasses `requestBff`, the `/api/*` adapters or the contract.
 
 The type generator is pinned to `openapi-typescript@7.10.1` in `scripts/contracts.mjs` and runs through npm. For documentation-only changes, check links, accuracy in both languages and `git diff --check`; do not regenerate contracts without changing their source.
 
