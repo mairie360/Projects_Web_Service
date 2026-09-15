@@ -49,3 +49,23 @@ test('static security headers apply to every route and X-Powered-By is disabled'
   assert.equal(rule.source, '/:path*');
   assert.deepEqual(rule.headers.map(({ key }) => key).sort(), ['Cross-Origin-Embedder-Policy', 'Cross-Origin-Opener-Policy', 'Cross-Origin-Resource-Policy', 'Permissions-Policy', 'Referrer-Policy', 'X-Content-Type-Options', 'X-Frame-Options']);
 });
+
+test('JWT sans exp, opaque ou illisible : seul un payload illisible est traité comme expiré', () => {
+  const noExp = `${b64url({ alg: 'HS256' })}.${b64url({ sub: '2' })}.signature`;
+  assert.equal(middleware(pageRequest(noExp)).status, 200);
+  assert.equal(middleware(pageRequest('opaque-session')).status, 200);
+  assert.equal(middleware(pageRequest('a.%%%.c')).status, 307);
+});
+
+test('la redirection suit LOGIN_FRONT_URL et efface le cookie sur COOKIE_DOMAIN', () => {
+  process.env.LOGIN_FRONT_URL = 'https://login.example/';
+  process.env.COOKIE_DOMAIN = ' .mairie360.test ';
+  try {
+    const response = middleware(pageRequest());
+    assert.equal(response.headers.get('location'), 'https://login.example/');
+    assert.match(response.headers.get('set-cookie'), /Domain=\.mairie360\.test/i);
+  } finally {
+    delete process.env.LOGIN_FRONT_URL;
+    delete process.env.COOKIE_DOMAIN;
+  }
+});
