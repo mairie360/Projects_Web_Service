@@ -18,7 +18,7 @@ Domaine fonctionnel: Projets et tâches.
 
 ## Parcours type
 
-1. Résoudre la session avec BFF User et charger `/projects-page`.
+1. Charger `/projects-page` depuis BFF_Project, qui renvoie aussi le rôle et les permissions de l’utilisateur.
 2. Ouvrir un projet pour consulter ses tâches et les actions autorisées.
 3. Effectuer une mutation puis utiliser les données renvoyées et recharger le contexte concerné.
 

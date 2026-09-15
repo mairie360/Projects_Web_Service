@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Next.js 15 (App Router, React 19, TypeScript, Tailwind 4) web service for Mairie360 hosting the project & task management module (list/kanban views, tasks, comments, collaboration). The browser only talks to this app's own origin; the Next.js server forwards data calls to **BFF_Project**. UI building blocks come from the private package `@mairie360/lib-components`. The `@mairie360/bff-project-openapi` dependency is currently not imported anywhere; types come from the local `src/contracts/bff.d.ts`. Docs are bilingual: `docs/en|fr/module.md` (functional) and `docs/en|fr/technical.md` (routes, config, troubleshooting) — update both languages together. `BFF.md` / `BACKEND.md` contain *proposed* backend needs; the OpenAPI snapshot is the source of truth for implemented behaviour.
+Next.js 15 (App Router, React 19, TypeScript, Tailwind 4) web service for Mairie360 hosting the project & task management module (list/kanban views, tasks, comments, collaboration). The browser only talks to this app's own origin, and the Next.js server talks to **one service only: BFF_Project**. It goes through BFF_Project's published contract, and BFF_Project calls BFF User itself. This front must never call BFF User or any other BFF directly. UI building blocks come from the private package `@mairie360/lib-components`. Docs are bilingual: `docs/en|fr/module.md` (functional) and `docs/en|fr/technical.md` (routes, config, troubleshooting) — update both languages together. `BFF.md` / `BACKEND.md` contain *proposed* backend needs; the published contract package is the source of truth for implemented behaviour.
 
 ## Commands
 
@@ -12,7 +12,7 @@ Private `@mairie360/*` packages come from GitHub Packages: `.npmrc` reads `NODE_
 
 ```bash
 npm ci
-npm run dev -- --port 5001         # needs the BFF(s) reachable, see "BFF URL" below
+npm run dev -- --port 5001         # needs BFF_Project reachable, see "BFF URL" below
 npm run build && npm run start -- --port 5001
 npm run lint                             # next lint (next/core-web-vitals + next/typescript)
 npm test                                 # node:test on tests/*.test.cjs + lcov in coverage/lcov.info (what CI runs)
@@ -23,30 +23,54 @@ node --test --enable-source-maps --test-name-pattern="<name>" tests/bff-project-
 Tests are plain CommonJS `node:test` files (no Jest/Vitest, no DOM) matching `tests/*.test.cjs`. The 60% coverage threshold (lines/branches/functions) only counts modules a test loads; `network-contract.test.cjs` loads every `src/**/*.ts`, so only `.tsx` UI stays out of scope. `--enable-source-maps` makes coverage report TypeScript lines, which also counts type-only lines as uncovered, so the percentages are lower than without it.
 
 - `tests/support/typescript.cjs` (`requireTs`) is the shared loader: a `.ts` hook with inline source maps that resolves the `@/*` alias. `proxy.test.cjs` and `security-headers.test.cjs` still use their own inline hook and stub `global.fetch`.
-- `tests/support/{openapi-contract,contract-mock-server,orval-contract}.ts` are **verbatim copies** of the BFF helpers (`../../BFFs/BFF_*/tests/support/`); keep them identical. They are type-checked by `next build` because the tsconfig includes `**/*.ts`.
-- `front-harness.cjs` starts real HTTP mocks for BFF_Project (`contracts/openapi.json`) and BFF User (rebuilt from the installed `@mairie360/bff-user-openapi` devDependency, pinned to the same version as BFF_Project). It also replaces `global.fetch` and `global.window`: same-origin paths go to the real `src/app/**/route.ts` handlers, which it discovers the way the App Router does, and absolute URLs may only target the registered mocks (`allowUpstream` adds an extra one, e.g. a closed port). `violations()` (checked in `afterEach`) collects contract mismatches, undeclared query params, cookies forwarded to a BFF and blocked calls. Orval only types successes, so BFF User error replies need `outOfContract: true`; BFF_Project errors are documented `ApiError`s and must not use it.
-- `network-contract.test.cjs` walks the TypeScript AST of `src/`. It allows `fetch` only in `forwardToBff`, `requestBff` and the `/api/*` calls of `auth-session.ts`, and forbids other network primitives. Every `requestBff` path+method (templates built from `${encodeURIComponent(x)}`) must match the contract, `ProjectsPageQuery` keys must equal the declared query params, and each `/api/*` adapter must target a BFF User operation. `bff-project-client.test.cjs` then checks that every consumed operation was exercised against the mock. A new client call must be written as `requestBff(literal or template, { method: 'LITERAL' })` or it fails the static analysis.
+- `tests/support/{openapi-contract,contract-mock-server}.ts` are **verbatim copies** of the BFF helpers (`../../BFFs/BFF_*/tests/support/`); keep them identical. They are type-checked by `next build` because the tsconfig includes `**/*.ts`.
+- `front-harness.cjs` starts one real HTTP mock, for BFF_Project, driven by `contracts/openapi.json`. It also replaces `global.fetch` and `global.window`:
+  - same-origin paths go to the real `src/app/**/route.ts` handlers, which it discovers the way the App Router does;
+  - absolute URLs may only target the mock (`allowUpstream` adds an extra one, e.g. a closed port).
+
+  `violations()` (checked in `afterEach`) collects contract mismatches, undeclared query params, cookies forwarded to the BFF and blocked calls. Orval only types successes (`2XX`), so error replies must go through `harness.errorReply(status, body)`. It marks them `outOfContract` but still validates the body against the published `ApiError` model.
+- `network-contract.test.cjs` walks the TypeScript AST of `src/` and forbids network primitives other than `fetch`. It allows `fetch` only in three places:
+  - `forwardToBff`, which may only be called by the catch-all route's `proxyBffRequest`;
+  - `requestBff`;
+  - `logoutAndReload`, which posts to the local `/api/auth/logout`.
+
+  The only route files allowed are the catch-all and that local logout route, which must not import the proxy. Every `requestBff` path+method (templates built from `${encodeURIComponent(x)}`) must match the contract, and `ProjectsPageQuery` keys must equal the declared query params. `bff-project-client.test.cjs` then checks that every consumed operation was exercised against the mock. A new client call must be written as `requestBff(literal or template, { method: 'LITERAL' })` or it fails the static analysis.
+- `package-contract.test.cjs` checks that:
+  - the package is pinned to an exact `X.Y.Z`, installed and locked at that version;
+  - it is the only `@mairie360/bff-*-openapi` dependency;
+  - `contracts/openapi.json` equals the rebuild from the package;
+  - every `docker-compose*.yml` uses `bff-project:<that version>` (never a `../BFF_Project` build);
+  - the `projects-front` service references no other service than BFF_Project.
 - `session.test.cjs` replaces `react` in `require.cache` with a one-render `useState`/`useEffect` stub to test `useAuthSession`.
 - `bff-fixtures.cjs` holds contract-valid bodies. JWTs use a fixed `exp`, because tokens computed from `Date.now()` made tests flaky.
 
 ### OpenAPI contract
 
-`contracts/openapi.json` is a committed copy of BFF_Project's contract and `src/contracts/bff.d.ts` is generated from it (`openapi-typescript@7.10.1`, pinned in `scripts/contracts.mjs`). Never hand-edit either file.
+The only contract is **BFF_Project's, as published in `@mairie360/bff-project-openapi`**, pinned to an exact version in `package.json` (`dependencies`). Never copy it from a BFF checkout: the local `BFFs/BFF_Project` can be ahead of the last release. The package is orval output (`endpoints/bffProject.ts` + `model/*.ts`, no `openapi.json`), so:
+
+- `scripts/orval-contract.mjs` rebuilds an OpenAPI document from it, using the TypeScript compiler API. It is the same ESM port as `Login_Web_Service/scripts/orval-contract.mjs`; only `PACKAGE_NAME` differs, so keep the two identical otherwise. It writes the committed `contracts/openapi.json` (`info.x-source-package` names the version), which the proxy imports at build time and the tests load. Never hand-edit it.
+- orval keeps paths, methods, parameters, bodies, success models and JSDoc constraints. It drops formats, examples and error statuses, and exposes success as `2XX`.
+- Source code imports its types straight from the package (`import type { ProjectsPageResponse } from '@mairie360/bff-project-openapi/model'`). There is no generated `.d.ts`.
 
 ```bash
-BFF_CONTRACT_DIR=../../BFFs/BFF_Project/contracts npm run contracts:sync   # copy the BFF contract and regenerate types
-npm run contracts:generate  # regenerate types from the local snapshot
-npm run contracts:check     # fail if types are stale, or if the BFF checkout at $BFF_CONTRACT_DIR has a different contract
+npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z   # bump: published releases only, never 0.0.0-dev/staging
+npm run contracts:sync      # (= contracts:generate) rebuild contracts/openapi.json from the installed package
+npm run contracts:check     # fail if the version isn't exact X.Y.Z, installed != package.json, a second bff-*-openapi exists, or the snapshot is stale
 ```
 
-The script's default source `../BFF_Project/contracts` resolves to `Fronts/BFF_Project`, which does not exist in the EIP checkout, so always set `BFF_CONTRACT_DIR` (without it, `check` silently skips the BFF comparison). All three commands `npm exec` `openapi-typescript`, so they need network access.
+These commands run offline. After a bump, also move the `bff-project` image tags in the `docker-compose*.yml` files to the same version (`package-contract.test.cjs` enforces it), then adapt the client.
 
 ## Architecture
 
 - **Contract-gated catch-all proxy** — `src/app/[...path]/route.ts` exports `proxyBffRequest` (`src/lib/bff-proxy.ts`) for every method. It matches the path against `contracts/openapi.json` `paths` (brace segments are wildcards): unknown path → 404, method not declared → 405 with `Allow`, `.`/`..` segments → 400; `/openapi.json` and `/swagger.json` are always forwarded. **A BFF route is therefore reachable from the browser only once the synced contract declares it.**
 - **`forwardToBff`** strips hop-by-hop headers and the `cookie` header, turns the `accessToken` cookie into `Authorization: Bearer` when no Authorization header is present, keeps the query string and raw (binary) body, uses `redirect: 'manual'`, a 15 s timeout and `Cache-Control: no-store`, preserves upstream status/headers (including `Set-Cookie`, empty 204/205/304 bodies) and returns a controlled 502 JSON error when the BFF is unreachable. `tests/proxy.test.cjs` pins this behaviour.
 - **BFF URL** — `BFF_PROJECT_BASE_URL` → `PROJECT_BFF_URL` → `NEXT_PUBLIC_BFF_PROJECT_BASE_URL` (fallback `http://localhost:4001`); resolved at request time on the server.
-- **Session adapters** — `src/app/api/{user/me,auth/me,auth/session,auth/logout}/route.ts` call `userBffRequest` (`src/lib/user-bff-proxy.ts`), which reuses `forwardToBff` against BFF User (`USER_BFF_URL` → `BFF_USER_API_URL`, fallback `http://localhost:4000`). `src/lib/auth-session.ts` (`useAuthSession`) loads `/api/user/me`, normalises roles (`Admin`/`Responsable`/`Maire`/`User`/`Guest`, with FR/EN aliases) and on 401 calls `logoutAndReload()`.
+- **Session** — there is no session adapter. The shell's session comes from BFF_Project's `access` block (`role`, `scope`, `can*`) in `GET /projects-page`:
+  - `src/app/page.tsx` derives it from the page response it already loads (`authSessionFromAccess`);
+  - `src/app/profile/page.tsx` uses `useAuthSession()`, which calls `GET /projects-page?limit=1`.
+
+  The published contract has no identity (name, e-mail), so the header shows the role label.
+- **Logout** — `logoutAndReload()` (`src/lib/auth-token.ts`) posts to the local `src/app/api/auth/logout/route.ts`, which only clears the `accessToken` cookie on `COOKIE_DOMAIN` (`src/lib/access-token-cookie.ts`, shared with the middleware). It then clears `localStorage` and reloads, and the middleware redirects to Login. The session is not revoked server-side: BFF_Project's contract has no logout route. The client calls it on any 401.
 - **Auth gate** — `src/middleware.ts` redirects every page request (matcher excludes `/api`, `/_next/static`, `/_next/image` and paths with a dot) to `LOGIN_FRONT_URL` when the `accessToken` cookie is missing or its JWT `exp` is past, clearing the cookie on `COOKIE_DOMAIN`. It only decodes the payload; signature validation is the BFF/Core's job. Note that the catch-all data routes (e.g. `/health`) also pass through it. For authenticated requests it also sets a per-request nonce `Content-Security-Policy` (built in `src/lib/content-security-policy.ts`, forwarded to Next.js via request headers), which is why `src/app/layout.tsx` forces dynamic rendering: a prerendered page would carry no nonce and its scripts would be blocked. Any new external origin (images, fonts, browser-side API calls) must be added to that policy.
 - **Client calls** — pages call same-origin paths (e.g. `/projects-page`, `/projects/*`) through clients that parse `{ error: { message } }` / `{ message }` bodies into typed errors and, when no Authorization header is set, add a Bearer token stored in `localStorage` (`mairie360.auth.jwt`, see `src/lib/auth-token.ts`); in normal use the proxy relies on the cookie.
 - `src/app/page.tsx` orchestrates views and forms; `src/lib/bffProjectClient.ts` adapts the OpenAPI contract to the presentation model (`src/types/project.tsx`) and `src/lib/projectPageState.ts` centralises page-state updates.
@@ -61,12 +85,12 @@ The script's default source `../BFF_Project/contracts` resolves to `Fronts/BFF_P
 
 ## Local Docker dev stack
 
-`docker-compose.yml` (with `development.Dockerfile`, which runs `npm run dev` as a non-root user and reads `NODE_AUTH_TOKEN` as a build secret) starts Postgres + Liquibase + Redis (`dev-latest` GHCR images), `project-api` (3001), `bff-project` (4001) and this front on host port **5001 → container 3000**, with `docker compose watch` syncing `src/`. Core API is commented out and `USER_BFF_URL` defaults to `http://host.docker.internal:4000`, so session routes need a BFF User running on the host. The `bff-project` build context is `../BFF_Project`, which suffers from the same wrong-path problem as the contract script in the EIP checkout. `nginx.conf` is a leftover and nothing references it.
+`docker-compose.yml` (with `development.Dockerfile`, which runs `npm run dev` as a non-root user and reads `NODE_AUTH_TOKEN` as a build secret) starts Postgres + Liquibase + Redis (`dev-latest` GHCR images), `project-api` (3001), `bff-project` (4001, `ghcr.io/mairie360/bff-project:<contract package version>`, overridable with `BFF_PROJECT_IMAGE`) and this front on host port **5001 → container 3000**, with `docker compose watch` syncing `src/`. Core API and BFF User are not in this stack (Core is commented out), so BFF_Project cannot resolve sessions there without extra services. `nginx.conf` is a leftover and nothing references it.
 
 ## Isolated security & performance tests
 
 Same pattern as the APIs/BFFs, adapted to a web front. Not part of `npm test`; they need Docker and `NODE_AUTH_TOKEN` (the front image is built from the production `Dockerfile`).
 
-- `./security_test.sh` → `docker-compose-security.yml`: full isolated upstream stack (Postgres + Liquibase + `init-test.sql` seed, Redis, Core API, BFF User, BFF_Project and its dependencies; published GHCR images, versions overridable via `*_IMAGE` env vars) + this front, then `zap-baseline.py` (spider + passive scan) authenticated with a static `accessToken` cookie. Any WARN/FAIL alert not set to IGNORE in `.zap/rules.tsv` fails the run.
-- `./performance_test.sh` → `docker-compose-performance.yml`: same stack + k6 running `load-test.js` (pages, `/health`, `/api/user/me`, `/projects-page`, `/projects/*` through the proxy) with a JWT minted from `JWT_SECRET`; thresholds fail the run.
+- `./security_test.sh` → `docker-compose-security.yml`: full isolated upstream stack (Postgres + Liquibase + `init-test.sql` seed, Redis, Core API, BFF User (a dependency of BFF_Project only; the front service is only wired to `bff-project`), BFF_Project and its dependencies; published GHCR images, versions overridable via `*_IMAGE` env vars) + this front, then `zap-baseline.py` (spider + passive scan) authenticated with a static `accessToken` cookie. Any WARN/FAIL alert not set to IGNORE in `.zap/rules.tsv` fails the run.
+- `./performance_test.sh` → `docker-compose-performance.yml`: same stack + k6 running `load-test.js` (pages, `/health`, `/projects-page` through the proxy) with a JWT minted from `JWT_SECRET`; thresholds fail the run.
 - Test user is id 2 (seeded in `init-test.sql`); every service shares `JWT_SECRET=b"secret"`. `TARGET_IMAGE` lets the stacks reuse a pre-built front image. These files are excluded from the image by `.dockerignore`.
