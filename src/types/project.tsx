@@ -1,9 +1,14 @@
-import type { components } from '@/contracts/bff';
-type Schemas = components['schemas'];
+import type {
+  ProjectPriority as ContractProjectPriority,
+  ProjectStatus as ContractProjectStatus,
+  TaskCollaborationResponse,
+  TaskComment as ContractTaskComment,
+  TaskHistoryEntry as ContractTaskHistoryEntry,
+} from '@mairie360/bff-project-openapi/model';
 import { AlertCircle, CheckCircle2, Clock, Eye } from 'lucide-react';
 
-export type ProjectStatus = Schemas['ProjectStatus'];
-export type ProjectPriority = Schemas['ProjectPriority'];
+export type ProjectStatus = ContractProjectStatus;
+export type ProjectPriority = ContractProjectPriority;
 
 export interface Person {
   id?: string;
@@ -35,11 +40,11 @@ export interface ProjectTask {
   };
 }
 
-export type TaskComment = Schemas['TaskComment'];
+export type TaskComment = ContractTaskComment;
 
-export type TaskHistoryEntry = Schemas['TaskHistoryEntry'];
+export type TaskHistoryEntry = ContractTaskHistoryEntry;
 
-export type TaskCollaboration = Schemas['TaskCollaborationResponse'];
+export type TaskCollaboration = TaskCollaborationResponse;
 
 export interface ProjectTaskDraft {
   title: string;

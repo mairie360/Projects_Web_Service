@@ -38,7 +38,7 @@ import {
   type ViewMode,
 } from '../lib/projectPageState';
 import { navigateToPage } from '../lib/navigation';
-import { logoutAndReload, useAuthSession } from '../lib/auth-session';
+import { authSessionFromAccess, logoutAndReload } from '../lib/auth-session';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
 
 type AlertState = {
@@ -88,7 +88,8 @@ export default function ProjectsPage() {
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
-  const session = useAuthSession();
+  // La session vient de la réponse /projects-page déjà chargée : aucun appel supplémentaire.
+  const session = useMemo(() => authSessionFromAccess(projectsPage?.access ?? null), [projectsPage]);
 
   const handlePageChange = (page: string) => {
     navigateToPage(page);
