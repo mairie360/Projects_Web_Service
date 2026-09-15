@@ -1,6 +1,5 @@
-// Réponses de BFF_Project conformes à contracts/openapi.json et réponses de BFF User conformes au
-// paquet @mairie360/bff-user-openapi installé. Les mocks valident chaque réponse de succès contre le
-// contrat : une fixture qui dérive du contrat fait échouer le test qui l'utilise.
+// Réponses de BFF_Project conformes au contrat publié @mairie360/bff-project-openapi. Le mock valide chaque
+// réponse de succès contre ce contrat : une fixture qui en dérive fait échouer le test qui l'utilise.
 
 const STATUS_LABELS = { todo: 'À faire', 'in-progress': 'En cours', review: 'En revue', done: 'Terminé' };
 const PRIORITY_LABELS = { high: 'Haute', medium: 'Moyenne', low: 'Basse' };
@@ -9,9 +8,9 @@ const person = (id, name) => ({ id: String(id), name, avatarUrl: null });
 
 /** Agents de la mairie ; l'id est celui de la base (test user id 2 = Alice). */
 const agents = {
-  admin: { id: 1, first_name: 'Admin', last_name: 'Mairie', role: 'Admin' },
-  alice: { id: 2, first_name: 'Alice', last_name: 'Martin', role: 'User' },
-  marie: { id: 3, first_name: 'Marie', last_name: 'Durand', role: 'Responsable' },
+  admin: { id: 1, first_name: 'Admin', last_name: 'Mairie' },
+  alice: { id: 2, first_name: 'Alice', last_name: 'Martin' },
+  marie: { id: 3, first_name: 'Marie', last_name: 'Durand' },
 };
 const people = Object.fromEntries(Object.entries(agents).map(([key, agent]) => [key, person(agent.id, `${agent.first_name} ${agent.last_name}`)]));
 
@@ -112,24 +111,6 @@ function taskCollaboration() {
 /** Enveloppe d'erreur du BFF (schéma ApiError). */
 const apiError = (code, message, details = []) => ({ error: { code, message, details } });
 
-/** Corps de BFF User `GET /me` et `GET /session/me` (SessionResponse). */
-function sessionResponse(agent = agents.marie, user = {}) {
-  return {
-    user: {
-      id: agent.id,
-      first_name: agent.first_name,
-      last_name: agent.last_name,
-      email: `${agent.first_name.toLowerCase()}@mairie.test`,
-      phone: null,
-      status: 'active',
-      role: agent.role,
-      ...user,
-    },
-    groups: [{ id: 1, name: 'Service urbanisme', owner_id: 1, description: null }],
-    roles: [{ id: 3, name: agent.role }],
-  };
-}
-
 const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 /**
  * JWT non signé : le front ne fait que décoder `exp`, la signature est vérifiée par les BFF. Expiration fixe
@@ -137,4 +118,4 @@ const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url
  */
 const jwt = (sub, exp = 4102444800) => `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: String(sub), exp })}.signature`;
 
-module.exports = { agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, sessionResponse, jwt };
+module.exports = { agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };

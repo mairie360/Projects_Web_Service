@@ -4,15 +4,15 @@ const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./typescript.cjs');
 const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
-const { loadOrvalContract } = requireTs('tests/support/orval-contract.ts');
 
-// Harnais « navigateur → Next.js → BFF » sans DOM ni serveur Next :
+// Harnais « navigateur → Next.js → BFF_Project » sans DOM ni serveur Next :
 // - le `fetch` du navigateur (chemins same-origin) est routé vers les vrais fichiers `src/app/**/route.ts`,
 //   découverts comme le fait l'App Router (segments statiques avant la route catch-all) ;
-// - le `fetch` serveur du proxy n'a le droit de joindre que les mocks déclarés : BFF_Project, piloté par
-//   contracts/openapi.json, et BFF User, piloté par le paquet @mairie360/bff-user-openapi installé ;
+// - le `fetch` serveur du proxy n'a le droit de joindre qu'un seul service : le mock de BFF_Project, piloté
+//   par contracts/openapi.json, reconstruction exacte du paquet publié @mairie360/bff-project-openapi
+//   (version X.Y.Z de package.json, vérifiée par package-contract.test.cjs) ;
 // - tout autre appel réseau est refusé et relevé comme violation, tout comme les écarts de contrat
-//   détectés par les mocks, les paramètres de query non déclarés et le cookie transmis à un BFF.
+//   détectés par le mock, les paramètres de query non déclarés et le cookie transmis au BFF.
 
 const ORIGIN = 'http://projects.test';
 const APP_DIR = path.join(root, 'src', 'app');
@@ -67,8 +67,7 @@ function abortable(promise, signal) {
 
 function createFrontHarness() {
   const bffProject = new ContractMockServer('BFF_PROJECT', OpenApiContract.load(path.join(root, 'contracts', 'openapi.json')));
-  const bffUser = new ContractMockServer('BFF_USER', loadOrvalContract('@mairie360/bff-user-openapi'));
-  const mocks = [bffProject, bffUser];
+  const mocks = [bffProject];
   const routes = discoverRoutes();
   const originalFetch = global.fetch;
   const upstreams = new Set();
@@ -124,7 +123,6 @@ function createFrontHarness() {
 
   return {
     bffProject,
-    bffUser,
     browserCalls,
     cookies,
     storage,
@@ -150,14 +148,22 @@ function createFrontHarness() {
       forbidden.length = 0;
       location.reloads = 0;
       location.assigned.length = 0;
-      // Les deux proxys relisent leur URL à chaque requête : les variables de repli sont neutralisées.
-      for (const name of ['PROJECT_BFF_URL', 'NEXT_PUBLIC_BFF_PROJECT_BASE_URL', 'BFF_USER_API_URL']) delete process.env[name];
+      // Le proxy relit son URL à chaque requête : les variables de repli sont neutralisées.
+      for (const name of ['PROJECT_BFF_URL', 'NEXT_PUBLIC_BFF_PROJECT_BASE_URL']) delete process.env[name];
       process.env.BFF_PROJECT_BASE_URL = bffProject.url;
-      process.env.USER_BFF_URL = bffUser.url;
     },
     /** Autorise le proxy à joindre une URL supplémentaire (ex. port fermé pour simuler un BFF injoignable). */
     allowUpstream(url) { upstreams.add(new URL(url).origin); },
     signIn(token) { cookies.set('accessToken', token); },
+    /**
+     * Réponse d'erreur du BFF. Orval ne type que les succès : l'erreur est marquée hors contrat, mais son
+     * corps est validé contre le schéma ApiError publié dans le paquet.
+     */
+    errorReply(status, body) {
+      bffProject.contract.validate(bffProject.contract.schema('ApiError'), body, '$error')
+        .forEach((error) => forbidden.push(`[BFF_PROJECT] réponse d'erreur ${status} non conforme à ApiError : ${error}`));
+      return { status, body, outOfContract: true };
+    },
     violations() {
       return [
         ...forbidden,
