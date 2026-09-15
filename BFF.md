@@ -1,10 +1,10 @@
 # Contrat web service / BFF
 
-Ce web service consomme **BFF_Project**. La copie [OpenAPI](contracts/openapi.json) définit les routes et les données échangées ; les [types TypeScript](src/contracts/bff.d.ts) sont générés depuis cette copie.
+Ce web service consomme **uniquement BFF_Project**, via son contrat publié `@mairie360/bff-project-openapi` épinglé à une version exacte dans `package.json`. [contracts/openapi.json](contracts/openapi.json) en est la reconstruction versionnée ; les types TypeScript sont importés du paquet (`@mairie360/bff-project-openapi/model`).
 
 ## Routes implémentées
 
-Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètres, contenu binaire, statuts et cookies. Les chemins `/api/auth/*` restent des adaptateurs de session vers BFF User ; les pages Next.js sont distinctes des routes de données.
+Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètres, contenu binaire, statuts et cookies. Le front n’appelle aucun autre BFF : le rôle affiché vient de `access` dans `/projects-page`, et `/api/auth/logout` est une route locale qui efface le cookie sans appeler de service. Les pages Next.js sont distinctes des routes de données.
 
 | Méthode | Route | Réponse / schéma |
 | --- | --- | --- |
@@ -26,6 +26,6 @@ Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètr
 
 ## Mise à jour et validation
 
-Dans le BFF associé, exécuter `npm run contracts:generate`. Dans ce web service, exécuter `npm run contracts:sync`, puis `npm run contracts:check` et `npm run test:contracts`. Les dépôts peuvent être voisins ; sinon `BFF_CONTRACT_DIR` indique le répertoire `contracts` du BFF. La CI vérifie que les types correspondent au document livré, même sans checkout du dépôt voisin.
+Après une publication de BFF_Project, épingler la version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion dev/staging), aligner les images `bff-project` des `docker-compose*.yml`, puis exécuter `npm run contracts:sync`, `npm run contracts:check` et `npm run test:contracts`. Ces commandes fonctionnent hors ligne ; la CI vérifie l’épinglage et que `contracts/openapi.json` correspond au paquet installé.
 
-Le générateur de types est fixé à `openapi-typescript@7.10.1`. Il est exécuté via npm ; aucun jeton privé ne figure dans les contrats.
+Besoins proposés pour BFF_Project, absents du contrat publié : une route d’identité de session (nom, e-mail, groupes) pour l’en-tête et la page profil, et une route de déconnexion qui révoque la session côté serveur.

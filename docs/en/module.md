@@ -18,7 +18,7 @@ Business domain: Projects and tasks.
 
 ## Typical workflow
 
-1. Resolve the session with BFF User and load `/projects-page`.
+1. Load `/projects-page` from BFF_Project, which also returns the user's role and permissions.
 2. Open a project to inspect tasks and allowed actions.
 3. Perform a mutation, consume the returned data and reload the relevant context.
 
