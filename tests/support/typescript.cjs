@@ -12,8 +12,10 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '..', '..');
 const src = path.join(root, 'src');
 
-if (!require.extensions['.ts']) {
-  require.extensions['.ts'] = (module, filename) => {
+// Node >= 23 définit déjà require.extensions['.ts'] (type stripping natif, sans parameter properties ni
+// imports sans extension) : le hook est donc toujours remplacé, une seule fois grâce au marqueur.
+if (!require.extensions['.ts']?.mairie360) {
+  const loadTs = (module, filename) => {
     const { outputText } = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
       fileName: filename,
       compilerOptions: {
@@ -27,6 +29,8 @@ if (!require.extensions['.ts']) {
     });
     module._compile(outputText, filename);
   };
+  loadTs.mairie360 = true;
+  require.extensions['.ts'] = loadTs;
 
   const resolveFilename = Module._resolveFilename;
   Module._resolveFilename = function resolveAlias(request, ...rest) {
