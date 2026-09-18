@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import "@mairie360/lib-components/dist/styles.css";
 import "./globals.css";
 
+// Rendu à la demande obligatoire : une page prérendue au build ne porterait pas le
+// nonce CSP propre à chaque requête, et ses scripts seraient bloqués.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Projets | Mairie360",
   description: "Module de gestion des projets municipaux.",
