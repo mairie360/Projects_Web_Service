@@ -37,7 +37,7 @@ x-service: &service-template
 
 services:
   postgres:
-    image: ghcr.io/mairie360/database:dev-latest
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.3.0}
     restart: always
     container_name: mairie360-db-projects-front #change front name
     environment:
@@ -57,7 +57,7 @@ services:
       retries: 5
 
   liquibase:
-    image: ghcr.io/mairie360/liquibase-migrations:dev-latest
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.3.0}
     container_name: mairie360-liquibase-projects-front #change front name
     depends_on:
       postgres:
@@ -90,38 +90,38 @@ services:
       timeout: 5s
       retries: 5
 
-  # core:
-  #   container_name: core-projects-front-developpement
-  #   image: ghcr.io/mairie360/core-api:dev-1644fa7
-  #   ports:
-  #     - "3000:3000"
-  #   networks:
-  #     - backend
-  #   dns:
-  #     - 8.8.8.8
-  #     - 1.1.1.1
-  #   environment:
-  #     HOST: "0.0.0.0"
-  #     PORT: 3000
-  #     REDIS_URL: redis://redis:6379
-  #     DB_TYPE: postgres
-  #     DB_NAME: mairie_360_database
-  #     DB_USER: postgres
-  #     DB_HOST: postgres
-  #     DB_PASSWORD: password
-  #     DB_PORT: 5432
-  #     PUBLIC_URL: http://core.development.mairie360.fr
-  #     JWT_SECRET: b"secret"
-  #     JWT_TIMEOUT: 3600
-  #   depends_on:
-  #     liquibase:
-  #       condition: service_completed_successfully
-  #     redis:
-  #       condition: service_healthy
-      
+  core:
+    container_name: core-projects-front-developpement
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:1.2.0}
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      HOST: "0.0.0.0"
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      DB_TYPE: postgres
+      DB_NAME: mairie_360_database
+      DB_USER: ${DB_USER:-postgres}
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_PORT: 5432
+      PUBLIC_URL: http://core.development.mairie360.fr
+      JWT_SECRET: b"secret"
+      JWT_TIMEOUT: 3600
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   project-api:
     container_name: project-api-front-projects-developpement
-    image: ghcr.io/mairie360/project-api:dev-latest
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:0.5.1}
     ports:
       - "3001:3001"
     networks:
@@ -135,9 +135,9 @@ services:
       REDIS_URL: redis://redis:6379
       DB_TYPE: postgres
       DB_NAME: mairie_360_database
-      DB_USER: postgres
+      DB_USER: ${DB_USER:-postgres}
       DB_HOST: postgres
-      DB_PASSWORD: password
+      DB_PASSWORD: ${DB_PASSWORD:-password}
       DB_PORT: 5432
       PUBLIC_URL: http://core.development.mairie360.fr
       JWT_SECRET: b"secret"
@@ -147,8 +147,35 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-  
+
   #add other apis if needed
+
+  bff-user:
+    container_name: bff-user-projects-front
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.5.0}
+    networks:
+      - backend
+    environment:
+      DB_TYPE: postgres
+      DB_NAME: mairie_360_database
+      DB_USER: ${DB_USER:-postgres}
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_PORT: 5432
+      HOST: "0.0.0.0"
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core:3000
+    expose:
+      - "4000"
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      core:
+        condition: service_started
 
   bff-project:
     container_name: bff-project-projects-front
@@ -160,16 +187,19 @@ services:
       - backend
       - frontend
     environment:
-      CORE_API_URL: "core" 
+      CORE_API_URL: "core"
       CORE_API_PORT: 3000
-      PROJECT_API_URL: "project-api" 
+      PROJECT_API_URL: "project-api"
       PROJECT_API_PORT: 3001
       PROJECT_API_BASE_PATH: "http://project-api:3001"
+      USER_BFF_URL: http://bff-user:4000
       PORT: 4001
     depends_on:
       project-api:
         condition: service_started
-  
+      bff-user:
+        condition: service_started
+
   projects-front: # Ton application React
     container_name: projects-front-developpement
     build:
@@ -193,7 +223,7 @@ services:
       PORT: 3000
       BFF_PROJECT_BASE_URL: http://bff-project:4001
       # Force React/Vite à surveiller les fichiers correctement dans Docker
-      WATCHPACK_POLLING: "true" 
+      WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     depends_on:
       bff-project:
@@ -204,7 +234,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 10s
       retries: 3
-        
+
 secrets:
   NODE_AUTH_TOKEN:
     environment: NODE_AUTH_TOKEN
