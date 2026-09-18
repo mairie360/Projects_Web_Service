@@ -90,6 +90,15 @@ describe('lecture des projets', () => {
     assert.equal(onlyCall('/projects-page', 'get').headers.authorization, 'Bearer explicit-session');
   });
 
+  test('clearStoredBffProjectJwtToken efface le jeton stocké', () => {
+    client.storeBffProjectJwtToken('Bearer explicit-session');
+    assert.equal(client.getStoredBffProjectJwtToken(), 'Bearer explicit-session');
+
+    client.clearStoredBffProjectJwtToken();
+
+    assert.equal(client.getStoredBffProjectJwtToken(), null);
+  });
+
   test('GET /projects/{projectId} encode l’identifiant et fusionne les tâches normalisées', async () => {
     bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
 
