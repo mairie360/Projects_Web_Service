@@ -23,7 +23,7 @@ x-db-env: &db-env
   DB_PORT: 5432
 
 # JWT_SECRET identique sur toute la chaîne : le cookie accessToken du front est
-# relayé tel quel (Bearer) à BFF User, aux BFFs métier et aux APIs.
+# relayé tel quel (Bearer) à BFF_Project, seul BFF de ce front, puis à BFF User et aux APIs.
 x-api-env: &api-env
   <<: *db-env
   HOST: "0.0.0.0"
@@ -193,7 +193,7 @@ services:
       - backend
 
   bff-project:
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:0.3.0}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:0.4.0}
     container_name: projects-front-perf-bff-project
     depends_on:
       seeder:
@@ -242,15 +242,12 @@ services:
       args:
         NODE_AUTH_TOKEN: ${NODE_AUTH_TOKEN:-}
     depends_on:
-      bff-user-ready:
-        condition: service_completed_successfully
       bff-project-ready:
         condition: service_completed_successfully
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: 5001
       BFF_PROJECT_BASE_URL: http://bff-project:4001
-      USER_BFF_URL: http://bff-user:4000
     expose:
       - "5001"
     networks:

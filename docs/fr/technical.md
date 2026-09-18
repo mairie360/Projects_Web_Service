@@ -40,10 +40,9 @@ Créer `.env.local` à la racine. Exemple pour des BFF exécutés sur la même m
 
 ```dotenv
 BFF_PROJECT_BASE_URL=http://localhost:4001
-USER_BFF_URL=http://localhost:4000
 ```
 
-Démarrer le BFF associé et BFF User pour les parcours de session, puis lancer le web service. Le port `5001` ci-dessous est un choix local explicite pour éviter les collisions; ce n’est pas une affirmation sur les ports de tous les fichiers Compose.
+Démarrer BFF_Project (il résout lui-même la session auprès de BFF User), puis lancer le web service. Le port `5001` ci-dessous est un choix local explicite pour éviter les collisions; ce n’est pas une affirmation sur les ports de tous les fichiers Compose.
 
 ```bash
 npm run dev -- --port 5001
@@ -63,9 +62,7 @@ Les valeurs ci-dessous sont des exemples locaux ou des comportements expliciteme
 | Variable ou priorité | Exemple / repli indiqué | Rôle |
 | --- | --- | --- |
 | `BFF_PROJECT_BASE_URL` → `PROJECT_BFF_URL` → `NEXT_PUBLIC_BFF_PROJECT_BASE_URL` | http://localhost:4001 | Priorité de gauche à droite dans le proxy; l’URL indiquée est le repli local. |
-| `USER_BFF_URL` → `BFF_USER_API_URL` | http://localhost:4000 | Priorité propre aux adaptateurs de session vers BFF User. |
-| `BFF_CONTRACT_DIR` | ../BFF_Project/contracts | Répertoire des contrats BFF pour les scripts de synchronisation et de contrôle. |
-| `COOKIE_DOMAIN` | — | Domaine des cookies; vérifier sa cohérence avec Login et BFF User. |
+| `COOKIE_DOMAIN` | — | Domaine des cookies; vérifier sa cohérence avec Login ; la déconnexion locale efface le cookie sur ce domaine. |
 | `ADMINISTRATION_FRONT_URL` | — | Destination de navigation; voir le fichier source qui la lit. Les variables injectées par `next.config.ts` ou préfixées `NEXT_PUBLIC_` sont publiques et prises en compte lors du build. |
 | `CALENDAR_FRONT_URL` | — | Destination de navigation; voir le fichier source qui la lit. Les variables injectées par `next.config.ts` ou préfixées `NEXT_PUBLIC_` sont publiques et prises en compte lors du build. |
 | `ELEARNING_FRONT_URL` | — | Destination de navigation; voir le fichier source qui la lit. Les variables injectées par `next.config.ts` ou préfixées `NEXT_PUBLIC_` sont publiques et prises en compte lors du build. |
@@ -79,29 +76,29 @@ Dans un conteneur, `localhost` désigne le conteneur lui-même. Utiliser le nom 
 
 ## Routes et contrat de données
 
-Inventaire extrait de `contracts/openapi.json`. Les paramètres entre accolades sont remplacés par des identifiants réels. Les types détaillés, champs requis, réponses et exemples éventuels sont définis dans ce contrat; les statuts du tableau sont ceux déclarés, sans prétendre lister toutes les erreurs de transport ou de validation.
+Inventaire extrait de `contracts/openapi.json`, reconstruction exacte du paquet publié `@mairie360/bff-project-openapi` épinglé dans `package.json`. Les paramètres entre accolades sont remplacés par des identifiants réels. Les types détaillés et champs requis sont définis dans ce contrat. Le paquet orval ne type que les succès (`2XX`) ; les erreurs de BFF_Project utilisent l’enveloppe `ApiError` (`{ error: { code, message, details } }`).
 
 Ces chemins de données sont exposés à la même origine par le proxy; les pages Next.js sont distinctes. `/openapi.json` et `/swagger.json` sont également relayés. L’interface Swagger `/docs` se consulte directement sur le BFF.
 
 | Méthode | Chemin | Corps déclaré | Statuts déclarés |
 | --- | --- | --- | --- |
-| GET | `/health` | — | 200 |
-| GET | `/check_apis` | — | 200, 502 |
-| PATCH | `/projects/{projectId}/close` | application/json | 200, 403 |
-| POST | `/projects` | application/json | 201, 400 |
-| POST | `/projects/{projectId}/tasks` | application/json | 201, 400, 404 |
-| DELETE | `/projects/{projectId}` | — | 204, 404 |
-| PATCH | `/projects/{projectId}` | application/json | 200, 400, 404 |
-| GET | `/projects/{projectId}` | — | 200, 404 |
-| DELETE | `/projects/{projectId}/tasks/{taskId}` | — | 204, 404 |
-| PATCH | `/projects/{projectId}/tasks/{taskId}` | application/json | 200, 400, 404 |
-| POST | `/projects/{projectId}/duplicate` | — | 201, 404 |
-| PATCH | `/projects/{projectId}/tasks/{taskId}/status` | application/json | 200, 400, 404 |
-| GET | `/projects-page` | — | 200, 500 |
-| GET | `/projects/{projectId}/tasks/{taskId}/collaboration` | — | 200, 403 |
-| POST | `/projects/{projectId}/tasks/{taskId}/comments` | application/json | 201, 403 |
+| GET | `/check_apis` | — | 2XX |
+| GET | `/health` | — | 2XX |
+| POST | `/projects` | application/json | 400, 2XX |
+| GET | `/projects-page` | — | 500, 2XX |
+| DELETE | `/projects/{projectId}` | — | 404, 2XX |
+| GET | `/projects/{projectId}` | — | 404, 2XX |
+| PATCH | `/projects/{projectId}` | application/json | 400, 404, 2XX |
+| PATCH | `/projects/{projectId}/close` | application/json | 403, 2XX |
+| POST | `/projects/{projectId}/duplicate` | — | 404, 2XX |
+| POST | `/projects/{projectId}/tasks` | application/json | 400, 404, 2XX |
+| DELETE | `/projects/{projectId}/tasks/{taskId}` | — | 404, 2XX |
+| PATCH | `/projects/{projectId}/tasks/{taskId}` | application/json | 400, 404, 2XX |
+| GET | `/projects/{projectId}/tasks/{taskId}/collaboration` | — | 403, 2XX |
+| POST | `/projects/{projectId}/tasks/{taskId}/comments` | application/json | 403, 2XX |
+| PATCH | `/projects/{projectId}/tasks/{taskId}/status` | application/json | 400, 404, 2XX |
 
-### Pages et adaptateurs locaux
+### Pages et route locale
 
 | Page | Source |
 | --- | --- |
@@ -110,14 +107,11 @@ Ces chemins de données sont exposés à la même origine par le proxy; les page
 
 | Méthode | Route locale | Source |
 | --- | --- | --- |
-| GET | `/api/user/me` | [src/app/api/user/me/route.ts](../../src/app/api/user/me/route.ts) |
 | POST | `/api/auth/logout` | [src/app/api/auth/logout/route.ts](../../src/app/api/auth/logout/route.ts) |
-| GET | `/api/auth/me` | [src/app/api/auth/me/route.ts](../../src/app/api/auth/me/route.ts) |
-| GET | `/api/auth/session` | [src/app/api/auth/session/route.ts](../../src/app/api/auth/session/route.ts) |
 
 ## Session, permissions et erreurs
 
-Les adaptateurs `/api/auth/me`, `/api/auth/session` et `/api/user/me` utilisent BFF User pour la session; `/api/auth/logout` relaie la déconnexion. Le proxy générique utilise le Bearer explicite ou, en son absence, le cookie `accessToken`. Les permissions métier restent celles du BFF et de ses sources.
+BFF_Project est le seul service appelé par ce web service ; c’est lui qui résout l’utilisateur auprès de BFF User. Le rôle affiché par le shell vient du bloc `access` de `GET /projects-page` (le contrat publié n’expose ni nom ni e-mail, l’en-tête affiche donc le libellé du rôle). `/api/auth/logout` est local : il efface le cookie `accessToken` sans appeler de service, la session n’est donc pas révoquée côté serveur, faute de route de déconnexion dans le contrat publié. Le proxy générique utilise le Bearer explicite ou, en son absence, le cookie `accessToken`. Les permissions métier restent celles du BFF et de ses sources.
 
 Le proxy générique répond 400 pour un chemin invalide, 404 pour un chemin hors contrat, 405 pour une méthode interdite et 502 si le service est injoignable ou dépasse le délai. Les réponses amont sont conservées, y compris les corps vides 204/205/304.
 
@@ -125,7 +119,7 @@ Toutes les réponses portent `X-Frame-Options: DENY`, `X-Content-Type-Options: n
 
 ## Synchronisation et vérifications
 
-Après une modification de routes ou de schémas, exporter le contrat dans **BFF_Project** avec `npm run contracts:generate`, puis exécuter dans ce dépôt:
+Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :
 
 ```bash
 npm run contracts:sync
@@ -135,9 +129,11 @@ npm run lint
 npm run build
 ```
 
-`contracts:sync` copie le contrat BFF et régénère `src/contracts/bff.d.ts`. `contracts:check` compare aussi le BFF voisin lorsqu’il est présent; dans un checkout isolé, il vérifie les types contre la copie locale versionnée. `test:contracts` exécute les tests Node du proxy.
+`contracts:sync` reconstruit `contracts/openapi.json` depuis le paquet installé (`scripts/orval-contract.mjs`). `contracts:check` échoue si la version n’est pas un `X.Y.Z` exact, si le paquet installé diffère, si un autre paquet `bff-*-openapi` existe ou si le snapshot est périmé. Les deux fonctionnent hors ligne. Les types sont importés de `@mairie360/bff-project-openapi/model`. `test:contracts` exécute les tests Node sans coverage ; `npm test` les exécute avec le seuil de 60 % (lignes, branches, fonctions) sur les modules `src/**/*.ts` chargés, rapportés aux lignes TypeScript grâce aux source maps.
 
-Le générateur de types est fixé à `openapi-typescript@7.10.1` dans `scripts/contracts.mjs` et s’exécute via npm. Pour une modification uniquement documentaire, vérifier les liens, l’exactitude des deux langues et `git diff --check`; ne pas régénérer les contrats sans modification de leur source.
+Les tests reprennent les mocks pilotés par contrat des BFF : `tests/support/contract-mock-server.ts` et `openapi-contract.ts` sont des copies à l’identique des helpers des BFF. Un seul vrai serveur HTTP local simule BFF_Project, piloté par `contracts/openapi.json` ; il refuse tout chemin, méthode, paramètre ou corps hors contrat et valide les réponses simulées. `tests/support/front-harness.cjs` route le `fetch` same-origin du navigateur vers les vrais handlers `src/app/**/route.ts` et n’autorise le proxy serveur qu’à joindre ce mock. `tests/network-contract.test.cjs` inventorie statiquement chaque appel réseau de `src/` et échoue si l’un d’eux contourne `requestBff` ou le contrat. `tests/package-contract.test.cjs` vérifie l’épinglage exact, l’unicité du paquet de contrat, le snapshot et les tags d’image Docker.
+
+Pour une modification uniquement documentaire, vérifier les liens, l’exactitude des deux langues et `git diff --check`; ne pas régénérer les contrats sans modification de leur source.
 
 ## CI/CD et exécution Docker
 
@@ -151,9 +147,9 @@ Avant un lancement Docker, vérifier les variables de service, les secrets de bu
 
 ## Diagnostic
 
-Si le contexte utilisateur échoue, vérifier BFF User. Si les vues divergent, comparer la réponse de BFF Project, ses permissions et les conversions de `bffProjectClient.ts`. Le mode SQL et le repli mémoire se configurent dans BFF Project, pas dans ce web service.
+Si le rôle ou le contexte utilisateur échoue, vérifier `GET /projects-page` sur BFF_Project (et, derrière lui, BFF User). Si les vues divergent, comparer la réponse de BFF Project, ses permissions et les conversions de `bffProjectClient.ts`. Le mode SQL et le repli mémoire se configurent dans BFF Project, pas dans ce web service.
 
-En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, vérifier l’URL du BFF puis la session. Pour un 401 après navigation entre modules, vérifier le cookie `accessToken`, son domaine et le service BFF User. Un 404 sur un besoin décrit dans `BACKEND.md` peut correspondre à une fonctionnalité seulement proposée.
+En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, vérifier l’URL du BFF puis la session. Pour un 401 après navigation entre modules, vérifier le cookie `accessToken`, son domaine et BFF_Project. Un 404 sur un besoin décrit dans `BACKEND.md` peut correspondre à une fonctionnalité seulement proposée.
 
 ## Repères dans le dépôt
 
@@ -164,9 +160,8 @@ En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, 
 - [src/middleware.ts](../../src/middleware.ts)
 - [src/lib/bff-proxy.ts](../../src/lib/bff-proxy.ts)
 - [src/app/[...path]/route.ts](../../src/app/%5B...path%5D/route.ts)
-- [src/lib/user-bff-proxy.ts](../../src/lib/user-bff-proxy.ts)
 - [contracts/openapi.json](../../contracts/openapi.json)
-- [src/contracts/bff.d.ts](../../src/contracts/bff.d.ts)
+- [scripts/orval-contract.mjs](../../scripts/orval-contract.mjs)
 - [scripts/contracts.mjs](../../scripts/contracts.mjs)
 - [package.json](../../package.json)
 - [.github/workflows/contracts.yml](../../.github/workflows/contracts.yml)
