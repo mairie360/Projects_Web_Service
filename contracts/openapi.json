@@ -1412,6 +1412,28 @@
           },
           "statusLabel": {
             "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "type": "object"
+      },
+      "PatchProjectsProjectId200ProjectStatus": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "review",
+          "done"
+        ],
+        "type": "string"
+      },
+      "PatchProjectsProjectId200ProjectTasks": {
+        "properties": {
+          "completed": {
+            "type": "number"
           },
           "tasks": {
             "$ref": "#/components/schemas/PatchProjectsProjectId200ProjectTasks"
@@ -3607,6 +3629,30 @@
           },
           "dueDate": {
             "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "type": "object"
+      },
+      "PostProjectsProjectIdTasks404": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/PostProjectsProjectIdTasks404Error"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "PostProjectsProjectIdTasks404Error": {
+        "properties": {
+          "code": {
+            "type": "string"
           },
           "labels": {
             "items": {
@@ -5736,7 +5782,8 @@
               "schema": {
                 "$ref": "#/components/schemas/PatchProjectsProjectIdCloseBody"
               }
-            }
+            },
+            "description": "Réponse 403 (modèle orval PatchProjectsProjectIdClose403)"
           },
           "required": true
         },
@@ -5951,7 +5998,8 @@
               "schema": {
                 "$ref": "#/components/schemas/PostProjectsProjectIdTasksTaskIdCommentsBody"
               }
-            }
+            },
+            "description": "Réponse 403 (modèle orval PostProjectsProjectIdTasksTaskIdComments403)"
           },
           "required": true
         },
