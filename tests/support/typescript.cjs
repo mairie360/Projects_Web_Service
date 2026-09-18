@@ -7,7 +7,7 @@ const ts = require('typescript');
 // - chaque fichier .ts est transpilé en CommonJS avec une source map inline, pour que le coverage
 //   (lancé avec --enable-source-maps) compte les lignes du fichier source et non du code généré ;
 // - l'alias `@/*` du tsconfig est résolu vers `src/*`, comme le fait Next.js ;
-// - les imports `import type` disparaissent à la transpilation, les .tsx ne sont donc jamais chargés.
+// - les .tsx sont transpilés avec le runtime JSX automatique (`react/jsx-runtime`), comme le fait Next.js.
 
 const root = path.resolve(__dirname, '..', '..');
 const src = path.join(root, 'src');
@@ -25,12 +25,14 @@ if (!require.extensions['.ts']?.mairie360) {
         resolveJsonModule: true,
         inlineSourceMap: true,
         inlineSources: true,
+        jsx: ts.JsxEmit.ReactJSX,
       },
     });
     module._compile(outputText, filename);
   };
   loadTs.mairie360 = true;
   require.extensions['.ts'] = loadTs;
+  require.extensions['.tsx'] = loadTs;
 
   const resolveFilename = Module._resolveFilename;
   Module._resolveFilename = function resolveAlias(request, ...rest) {

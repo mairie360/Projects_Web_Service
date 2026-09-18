@@ -20,7 +20,7 @@ npm run test:contracts                   # same tests, no coverage
 node --test --enable-source-maps --test-name-pattern="<name>" tests/bff-project-client.test.cjs   # single test
 ```
 
-Tests are plain CommonJS `node:test` files (no Jest/Vitest, no DOM) matching `tests/*.test.cjs`. The 60% coverage threshold (lines/branches/functions) only counts modules a test loads; `network-contract.test.cjs` loads every `src/**/*.ts`, so only `.tsx` UI stays out of scope. `--enable-source-maps` makes coverage report TypeScript lines, which also counts type-only lines as uncovered, so the percentages are lower than without it.
+Tests are plain CommonJS `node:test` files (no Jest/Vitest, no DOM) matching `tests/*.test.cjs`. The 60% coverage threshold (lines/branches/functions) only counts modules a test loads; `network-contract.test.cjs` loads every `src/**/*.ts`, and `projects-page-html.test.cjs` loads the `.tsx` UI, which therefore counts too (its many handlers are what keeps the function ratio near the threshold: cover new interactions there). `--enable-source-maps` makes coverage report TypeScript lines, which also counts type-only lines as uncovered, so the percentages are lower than without it.
 
 - `tests/support/typescript.cjs` (`requireTs`) is the shared loader: a `.ts` hook with inline source maps that resolves the `@/*` alias. `proxy.test.cjs` and `security-headers.test.cjs` still use their own inline hook and stub `global.fetch`.
 - `tests/support/{openapi-contract,contract-mock-server}.ts` are **verbatim copies** of the BFF helpers (`../../BFFs/BFF_*/tests/support/`); keep them identical. They are type-checked by `next build` because the tsconfig includes `**/*.ts`.
@@ -41,6 +41,7 @@ Tests are plain CommonJS `node:test` files (no Jest/Vitest, no DOM) matching `te
   - `contracts/openapi.json` equals the rebuild from the package;
   - every `docker-compose*.yml` uses `bff-project:<that version>` (never a `../BFF_Project` build);
   - the `projects-front` service references no other service than BFF_Project.
+- `projects-page-html.test.cjs` renders the real `src/app/page.tsx` with its components through `tests/support/server-view.cjs` (`react-dom/server` with hook state kept between passes, same file in every front, see `../CLAUDE.md`) on the harness: loading, `/projects-page` with the declared query, search/filters/views, card menu (duplicate, edit, delete with confirmation), task composer, detail modal (task status, deletion, collaboration and comments, inline edit, close) are driven through `view.click` / `view.fire` / component props and asserted on the HTML and the BFF calls.
 - `session.test.cjs` replaces `react` in `require.cache` with a one-render `useState`/`useEffect` stub to test `useAuthSession`.
 - `bff-fixtures.cjs` holds contract-valid bodies. JWTs use a fixed `exp`, because tokens computed from `Date.now()` made tests flaky.
 
