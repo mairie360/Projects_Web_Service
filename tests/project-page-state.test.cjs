@@ -5,7 +5,9 @@ const fixtures = require('./support/bff-fixtures.cjs');
 
 // Helpers purs de la page projets (état des formulaires, navigation) : aucun appel réseau.
 
+// Read at runtime from the environment (src/lib/front-urls.ts), as the Helm chart injects them.
 process.env.PROJECT_FRONT_URL = 'https://projects.example/';
+process.env.SETTINGS_FRONT_URL = 'https://settings.example/';
 const state = requireTs('src/lib/projectPageState.ts');
 const navigation = requireTs('src/lib/navigation.ts');
 const { appSidebarItems, getNavigationHref } = requireTs('src/lib/appShell.ts');
@@ -51,8 +53,9 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
   });
 });
 
-test('navigation : URLs des fronts injectées au build, navigation seulement vers une cible connue', () => {
+test('navigation: front URLs read at runtime, navigation only to a known target', () => {
   assert.equal(getNavigationHref('projects'), 'https://projects.example/');
+  assert.equal(getNavigationHref('settings'), 'https://settings.example/');
   assert.equal(navigation.getNavigationHref('profile'), '/profile');
   assert.equal(navigation.getNavigationHref('inconnu'), null);
   assert.ok(appSidebarItems.some((item) => item.id === 'admin' && item.adminOnly));
