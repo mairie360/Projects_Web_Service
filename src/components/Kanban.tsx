@@ -24,6 +24,7 @@ type KanbanBoardProps = {
   onProjectDelete?: (project: Project) => void;
   onProjectTaskAdd?: (project: Project, task: ProjectTaskDraft) => void;
   onAddProject?: (status: Project['status']) => void;
+  onMoveProject?: (project: Project, status: Project['status']) => Promise<void>;
 };
 
 type KanbanColumnPresentation = {
@@ -49,16 +50,70 @@ export function KanbanBoard({
   onProjectDelete,
   onProjectTaskAdd,
   onAddProject,
+  onMoveProject,
 }: KanbanBoardProps) {
+  const [draggedId, setDraggedId] = React.useState<string | null>(null);
+  const [targetStatus, setTargetStatus] = React.useState<Project['status'] | null>(null);
+  const [movingId, setMovingId] = React.useState<string | null>(null);
+  const moving = React.useRef(false);
+  const startedOnControl = React.useRef(false);
+  const suppressClickUntil = React.useRef(0);
+  const instructionsId = React.useId();
+  const dragged = projects.find((project) => project.id === draggedId);
+  const canMove = (project: Project) => Boolean(onMoveProject && !moving.current && project.permissions?.canEdit === true);
+  const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status);
+
+  const endDrag = () => {
+    setDraggedId(null);
+    setTargetStatus(null);
+    suppressClickUntil.current = Date.now() + 300;
+  };
+
+  const dropProject = async (event: React.DragEvent, status: Project['status']) => {
+    event.preventDefault();
+    if (!dragged || !acceptsDrop(status) || event.dataTransfer.getData('application/x-mairie360-project') !== dragged.id) return;
+
+    const project = dragged;
+    endDrag();
+    moving.current = true;
+    setMovingId(project.id);
+    try {
+      await onMoveProject?.(project, status);
+    } finally {
+      moving.current = false;
+      setMovingId(null);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+      <p id={instructionsId} className="sr-only">
+        Glissez une carte vers une autre colonne pour changer son statut. Au clavier ou sur mobile, utilisez Modifier dans le menu Actions du projet.
+      </p>
       {columns.map((column) => {
         const presentation = columnPresentation[column.status];
         const Icon = presentation.icon;
         const columnProjects = projects.filter((project) => project.status === column.status);
 
         return (
-          <section key={column.status} className="min-w-0">
+          <section
+            key={column.status}
+            className={`min-w-0 rounded-md transition-colors ${targetStatus === column.status ? 'bg-[#ddf4ff] ring-2 ring-[#0969da]' : ''}`}
+            data-project-status={column.status}
+            aria-label={column.label}
+            onDragOver={(event) => {
+              if (!acceptsDrop(column.status)) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              setTargetStatus((current: Project['status'] | null) => current === column.status ? current : column.status);
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setTargetStatus((current: Project['status'] | null) => current === column.status ? null : current);
+              }
+            }}
+            onDrop={(event) => void dropProject(event, column.status)}
+          >
             <div className="mb-3 flex h-12 items-center justify-between rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Icon className={`h-4 w-4 shrink-0 ${presentation.iconClassName}`} strokeWidth={2} />
@@ -79,20 +134,50 @@ export function KanbanBoard({
               </ToolTip>}
             </div>
 
-            <div className="space-y-2.5">
+            <div className="min-h-[120px] space-y-2.5">
               {columnProjects.map((project) => (
-                <ProjectCard
+                <div
                   key={project.id}
-                  project={project}
-                  memberOptions={memberOptions}
-                  labelOptions={labelOptions}
-                  onOpen={onProjectOpen}
-                  onEdit={onProjectEdit}
-                  onDuplicate={onProjectDuplicate}
-                  onDelete={onProjectDelete}
-                  onAddTask={onProjectTaskAdd}
-                  variant="kanban"
-                />
+                  data-project-id={project.id}
+                  role="group"
+                  aria-label={project.title}
+                  aria-describedby={instructionsId}
+                  aria-busy={movingId === project.id}
+                  draggable={canMove(project)}
+                  className={draggedId === project.id ? 'opacity-50' : ''}
+                  onPointerDownCapture={(event) => {
+                    suppressClickUntil.current = 0;
+                    startedOnControl.current = Boolean((event.target as Element).closest('button, a, input, textarea, select, [contenteditable="true"]'));
+                  }}
+                  onDragStart={(event) => {
+                    if (!canMove(project) || startedOnControl.current) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('application/x-mairie360-project', project.id);
+                    setDraggedId(project.id);
+                  }}
+                  onDragEnd={endDrag}
+                  onClickCapture={(event) => {
+                    if (Date.now() < suppressClickUntil.current || movingId === project.id) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }
+                  }}
+                >
+                  <ProjectCard
+                    project={project}
+                    memberOptions={memberOptions}
+                    labelOptions={labelOptions}
+                    onOpen={onProjectOpen}
+                    onEdit={onProjectEdit}
+                    onDuplicate={onProjectDuplicate}
+                    onDelete={onProjectDelete}
+                    onAddTask={onProjectTaskAdd}
+                    variant="kanban"
+                  />
+                </div>
               ))}
             </div>
           </section>

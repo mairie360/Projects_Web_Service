@@ -74,6 +74,105 @@ test('an agent without the creation right sees no "Nouveau projet" button', asyn
   assert.equal(view.props('KanbanBoard').onAddProject, undefined);
 });
 
+test('dragging a project changes only its status and reloads the Kanban from the BFF', async () => {
+  await renderLoadedPage();
+  const project = view.props('KanbanBoard').projects[0];
+  const moved = fixtures.projectListItem({ status: 'review' });
+  bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ status: body.status })) }));
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([moved]) });
+
+  const payload = new Map();
+  const dataTransfer = {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    setData(type, value) { payload.set(type, value); },
+    getData(type) { return payload.get(type) ?? ''; },
+  };
+  await view.fire((props) => props['data-project-id'] === project.id, 'onDragStart', { dataTransfer });
+  await view.fire((props) => props['data-project-status'] === 'review', 'onDragOver', { dataTransfer });
+  await view.fire((props) => props['data-project-status'] === 'review', 'onDrop', { dataTransfer });
+  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review');
+
+  assert.equal(dataTransfer.effectAllowed, 'move');
+  assert.equal(dataTransfer.dropEffect, 'move');
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { status: 'review' });
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch')[0].pathParams.projectId, project.id);
+  assert.equal(pageCalls().length, 2);
+  assert.equal(view.props('KanbanBoard').projects[0].status, 'review');
+  assert.equal(alertText(), `Statut du projet "${project.title}" mis à jour.`);
+});
+
+test('a failed status change keeps the project in its original column and reports the error', async () => {
+  await renderLoadedPage();
+  const project = view.props('KanbanBoard').projects[0];
+  bffProject.on('patch', '/projects/{projectId}', harness.errorReply(403, fixtures.apiError('FORBIDDEN', 'Modification du projet interdite')));
+
+  await view.act(() => view.props('KanbanBoard').onMoveProject(project, 'done'));
+
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { status: 'done' });
+  assert.equal(pageCalls().length, 1);
+  assert.equal(view.props('KanbanBoard').projects[0].status, 'in-progress');
+  assert.equal(alertText(), 'Modification du projet interdite');
+});
+
+test('Kanban status changes reject the same column and projects without management permission', async () => {
+  const forbidden = fixtures.projectListItem({ permissions: { ...fixtures.projectListItem().permissions, canEdit: false } });
+  await renderLoadedPage(fixtures.projectsPage([forbidden]));
+
+  assert.equal(view.hostElements((props) => props['data-project-id'] === forbidden.id)[0].props.draggable, false);
+  await view.act(() => view.props('KanbanBoard').onMoveProject(forbidden, 'done'));
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 0);
+
+  const allowed = fixtures.projectListItem();
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([allowed]) });
+  await view.act(() => view.props('ViewToggle').onChange('grid'));
+  await view.act(() => view.props('ViewToggle').onChange('kanban'));
+  await view.act(() => view.props('KanbanBoard').onMoveProject(allowed, allowed.status));
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 0);
+});
+
+test('Kanban ignores control-origin and foreign drags, and prevents a post-drag card click', async () => {
+  await renderLoadedPage();
+  const card = (props) => props['data-project-id'] === 'project-1';
+  const column = (props) => props['data-project-status'] === 'review';
+  let prevented = 0;
+  let stopped = 0;
+  const payload = new Map();
+  const dataTransfer = {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    setData(type, value) { payload.set(type, value); },
+    getData(type) { return payload.get(type) ?? ''; },
+  };
+
+  await view.fire(card, 'onPointerDownCapture', { target: { closest: () => ({ tagName: 'BUTTON' }) } });
+  await view.fire(card, 'onDragStart', { dataTransfer, preventDefault() { prevented++; } });
+  assert.equal(prevented, 1);
+  assert.equal(dataTransfer.effectAllowed, 'none');
+
+  await view.fire(card, 'onPointerDownCapture', { target: { closest: () => null } });
+  await view.fire(card, 'onDragStart', { dataTransfer });
+  await view.fire(column, 'onDragOver', { dataTransfer });
+  await view.fire(column, 'onDragLeave', { currentTarget: { contains: () => false }, relatedTarget: null });
+  dataTransfer.setData('application/x-mairie360-project', 'another-project');
+  await view.fire(column, 'onDrop', { dataTransfer });
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 0);
+
+  await view.fire(card, 'onDragEnd');
+  await view.fire(card, 'onClickCapture', { preventDefault() { prevented++; }, stopPropagation() { stopped++; } });
+  assert.equal(prevented, 2);
+  assert.equal(stopped, 1);
+});
+
+test('Kanban disables dragging when project management access is absent', async () => {
+  const page = fixtures.projectsPage();
+  page.access = { ...page.access, canManageProjects: false };
+  await renderLoadedPage(page);
+
+  assert.equal(view.props('KanbanBoard').onMoveProject, undefined);
+  assert.equal(view.hostElements((props) => props['data-project-id'] === 'project-1')[0].props.draggable, false);
+});
+
 test('a BFF error is rendered in the page instead of the board', async () => {
   bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('BFF_UNAVAILABLE', 'Le service projets est indisponible')));
   view = mount(React.createElement(ProjectsPage));

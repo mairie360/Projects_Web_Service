@@ -292,6 +292,19 @@ export default function ProjectsPage() {
     }
   };
 
+  const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
+    if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
+
+    try {
+      const details = await updateProject(project.id, { status });
+      setSelectedProjectDetails((current: ProjectDetailsResponse | null) => current?.project.id === project.id ? details : current);
+      await refreshProjectsPage({ silent: true });
+      setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
+    } catch (error) {
+      showError(error);
+    }
+  };
+
   const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -655,6 +668,7 @@ export default function ProjectsPage() {
                     onProjectDelete={deleteProject}
                     onProjectTaskAdd={addProjectTask}
                     onAddProject={canCreateProject ? openCreateProject : undefined}
+                    onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                   />
                 )}
 
