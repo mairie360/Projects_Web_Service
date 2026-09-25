@@ -246,6 +246,7 @@ export function CreateProjectModal({
 export function ProjectDetailModal({
   project,
   tasks,
+  highlightTaskId,
   memberOptions,
   labelOptions,
   statusOptions,
@@ -260,6 +261,7 @@ export function ProjectDetailModal({
 }: {
   project: Project;
   tasks: ProjectTask[];
+  highlightTaskId?: string | null;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   statusOptions: FilterOption[];
@@ -289,6 +291,7 @@ export function ProjectDetailModal({
   const [collaborationError, setCollaborationError] = React.useState('');
   const [commentMessage, setCommentMessage] = React.useState('');
   const [commentSaving, setCommentSaving] = React.useState(false);
+  const highlightedTaskRef = React.useRef<HTMLElement | null>(null);
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
   const filteredTasks = React.useMemo(() => {
@@ -322,6 +325,13 @@ export function ProjectDetailModal({
     setCollaborationError('');
     setCommentMessage('');
   }, [project]);
+
+  React.useEffect(() => {
+    const article = highlightedTaskRef.current;
+    if (!highlightTaskId || !article) return;
+    article.scrollIntoView?.({ block: 'center' });
+    article.focus?.({ preventScroll: true });
+  }, [highlightTaskId]);
 
   const openTaskCollaboration = async (taskId: string) => {
     if (collaborationTaskId === taskId) {
@@ -608,12 +618,20 @@ export function ProjectDetailModal({
                   <div className="divide-y divide-[#d8dee4]">
                     {filteredTasks.map((task) => {
                       const TaskIcon = task.completed ? CheckSquare2 : Square;
+                      const isLinkedTask = highlightTaskId === task.id;
                       const canUpdateStatus = task.permissions?.canUpdateStatus !== false;
                       const canEditTask = task.permissions?.canEdit !== false;
                       const canDeleteTask = task.permissions?.canDelete !== false;
 
                       return (
-                        <article key={task.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3">
+                        <article
+                          key={task.id}
+                          ref={isLinkedTask ? highlightedTaskRef : undefined}
+                          tabIndex={isLinkedTask ? -1 : undefined}
+                          aria-current={isLinkedTask ? 'true' : undefined}
+                          data-linked-task={isLinkedTask ? task.id : undefined}
+                          className={`grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3 ${isLinkedTask ? 'bg-[#ddf4ff] ring-2 ring-inset ring-[#0969da]' : ''}`}
+                        >
                           <button
                             type="button"
                             disabled={!canUpdateStatus}

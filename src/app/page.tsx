@@ -39,6 +39,7 @@ import {
 } from '../lib/projectPageState';
 import { navigateToPage } from '../lib/navigation';
 import { authSessionFromAccess, logoutAndReload } from '../lib/auth-session';
+import { parseProjectDeepLink } from '../lib/projectDeepLink';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
 
 type AlertState = {
@@ -73,6 +74,7 @@ export default function ProjectsPage() {
   const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<ProjectDetailsResponse | null>(null);
+  const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -216,6 +218,29 @@ export default function ProjectsPage() {
     setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
   };
 
+  useEffect(() => {
+    const target = parseProjectDeepLink(window.location.search ?? '');
+    if (!target) return;
+    if ('error' in target) {
+      setAlert({ type: 'error', message: target.error });
+      return;
+    }
+
+    let active = true;
+    void getProjectDetails(target.projectId).then((details) => {
+      if (!active) return;
+      if (target.taskId && !details.taskItems.some((task: { id: string }) => task.id === target.taskId)) {
+        setAlert({ type: 'error', message: 'La tâche demandée est introuvable dans ce projet.' });
+        return;
+      }
+      setSelectedProjectDetails(details);
+      setLinkedTaskId(target.taskId);
+    }).catch((error) => {
+      if (active) setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
+    });
+    return () => { active = false; };
+  }, []);
+
   const refreshProjectDetails = async (projectId: string) => {
     const details = await getProjectDetails(projectId);
     const projectWithTasks = mergeProjectDetails(details);
@@ -241,6 +266,7 @@ export default function ProjectsPage() {
 
   const openProjectDetails = async (project: Project) => {
     setOpenFilter(null);
+    setLinkedTaskId(null);
 
     try {
       setSelectedProjectDetails(await getProjectDetails(project.id));
@@ -480,11 +506,12 @@ export default function ProjectsPage() {
         <ProjectDetailModal
           project={selectedProject}
           tasks={selectedProjectTasks}
+          highlightTaskId={linkedTaskId}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           statusOptions={projectStatusOptions}
           priorityOptions={projectPriorityOptions}
-          onClose={() => setSelectedProjectDetails(null)}
+          onClose={() => { setSelectedProjectDetails(null); setLinkedTaskId(null); }}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
           onUpdateTask={updateProjectTask}
