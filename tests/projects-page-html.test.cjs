@@ -13,6 +13,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
 const ProjectsPage = requireTs('src/app/page.tsx').default;
+const { setBrowserFrontUrls } = requireTs('src/lib/front-urls.ts');
 
 const harness = createFrontHarness();
 const { bffProject } = harness;
@@ -73,6 +74,22 @@ test('an agent without the creation right sees no "Nouveau projet" button', asyn
   assert.doesNotMatch(view.text(), /Nouveau projet/);
   assert.match(view.html, /<span[^>]*>Mes projets assignés<\/span>/);
   assert.equal(view.props('KanbanBoard').onAddProject, undefined);
+});
+
+test('the Settings action opens the configured Settings frontend', async () => {
+  setBrowserFrontUrls({ SETTINGS_FRONT_URL: 'https://settings.example/' });
+  try {
+    await renderLoadedPage();
+    const settings = view.find('ActionButton').find((button) => button.props.label === 'Paramètres');
+    assert.ok(settings);
+
+    await view.act(() => settings.props.onClick());
+
+    assert.deepEqual(harness.location.assigned, ['https://settings.example/']);
+    assert.doesNotMatch(view.text(), /Paramètres en cours de développement/);
+  } finally {
+    setBrowserFrontUrls({});
+  }
 });
 
 test('dragging a project changes only its status and reloads the Kanban from the BFF', async () => {
