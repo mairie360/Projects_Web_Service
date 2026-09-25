@@ -612,7 +612,7 @@ export default function ProjectsPage() {
                     <ActionButton
                       label="Paramètres"
                       icon={Settings}
-                      onClick={() => showInfo('Paramètres en cours de développement.')}
+                      onClick={() => navigateToPage('settings')}
                     />
                   </div>
                 </div>
