@@ -57,21 +57,21 @@ export function KanbanBoard({
   const [movingId, setMovingId] = React.useState<string | null>(null);
   const moving = React.useRef(false);
   const startedOnControl = React.useRef(false);
-  const suppressClickUntil = React.useRef(0);
+  const suppressNextClick = React.useRef(false);
   const instructionsId = React.useId();
   const dragged = projects.find((project) => project.id === draggedId);
-  const canMove = (project: Project) => Boolean(onMoveProject && !moving.current && project.permissions?.canEdit === true);
+  const canMove = (project: Project) => Boolean(onMoveProject && movingId === null && project.permissions?.canEdit === true);
   const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status);
 
   const endDrag = () => {
     setDraggedId(null);
     setTargetStatus(null);
-    suppressClickUntil.current = Date.now() + 300;
+    suppressNextClick.current = true;
   };
 
   const dropProject = async (event: React.DragEvent, status: Project['status']) => {
     event.preventDefault();
-    if (!dragged || !acceptsDrop(status) || event.dataTransfer.getData('application/x-mairie360-project') !== dragged.id) return;
+    if (moving.current || !dragged || !acceptsDrop(status) || event.dataTransfer.getData('application/x-mairie360-project') !== dragged.id) return;
 
     const project = dragged;
     endDrag();
@@ -146,11 +146,11 @@ export function KanbanBoard({
                   draggable={canMove(project)}
                   className={draggedId === project.id ? 'opacity-50' : ''}
                   onPointerDownCapture={(event) => {
-                    suppressClickUntil.current = 0;
+                    suppressNextClick.current = false;
                     startedOnControl.current = Boolean((event.target as Element).closest('button, a, input, textarea, select, [contenteditable="true"]'));
                   }}
                   onDragStart={(event) => {
-                    if (!canMove(project) || startedOnControl.current) {
+                    if (moving.current || !canMove(project) || startedOnControl.current) {
                       event.preventDefault();
                       return;
                     }
@@ -160,9 +160,10 @@ export function KanbanBoard({
                   }}
                   onDragEnd={endDrag}
                   onClickCapture={(event) => {
-                    if (Date.now() < suppressClickUntil.current || movingId === project.id) {
+                    if (suppressNextClick.current || movingId === project.id) {
                       event.preventDefault();
                       event.stopPropagation();
+                      suppressNextClick.current = false;
                     }
                   }}
                 >
