@@ -22,6 +22,7 @@ before(() => harness.start());
 after(() => harness.stop());
 beforeEach(() => {
   harness.reset();
+  harness.location.search = '';
   harness.signIn(fixtures.jwt(fixtures.agents.marie.id));
 });
 afterEach(() => {
@@ -211,6 +212,59 @@ test('opening a project loads its details and renders them in the modal', async 
 
   await view.act(() => modal.onClose());
   assert.equal(view.find('ProjectDetailModal').length, 0);
+});
+
+test('a project deep link loads the authorized detail even when absent from the first project page', async () => {
+  harness.location.search = '?source=dashboard&project=project-99';
+  bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({
+    body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })),
+  }));
+  await renderLoadedPage();
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'project-99');
+  assert.equal(view.props('ProjectDetailModal').project.id, 'project-99');
+  assert.equal(view.props('ProjectDetailModal').highlightTaskId, null);
+});
+
+test('a task deep link makes the selected BFF task visible and identifiable', async () => {
+  harness.location.search = '?project=project-1&task=task-2';
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
+  await renderLoadedPage();
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1 && view.props('ProjectDetailModal').highlightTaskId === 'task-2');
+
+  assert.match(view.html, /data-linked-task="task-2"/);
+  assert.match(view.html, /aria-current="true"/);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+});
+
+test('invalid, missing and unauthorized deep-link targets never create a fake detail', async () => {
+  harness.location.search = '?task=task-2';
+  await renderLoadedPage();
+  assert.match(view.text(), /Lien de projet invalide/);
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 0);
+  view.unmount();
+
+  harness.reset();
+  harness.signIn(fixtures.jwt(fixtures.agents.marie.id));
+  harness.location.search = '?project=private-project';
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage() });
+  bffProject.on('get', '/projects/{projectId}', harness.errorReply(403, fixtures.apiError('FORBIDDEN', 'Projet inaccessible')));
+  view = mount(React.createElement(ProjectsPage));
+  await view.waitFor((html) => html.includes('Projet inaccessible'));
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'private-project');
+});
+
+test('a link to a missing task leaves the modal closed and explains the missing target', async () => {
+  harness.location.search = '?project=project-1&task=missing-task';
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
+  await renderLoadedPage();
+  await view.waitFor((html) => html.includes('La tâche demandée est introuvable'));
+
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.doesNotMatch(view.html, /data-linked-task=/);
 });
 
 test('creating a project posts the form, reloads the page and announces the success', async () => {
