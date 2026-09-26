@@ -15,6 +15,12 @@ The guides describe the implemented module, its current limitations, local setup
 
 Les guides décrivent le module implémenté, ses limites actuelles, le démarrage local, les routes, les données, les vérifications et la CI/CD.
 
+## Frontend checks / Vérifications du front
+
+`npm test` runs the existing Node contract/security suite and the Vitest component suite. Use `npm run test:node` or `npm run test:components` for an isolated run. The component checks stub only the published BFF Project client and cover loading, failure, empty data, project/task deep links and basic keyboard/axe accessibility. They do not replace live BFF end-to-end or role-based browser tests.
+
+`npm test` lance les tests Node de contrat/sécurité et les tests de composants Vitest. Les réponses BFF des tests sont synthétiques et restent hors du code de production.
+
 ## Contracts and background / Contrats et compléments
 
 - [BFF.md](BFF.md)
