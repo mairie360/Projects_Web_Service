@@ -380,8 +380,7 @@ test('search, filters and the grid view reload the page with the declared query 
   await view.waitFor(() => pageCalls().length === 2);
   assert.equal(pageCalls()[1].q, 'éclairage');
 
-  // The contract fixtures declare no `all` option: the trigger shows the first status until one is picked.
-  await view.click((props, text, tag) => tag === 'button' && props['aria-haspopup'] === 'listbox' && text === 'À faire');
+  await view.click((props, text, tag) => tag === 'button' && props['aria-haspopup'] === 'listbox' && text === 'Tous les statuts');
   assert.match(view.html, /role="listbox" aria-label="Filtrer par statut"/);
   await view.click((props, text, tag) => tag === 'button' && props.role === 'option' && text === 'En cours');
   await view.waitFor(() => pageCalls().length === 3);
@@ -402,6 +401,48 @@ test('search, filters and the grid view reload the page with the declared query 
   bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
   await view.waitFor(() => pageCalls().length === 6 && view.props('GridView').projects.length === 0);
   assert.doesNotMatch(view.text(), /Rénovation de l’éclairage public/);
+});
+
+test('filter controls show and restore the actual unfiltered BFF query', async () => {
+  await renderLoadedPage();
+
+  assert.equal(pageCalls()[0].status, 'all');
+  assert.equal(pageCalls()[0].priority, 'all');
+  assert.deepEqual(view.props('FilterSelect', 0).options.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('FilterSelect', 1).options.map((option) => option.value), ['all', 'high', 'medium', 'low']);
+  assert.match(view.text(), /Tous les statuts/);
+  assert.match(view.text(), /Toutes les priorités/);
+
+  await view.act(() => view.props('FilterSelect', 0).onChange('in-progress'));
+  await view.waitFor(() => pageCalls().length === 2);
+  assert.equal(pageCalls()[1].status, 'in-progress');
+  assert.equal(view.props('FilterSelect', 0).value, 'in-progress');
+
+  await view.act(() => view.props('FilterSelect', 0).onChange('all'));
+  await view.waitFor(() => pageCalls().length === 3);
+  assert.equal(pageCalls()[2].status, 'all');
+  assert.match(view.text(), /Tous les statuts/);
+
+  await view.act(() => view.props('FilterSelect', 1).onChange('high'));
+  await view.waitFor(() => pageCalls().length === 4);
+  assert.equal(pageCalls()[3].priority, 'high');
+
+  await view.act(() => view.props('FilterSelect', 1).onChange('all'));
+  await view.waitFor(() => pageCalls().length === 5);
+  assert.equal(pageCalls()[4].priority, 'all');
+  assert.match(view.text(), /Toutes les priorités/);
+});
+
+test('filter controls do not duplicate all when the BFF already supplies it', async () => {
+  const page = fixtures.projectsPage();
+  page.filters.statuses.unshift({ value: 'all', label: 'Tous' });
+  page.filters.priorities.unshift({ value: 'all', label: 'Toutes' });
+  await renderLoadedPage(page);
+
+  assert.deepEqual(view.props('FilterSelect', 0).options.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('FilterSelect', 1).options.map((option) => option.value), ['all', 'high', 'medium', 'low']);
+  assert.match(view.text(), /Tous les statuts/);
+  assert.match(view.text(), /Toutes les priorités/);
 });
 
 test('the card menu duplicates, edits and deletes a project through the BFF and announces each result', async () => {

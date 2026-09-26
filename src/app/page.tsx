@@ -117,17 +117,21 @@ export default function ProjectsPage() {
     [projects, projectsPage?.options.labels]
   );
 
+  const statusOptionsFromBff = projectsPage?.filters.statuses;
+  const priorityOptionsFromBff = projectsPage?.filters.priorities;
   const statusFilterOptions = useMemo(
-    () => (projectsPage?.filters.statuses ?? []).map((option) =>
-      option.value === 'all' ? { ...option, label: 'Tous les statuts' } : option
-    ),
-    [projectsPage?.filters.statuses]
+    () => statusOptionsFromBff ? [
+      { value: 'all', label: 'Tous les statuts' },
+      ...statusOptionsFromBff.filter((option) => option.value !== 'all'),
+    ] : [],
+    [statusOptionsFromBff]
   );
   const priorityFilterOptions = useMemo(
-    () => (projectsPage?.filters.priorities ?? []).map((option) =>
-      option.value === 'all' ? { ...option, label: 'Toutes les priorités' } : option
-    ),
-    [projectsPage?.filters.priorities]
+    () => priorityOptionsFromBff ? [
+      { value: 'all', label: 'Toutes les priorités' },
+      ...priorityOptionsFromBff.filter((option) => option.value !== 'all'),
+    ] : [],
+    [priorityOptionsFromBff]
   );
   const projectStatusOptions = useMemo(
     () => statusFilterOptions.filter((option) => option.value !== 'all'),
