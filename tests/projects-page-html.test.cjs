@@ -433,6 +433,18 @@ test('filter controls show and restore the actual unfiltered BFF query', async (
   assert.match(view.text(), /Toutes les priorités/);
 });
 
+test('filter controls do not duplicate all when the BFF already supplies it', async () => {
+  const page = fixtures.projectsPage();
+  page.filters.statuses.unshift({ value: 'all', label: 'Tous' });
+  page.filters.priorities.unshift({ value: 'all', label: 'Toutes' });
+  await renderLoadedPage(page);
+
+  assert.deepEqual(view.props('FilterSelect', 0).options.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('FilterSelect', 1).options.map((option) => option.value), ['all', 'high', 'medium', 'low']);
+  assert.match(view.text(), /Tous les statuts/);
+  assert.match(view.text(), /Toutes les priorités/);
+});
+
 test('the card menu duplicates, edits and deletes a project through the BFF and announces each result', async () => {
   await renderLoadedPage();
   const title = 'Rénovation de l’éclairage public';
