@@ -1,5 +1,11 @@
 const assert = require('node:assert/strict');
-const { test } = require('node:test');
+const { test, beforeEach, afterEach } = require('node:test');
+const savedLoginUrl = process.env.LOGIN_FRONT_URL;
+beforeEach(() => { process.env.LOGIN_FRONT_URL = 'https://login.mairie.test/'; });
+afterEach(() => {
+  if (savedLoginUrl === undefined) delete process.env.LOGIN_FRONT_URL;
+  else process.env.LOGIN_FRONT_URL = savedLoginUrl;
+});
 const fs = require('node:fs');
 const ts = require('typescript');
 const { NextRequest } = require('next/server');
