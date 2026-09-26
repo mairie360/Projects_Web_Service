@@ -37,7 +37,7 @@ import {
   type ProjectFormState,
   type ViewMode,
 } from '../lib/projectPageState';
-import { navigateToPage } from '../lib/navigation';
+import { getNavigationHref, navigateToPage } from '../lib/navigation';
 import { authSessionFromAccess, logoutAndReload } from '../lib/auth-session';
 import { parseProjectDeepLink } from '../lib/projectDeepLink';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
@@ -574,7 +574,7 @@ export default function ProjectsPage() {
             user={session.user}
             isAdmin={session.isAdmin}
             setSidebarOpen={setSidebarOpen}
-            profileHref="/profile"
+            profileHref={getNavigationHref('profile')}
             onPageChange={handlePageChange}
             onLogout={() => void logoutAndReload()}
           />

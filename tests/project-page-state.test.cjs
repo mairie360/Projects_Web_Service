@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { test, afterEach } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
+const { setBrowserFrontUrls } = requireTs('src/lib/front-urls.ts');
 
 // Helpers purs de la page projets (état des formulaires, navigation) : aucun appel réseau.
 
@@ -12,7 +13,10 @@ const state = requireTs('src/lib/projectPageState.ts');
 const navigation = requireTs('src/lib/navigation.ts');
 const { appSidebarItems, getNavigationHref } = requireTs('src/lib/appShell.ts');
 
-afterEach(() => { delete global.window; });
+afterEach(() => {
+  delete global.window;
+  setBrowserFrontUrls({});
+});
 
 test('valeurs uniques triées en français et options de sélection', () => {
   assert.deepEqual(state.getUniqueValues([' Écoles', 'voirie', 'Voirie', 'ecoles', '', 'voirie ']), ['ecoles', 'Écoles', 'voirie', 'Voirie']);
@@ -56,7 +60,7 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
 test('navigation: front URLs read at runtime, navigation only to a known target', () => {
   assert.equal(getNavigationHref('projects'), 'https://projects.example/');
   assert.equal(getNavigationHref('settings'), 'https://settings.example/');
-  assert.equal(navigation.getNavigationHref('profile'), '/profile');
+  assert.equal(navigation.getNavigationHref('profile'), 'https://settings.example/');
   assert.equal(navigation.getNavigationHref('inconnu'), null);
   assert.ok(appSidebarItems.some((item) => item.id === 'admin' && item.adminOnly));
   assert.equal(appSidebarItems.some((item) => item.id === 'profile'), false);
@@ -64,9 +68,22 @@ test('navigation: front URLs read at runtime, navigation only to a known target'
 
   const assigned = [];
   global.window = { location: { assign: (href) => assigned.push(href) } };
+  setBrowserFrontUrls({ SETTINGS_FRONT_URL: 'https://settings.example/' });
   navigation.navigateToPage('profile');
   navigation.navigateToPage('inconnu');
-  assert.deepEqual(assigned, ['/profile']);
+  assert.deepEqual(assigned, ['https://settings.example/']);
+});
+
+test('profile navigation keeps the local unavailable state for an invalid Settings URL', () => {
+  const previous = process.env.SETTINGS_FRONT_URL;
+  try {
+    process.env.SETTINGS_FRONT_URL = 'https://settings.example/profile';
+    assert.equal(navigation.getNavigationHref('profile'), '/profile');
+    process.env.SETTINGS_FRONT_URL = 'javascript:alert(1)';
+    assert.equal(navigation.getNavigationHref('profile'), '/profile');
+  } finally {
+    process.env.SETTINGS_FRONT_URL = previous;
+  }
 });
 
 test('métadonnées des cartes projet : initiales, dates et numéro affiché', () => {
