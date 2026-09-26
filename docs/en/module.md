@@ -1,5 +1,12 @@
 # Projects_Web_Service — Module overview
 
+## One account destination
+
+Profile access now opens **Settings**. Existing `/profile` bookmarks and subpaths
+redirect to the configured Settings frontend. The sidebar keeps Settings without
+a duplicate Profile entry. If Settings is not configured correctly, an explicit
+unavailable state replaces the redirect; no demo identity or simulated save is shown.
+
 [Technical documentation](technical.md) · [Français](../fr/module.md) · [README](../../README.md)
 
 Enable municipal project and task tracking through Kanban, grid and table views. Data and permissions come from BFF Project.
