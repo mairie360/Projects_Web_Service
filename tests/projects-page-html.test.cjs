@@ -48,6 +48,7 @@ test('the first pass renders the loading state, the next one the projects of GET
   assert.match(view.html, /<h1[^>]*>Projets<\/h1>/);
   assert.match(view.text(), /Chargement des projets\.\.\./);
   assert.equal(view.find('KanbanBoard').length, 0);
+  assert.equal(view.find('AppShell').length, 1);
   assert.doesNotMatch(view.text(), /Nouveau projet/);
 
   const html = await view.waitFor((current) => !current.includes('Chargement des projets'));
@@ -84,9 +85,19 @@ test('desktop and mobile navigation expose only active modules and keep Settings
   const assigned = [];
   const originalAssign = global.window.location.assign;
   global.window.location.assign = (href) => assigned.push(href);
-  setBrowserFrontUrls({ SETTINGS_FRONT_URL: 'https://settings.test.example/' });
+  setBrowserFrontUrls({
+    DASHBOARD_FRONT_URL: 'https://dashboard.test.example/',
+    PROJECT_FRONT_URL: 'https://projects.test.example/',
+    MESSAGE_FRONT_URL: 'https://messages.test.example/',
+    ELEARNING_FRONT_URL: 'https://training.test.example/',
+    CALENDAR_FRONT_URL: 'https://calendar.test.example/',
+    ADMINISTRATION_FRONT_URL: 'https://admin.test.example/',
+    SETTINGS_FRONT_URL: 'https://settings.test.example/',
+  });
   try {
     await renderLoadedPage();
+    assert.equal(view.props('AppShell').activeItem, 'projects');
+    assert.equal(view.props('AppShell').hrefs.profile, 'https://settings.test.example/');
     assert.equal(view.props('Header').profileHref, 'https://settings.test.example/');
     const isAdmin = view.props('Sidebar').isAdmin;
     for (const mobileOpen of [false, true]) {

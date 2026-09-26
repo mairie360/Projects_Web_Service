@@ -1,20 +1,28 @@
+import { parseFrontUrl } from "@/lib/front-url";
 import { frontUrl } from "@/lib/front-urls";
+import type { FrontUrlKey } from "@/lib/front-urls";
 import { settingsProfileUrl } from "@/lib/settings-profile";
-const pageRoutes: Partial<Record<string, string>> = {
-  get dashboard() { return frontUrl("DASHBOARD_FRONT_URL"); },
-  get projects() { return frontUrl("PROJECT_FRONT_URL"); },
-  get messages() { return frontUrl("MESSAGE_FRONT_URL"); },
-  get emails() { return frontUrl("EMAIL_FRONT_URL"); },
-  get files() { return frontUrl("FILES_FRONT_URL"); },
-  get training() { return frontUrl("ELEARNING_FRONT_URL"); },
-  get calendar() { return frontUrl("CALENDAR_FRONT_URL"); },
-  get admin() { return frontUrl("ADMINISTRATION_FRONT_URL"); },
-  get settings() { return frontUrl("SETTINGS_FRONT_URL"); },
-  get profile() { return settingsProfileUrl(frontUrl("SETTINGS_FRONT_URL")) ?? "/profile"; },
-};
+
+const configuredUrl = (key: FrontUrlKey) => parseFrontUrl(frontUrl(key))?.href;
+
+/** Runtime destinations for the active modules; archived fronts are not offered. */
+export function getActiveFrontHrefs() {
+  const settings = settingsProfileUrl(frontUrl("SETTINGS_FRONT_URL"));
+  return {
+    dashboard: configuredUrl("DASHBOARD_FRONT_URL"),
+    projects: configuredUrl("PROJECT_FRONT_URL"),
+    messages: configuredUrl("MESSAGE_FRONT_URL"),
+    training: configuredUrl("ELEARNING_FRONT_URL"),
+    calendar: configuredUrl("CALENDAR_FRONT_URL"),
+    admin: configuredUrl("ADMINISTRATION_FRONT_URL"),
+    settings,
+    profile: settings,
+  };
+}
 
 export function getNavigationHref(page: string) {
-  return pageRoutes[page] ?? null;
+  const destinations: Record<string, string | undefined> = getActiveFrontHrefs();
+  return destinations[page] ?? null;
 }
 
 export function navigateToPage(page: string) {

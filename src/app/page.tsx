@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Header, Sidebar } from '@mairie360/lib-components';
+import { Alert, AppShell } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
 
 import { KanbanBoard } from '../components/Kanban';
 import { ActionButton } from '../components/project/ProjectFormControls';
 import { CreateProjectModal, ProjectDetailModal } from '../components/project/ProjectModals';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from '../components/project/ProjectViews';
-import { appSidebarItems } from '../lib/appShell';
 import {
   createProject,
   createProjectBodyFromForm,
@@ -37,7 +36,7 @@ import {
   type ProjectFormState,
   type ViewMode,
 } from '../lib/projectPageState';
-import { getNavigationHref, navigateToPage } from '../lib/navigation';
+import { getActiveFrontHrefs, navigateToPage } from '../lib/navigation';
 import { authSessionFromAccess, logoutAndReload } from '../lib/auth-session';
 import { parseProjectDeepLink } from '../lib/projectDeepLink';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../types/project';
@@ -81,7 +80,6 @@ export default function ProjectsPage() {
   const [dueBeforeFilter, setDueBeforeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
@@ -92,11 +90,6 @@ export default function ProjectsPage() {
   const [projectFormError, setProjectFormError] = useState('');
   // La session vient de la réponse /projects-page déjà chargée : aucun appel supplémentaire.
   const session = useMemo(() => authSessionFromAccess(projectsPage?.access ?? null), [projectsPage]);
-
-  const handlePageChange = (page: string) => {
-    navigateToPage(page);
-    setSidebarOpen(false);
-  };
 
   const memberOptions = useMemo<FilterOption[]>(
     () =>
@@ -484,9 +477,10 @@ export default function ProjectsPage() {
     projectsPage?.access?.canCreateProject ?? false;
   const pageTitle = projectsPage?.page.title ?? 'Projets';
   const pageSubtitle = projectsPage?.page.subtitle ?? '';
+  const frontHrefs = getActiveFrontHrefs();
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f6f4f1] text-[#172033]">
+    <>
       {projectPendingDeletion && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
           <div className="w-full max-w-md overflow-hidden rounded-md border border-[#d0d7de] bg-[#fbfaf8] shadow-[0_18px_50px_rgba(27,31,36,0.28)]">
@@ -540,50 +534,14 @@ export default function ProjectsPage() {
         />
       )}
 
-      <div className="flex h-full">
-        <div className="hidden shrink-0 lg:block">
-          <Sidebar
-            activeItem="projects"
-            isAdmin={session.isAdmin}
-            items={appSidebarItems}
-            brandLabel="Mairie360"
-            brandInitial="M"
-            onItemSelect={(item) => handlePageChange(item.id)}
-          />
-        </div>
-
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 flex lg:hidden">
-            <button
-              type="button"
-              aria-label="Fermer la navigation"
-              className="absolute inset-0 bg-black/30"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="relative z-10">
-              <Sidebar
-                activeItem="projects"
-                isAdmin={session.isAdmin}
-                items={appSidebarItems}
-                brandLabel="Mairie360"
-                brandInitial="M"
-                onItemSelect={(item) => handlePageChange(item.id)}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Header
-            user={session.user}
-            isAdmin={session.isAdmin}
-            setSidebarOpen={setSidebarOpen}
-            profileHref={getNavigationHref('profile')}
-            onPageChange={handlePageChange}
-            onLogout={() => void logoutAndReload()}
-          />
-
-          <main className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
+      <AppShell
+        activeItem="projects"
+        isAdmin={session.isAdmin}
+        user={session.user}
+        onLogout={() => void logoutAndReload()}
+        hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
+        className="projects-shell"
+      >
             <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
               {alert && (
                 <div className="mb-5">
@@ -727,13 +685,7 @@ export default function ProjectsPage() {
                 )}
               </section>
             </div>
-          </main>
-
-          <footer className="flex min-h-16 w-full shrink-0 items-center border-t border-[#b9d6d5] bg-white px-6 py-4 text-sm text-[#4c5258] shadow-[0_-1px_5px_rgba(0,0,0,0.08)]">
-            © {new Date().getFullYear()} Mairie360
-          </footer>
-        </div>
-      </div>
-    </div>
+      </AppShell>
+    </>
   );
 }

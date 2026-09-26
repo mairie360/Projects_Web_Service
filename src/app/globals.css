@@ -20,6 +20,17 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.projects-shell {
+  background: #f6f4f1;
+  color: #172033;
+}
+
+.projects-shell > .flex > .flex > main {
+  padding: 0;
+  background: #f6f4f1;
+  overflow-y: auto;
+}
+
 button,
 input,
 textarea,
