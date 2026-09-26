@@ -40,7 +40,17 @@ function KanbanProjectCard({
         <div className="flex min-w-0 gap-2">
           <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-[#1a7f37]" strokeWidth={2} />
           <div className="min-w-0">
-            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[#24292f]">{project.title}</h3>
+            <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[#24292f]">
+              <button
+                type="button"
+                aria-label={`Ouvrir la fiche du projet ${project.title}`}
+                className="text-left focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0969da]"
+                onClick={(event) => { event.stopPropagation(); onOpen?.(project); }}
+                disabled={!onOpen}
+              >
+                {project.title}
+              </button>
+            </h3>
             <p className="mt-1 truncate text-xs text-[#57606a]">Mairie360 / projets {getProjectNumber(project)}</p>
           </div>
         </div>
@@ -107,7 +117,17 @@ function GridProjectCard({
         <div className="flex min-w-0 gap-2.5">
           <CircleDot className="mt-1 h-4 w-4 shrink-0 text-[#1a7f37]" strokeWidth={2} />
           <div className="min-w-0">
-            <h3 className="line-clamp-2 text-base font-semibold leading-snug text-[#24292f]">{project.title}</h3>
+            <h3 className="line-clamp-2 text-base font-semibold leading-snug text-[#24292f]">
+              <button
+                type="button"
+                aria-label={`Ouvrir la fiche du projet ${project.title}`}
+                className="text-left focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0969da]"
+                onClick={(event) => { event.stopPropagation(); onOpen?.(project); }}
+                disabled={!onOpen}
+              >
+                {project.title}
+              </button>
+            </h3>
             <p className="mt-1 text-xs text-[#57606a]">Mairie360 / projets {getProjectNumber(project)}</p>
           </div>
         </div>

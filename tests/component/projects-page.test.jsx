@@ -50,6 +50,46 @@ describe("Projects page", () => {
     expect(getProjectDetails).toHaveBeenCalledExactlyOnceWith(project.id);
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
     expect(screen.getByText(task.title)).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: project.title })).toBeTruthy();
+    expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
+  });
+
+  it("keeps keyboard focus inside a named project dialog and returns it to the opener", async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project));
+    render(<ProjectsPage />);
+
+    const opener = await screen.findByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` });
+    await user.click(opener);
+    const dialog = await screen.findByRole("dialog", { name: project.title });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement).toBe(dialog);
+
+    const focusable = Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])"))
+      .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true");
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    expect(first).toBeTruthy();
+    expect(last).toBeTruthy();
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(last);
+    await user.tab();
+    expect(document.activeElement).toBe(first);
+
+    const results = await axe(dialog);
+    expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
+    expect(document.activeElement).toBe(opener);
+
+    await user.click(opener);
+    expect(await screen.findByRole("dialog", { name: project.title })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Fermer la fiche projet" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
+    expect(document.activeElement).toBe(opener);
   });
 
   it("rejects an incomplete task link without requesting a project detail", async () => {

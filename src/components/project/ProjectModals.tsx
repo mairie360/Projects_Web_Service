@@ -292,7 +292,59 @@ export function ProjectDetailModal({
   const [commentMessage, setCommentMessage] = React.useState('');
   const [commentSaving, setCommentSaving] = React.useState(false);
   const highlightedTaskRef = React.useRef<HTMLElement | null>(null);
+  const overlayRef = React.useRef<HTMLDivElement | null>(null);
+  const dialogRef = React.useRef<HTMLElement | null>(null);
+  const titleId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
+
+  React.useEffect(() => {
+    const opener = typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const overlay = overlayRef.current;
+    dialogRef.current?.focus();
+
+    return () => {
+      if (opener?.isConnected && (overlay?.contains(document.activeElement) || document.activeElement === document.body)) {
+        opener.focus();
+      }
+    };
+  }, []);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return element.tabIndex >= 0 && !element.hasAttribute('hidden') &&
+        element.getAttribute('aria-hidden') !== 'true' && style.display !== 'none' && style.visibility !== 'hidden';
+    });
+    if (focusable.length === 0) {
+      event.preventDefault();
+      dialog.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const filteredTasks = React.useMemo(() => {
     const search = taskSearch.trim().toLowerCase();
@@ -443,14 +495,14 @@ export function ProjectDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
-      <button type="button" aria-label="Fermer le projet" className="absolute inset-0" onClick={onClose} />
+    <div ref={overlayRef} className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
+      <button type="button" aria-hidden="true" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
 
-      <section className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
         <header className="flex items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
           <div className="min-w-0">
             <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
-            <h2 className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
+            <h2 id={titleId} className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {project.permissions?.canEdit !== false && <button
