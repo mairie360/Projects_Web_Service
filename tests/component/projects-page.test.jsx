@@ -46,7 +46,7 @@ describe("Projects page", () => {
 
     const { container } = render(<ProjectsPage />);
 
-    expect(await screen.findByRole("heading", { name: project.title })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: project.title, level: 2 })).toBeTruthy();
     expect(getProjectDetails).toHaveBeenCalledExactlyOnceWith(project.id);
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
     expect(screen.getByText(task.title)).toBeTruthy();
