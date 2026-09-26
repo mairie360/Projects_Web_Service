@@ -1,4 +1,5 @@
 import { frontUrl } from "@/lib/front-urls";
+import { settingsProfileUrl } from "@/lib/settings-profile";
 const pageRoutes: Partial<Record<string, string>> = {
   get dashboard() { return frontUrl("DASHBOARD_FRONT_URL"); },
   get projects() { return frontUrl("PROJECT_FRONT_URL"); },
@@ -9,7 +10,7 @@ const pageRoutes: Partial<Record<string, string>> = {
   get calendar() { return frontUrl("CALENDAR_FRONT_URL"); },
   get admin() { return frontUrl("ADMINISTRATION_FRONT_URL"); },
   get settings() { return frontUrl("SETTINGS_FRONT_URL"); },
-  profile: "/profile",
+  get profile() { return settingsProfileUrl(frontUrl("SETTINGS_FRONT_URL")) ?? "/profile"; },
 };
 
 export function getNavigationHref(page: string) {
