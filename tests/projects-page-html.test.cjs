@@ -76,6 +76,43 @@ test('an agent without the creation right sees no "Nouveau projet" button', asyn
   assert.equal(view.props('KanbanBoard').onAddProject, undefined);
 });
 
+test('desktop and mobile navigation expose only active modules and keep Settings functional', async () => {
+  const assigned = [];
+  const originalAssign = global.window.location.assign;
+  global.window.location.assign = (href) => assigned.push(href);
+  setBrowserFrontUrls({ SETTINGS_FRONT_URL: 'https://settings.test.example/' });
+  try {
+    await renderLoadedPage();
+    const isAdmin = view.props('Sidebar').isAdmin;
+    for (const mobileOpen of [false, true]) {
+      await view.act(() => view.props('Header').setSidebarOpen(mobileOpen));
+      const sidebars = view.find('Sidebar');
+      assert.equal(sidebars.length, mobileOpen ? 2 : 1);
+      for (const { props } of sidebars) {
+        assert.deepEqual(props.items.map(item => item.id),
+          ['dashboard', 'projects', 'messages', 'training', 'calendar', 'admin', 'settings']);
+        assert.equal(props.items.find(item => item.id === 'admin').adminOnly, true);
+        assert.equal(props.isAdmin, isAdmin);
+        assert.equal(props.activeItem, 'projects');
+      }
+      const menus = view.html.match(/<nav\b[^>]*aria-label="Menu principal"[^>]*>[\s\S]*?<\/nav>/g) ?? [];
+      assert.equal(menus.length, sidebars.length);
+      for (const menu of menus) {
+        assert.doesNotMatch(menu, /E-mails|Fichiers/);
+        assert.match(menu, /Paramètres/);
+        assert.equal(menu.includes('>Administration<'), isAdmin);
+      }
+    }
+    const mobileSidebar = view.find('Sidebar')[1].props;
+    await view.act(() => mobileSidebar.onItemSelect(mobileSidebar.items.find(item => item.id === 'settings')));
+    assert.deepEqual(assigned, ['https://settings.test.example/']);
+    assert.equal(view.find('Sidebar').length, 1);
+  } finally {
+    setBrowserFrontUrls({});
+    global.window.location.assign = originalAssign;
+  }
+});
+
 test('the Settings action opens the configured Settings frontend', async () => {
   setBrowserFrontUrls({ SETTINGS_FRONT_URL: 'https://settings.example/' });
   try {
