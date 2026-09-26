@@ -263,6 +263,8 @@ test('opening a project loads its details and renders them in the modal', async 
   assert.equal(modal.project.id, 'project-1');
   assert.deepEqual(modal.tasks.map((task) => task.id), ['task-1', 'task-2']);
   assert.match(view.text(), /Relevé des candélabres/);
+  assert.match(view.html, /role="dialog" aria-modal="true" aria-labelledby="[^"]+"/);
+  assert.match(view.html, /aria-label="Ouvrir la fiche du projet Rénovation de l’éclairage public"/);
 
   await view.act(() => modal.onClose());
   assert.equal(view.find('ProjectDetailModal').length, 0);
