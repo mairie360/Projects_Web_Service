@@ -75,7 +75,7 @@ Les valeurs ci-dessous sont des exemples locaux ou des comportements expliciteme
 
 | Variable ou priorité | Exemple / repli indiqué | Rôle |
 | --- | --- | --- |
-| `BFF_PROJECT_BASE_URL` → `PROJECT_BFF_URL` → `NEXT_PUBLIC_BFF_PROJECT_BASE_URL` | http://localhost:4001 | Priorité de gauche à droite dans le proxy; l’URL indiquée est le repli local. |
+| `BFF_PROJECT_BASE_URL` → `PROJECT_BFF_URL` → `NEXT_PUBLIC_BFF_PROJECT_BASE_URL` | http://localhost:4001 | Priorité de gauche à droite dans le proxy ; configurer explicitement une URL HTTP(S). Une configuration absente ou invalide renvoie un 503 non mis en cache, sans appel réseau. |
 | `COOKIE_DOMAIN` | — | Domaine des cookies; vérifier sa cohérence avec Login ; la déconnexion locale efface le cookie sur ce domaine. |
 | `ADMINISTRATION_FRONT_URL` | — | Destination de navigation; voir le fichier source qui la lit. Les variables injectées par `next.config.ts` ou préfixées `NEXT_PUBLIC_` sont publiques et prises en compte lors du build. |
 | `CALENDAR_FRONT_URL` | — | Destination de navigation; voir le fichier source qui la lit. Les variables injectées par `next.config.ts` ou préfixées `NEXT_PUBLIC_` sont publiques et prises en compte lors du build. |
