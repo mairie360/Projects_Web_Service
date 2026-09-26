@@ -9,7 +9,6 @@ import {
   MessageSquare,
   Settings,
   Shield,
-  UserRound,
 } from 'lucide-react';
 
 export { getNavigationHref } from './navigation';
@@ -31,6 +30,5 @@ export const appSidebarItems: AppNavigationItem[] = [
   { id: 'training', label: 'Formation', icon: GraduationCap },
   { id: 'calendar', label: 'Calendrier', icon: CalendarDays },
   { id: 'admin', label: 'Administration', icon: Shield, adminOnly: true, badge: 'Admin' },
-  { id: 'profile', label: 'Profil', icon: UserRound },
   { id: 'settings', label: 'Paramètres', icon: Settings },
 ];

@@ -59,6 +59,8 @@ test('navigation: front URLs read at runtime, navigation only to a known target'
   assert.equal(navigation.getNavigationHref('profile'), '/profile');
   assert.equal(navigation.getNavigationHref('inconnu'), null);
   assert.ok(appSidebarItems.some((item) => item.id === 'admin' && item.adminOnly));
+  assert.equal(appSidebarItems.some((item) => item.id === 'profile'), false);
+  assert.equal(appSidebarItems.filter((item) => item.id === 'settings').length, 1);
 
   const assigned = [];
   global.window = { location: { assign: (href) => assigned.push(href) } };
