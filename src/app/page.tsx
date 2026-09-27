@@ -623,8 +623,8 @@ export default function ProjectsPage() {
               </section>
 
               <section className="border-b border-[#e3e0dc] py-7">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center">
+                <div className="flex flex-col items-start gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                  <div className="flex w-full min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-center">
                     <div className="w-full md:min-w-[280px] md:max-w-[448px] md:flex-1">
                       <SearchInput value={searchTerm} onChange={setSearchTerm} />
                     </div>
