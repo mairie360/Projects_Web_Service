@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { readFrontUrlsFromEnv } from "@/lib/front-urls";
 import { FrontUrlsProvider } from "@/lib/front-urls-provider";
-import "@mairie360/lib-components/dist/styles.css";
 import "./globals.css";
 
 // Rendu à la demande obligatoire : une page prérendue au build ne porterait pas le
