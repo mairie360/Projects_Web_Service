@@ -65,7 +65,7 @@ describe('ProjectTasksEditor task assignees', () => {
     render(<Editor responsible="3" />);
 
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Vérifier le dossier');
-    await user.click(screen.getByRole('button', { name: 'Choisir un ou plusieurs assignés' }));
+    await user.click(screen.getByRole('button', { name: 'Assignés' }));
     await user.click(screen.getByRole('option', { name: 'Alice Martin' }));
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
 
