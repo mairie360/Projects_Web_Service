@@ -37,6 +37,23 @@ describe("Projects page", () => {
     expect(screen.queryByRole("group", { name: fixtures.projectListItem().title })).toBeNull();
   });
 
+  it("keeps the search and filter toolbar stacked until enough width is available", async () => {
+    render(<ProjectsPage />);
+    await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
+
+    const search = screen.getByPlaceholderText("Rechercher des projets...");
+    const controls = search.parentElement.parentElement.parentElement;
+    const toolbar = controls.parentElement;
+
+    expect(controls.classList.contains("w-full")).toBe(true);
+    expect(controls.classList.contains("xl:flex-row")).toBe(true);
+    expect(controls.classList.contains("md:flex-row")).toBe(false);
+    expect(toolbar.classList.contains("items-start")).toBe(true);
+    expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
+    expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
+    expect(screen.getByRole("tablist", { name: "Vue des projets" })).toBeTruthy();
+  });
+
   it("opens the requested BFF-backed project and highlights its task", async () => {
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
