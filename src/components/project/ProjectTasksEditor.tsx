@@ -40,12 +40,12 @@ function createTaskSummaryPatch(taskItems: ProjectTask[]): Pick<ProjectFormState
   };
 }
 
-function createTaskFormStateFromProjectForm(form: ProjectFormState, memberOptions: FilterOption[]): TaskFormState {
+function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskFormState {
   return {
     title: '',
     status: form.status,
     priority: form.priority,
-    assignees: form.responsible ? [form.responsible] : memberOptions[0]?.value ? [memberOptions[0].value] : [],
+    assignees: [],
     labels: [],
     dueDate: form.dueDate,
   };
@@ -82,7 +82,7 @@ export function ProjectTasksEditor({
   onChange: (patch: Partial<ProjectFormState>) => void;
 }) {
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() =>
-    createTaskFormStateFromProjectForm(form, memberOptions)
+    createTaskFormStateFromProjectForm(form)
   );
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
@@ -92,17 +92,9 @@ export function ProjectTasksEditor({
       ...current,
       status: current.title ? current.status : form.status,
       priority: current.title ? current.priority : form.priority,
-      assignees:
-        current.assignees.length > 0
-          ? current.assignees
-          : form.responsible
-            ? [form.responsible]
-            : memberOptions[0]?.value
-              ? [memberOptions[0].value]
-              : [],
       dueDate: current.dueDate || form.dueDate,
     }));
-  }, [form.dueDate, form.priority, form.responsible, form.status, memberOptions]);
+  }, [form.dueDate, form.priority, form.status]);
 
   const updateTaskForm = (patch: Partial<TaskFormState>) => {
     setTaskForm((current) => ({ ...current, ...patch }));
@@ -121,10 +113,15 @@ export function ProjectTasksEditor({
     }
 
     const assigneeValues = getUniqueValues(
-      taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible || memberOptions[0]?.value || 'Non assigné']
+      taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible]
     );
+    if (assigneeValues.length === 0) {
+      setTaskFormError('Choisissez un assigné pour la tâche ou un responsable pour le projet.');
+      return;
+    }
+
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
-    const responsible = assignees[0] ?? { name: 'Non assigné' };
+    const responsible = assignees[0];
     const task: ProjectTask = {
       id: editingTaskId ?? `task-${Date.now()}`,
       title,
@@ -148,7 +145,7 @@ export function ProjectTasksEditor({
     setTaskForm({
       ...taskForm,
       title: '',
-      assignees: form.responsible ? [form.responsible] : memberOptions[0]?.value ? [memberOptions[0].value] : [],
+      assignees: [],
       labels: [],
     });
     setEditingTaskId(null);
@@ -163,7 +160,7 @@ export function ProjectTasksEditor({
 
   const cancelTaskEdit = () => {
     setEditingTaskId(null);
-    setTaskForm(createTaskFormStateFromProjectForm(form, memberOptions));
+    setTaskForm(createTaskFormStateFromProjectForm(form));
     setTaskFormError('');
   };
 
@@ -210,7 +207,7 @@ export function ProjectTasksEditor({
             }}
           />
 
-          {taskFormError && <p className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+          {taskFormError && <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SelectField
@@ -247,6 +244,12 @@ export function ProjectTasksEditor({
             placeholder="Choisir un ou plusieurs assignés"
             onChange={(assignees) => updateTaskForm({ assignees })}
           />
+
+          {taskForm.assignees.length === 0 && form.responsible && (
+            <p className="text-xs text-[#57606a]">
+              Sans choix, le responsable du projet sera assigné à cette tâche.
+            </p>
+          )}
 
           <MultiSelectField
             id="project-form-task-labels"
