@@ -132,9 +132,11 @@ describe('déconnexion locale', () => {
     }
   });
 
-  test('logoutAndReload vide le stockage et recharge même si la route échoue', async () => {
+  test('logoutAndReload retire seulement les jetons et recharge même si la route échoue', async () => {
     const { logoutAndReload } = requireTs('src/lib/auth-token.ts');
     harness.storage.setItem('mairie360.auth.jwt', 'stale');
+    harness.storage.setItem('mairie360.projects.jwt', 'legacy');
+    harness.storage.setItem('unrelated.preference', 'keep');
     const failingFetch = global.fetch;
     global.fetch = async () => { throw new TypeError('hors ligne'); };
     try {
@@ -142,6 +144,9 @@ describe('déconnexion locale', () => {
     } finally {
       global.fetch = failingFetch;
     }
-    assert.deepEqual([harness.storage.length, harness.location.reloads], [0, 1]);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), null);
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), null);
+    assert.equal(harness.storage.getItem('unrelated.preference'), 'keep');
+    assert.equal(harness.location.reloads, 1);
   });
 });
