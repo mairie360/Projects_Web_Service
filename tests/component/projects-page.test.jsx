@@ -68,7 +68,9 @@ describe("Projects page", () => {
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
     expect(screen.getByText(task.title)).toBeTruthy();
     expect(screen.getByRole("dialog", { name: project.title })).toBeTruthy();
-    expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
+    });
   });
 
   it("keeps keyboard focus inside a named project dialog and returns it to the opener", async () => {
