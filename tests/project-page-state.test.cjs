@@ -11,7 +11,6 @@ process.env.PROJECT_FRONT_URL = 'https://projects.example/';
 process.env.SETTINGS_FRONT_URL = 'https://settings.example/';
 const state = requireTs('src/lib/projectPageState.ts');
 const navigation = requireTs('src/lib/navigation.ts');
-const { appSidebarItems, getNavigationHref } = requireTs('src/lib/appShell.ts');
 
 afterEach(() => {
   delete global.window;
@@ -58,13 +57,13 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
 });
 
 test('navigation: front URLs read at runtime, navigation only to a known target', () => {
-  assert.equal(getNavigationHref('projects'), 'https://projects.example/');
-  assert.equal(getNavigationHref('settings'), 'https://settings.example/');
+  assert.equal(navigation.getNavigationHref('projects'), 'https://projects.example/');
+  assert.equal(navigation.getNavigationHref('settings'), 'https://settings.example/');
   assert.equal(navigation.getNavigationHref('profile'), 'https://settings.example/');
   assert.equal(navigation.getNavigationHref('inconnu'), null);
-  assert.ok(appSidebarItems.some((item) => item.id === 'admin' && item.adminOnly));
-  assert.equal(appSidebarItems.some((item) => item.id === 'profile'), false);
-  assert.equal(appSidebarItems.filter((item) => item.id === 'settings').length, 1);
+  assert.deepEqual(Object.keys(navigation.getActiveFrontHrefs()),
+    ['dashboard', 'projects', 'messages', 'training', 'calendar', 'admin', 'settings', 'profile']);
+  assert.equal(navigation.getActiveFrontHrefs().profile, 'https://settings.example/');
 
   const assigned = [];
   global.window = { location: { assign: (href) => assigned.push(href) } };
@@ -74,15 +73,28 @@ test('navigation: front URLs read at runtime, navigation only to a known target'
   assert.deepEqual(assigned, ['https://settings.example/']);
 });
 
-test('profile navigation keeps the local unavailable state for an invalid Settings URL', () => {
+test('profile navigation omits invalid Settings destinations', () => {
   const previous = process.env.SETTINGS_FRONT_URL;
   try {
     process.env.SETTINGS_FRONT_URL = 'https://settings.example/profile';
-    assert.equal(navigation.getNavigationHref('profile'), '/profile');
+    assert.equal(navigation.getNavigationHref('profile'), null);
     process.env.SETTINGS_FRONT_URL = 'javascript:alert(1)';
-    assert.equal(navigation.getNavigationHref('profile'), '/profile');
+    assert.equal(navigation.getNavigationHref('profile'), null);
   } finally {
     process.env.SETTINGS_FRONT_URL = previous;
+  }
+});
+
+test('active shell destinations reject credential-bearing and non-web URLs', () => {
+  const previousDashboard = process.env.DASHBOARD_FRONT_URL;
+  try {
+    process.env.DASHBOARD_FRONT_URL = 'https://user:pass@dashboard.example/';
+    assert.equal(navigation.getActiveFrontHrefs().dashboard, undefined);
+    process.env.DASHBOARD_FRONT_URL = 'javascript:alert(1)';
+    assert.equal(navigation.getNavigationHref('dashboard'), null);
+  } finally {
+    if (previousDashboard === undefined) delete process.env.DASHBOARD_FRONT_URL;
+    else process.env.DASHBOARD_FRONT_URL = previousDashboard;
   }
 });
 
