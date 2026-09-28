@@ -292,12 +292,13 @@ export function ProjectDetailModal({
   const [commentMessage, setCommentMessage] = React.useState('');
   const [commentSaving, setCommentSaving] = React.useState(false);
   const highlightedTaskRef = React.useRef<HTMLElement | null>(null);
+  const focusedLinkedTaskRef = React.useRef<HTMLElement | null>(null);
   const overlayRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const opener = typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
@@ -378,12 +379,17 @@ export function ProjectDetailModal({
     setCommentMessage('');
   }, [project]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const article = highlightedTaskRef.current;
-    if (!highlightTaskId || !article) return;
+    if (!highlightTaskId) {
+      focusedLinkedTaskRef.current = null;
+      return;
+    }
+    if (!article || focusedLinkedTaskRef.current === article) return;
     article.scrollIntoView?.({ block: 'center' });
     article.focus?.({ preventScroll: true });
-  }, [highlightTaskId]);
+    focusedLinkedTaskRef.current = article;
+  }, [filteredTasks, highlightTaskId]);
 
   const openTaskCollaboration = async (taskId: string) => {
     if (collaborationTaskId === taskId) {
