@@ -67,7 +67,7 @@ export function getStoredAuthorizationHeader() {
   return token ? formatBearerToken(token) : null;
 }
 
-/** Efface la session (cookie via la route locale /api/auth/logout, stockage navigateur) puis recharge la page. */
+/** Efface la session (cookie via la route locale /api/auth/logout, jetons locaux) puis recharge la page. */
 export async function logoutAndReload() {
   try {
     await fetch('/api/auth/logout', {
@@ -76,7 +76,7 @@ export async function logoutAndReload() {
     });
   } finally {
     try {
-      window.localStorage.clear();
+      clearStoredAuthJwtToken();
     } finally {
       window.location.reload();
     }
