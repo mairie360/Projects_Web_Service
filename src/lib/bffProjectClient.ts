@@ -169,8 +169,15 @@ async function parseResponseError(response: Response) {
     errorBody = null;
   }
 
+  const serviceMessage = errorBody?.error?.message;
+  const message = typeof serviceMessage === 'string' && serviceMessage.trim()
+    ? serviceMessage
+    : response.status >= 500
+      ? 'Le service des projets est temporairement indisponible.'
+      : 'La demande n’a pas pu aboutir.';
+
   throw new BffProjectError(
-    errorBody?.error?.message ?? `Erreur BFF (${response.status})`,
+    message,
     response.status,
     errorBody?.error?.code,
     errorBody?.error?.details

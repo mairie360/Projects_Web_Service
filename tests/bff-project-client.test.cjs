@@ -270,11 +270,17 @@ describe('erreurs du BFF', () => {
     assert.equal(harness.location.reloads, 0);
   });
 
-  test('un corps d’erreur illisible donne un message générique avec le statut', async () => {
+  test('un corps d’erreur illisible donne un message compréhensible sans jargon technique', async () => {
     // Page HTML d'un reverse proxy devant le BFF : volontairement hors contrat (le contrat impose ApiError).
     bffProject.on('get', '/projects-page', { status: 502, raw: '<html>Bad Gateway</html>', contentType: 'text/html', outOfContract: true });
 
-    await assert.rejects(client.getProjectsPage(), { name: 'BffProjectError', status: 502, code: undefined, message: 'Erreur BFF (502)' });
+    await assert.rejects(client.getProjectsPage(), { name: 'BffProjectError', status: 502, code: undefined, message: 'Le service des projets est temporairement indisponible.' });
+  });
+
+  test('une erreur 400 sans message exploitable ne montre pas de code HTTP brut', async () => {
+    bffProject.on('get', '/projects-page', { status: 400, raw: '', outOfContract: true });
+
+    await assert.rejects(client.getProjectsPage(), { name: 'BffProjectError', status: 400, code: undefined, message: 'La demande n’a pas pu aboutir.' });
   });
 
   test('un BFF injoignable produit l’erreur 502 contrôlée du proxy', async () => {
