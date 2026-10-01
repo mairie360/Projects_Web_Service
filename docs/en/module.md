@@ -56,6 +56,15 @@ desktop breakpoint, titles and actions share a compact row. Follow, Edit,
 delete confirmation and status permissions are unchanged. This presentation
 change neither writes data nor requires environment, dependency or API/BFF changes.
 
+## Responsive task follow-up
+
+The Follow panel uses one bounded column on phones and two columns on large
+screens. Comment authors, dates, complete messages and history entries wrap,
+including unbroken text; comment line breaks are preserved. The comment field
+and Send button stack on phones and share a row from the small breakpoint.
+Submission, stored text and existing `canComment` permissions are unchanged.
+No API/BFF, dependency or environment change is required.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).

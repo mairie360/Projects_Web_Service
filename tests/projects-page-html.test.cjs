@@ -635,6 +635,55 @@ test('the detail modal drives the tasks: status change, deletion with confirmati
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'delete')[0].pathParams, { projectId: 'project-1', taskId: 'task-1' });
 });
 
+test('task follow-up bounds long content and preserves the existing comment submission', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  const author = 'LongUnbrokenAuthor'.repeat(8);
+  const message = `${'LongUnbrokenComment'.repeat(12)}\nSecond line.`;
+  const label = 'LongUnbrokenHistory'.repeat(8);
+  const collaboration = fixtures.taskCollaboration();
+  collaboration.comments = [fixtures.taskComment({ message, author: { id: fixtures.people.alice.id, name: author } })];
+  collaboration.history[0] = { ...collaboration.history[0], label, author: { id: fixtures.people.marie.id, name: author } };
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: collaboration });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor((html) => html.includes(message));
+  assert.match(view.html, /grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2/);
+  assert.match(view.html, /flex flex-col[^"<>]*\[overflow-wrap:anywhere\][^"<>]*sm:flex-wrap/);
+  assert.match(view.html, /whitespace-pre-wrap[^"<>]*\[overflow-wrap:anywhere\]/);
+  assert.match(view.html, /border-l-2[^"<>]*\[overflow-wrap:anywhere\]/);
+  assert.match(view.html, /<form class="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row"/);
+  assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*class="h-8 min-w-0 rounded-md[^"<>]*sm:flex-1"/);
+  assert.ok(view.text().includes(author));
+  assert.ok(view.text().includes(label));
+  const sent = 'CommentWithoutSpaces'.repeat(20);
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', ({ body }) => {
+    const comment = fixtures.taskComment({ id: 'comment-long', message: body.message });
+    collaboration.comments.push(comment);
+    return { status: 201, body: comment };
+  });
+  await view.fire((props) => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: sent } });
+  await view.fire((props, text, tag) => tag === 'form' && text.includes('Envoyer'), 'onSubmit');
+  await view.waitFor(() => view.text().includes(sent));
+  const posts = bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post');
+  assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].body, { message: sent });
+  assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value=""/);
+});
+
+test('read-only task follow-up keeps comments and history without exposing a composer', async () => {
+  await renderLoadedPage();
+  const task = fixtures.projectTask();
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(undefined, [{ ...task, permissions: { ...task.permissions, canComment: false } }]) });
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor((html) => html.includes('Devis reçu.'));
+  assert.match(view.text(), /Statut modifié/);
+  assert.doesNotMatch(view.html, /placeholder="Ajouter un commentaire/);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 0);
+});
+
 test('the detail modal edits the project inline, adds a task from its form and closes the project', async () => {
   await renderLoadedPage();
   await openDetails();

@@ -802,35 +802,35 @@ export function ProjectDetailModal({
                             )}
 
                             {collaborationTaskId === task.id && (
-                              <div className="mt-3 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
+                              <div className="mt-3 min-w-0 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
                                 {collaborationLoading && <p className="text-xs text-[#57606a]">Chargement du suivi...</p>}
                                 {collaborationError && <p className="text-xs font-medium text-[#cf222e]">{collaborationError}</p>}
                                 {collaboration && (
-                                  <div className="grid gap-4 lg:grid-cols-2">
-                                    <div>
+                                  <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+                                    <div className="min-w-0">
                                       <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><MessageSquare className="h-3.5 w-3.5" /> Commentaires</h4>
                                       <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
                                         {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
                                         {collaboration.comments.map((comment) => (
                                           <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
-                                            <div className="flex justify-between gap-2 font-semibold text-[#24292f]"><span>{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR')}</time></div>
-                                            <p className="mt-1 whitespace-pre-wrap text-[#57606a]">{comment.message}</p>
+                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR')}</time></div>
+                                            <p className="mt-1 whitespace-pre-wrap text-[#57606a] [overflow-wrap:anywhere]">{comment.message}</p>
                                           </div>
                                         ))}
                                       </div>
                                       {task.permissions?.canComment !== false && (
-                                        <form className="mt-2 flex gap-2" onSubmit={(event) => void submitComment(event, task.id)}>
-                                          <input value={commentMessage} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 flex-1 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da]" onChange={(event) => setCommentMessage(event.target.value)} />
-                                          <button type="submit" disabled={commentSaving || !commentMessage.trim()} className="rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
+                                        <form className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row" onSubmit={(event) => void submitComment(event, task.id)}>
+                                          <input value={commentMessage} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => setCommentMessage(event.target.value)} />
+                                          <button type="submit" disabled={commentSaving || !commentMessage.trim()} className="min-h-8 shrink-0 rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
                                         </form>
                                       )}
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                       <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><History className="h-3.5 w-3.5" /> Historique</h4>
                                       <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
                                         {collaboration.history.length === 0 && <p className="text-xs text-[#6e7781]">Aucune modification enregistrée.</p>}
                                         {collaboration.history.map((entry) => (
-                                          <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs">
+                                          <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs [overflow-wrap:anywhere]">
                                             <p className="font-medium text-[#24292f]">{entry.label}</p>
                                             <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR')}</p>
                                           </div>
