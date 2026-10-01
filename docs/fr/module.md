@@ -39,6 +39,16 @@ Domaine fonctionnel: Projets et tâches.
 2. Ouvrir un projet pour consulter ses tâches et les actions autorisées.
 3. Effectuer une mutation puis utiliser les données renvoyées et recharger le contexte concerné.
 
+## Recherche et filtres adaptatifs
+
+Recherche, statut, priorité, échéance et vues sont empilés sur téléphone.
+La recherche garde sa ligne avant `xl` ; les vues ne rejoignent la barre qu’à
+`2xl`. À ce seuil, la recherche peut descendre sous sa largeur minimale
+intermédiaire tout en gardant au moins 240px, ce qui réserve un espace entre
+échéance et vues lorsque la sidebar desktop est visible. Recherche, filtres et
+vues conservent leur comportement ; aucune donnée métier, variable ou API/BFF
+n’est modifiée.
+
 ## Présentation des échéances
 
 Les cartes projets, le tableau, les éditeurs de tâches et les fiches projets

@@ -42,6 +42,7 @@ describe("Projects page", () => {
     await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
 
     const search = screen.getByPlaceholderText("Rechercher des projets...");
+    const searchContainer = search.parentElement.parentElement;
     const controls = search.parentElement.parentElement.parentElement;
     const toolbar = controls.parentElement;
 
@@ -51,6 +52,9 @@ describe("Projects page", () => {
     expect(toolbar.classList.contains("items-start")).toBe(true);
     expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
     expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
+    expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
+    expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
+    expect(searchContainer.classList.contains("md:flex-1")).toBe(true);
     expect(screen.getByRole("tablist", { name: "Vue des projets" })).toBeTruthy();
   });
 
