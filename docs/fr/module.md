@@ -39,6 +39,17 @@ Domaine fonctionnel: Projets et tâches.
 2. Ouvrir un projet pour consulter ses tâches et les actions autorisées.
 3. Effectuer une mutation puis utiliser les données renvoyées et recharger le contexte concerné.
 
+## Présentation des échéances
+
+Les cartes projets, le tableau, les éditeurs de tâches et les fiches projets
+utilisent le même formateur de dates. Une échéance vide ou composée d’espaces
+affiche **Sans échéance** ; une date non vide malformée ou impossible affiche
+**Échéance invalide**. Les dates `YYYY-MM-DD` valides gardent le rendu
+`jj/mm/aaaa` ou `jj/mm`, sans conversion de fuseau. Le formatage ne remplace ni
+n’enregistre aucune date métier et ne change pas la recherche, les filtres,
+les permissions ou les actions de statut des tâches. Aucune nouvelle variable,
+dépendance ou évolution API/BFF n’est nécessaire.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

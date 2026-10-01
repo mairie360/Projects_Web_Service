@@ -130,3 +130,32 @@ test('jeton stocké : normalisation, effacement et stockage inaccessible', () =>
   assert.doesNotThrow(() => token.storeAuthJwtToken('jeton'));
   assert.doesNotThrow(() => token.clearStoredAuthJwtToken());
 });
+
+test('missing deadlines remain distinct from malformed or impossible dates', () => {
+  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  for (const withYear of [true, false]) {
+    for (const date of ['', ' ', '\t\n']) {
+      assert.equal(formatProjectDate(date, withYear), 'Sans échéance');
+    }
+    for (const date of ['not-a-date', '2026-1-05', '2026-01-5', '2026-01-05 extra',
+      '2026-01-05T00:00:00.000Z', ' 2026-01-05 ', '2026-00-01', '2026-13-01',
+      '2026-01-00', '2026-01-32', '2026-04-31', '2026-02-29', '2100-02-29', '0000-01-01']) {
+      assert.equal(formatProjectDate(date, withYear), 'Échéance invalide', date);
+    }
+  }
+});
+
+test('valid deadline formatting preserves calendar dates without time-zone conversion', () => {
+  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  for (const [date, full, short] of [
+    ['2026-01-01', '01/01/2026', '01/01'],
+    ['2026-04-30', '30/04/2026', '30/04'],
+    ['2026-12-31', '31/12/2026', '31/12'],
+    ['2024-02-29', '29/02/2024', '29/02'],
+    ['2000-02-29', '29/02/2000', '29/02'],
+    ['0001-01-01', '01/01/0001', '01/01'],
+  ]) {
+    assert.equal(formatProjectDate(date), full);
+    assert.equal(formatProjectDate(date, false), short);
+  }
+});

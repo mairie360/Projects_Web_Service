@@ -37,6 +37,16 @@ Business domain: Projects and tasks.
 2. Open a project to inspect tasks and allowed actions.
 3. Perform a mutation, consume the returned data and reload the relevant context.
 
+## Deadline presentation
+
+Project cards, the table, task editors and project details share the same date
+formatter. Empty or whitespace-only deadlines display **Sans échéance**;
+non-empty malformed or impossible calendar dates display **Échéance invalide**.
+Valid `YYYY-MM-DD` dates retain their `DD/MM/YYYY` or `DD/MM` presentation without
+time-zone conversion. Formatting never replaces or saves a business date and
+does not change the existing task search, filters, permissions or status actions.
+There are no new environment variables, dependencies or API/BFF requirements.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).

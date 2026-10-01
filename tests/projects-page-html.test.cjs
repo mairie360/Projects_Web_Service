@@ -303,6 +303,46 @@ test('a project deep link loads the authorized detail even when absent from the 
   assert.equal(view.props('ProjectDetailModal').highlightTaskId, null);
 });
 
+for (const [dueDate, expected, short] of [
+  ['', 'Sans échéance', 'Sans échéance'],
+  ['   ', 'Sans échéance', 'Sans échéance'],
+  ['incorrect', 'Échéance invalide', 'Échéance invalide'],
+  ['2026-02-29', 'Échéance invalide', 'Échéance invalide'],
+  ['2024-02-29T00:00:00.000Z', '29/02/2024', '29/02'],
+]) {
+  test(`deadline presentation across real project views and task editors: ${JSON.stringify(dueDate)}`, async () => {
+    const project = fixtures.projectListItem({ dueDate });
+    const task = fixtures.projectTask({ dueDate });
+    bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project, [task]) });
+    await renderLoadedPage(fixtures.projectsPage([project]));
+    assert.ok(view.text().includes(short));
+
+    for (const [value, component] of [['grid', 'GridView'], ['table', 'TableView'], ['kanban', 'KanbanBoard']]) {
+      const count = pageCalls().length;
+      await view.act(() => view.props('ViewToggle').onChange(value));
+      await view.waitFor(() => pageCalls().length === count + 1 && view.find(component).length === 1);
+      assert.ok(view.text().includes(value === 'kanban' ? short : expected));
+      assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
+    }
+
+    await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+    await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+    assert.ok(view.text().includes(expected));
+    assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
+    assert.equal(view.props('ProjectDetailModal').tasks[0].dueDate,
+      dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate);
+    await view.act(() => view.props('ProjectDetailModal').onClose());
+
+    await view.click((props) => props['aria-label'] === `Actions pour ${project.title}`);
+    await view.click((props, text) => props.role === 'menuitem' && text === 'Modifier');
+    await view.waitFor(() => view.find('CreateProjectModal').length === 1 && view.find('ProjectTasksEditor').length === 1);
+    assert.ok(view.text().includes(expected));
+    assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
+    assert.equal(bffProject.requests.filter((request) => request.method.toLowerCase() !== 'get').length, 0,
+      'formatting and opening views must never write a replacement deadline');
+  });
+}
+
 test('a task deep link makes the selected BFF task visible and identifiable', async () => {
   harness.location.search = '?project=project-1&task=task-2';
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
