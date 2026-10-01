@@ -37,6 +37,15 @@ Business domain: Projects and tasks.
 2. Open a project to inspect tasks and allowed actions.
 3. Perform a mutation, consume the returned data and reload the relevant context.
 
+## Responsive search and filters
+
+Search, status, priority, deadline and view controls stack on phones. Search
+has its own row before `xl`; the view toggle joins the toolbar only at `2xl`.
+At that boundary, search can shrink below its intermediate-screen minimum
+while retaining at least 240px, leaving a gap between deadline and view controls
+with the desktop sidebar visible. Search, filtering and view changes retain
+their existing behavior; no business data, environment or API/BFF changes.
+
 ## Deadline presentation
 
 Project cards, the table, task editors and project details share the same date
