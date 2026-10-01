@@ -1,5 +1,16 @@
 # Projects_Web_Service — Documentation technique
 
+## Pied de page partagé — MAIR-180
+
+Le paquet est épinglé à `@mairie360/lib-components@0.6.5`, publié par
+[lib-components #388](https://github.com/mairie360/lib-components/pull/388).
+L’AppShell affiche désormais le copyright dans la sidebar sombre, hors de la
+navigation défilante. Le tiroir mobile conserve sa gestion du focus. Aucun bandeau
+de pied de page ne réduit la zone de contenu ; seules les informations fournies
+par le service sont affichées (pas de version fictive).
+Les contrats, les API/BFF et les approbations de déploiement sont inchangés.
+Le suivi de l’adoption reste dans [l’issue partagée #387](https://github.com/mairie360/lib-components/issues/387).
+
 ## Structure applicative partagée — MAIR-180
 
 La page Projects utilise l’`AppShell` partagé pour la navigation ordinateur et
