@@ -165,6 +165,7 @@ export function MultiSelectField({
 }) {
   const [open, setOpen] = React.useState(false);
   const fieldRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const selectedOptions = options.filter((option) => values.includes(option.value));
 
   React.useEffect(() => {
@@ -175,16 +176,10 @@ export function MultiSelectField({
         setOpen(false);
       }
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-
     document.addEventListener('mousedown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
 
     return () => {
       document.removeEventListener('mousedown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
     };
   }, [open]);
 
@@ -202,10 +197,18 @@ export function MultiSelectField({
   };
 
   return (
-    <div ref={fieldRef}>
+    <div ref={fieldRef} onKeyDown={(event) => {
+      if (open && event.key === 'Escape' && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }}>
       <FieldLabel htmlFor={id} label={label} />
       <div className="relative">
         <button
+          ref={triggerRef}
           id={id}
           type="button"
           className="mt-2 flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 py-2 text-left text-sm text-[#24292f] shadow-sm transition hover:bg-white focus-visible:border-[#0969da] focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/20"
@@ -291,4 +294,3 @@ export function TaskEditButton({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
-

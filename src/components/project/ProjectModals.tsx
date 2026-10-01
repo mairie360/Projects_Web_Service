@@ -75,16 +75,69 @@ export function CreateProjectModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const isEditMode = mode === 'edit';
+  const overlayRef = React.useRef<HTMLDivElement>(null);
+  const dialogRef = React.useRef<HTMLFormElement>(null);
+  const titleId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
+  React.useLayoutEffect(() => {
+    if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overlay = overlayRef.current;
+    dialogRef.current?.focus();
+    return () => {
+      if (opener?.isConnected && (overlay?.contains(document.activeElement) || document.activeElement === document.body)) {
+        opener.focus();
+      }
+    };
+  }, []);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return element.tabIndex >= 0 && !element.closest('[hidden], [aria-hidden="true"]') &&
+        style.display !== 'none' && style.visibility !== 'hidden';
+    });
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first) {
+      event.preventDefault();
+      dialog.focus();
+    } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+    <div ref={overlayRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
       <form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onKeyDown={handleDialogKeyDown}
         className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
         onSubmit={onSubmit}
       >
         <div className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#2b2b2b] px-5 py-3">
-          <h2 className="truncate text-base font-semibold text-white">
+          <h2 id={titleId} className="truncate text-base font-semibold text-white">
             {isEditMode ? 'Modifier le projet' : 'Nouveau projet'}
           </h2>
           <button
