@@ -23,6 +23,7 @@ export function ProjectActionsMenu({
   const hasActions = canEdit || canDuplicate || canDelete;
   const [open, setOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -47,6 +48,7 @@ export function ProjectActionsMenu({
 
   const runAction = (action?: (project: Project) => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    triggerRef.current?.focus();
     setOpen(false);
     action?.(project);
   };
@@ -62,6 +64,7 @@ export function ProjectActionsMenu({
     >
       <ToolTip text="Actions">
         <button
+          ref={triggerRef}
           type="button"
           className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
           aria-label={`Actions pour ${project.title}`}

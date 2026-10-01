@@ -79,6 +79,17 @@ Le champ et le bouton Envoyer sont empilés sur téléphone, puis partagent une
 ligne au petit breakpoint. Envoi, texte enregistré et permissions `canComment`
 restent inchangés. Aucun changement API/BFF, dépendance ou environnement.
 
+## Formulaires de projet accessibles au clavier
+
+Nouveau projet et Modifier dans le menu de carte ouvrent des dialogues nommés.
+Le focus entre dans le formulaire, Tab/Maj+Tab restent dans ses contrôles et
+Échap ou Fermer annulent sans enregistrer puis rendent le focus au déclencheur
+encore présent (bouton Actions de la carte après Modifier). Échap ferme d’abord
+un sélecteur multiple d’assignés/étiquettes
+ouvert et rend le focus à son bouton, sans perdre les choix. Création, édition,
+permissions et requêtes publiées restent inchangées ; aucun changement API/BFF,
+de dépendance ou d’environnement n’est nécessaire.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

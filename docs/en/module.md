@@ -74,6 +74,16 @@ and Send button stack on phones and share a row from the small breakpoint.
 Submission, stored text and existing `canComment` permissions are unchanged.
 No API/BFF, dependency or environment change is required.
 
+## Keyboard-accessible project forms
+
+New project and card-menu Edit open named modal dialogs. Focus enters the form,
+Tab/Shift+Tab stay inside its controls, and Escape or Close dismiss without
+saving and restore the still-present opener (the card Actions button after Edit).
+Escape first dismisses an open
+assignee/label multi-select and returns focus to its trigger, preserving choices.
+Creation, editing, permissions and existing published requests are unchanged;
+no API/BFF, dependency or environment changes are required.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).
