@@ -60,6 +60,15 @@ une ligne compacte. Suivi, Modifier, confirmation de suppression et permissions
 de statut sont inchangés. Ce changement de présentation n’écrit aucune donnée
 et ne nécessite aucune évolution d’environnement, dépendance ou API/BFF.
 
+## Suivi des tâches responsive
+
+Le panneau Suivi utilise une colonne bornée sur téléphone et deux colonnes sur
+grand écran. Auteurs, dates, messages complets et historique reviennent à la
+ligne, même sans espaces ; les retours de ligne des commentaires sont conservés.
+Le champ et le bouton Envoyer sont empilés sur téléphone, puis partagent une
+ligne au petit breakpoint. Envoi, texte enregistré et permissions `canComment`
+restent inchangés. Aucun changement API/BFF, dépendance ou environnement.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).
