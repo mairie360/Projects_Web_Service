@@ -301,8 +301,8 @@ export function ProjectTasksEditor({
                   />
                 </button>
                 <div className="min-w-0">
-                  <div className="flex min-w-0 items-start justify-between gap-3">
-                    <h3 className="min-w-0 text-sm font-semibold leading-snug text-[#24292f]">{task.title}</h3>
+                  <div className="flex min-w-0 flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
+                    <h3 className="w-full min-w-0 text-sm font-semibold leading-snug text-[#24292f] [overflow-wrap:anywhere] sm:flex-1">{task.title}</h3>
                     <TaskEditButton onClick={() => editTask(task)} />
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">

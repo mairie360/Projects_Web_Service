@@ -47,6 +47,15 @@ time-zone conversion. Formatting never replaces or saves a business date and
 does not change the existing task search, filters, permissions or status actions.
 There are no new environment variables, dependencies or API/BFF requirements.
 
+## Responsive task headings
+
+Task titles in project details and the project task editor use the available
+width on phones; their permitted actions sit on a separate row. Long names,
+including unbroken words, wrap rather than overlap controls. From the small
+desktop breakpoint, titles and actions share a compact row. Follow, Edit,
+delete confirmation and status permissions are unchanged. This presentation
+change neither writes data nor requires environment, dependency or API/BFF changes.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).

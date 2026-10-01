@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -33,6 +33,22 @@ function Editor({ responsible = '' }) {
 }
 
 describe('ProjectTasksEditor task assignees', () => {
+  it('stacks a long task heading above its mobile edit action and preserves the full title on edit', async () => {
+    const user = userEvent.setup();
+    const title = 'ValiderLePlanDesNouveauxEspaces'.repeat(3);
+    render(<Editor responsible="3" />);
+    await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), title);
+    await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
+
+    const heading = screen.getByRole('heading', { name: title });
+    expect(heading.className).toContain('[overflow-wrap:anywhere]');
+    expect(heading.parentElement.className).toContain('flex-col');
+    expect(heading.parentElement.className).toContain('sm:flex-row');
+    await user.click(within(heading.closest('article')).getByRole('button', { name: 'Modifier' }));
+    expect(screen.getByPlaceholderText('Ajouter une tâche...').value).toBe(title);
+    expect(JSON.parse(screen.getByTestId('tasks').textContent)[0].title).toBe(title);
+  });
+
   it('refuses to create a task without an explicit assignee or project responsible', async () => {
     const user = userEvent.setup();
     render(<Editor />);

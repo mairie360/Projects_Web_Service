@@ -50,6 +50,16 @@ n’enregistre aucune date métier et ne change pas la recherche, les filtres,
 les permissions ou les actions de statut des tâches. Aucune nouvelle variable,
 dépendance ou évolution API/BFF n’est nécessaire.
 
+## Titres de tâches adaptatifs
+
+Les titres de tâches dans la fiche projet et l’éditeur de tâches utilisent la
+largeur disponible sur téléphone ; les actions autorisées sont sur une ligne
+distincte. Les noms longs, même sans espaces, se replient sans chevaucher les
+contrôles. À partir du petit breakpoint desktop, titres et actions partagent
+une ligne compacte. Suivi, Modifier, confirmation de suppression et permissions
+de statut sont inchangés. Ce changement de présentation n’écrit aucune donnée
+et ne nécessite aucune évolution d’environnement, dépendance ou API/BFF.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

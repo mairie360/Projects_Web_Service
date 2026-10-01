@@ -567,6 +567,37 @@ test('the task composer of a card refuses an empty title, then posts the task an
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/, 'the composer closes');
 });
 
+test('task headings stack above mobile actions without changing permission-gated controls or data', async () => {
+  const title = 'ValiderLePlanDesNouveauxEspaces'.repeat(3);
+  const editable = fixtures.projectTask({ title });
+  const restricted = fixtures.projectTask({
+    id: 'task-2', title: 'Tâche en lecture seule',
+    permissions: { ...editable.permissions, canEdit: false, canDelete: false, canUpdateStatus: false },
+  });
+  const project = fixtures.projectListItem();
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project, [editable, restricted]) });
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+
+  const articles = view.html.match(/<article\b[^>]*>[\s\S]*?<\/article>/g);
+  const taskHtml = articles.find(html => html.includes(`>${title}</h3>`));
+  const restrictedHtml = articles.find(html => html.includes('>Tâche en lecture seule</h3>'));
+  assert.ok(taskHtml && restrictedHtml);
+  for (const html of [taskHtml, restrictedHtml]) {
+    assert.match(html, /class="[^"]*flex-col[^"]*sm:flex-row[^"]*"/);
+    assert.match(html, /<h3[^>]*class="[^"]*\[overflow-wrap:anywhere\][^"]*sm:flex-1[^"]*"/);
+    assert.match(html, />Suivi<|Suivi<\/button>/);
+  }
+  assert.match(taskHtml, />Modifier<|Modifier<\/button>/);
+  assert.match(taskHtml, new RegExp(`aria-label="Supprimer ${title}"`));
+  assert.match(taskHtml, new RegExp(`aria-label="Statut de ${title}"`));
+  assert.doesNotMatch(restrictedHtml, />Modifier<|Supprimer Tâche en lecture seule|aria-label="Statut de Tâche en lecture seule"/);
+  assert.match(restrictedHtml, /aria-label="Marquer Tâche en lecture seule comme terminée"[^>]*disabled=""|disabled=""[^>]*aria-label="Marquer Tâche en lecture seule comme terminée"/);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0,
+    'rendering the responsive headings never writes business data');
+});
+
 test('the detail modal drives the tasks: status change, deletion with confirmation, collaboration and comments', async () => {
   await renderLoadedPage();
   await openDetails();

@@ -709,9 +709,9 @@ export function ProjectDetailModal({
                             />
                           </button>
                           <div className="min-w-0">
-                            <div className="flex min-w-0 items-start justify-between gap-3">
-                              <h3 className="min-w-0 text-sm font-semibold leading-snug text-[#24292f]">{task.title}</h3>
-                              <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex min-w-0 flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
+                              <h3 className="w-full min-w-0 text-sm font-semibold leading-snug text-[#24292f] [overflow-wrap:anywhere] sm:flex-1">{task.title}</h3>
+                              <div className="flex max-w-full flex-wrap items-center gap-1 sm:shrink-0">
                                 <button
                                   type="button"
                                   className="inline-flex h-7 items-center gap-1 rounded-md border border-[#d0d7de] bg-white px-2 text-[11px] font-semibold text-[#57606a] hover:bg-[#f6f8fa]"
