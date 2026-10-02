@@ -51,6 +51,8 @@ describe("Projects page", () => {
     expect(controls.classList.contains("md:flex-row")).toBe(false);
     expect(toolbar.classList.contains("items-start")).toBe(true);
     expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
+    expect(toolbar.classList.contains("2xl:flex-wrap")).toBe(true);
+    expect(controls.classList.contains("2xl:basis-[50rem]")).toBe(true);
     expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
     expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
     expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
