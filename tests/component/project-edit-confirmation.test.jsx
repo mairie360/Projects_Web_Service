@@ -60,6 +60,7 @@ describe("Inline project edit confirmation", () => {
     expect(form.getByRole("alert").textContent).toBe("Projet refusé");
     await user.click(form.getByRole("button", { name: "Enregistrer", exact: true }));
     expect(screen.queryByRole("form", { name: "Modifier le projet" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("dialog"));
     expect(values.onUpdateProject).toHaveBeenCalledTimes(2);
     expect(values.onUpdateProject.mock.calls[1][1]).toEqual(draft);
   });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectDetailModal } from "@/components/project/ProjectModals";
@@ -80,7 +80,8 @@ describe("Project linked task scrolling", () => {
     const close = screen.getByRole("button", { name: "Fermer la fiche projet" });
     await user.click(form.getByRole("button", { name: "Annuler", exact: true }));
     expect(screen.queryByRole("form", { name: "Modifier le projet" })).toBeNull();
-    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(document.activeElement).toBe(dialog);
+    await user.keyboard("{Escape}");
     expect(props.onClose).toHaveBeenCalledOnce();
     expect(close.disabled).toBe(false);
     expect(dialog.scrollTop).toBe(0);

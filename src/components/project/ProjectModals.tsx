@@ -524,6 +524,8 @@ export function ProjectDetailModal({
 
   const cancelProjectEdit = () => {
     if (projectSavingRef.current || taskSavingRef.current) return;
+    // Keep keyboard navigation in the detail before its focused form disappears.
+    dialogRef.current?.focus({ preventScroll: true });
     setProjectEditForm(projectToFormState(project));
     setProjectEditError('');
     editingProjectRef.current = false;
@@ -560,6 +562,7 @@ export function ProjectDetailModal({
     setProjectEditError('');
     try {
       await onUpdateProject(project.id, projectEditForm);
+      dialogRef.current?.focus({ preventScroll: true });
       editingProjectRef.current = false;
       setEditingProject(false);
     } catch (error) {
