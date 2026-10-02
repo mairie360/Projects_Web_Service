@@ -102,6 +102,15 @@ haut de la fiche. Les cibles absentes ou invalides gardent l’erreur explicite
 existante sans fausse fiche. Correction uniquement frontend ; la recette déployée
 Dashboard/multi-rôles reste distincte.
 
+## Défilement des formulaires de fiche
+
+Le panneau extérieur de la fiche projet masque son débordement sans devenir un
+conteneur défilant. Seul son corps défile lorsqu’un champ reçoit le focus, y
+compris pendant l’édition et la navigation Tab/Maj+Tab. Titre et Fermer restent
+visibles sur ordinateur et mobile ; le focus des tâches liées, les sélecteurs
+multiples, l’annulation et le retour du focus gardent leur comportement existant.
+Aucun changement API/BFF, dépendance, donnée métier ou environnement.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

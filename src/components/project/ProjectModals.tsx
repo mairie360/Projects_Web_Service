@@ -524,6 +524,8 @@ export function ProjectDetailModal({
 
   const cancelProjectEdit = () => {
     if (projectSavingRef.current || taskSavingRef.current) return;
+    // Keep keyboard navigation in the detail before its focused form disappears.
+    dialogRef.current?.focus({ preventScroll: true });
     setProjectEditForm(projectToFormState(project));
     setProjectEditError('');
     editingProjectRef.current = false;
@@ -560,6 +562,7 @@ export function ProjectDetailModal({
     setProjectEditError('');
     try {
       await onUpdateProject(project.id, projectEditForm);
+      dialogRef.current?.focus({ preventScroll: true });
       editingProjectRef.current = false;
       setEditingProject(false);
     } catch (error) {
@@ -631,7 +634,8 @@ export function ProjectDetailModal({
     <div ref={overlayRef} className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
       <button type="button" aria-hidden="true" tabIndex={-1} disabled={mutationPending} className="absolute inset-0" onClick={closeDetail} />
 
-      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
+      {/* Clip rather than hide overflow: native field focus must scroll only the body, never this header-bearing container. */}
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-clip border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
           <div className="min-w-0">
             <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
