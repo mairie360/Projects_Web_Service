@@ -54,6 +54,7 @@ type RefreshProjectsOptions = {
   dueBefore?: string;
   view?: ViewMode;
   silent?: boolean;
+  throwOnError?: boolean;
 };
 
 function isAbortError(error: unknown) {
@@ -186,6 +187,7 @@ export default function ProjectsPage() {
         if (isAbortError(error)) return;
 
         setPageError(getBffProjectErrorMessage(error));
+        if (options.throwOnError) throw error;
       } finally {
         if (!options.signal?.aborted) {
           setPageLoading(false);
@@ -301,17 +303,25 @@ export default function ProjectsPage() {
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
     if (!validateProjectForm(form)) {
-      setAlert({ type: 'error', message: 'Les champs obligatoires doivent être renseignés.' });
-      return;
+      const error = new Error('Les champs obligatoires doivent être renseignés.');
+      showError(error);
+      throw error;
     }
 
+    let details: ProjectDetailsResponse;
     try {
-      const details = await updateProject(projectId, updateProjectBodyFromForm(form));
-      setSelectedProjectDetails(details);
-      await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+      details = await updateProject(projectId, updateProjectBodyFromForm(form));
     } catch (error) {
       showError(error);
+      throw error;
+    }
+    setSelectedProjectDetails(details);
+    try {
+      await refreshProjectsPage({ silent: true, throwOnError: true });
+      setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+    } catch (error) {
+      // The mutation is confirmed: a failed refresh must not invite a second PATCH.
+      setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
     }
   };
 

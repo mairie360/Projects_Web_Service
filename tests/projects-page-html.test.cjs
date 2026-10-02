@@ -730,6 +730,44 @@ test('read-only task follow-up keeps comments and history without exposing a com
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 0);
 });
 
+test('inline project edits preserve the visible draft on refused PATCH and retry the same body', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  await view.fire((props) => props.id === 'detail-project-title', 'onChange', { target: { value: 'Projet à conserver' } });
+  await view.fire((props) => props.id === 'detail-project-description', 'onChange', { target: { value: 'Description conservée' } });
+  bffProject.on('patch', '/projects/{projectId}', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Projet temporairement refusé')));
+  const submit = () => view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier le projet', 'onSubmit');
+  await submit();
+  assert.match(view.html, /id="detail-project-title"[^>]*value="Projet à conserver"/);
+  assert.match(view.html, /role="alert"[^>]*>Projet temporairement refusé/);
+  assert.match(view.text(), /Description conservée/);
+  assert.equal(bffProject.calls('/projects-page', 'get').length, 1, 'no refresh for an unconfirmed PATCH');
+  bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ title: body.title, description: body.description })) }));
+  await submit();
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 2);
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[1].body, bffProject.calls('/projects/{projectId}', 'patch')[0].body);
+  assert.doesNotMatch(view.html, /id="detail-project-title"|Projet temporairement refusé/);
+  assert.match(view.text(), /Projet à conserver/);
+});
+
+test('a confirmed inline project edit closes even when the later page refresh fails, without another PATCH', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  await view.fire((props) => props.id === 'detail-project-title', 'onChange', { target: { value: 'Projet confirmé' } });
+  bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem({ title: 'Projet confirmé' })) });
+  bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Liste indisponible')));
+  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier le projet', 'onSubmit');
+  assert.match(alertText(), /Projet "Projet confirmé" enregistré\. Actualisation impossible : Liste indisponible/);
+  assert.doesNotMatch(view.html, /id="detail-project-title"/);
+  assert.match(view.text(), /Projet confirmé/);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1);
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  assert.match(view.html, /id="detail-project-title"[^>]*value="Projet confirmé"/);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1);
+});
+
 test('the detail modal edits the project inline, adds a task from its form and closes the project', async () => {
   await renderLoadedPage();
   await openDetails();
