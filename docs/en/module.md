@@ -86,6 +86,15 @@ assignee/label multi-select and returns focus to its trigger, preserving choices
 Creation, editing, permissions and existing published requests are unchanged;
 no API/BFF, dependency or environment changes are required.
 
+## Linked task visibility
+
+A project/task URL highlights and focuses the selected authorized task. Only
+the detail body scrolls to the task; the header and Close control stay in place
+on desktop and mobile. Later task arrival is handled without pulling the reader
+back on an unrelated refresh. Ordinary project navigation still starts at the top.
+Invalid or missing targets keep the existing explicit error without a fake detail.
+This is a frontend-only change; deployed Dashboard/role acceptance remains separate.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).
