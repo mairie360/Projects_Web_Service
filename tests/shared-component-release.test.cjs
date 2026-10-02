@@ -11,10 +11,10 @@ test('the AppShell consumer pins the published shared component', () => {
   const lock = JSON.parse(read('package-lock.json'));
   const dependency = 'node_modules/@mairie360/lib-components';
 
-  assert.equal(manifest.dependencies['@mairie360/lib-components'], '0.6.5');
-  assert.equal(lock.packages[''].dependencies['@mairie360/lib-components'], '0.6.5');
-  assert.equal(lock.packages[dependency].version, '0.6.5');
-  assert.match(lock.packages[dependency].resolved, /^https:\/\/npm\.pkg\.github\.com\/download\/@mairie360\/lib-components\/0\.6\.5\//);
+  assert.equal(manifest.dependencies['@mairie360/lib-components'], '0.6.8');
+  assert.equal(lock.packages[''].dependencies['@mairie360/lib-components'], '0.6.8');
+  assert.equal(lock.packages[dependency].version, '0.6.8');
+  assert.match(lock.packages[dependency].resolved, /^https:\/\/npm\.pkg\.github\.com\/download\/@mairie360\/lib-components\/0\.6\.8\//);
   assert.match(lock.packages[dependency].integrity, /^sha512-/);
 });
 
