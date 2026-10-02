@@ -567,6 +567,52 @@ test('the task composer of a card refuses an empty title, then posts the task an
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/, 'the composer closes');
 });
 
+for (const mode of ['create', 'edit']) {
+  test(`a refused detail task ${mode} preserves the draft through real page callbacks and existing routes`, async () => {
+    await renderLoadedPage();
+    await openDetails();
+    if (mode === 'edit') {
+      await view.click((props, text, tag) => tag === 'button' && text === 'Modifier' && props.className.includes('border-[#0969da]'));
+    }
+    const method = mode === 'edit' ? 'patch' : 'post';
+    const route = mode === 'edit' ? '/projects/{projectId}/tasks/{taskId}' : '/projects/{projectId}/tasks';
+    bffProject.on(method, route, harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Sauvegarde temporairement refusée')));
+    await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Saisie à conserver' } });
+    await view.fire((props) => props.id === 'detail-task-status', 'onChange', { target: { value: 'review' } });
+    await view.fire((props) => props.id === 'detail-task-priority', 'onChange', { target: { value: 'low' } });
+    await view.fire((props) => props.id === 'detail-task-due-date', 'onChange', { target: { value: '2026-11-17' } });
+    await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
+    assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value="Saisie à conserver"/);
+    const dialog = view.html.match(/<section[^>]*role="dialog"[^]*?<\/main>/)?.[0];
+    assert.match(dialog, /role="alert"[^>]*>Sauvegarde temporairement refusée/);
+    assert.match(view.text(), mode === 'edit' ? /Enregistrer la tâche/ : /Ajouter la tâche/);
+    assert.equal(bffProject.calls(route, method).length, 1);
+    assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1, 'no refresh before confirmation');
+    bffProject.on(method, route, ({ body }) => ({ status: mode === 'edit' ? 200 : 201, body: fixtures.projectTask({ ...body, id: mode === 'edit' ? 'task-1' : 'task-3' }) }));
+    await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
+    assert.equal(bffProject.calls(route, method).length, 2);
+    assert.deepEqual(bffProject.calls(route, method)[1].body, bffProject.calls(route, method)[0].body);
+    assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
+    assert.doesNotMatch(view.text(), /Sauvegarde temporairement refusée/);
+  });
+}
+
+test('a confirmed inline task creation is not offered for retry when the following detail refresh fails', async () => {
+  await renderLoadedPage();
+  bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-confirmed', title: 'Tâche enregistrée' }) });
+  bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée')));
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
+  await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Tâche enregistrée' } });
+  await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
+  await view.waitFor(() => alertText()?.includes('Actualisation impossible'));
+  assert.match(view.text(), /Tâche "Tâche enregistrée" enregistrée\. Actualisation impossible : Actualisation refusée/);
+  assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
+  assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
+});
+
 test('task headings stack above mobile actions without changing permission-gated controls or data', async () => {
   const title = 'ValiderLePlanDesNouveauxEspaces'.repeat(3);
   const editable = fixtures.projectTask({ title });

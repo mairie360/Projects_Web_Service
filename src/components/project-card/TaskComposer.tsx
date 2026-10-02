@@ -5,6 +5,7 @@ import { CheckCircle2, CircleDot, Plus, Tag } from 'lucide-react';
 
 import type { Project, ProjectTaskDraft } from '../../types/project';
 import { createPersonFromOptionValue, getPersonValue } from '../../lib/projectPageState';
+import { getBffProjectErrorMessage } from '../../lib/bffProjectClient';
 import type { SelectOption } from './types';
 
 const compactFieldClassName =
@@ -115,7 +116,7 @@ export function TaskComposer({
   project: Project;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
-  onAddTask?: (project: Project, task: ProjectTaskDraft) => void;
+  onAddTask?: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
 }) {
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState('');
@@ -125,6 +126,8 @@ export function TaskComposer({
   const [labels, setLabels] = React.useState<string[]>([]);
   const [dueDate, setDueDate] = React.useState(project.dueDate);
   const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const savingRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!open) {
@@ -138,13 +141,6 @@ export function TaskComposer({
     }
   }, [open, project.dueDate, project.priority, project.responsible, project.status]);
 
-  React.useEffect(() => {
-    setStatus(project.status);
-    setPriority(project.priority);
-    setAssignees([getPersonValue(project.responsible)]);
-    setDueDate(project.dueDate);
-  }, [project.dueDate, project.priority, project.responsible, project.status]);
-
   if (!onAddTask || project.permissions?.canCreateTask === false) return null;
 
   const availableMembers =
@@ -154,7 +150,8 @@ export function TaskComposer({
   const availableLabels =
     labelOptions.length > 0 ? labelOptions : project.labels.map((label) => ({ label, value: label }));
 
-  const submitTask = () => {
+  const submitTask = async () => {
+    if (savingRef.current) return;
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setError('Le titre de la tâche est obligatoire.');
@@ -166,19 +163,26 @@ export function TaskComposer({
     );
     const selectedAssignees = assigneeValues.map((value) => createPersonFromOptionValue(value, availableMembers));
 
-    onAddTask(project, {
-      title: trimmedTitle,
-      status,
-      responsible: selectedAssignees[0] ?? project.responsible,
-      assignees: selectedAssignees,
-      priority,
-      labels,
-      dueDate,
-    });
-    setTitle('');
-    setLabels([]);
+    savingRef.current = true;
+    setSaving(true);
     setError('');
-    setOpen(false);
+    try {
+      await onAddTask(project, {
+        title: trimmedTitle,
+        status,
+        responsible: selectedAssignees[0] ?? project.responsible,
+        assignees: selectedAssignees,
+        priority,
+        labels,
+        dueDate,
+      });
+      setOpen(false);
+    } catch (error) {
+      setError(getBffProjectErrorMessage(error));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   if (!open) {
@@ -200,18 +204,22 @@ export function TaskComposer({
   return (
     <form
       className="mt-3 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-2.5 shadow-sm"
+      aria-label="Créer une tâche"
+      aria-busy={saving}
       onClick={(event) => event.stopPropagation()}
       onSubmit={(event) => {
         event.preventDefault();
-        submitTask();
+        void submitTask();
       }}
     >
+      <fieldset disabled={saving} className="min-w-0 border-0 p-0">
       <div className="flex items-center gap-2">
         <CircleDot className="h-4 w-4 shrink-0 text-[#1a7f37]" strokeWidth={2} />
         <input
           value={title}
           autoFocus
           placeholder="Ajouter une tâche..."
+          aria-label="Titre de la tâche"
           className="h-8 min-w-0 flex-1 rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
           onChange={(event) => {
             setTitle(event.target.value);
@@ -220,22 +228,24 @@ export function TaskComposer({
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();
-              setOpen(false);
+              if (!savingRef.current) setOpen(false);
             }
           }}
         />
       </div>
 
-      {error && <p className="mt-2 text-xs font-medium text-[#cf222e]">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs font-medium text-[#cf222e]">{error}</p>}
+      {saving && <p role="status" className="mt-2 text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <select value={status} className={compactFieldClassName} onChange={(event) => setStatus(event.target.value as Project['status'])}>
+        <select aria-label="Statut" value={status} className={compactFieldClassName} onChange={(event) => setStatus(event.target.value as Project['status'])}>
           <option value="todo">À faire</option>
           <option value="in-progress">En cours</option>
           <option value="review">En révision</option>
           <option value="done">Terminé</option>
         </select>
         <select
+          aria-label="Priorité"
           value={priority}
           className={compactFieldClassName}
           onChange={(event) => setPriority(event.target.value as Project['priority'])}
@@ -244,7 +254,7 @@ export function TaskComposer({
           <option value="medium">Moyenne</option>
           <option value="low">Basse</option>
         </select>
-        <input type="date" value={dueDate} className={compactFieldClassName} onChange={(event) => setDueDate(event.target.value)} />
+        <input aria-label="Échéance" type="date" value={dueDate} className={compactFieldClassName} onChange={(event) => setDueDate(event.target.value)} />
       </div>
 
       <div className="mt-2">
@@ -270,6 +280,7 @@ export function TaskComposer({
           Ajouter
         </button>
       </div>
+      </fieldset>
     </form>
   );
 }

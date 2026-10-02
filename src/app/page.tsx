@@ -406,11 +406,17 @@ export default function ProjectsPage() {
 
     try {
       await createProjectTask(project.id, taskBodyFromDraft(taskDraft));
+    } catch (error) {
+      showError(error);
+      throw error;
+    }
+    // The write is confirmed. A failed refresh must not offer the same POST again.
+    try {
       await refreshProjectDetails(project.id);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
     } catch (error) {
-      showError(error);
+      showInfo(`Tâche "${title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
     }
   };
 
@@ -420,11 +426,16 @@ export default function ProjectsPage() {
 
     try {
       await updateBffProjectTask(projectId, taskId, taskBodyFromDraft(taskDraft));
+    } catch (error) {
+      showError(error);
+      throw error;
+    }
+    try {
       await refreshProjectDetails(projectId);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Tâche "${title}" modifiée.` });
     } catch (error) {
-      showError(error);
+      showInfo(`Tâche "${title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
     }
   };
 

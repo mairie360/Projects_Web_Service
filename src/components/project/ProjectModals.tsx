@@ -321,8 +321,8 @@ export function ProjectDetailModal({
   priorityOptions: FilterOption[];
   onClose: () => void;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void;
-  onAddTask: (project: Project, task: ProjectTaskDraft) => void;
-  onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void;
+  onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
+  onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
   onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
@@ -333,6 +333,9 @@ export function ProjectDetailModal({
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
+  const [taskSaving, setTaskSaving] = React.useState(false);
+  const taskSavingRef = React.useRef(false);
+  const taskProjectIdRef = React.useRef(project.id);
   const [taskSearch, setTaskSearch] = React.useState('');
   const [taskStatusFilter, setTaskStatusFilter] = React.useState('all');
   const [taskPriorityFilter, setTaskPriorityFilter] = React.useState('all');
@@ -370,7 +373,7 @@ export function ProjectDetailModal({
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      if (!taskSavingRef.current) onClose();
       return;
     }
     if (event.key !== 'Tab') return;
@@ -419,9 +422,13 @@ export function ProjectDetailModal({
     setProjectEditForm(projectToFormState(project));
     setProjectEditError('');
     setEditingProject(false);
-    setTaskForm(createTaskFormState(project));
-    setEditingTaskId(null);
-    setTaskFormError('');
+    // A same-project refresh must not discard an unsaved task or its retry.
+    if (taskProjectIdRef.current !== project.id) {
+      taskProjectIdRef.current = project.id;
+      setTaskForm(createTaskFormState(project));
+      setEditingTaskId(null);
+      setTaskFormError('');
+    }
     setTaskSearch('');
     setTaskStatusFilter('all');
     setTaskPriorityFilter('all');
@@ -517,8 +524,9 @@ export function ProjectDetailModal({
     setEditingProject(false);
   };
 
-  const submitTask = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (taskSavingRef.current) return;
 
     const title = taskForm.title.trim();
     if (!title) {
@@ -540,23 +548,34 @@ export function ProjectDetailModal({
       dueDate: taskForm.dueDate,
     };
 
-    if (editingTaskId) {
-      onUpdateTask(project.id, editingTaskId, taskDraft);
-    } else {
-      onAddTask(project, taskDraft);
-    }
-    setTaskForm(createTaskFormState(project));
-    setEditingTaskId(null);
+    taskSavingRef.current = true;
+    setTaskSaving(true);
     setTaskFormError('');
+    try {
+      if (editingTaskId) {
+        await onUpdateTask(project.id, editingTaskId, taskDraft);
+      } else {
+        await onAddTask(project, taskDraft);
+      }
+      setTaskForm(createTaskFormState(project));
+      setEditingTaskId(null);
+    } catch (error) {
+      setTaskFormError(getBffProjectErrorMessage(error));
+    } finally {
+      taskSavingRef.current = false;
+      setTaskSaving(false);
+    }
   };
 
   const editTask = (task: ProjectTask) => {
+    if (taskSavingRef.current) return;
     setTaskForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setTaskFormError('');
   };
 
   const cancelTaskEdit = () => {
+    if (taskSavingRef.current) return;
     setTaskForm(createTaskFormState(project));
     setEditingTaskId(null);
     setTaskFormError('');
@@ -564,7 +583,7 @@ export function ProjectDetailModal({
 
   return (
     <div ref={overlayRef} className="fixed inset-0 z-[75] flex items-stretch justify-end bg-black/45 p-0 sm:p-4">
-      <button type="button" aria-hidden="true" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
+      <button type="button" aria-hidden="true" tabIndex={-1} disabled={taskSaving} className="absolute inset-0" onClick={onClose} />
 
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
@@ -575,6 +594,7 @@ export function ProjectDetailModal({
           <div className="flex shrink-0 items-center gap-2">
             {project.permissions?.canEdit !== false && <button
               type="button"
+              disabled={taskSaving}
               className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
               onClick={() => setEditingProject((current) => !current)}
             >
@@ -584,6 +604,7 @@ export function ProjectDetailModal({
               <button
                 type="button"
                 aria-label="Fermer la fiche projet"
+                disabled={taskSaving}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                 onClick={onClose}
               >
@@ -603,15 +624,18 @@ export function ProjectDetailModal({
                     {editingTaskId ? 'Modifier la tâche' : 'Ajouter une tâche'}
                   </div>
 
-                  <form className="space-y-3" onSubmit={submitTask}>
+                  <form className="space-y-3" aria-label={editingTaskId ? 'Modifier une tâche' : 'Créer une tâche'} aria-busy={taskSaving} onSubmit={submitTask}>
+                  <fieldset disabled={taskSaving} className="min-w-0 space-y-3 border-0 p-0">
                   <input
                     value={taskForm.title}
                     placeholder="Ajouter une tâche..."
+                    aria-label="Titre de la tâche"
                     className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
                     onChange={(event) => updateTaskForm({ title: event.target.value })}
                   />
 
-                  {taskFormError && <p className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+                  {taskFormError && <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+                  {taskSaving && <p role="status" className="text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <SelectField
@@ -674,6 +698,7 @@ export function ProjectDetailModal({
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
                   </div>
+                  </fieldset>
                   </form>
                 </div>
               )}
@@ -754,7 +779,7 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={!canUpdateStatus}
+                            disabled={taskSaving || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
@@ -782,11 +807,12 @@ export function ProjectDetailModal({
                                   <MessageSquare className="h-3.5 w-3.5" />
                                   Suivi
                                 </button>
-                                {canEditTask && <TaskEditButton onClick={() => editTask(task)} />}
+                                {canEditTask && <TaskEditButton disabled={taskSaving} onClick={() => editTask(task)} />}
                                 {canDeleteTask && deletingTaskId !== task.id && (
                                   <button
                                     type="button"
                                     aria-label={`Supprimer ${task.title}`}
+                                    disabled={taskSaving}
                                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
                                     onClick={() => setDeletingTaskId(task.id)}
                                   >
@@ -801,6 +827,7 @@ export function ProjectDetailModal({
                                   <span className="sr-only">Statut de {task.title}</span>
                                   <select
                                     aria-label={`Statut de ${task.title}`}
+                                    disabled={taskSaving}
                                     value={task.status}
                                     className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
                                     onChange={(event) =>
