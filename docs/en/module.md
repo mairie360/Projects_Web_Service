@@ -95,6 +95,15 @@ back on an unrelated refresh. Ordinary project navigation still starts at the to
 Invalid or missing targets keep the existing explicit error without a fake detail.
 This is a frontend-only change; deployed Dashboard/role acceptance remains separate.
 
+## Detail form scrolling
+
+The project detail's outer panel clips overflow without becoming a scroll
+container. Only its body scrolls when a field receives focus, including during
+editing and Tab/Shift+Tab navigation. The title and Close action stay visible
+on desktop and mobile; linked-task focus, multi-selects, cancellation and focus
+restoration retain their existing behavior. No API/BFF, dependency, business
+data or environment change is required.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).

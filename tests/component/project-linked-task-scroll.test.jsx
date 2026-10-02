@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectDetailModal } from "@/components/project/ProjectModals";
 import fixtures from "../support/bff-fixtures.cjs";
@@ -51,6 +52,41 @@ function modalProps() {
 }
 
 describe("Project linked task scrolling", () => {
+  it.each([null, "task-1"])("prevents outer focus scrolling while preserving edit and keyboard navigation (linked task %s)", async (highlightTaskId) => {
+    const user = userEvent.setup();
+    const props = modalProps();
+    render(<ProjectDetailModal {...props} highlightTaskId={highlightTaskId} />);
+    const dialog = screen.getByRole("dialog");
+    const content = dialog.querySelector(".overflow-y-auto");
+    // overflow:hidden still permits native focus to scroll the outer dialog.
+    // jsdom cannot reproduce that layout; pin the containment strategy here
+    // and verify real desktop/mobile header geometry separately.
+    expect(dialog.classList.contains("overflow-clip")).toBe(true);
+    expect(dialog.classList.contains("overflow-hidden")).toBe(false);
+    expect(content.classList.contains("min-h-0")).toBe(true);
+    expect(dialog.querySelector("header").classList.contains("shrink-0")).toBe(true);
+
+    await user.click(within(dialog.querySelector("header")).getByRole("button", { name: "Modifier", exact: true }));
+    const form = within(screen.getByRole("form", { name: "Modifier le projet" }));
+    for (const name of [/^Titre/, /^Description/, /^Échéance/]) {
+      const field = form.getByLabelText(name);
+      await user.click(field);
+      expect(document.activeElement).toBe(field);
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      await user.tab({ shift: true });
+      expect(document.activeElement).toBe(field);
+    }
+    const close = screen.getByRole("button", { name: "Fermer la fiche projet" });
+    await user.click(form.getByRole("button", { name: "Annuler", exact: true }));
+    expect(screen.queryByRole("form", { name: "Modifier le projet" })).toBeNull();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(props.onClose).toHaveBeenCalledOnce();
+    expect(close.disabled).toBe(false);
+    expect(dialog.scrollTop).toBe(0);
+    expect(ancestorScroll).not.toHaveBeenCalled();
+  });
+
   it.each([
     { height: 100, expectedScroll: 450 },
     { height: 700, expectedScroll: 700 },
