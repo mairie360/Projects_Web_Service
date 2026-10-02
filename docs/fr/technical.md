@@ -196,6 +196,30 @@ Avant un lancement Docker, vérifier les variables de service, les secrets de bu
 
 ## Diagnostic
 
+### Confirmation des commentaires de tâche — MAIR-446 / issue #204
+
+`ProjectDetailModal` distingue la sélection du suivi, la génération de lecture
+et le verrou immédiat d’envoi. Une réponse ou erreur tardive ne remplace pas
+une autre tâche et ne rouvre pas un panneau fermé. Une actualisation du même
+projet conserve le suivi et son brouillon ; un changement de projet ou le
+démontage invalide les opérations de présentation précédentes.
+
+Le retour existant de `addTaskComment` fournit le commentaire confirmé :
+il est rapproché par identifiant, sans donnée auteur/date fabriquée, puis le
+brouillon envoyé est vidé. L’échec de `getTaskCollaboration` ne supprime pas ce
+commentaire et affiche « Commentaire enregistré. Actualisation impossible ».
+Une lecture réussie encore en retard conserve également les commentaires
+confirmés manquants. « Actualiser le suivi » relance seulement le GET. Un POST
+refusé conserve le brouillon et libère le nouvel essai ; les appels rapprochés
+ou pendant l’envoi ne doublent pas l’écriture. L’état d’envoi est annoncé et
+le champ est temporairement désactivé. `canComment=false` masque toujours le
+formulaire, sans changer les permissions côté serveur.
+
+Les régressions utilisent la vraie page et les routes existantes dans le
+harnais contractuel. Aucun client/proxy/route/contrat, API/BFF, dépendance,
+environnement ou donnée métier de référence ne change. Une recette locale
+sur copies jetables ne constitue pas une preuve de persistance déployée.
+
 Si le rôle ou le contexte utilisateur échoue, vérifier `GET /projects-page` sur BFF_Project (et, derrière lui, BFF User). Si les vues divergent, comparer la réponse de BFF Project, ses permissions et les conversions de `bffProjectClient.ts`. Le mode SQL et le repli mémoire se configurent dans BFF Project, pas dans ce web service.
 
 En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, vérifier l’URL du BFF puis la session. Pour un 401 après navigation entre modules, vérifier le cookie `accessToken`, son domaine et BFF_Project. Un 404 sur un besoin décrit dans `BACKEND.md` peut correspondre à une fonctionnalité seulement proposée.

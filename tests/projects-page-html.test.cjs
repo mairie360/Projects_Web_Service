@@ -681,6 +681,190 @@ test('the detail modal drives the tasks: status change, deletion with confirmati
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'delete')[0].pathParams, { projectId: 'project-1', taskId: 'task-1' });
 });
 
+test('task follow-up ignores a late response from a previously selected task', async (t) => {
+  await renderLoadedPage();
+  await openDetails();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const originalFetch = global.fetch;
+  t.mock.method(global, 'fetch', async (target, init) => {
+    const response = await originalFetch(target, init);
+    if (typeof target === 'string' && target === '/projects/project-1/tasks/task-1/collaboration') await gate;
+    return response;
+  });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: {
+    comments: [fixtures.taskComment({ message: `Suivi ${pathParams.taskId}` })], history: [],
+  } }));
+  const follow = () => view.hostElements((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.act(() => { void follow()[0].props.onClick(); });
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length === 1);
+  await view.act(() => { void follow()[1].props.onClick(); });
+  await view.waitFor(html => html.includes('Suivi task-2'));
+  release();
+  await view.waitFor(() => !view.text().includes('Chargement du suivi'));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  await view.settle();
+  assert.match(view.text(), /Suivi task-2/);
+  assert.doesNotMatch(view.text(), /Suivi task-1/);
+});
+
+test('task follow-up guards synchronous repeated comment submission and preserves a refused draft', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Brouillon à conserver' } });
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Commentaire refusé')));
+  const submit = view.hostElements((props, text, tag) => tag === 'form' && text.includes('Envoyer'))[0].props.onSubmit;
+  await view.act(() => {
+    submit({ preventDefault() {} });
+    submit({ preventDefault() {} });
+  });
+  await view.waitFor(html => html.includes('Commentaire refusé'));
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 1);
+  assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value="Brouillon à conserver"|value="Brouillon à conserver"[^>]*placeholder="Ajouter un commentaire/);
+  assert.match(view.html, /role="alert"[^>]*>Commentaire refusé/);
+  const confirmed = fixtures.taskComment({ id: 'comment-retry', message: 'Brouillon à conserver' });
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', { status: 201, body: confirmed });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { comments: [confirmed], history: [] } });
+  await view.fire((props, text, tag) => tag === 'form' && text.includes('Envoyer'), 'onSubmit');
+  await view.waitFor(html => html.includes('Brouillon à conserver') && !html.includes('Envoi du commentaire'));
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 2);
+  assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post')[1].body, { message: 'Brouillon à conserver' });
+  assert.doesNotMatch(view.html, /Commentaire refusé/);
+});
+
+test('task follow-up retains a confirmed comment when its reload fails and retries only the read', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Commentaire confirmé' } });
+  const comment = fixtures.taskComment({ id: 'comment-confirmed', message: 'Commentaire confirmé' });
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', { status: 201, body: comment });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Suivi indisponible')));
+  await view.fire((props, text, tag) => tag === 'form' && text.includes('Envoyer'), 'onSubmit');
+  await view.waitFor(html => html.includes('Suivi indisponible'));
+  assert.match(view.text(), /Commentaire confirmé/);
+  assert.match(view.text(), /Commentaire enregistré\. Actualisation impossible/);
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { comments: [fixtures.taskComment(), comment], history: [] } });
+  await view.click((props, text, tag) => tag === 'button' && text === 'Actualiser le suivi');
+  await view.waitFor(html => !html.includes('Suivi indisponible') && !html.includes('Chargement du suivi'));
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 1);
+  assert.equal(view.text().split('Commentaire confirmé').length - 1, 1);
+});
+
+test('task follow-up retries an initial read refusal without posting a comment', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Lecture refusée')));
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Lecture refusée'));
+  assert.match(view.html, /role="alert"[^>]*>Lecture refusée/);
+  assert.doesNotMatch(view.html, /placeholder="Ajouter un commentaire/);
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text === 'Actualiser le suivi');
+  await view.waitFor(html => html.includes('Devis reçu.') && !html.includes('Chargement du suivi'));
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 0);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length, 2);
+});
+
+test('task follow-up ignores a late failure after the panel has been closed and reopened', async (t) => {
+  await renderLoadedPage();
+  await openDetails();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  let reads = 0;
+  const originalFetch = global.fetch;
+  t.mock.method(global, 'fetch', async (target, init) => {
+    const delayed = typeof target === 'string' && target.endsWith('/task-1/collaboration') && ++reads === 1;
+    const response = await originalFetch(target, init);
+    if (delayed) await gate;
+    return response;
+  });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Ancienne erreur')));
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length === 1);
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  release();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  await view.settle();
+  assert.doesNotMatch(view.html, /Ancienne erreur|Chargement du suivi/);
+  assert.match(view.text(), /Devis reçu\./);
+});
+
+test('task follow-up never applies a late comment confirmation to another task', async (t) => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: {
+    comments: [fixtures.taskComment({ message: `Suivi ${pathParams.taskId}` })], history: [],
+  } }));
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Suivi task-1'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Envoi pour task-1' } });
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', { status: 201, body: fixtures.taskComment({ message: 'Envoi pour task-1' }) });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const originalFetch = global.fetch;
+  t.mock.method(global, 'fetch', async (target, init) => {
+    const response = await originalFetch(target, init);
+    if (typeof target === 'string' && target.endsWith('/task-1/comments')) await gate;
+    return response;
+  });
+  const submit = view.hostElements((props, text, tag) => tag === 'form' && text.includes('Envoyer'))[0].props.onSubmit;
+  await view.act(() => submit({ preventDefault() {} }));
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length === 1);
+  assert.match(view.html, /role="status"[^>]*>Envoi du commentaire/);
+  assert.equal(view.hostElements(props => props.placeholder === 'Ajouter un commentaire...')[0].props.disabled, true);
+  await view.act(() => view.hostElements((props, text, tag) => tag === 'button' && text.includes('Suivi'))[1].props.onClick());
+  await view.waitFor(html => html.includes('Suivi task-2'));
+  await view.act(() => submit({ preventDefault() {} }));
+  release();
+  await view.waitFor(html => !html.includes('Envoi du commentaire'));
+  assert.match(view.text(), /Suivi task-2/);
+  assert.doesNotMatch(view.text(), /Envoi pour task-1|Suivi task-1/);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 1);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length, 2, 'no stale POST-triggered read');
+});
+
+test('task follow-up preserves its draft across a same-project status refresh', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Brouillon encore présent' } });
+  bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: fixtures.projectTask({ status: 'done' }) });
+  await view.fire(props => props['aria-label'] === 'Statut de Relevé des candélabres', 'onChange', { target: { value: 'done' } });
+  await view.waitFor(() => alertText().includes('mis à jour'));
+  assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value="Brouillon encore présent"/);
+  assert.match(view.text(), /Devis reçu\./);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 0);
+});
+
+test('task follow-up keeps a confirmed comment once while a successful read is still catching up', async () => {
+  await renderLoadedPage();
+  await openDetails();
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Confirmé avant relecture' } });
+  bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', { status: 201, body: fixtures.taskComment({ id: 'confirmed-lag', message: 'Confirmé avant relecture' }) });
+  await view.fire((props, text, tag) => tag === 'form' && text.includes('Envoyer'), 'onSubmit');
+  await view.waitFor(html => html.includes('Confirmé avant relecture') && !html.includes('Envoi du commentaire'));
+  assert.equal(view.text().split('Confirmé avant relecture').length - 1, 1);
+  assert.match(view.text(), /Devis reçu\./);
+  assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value=""/);
+});
+
 test('task follow-up bounds long content and preserves the existing comment submission', async () => {
   await renderLoadedPage();
   await openDetails();
@@ -714,6 +898,7 @@ test('task follow-up bounds long content and preserves the existing comment subm
   assert.equal(posts.length, 1);
   assert.deepEqual(posts[0].body, { message: sent });
   assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value=""/);
+  await view.waitFor(html => !html.includes('Chargement du suivi') && !html.includes('Envoi du commentaire'));
 });
 
 test('read-only task follow-up keeps comments and history without exposing a composer', async () => {

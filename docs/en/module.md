@@ -39,6 +39,23 @@ Business domain: Projects and tasks.
 2. Open a project to inspect tasks and allowed actions.
 3. Perform a mutation, consume the returned data and reload the relevant context.
 
+## Confirmed task comments
+
+Task follow-up ignores responses for a previously selected or closed task.
+A same-project refresh preserves the open follow-up and its unsent draft.
+Only one comment submission can be pending; refused writes retain the draft
+for retry. A successful POST contributes the actual returned comment immediately,
+without inventing its author, identifier or date. If the subsequent GET fails
+or temporarily omits that comment, the confirmed entry stays visible once.
+The accessible error distinguishes a saved comment from a failed refresh;
+**Actualiser le suivi** retries only the read, never the confirmed POST.
+Read-only tasks still expose comments/history without a composer.
+
+This is an intentional correction to the inherited reference behavior, tracked
+by MAIR-446 / issue #204. No API/BFF, existing client/proxy/route/contract,
+dependency, permission or environment change is required. Local copied-state
+QA does not certify deployed persistence or authorization.
+
 ## Responsive search and filters
 
 Search, status, priority, deadline and view controls stack on phones. Search

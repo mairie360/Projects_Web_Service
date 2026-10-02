@@ -28,6 +28,7 @@ import type {
   ProjectTask,
   ProjectTaskDraft,
   TaskCollaboration,
+  TaskComment,
 } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
 import {
@@ -50,6 +51,13 @@ import {
   fieldClassName,
 } from './ProjectFormControls';
 import { ProjectTasksEditor, taskToFormState } from './ProjectTasksEditor';
+
+type TaskFollowUpSelection = {
+  projectId: string;
+  taskId: string;
+  confirmedComments: TaskComment[];
+  loading: boolean;
+};
 
 export function CreateProjectModal({
   mode,
@@ -351,6 +359,9 @@ export function ProjectDetailModal({
   const [collaborationError, setCollaborationError] = React.useState('');
   const [commentMessage, setCommentMessage] = React.useState('');
   const [commentSaving, setCommentSaving] = React.useState(false);
+  const collaborationSelectionRef = React.useRef<TaskFollowUpSelection | null>(null);
+  const collaborationReadRef = React.useRef(0);
+  const commentRequestRef = React.useRef<symbol | null>(null);
   const highlightedTaskRef = React.useRef<HTMLElement | null>(null);
   const focusedLinkedTaskRef = React.useRef<HTMLElement | null>(null);
   const overlayRef = React.useRef<HTMLDivElement | null>(null);
@@ -427,6 +438,7 @@ export function ProjectDetailModal({
   }, [taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
 
   React.useEffect(() => {
+    const projectChanged = taskProjectIdRef.current !== project.id;
     // Official refreshes update defaults, never an active same-project draft.
     if (projectEditIdRef.current !== project.id || !editingProjectRef.current) {
       projectEditIdRef.current = project.id;
@@ -436,22 +448,31 @@ export function ProjectDetailModal({
       setEditingProject(false);
     }
     // A same-project refresh must not discard an unsaved task or its retry.
-    if (taskProjectIdRef.current !== project.id) {
+    if (projectChanged) {
       taskProjectIdRef.current = project.id;
       setTaskForm(createTaskFormState(project));
       setEditingTaskId(null);
       setTaskFormError('');
+      collaborationSelectionRef.current = null;
+      collaborationReadRef.current += 1;
+      setCollaborationTaskId(null);
+      setCollaboration(null);
+      setCollaborationLoading(false);
+      setCollaborationError('');
+      setCommentMessage('');
     }
     setTaskSearch('');
     setTaskStatusFilter('all');
     setTaskPriorityFilter('all');
     setTaskDueFilter('');
     setDeletingTaskId(null);
-    setCollaborationTaskId(null);
-    setCollaboration(null);
-    setCollaborationError('');
-    setCommentMessage('');
   }, [project]);
+
+  React.useEffect(() => () => {
+    collaborationSelectionRef.current = null;
+    collaborationReadRef.current += 1;
+    commentRequestRef.current = null;
+  }, []);
 
   React.useLayoutEffect(() => {
     const article = highlightedTaskRef.current;
@@ -473,41 +494,82 @@ export function ProjectDetailModal({
     focusedLinkedTaskRef.current = article;
   }, [filteredTasks, highlightTaskId]);
 
+  const loadTaskCollaboration = async (selection: TaskFollowUpSelection) => {
+    if (collaborationSelectionRef.current !== selection) return;
+    const read = ++collaborationReadRef.current;
+    selection.loading = true;
+    setCollaborationError('');
+    setCollaborationLoading(true);
+    const isCurrent = () => collaborationSelectionRef.current === selection && collaborationReadRef.current === read;
+    try {
+      const received = await getTaskCollaboration(selection.projectId, selection.taskId);
+      if (!isCurrent()) return;
+      // The POST response is already authoritative, even if the following read
+      // temporarily fails or has not caught up with the confirmed comment yet.
+      const receivedIds = new Set(received.comments.map((comment) => comment.id));
+      setCollaboration({
+        ...received,
+        comments: [...received.comments, ...selection.confirmedComments.filter((comment) => !receivedIds.has(comment.id))],
+      });
+    } catch (error) {
+      if (isCurrent()) {
+        const prefix = selection.confirmedComments.length ? 'Commentaire enregistré. Actualisation impossible : ' : '';
+        setCollaborationError(`${prefix}${getBffProjectErrorMessage(error)}`);
+      }
+    } finally {
+      if (isCurrent()) {
+        selection.loading = false;
+        setCollaborationLoading(false);
+      }
+    }
+  };
+
   const openTaskCollaboration = async (taskId: string) => {
-    if (collaborationTaskId === taskId) {
+    if (collaborationSelectionRef.current?.taskId === taskId) {
+      collaborationSelectionRef.current = null;
+      collaborationReadRef.current += 1;
       setCollaborationTaskId(null);
+      setCollaborationLoading(false);
       return;
     }
 
+    const selection: TaskFollowUpSelection = { projectId: project.id, taskId, confirmedComments: [], loading: false };
+    collaborationSelectionRef.current = selection;
     setCollaborationTaskId(taskId);
     setCollaboration(null);
     setCollaborationError('');
-    setCollaborationLoading(true);
-
-    try {
-      setCollaboration(await getTaskCollaboration(project.id, taskId));
-    } catch (error) {
-      setCollaborationError(getBffProjectErrorMessage(error));
-    } finally {
-      setCollaborationLoading(false);
-    }
+    setCommentMessage('');
+    await loadTaskCollaboration(selection);
   };
 
   const submitComment = async (event: React.FormEvent<HTMLFormElement>, taskId: string) => {
     event.preventDefault();
     const message = commentMessage.trim();
-    if (!message) return;
+    const selection = collaborationSelectionRef.current;
+    if (!message || commentRequestRef.current || !selection || selection.taskId !== taskId || selection.loading ||
+      tasks.find((task) => task.id === taskId)?.permissions?.canComment === false) return;
 
+    const request = Symbol('comment-request');
+    commentRequestRef.current = request;
     setCommentSaving(true);
     setCollaborationError('');
     try {
-      await addTaskComment(project.id, taskId, message);
+      const confirmed = await addTaskComment(selection.projectId, taskId, message);
+      if (collaborationSelectionRef.current !== selection) return;
+      selection.confirmedComments = [...selection.confirmedComments.filter((comment) => comment.id !== confirmed.id), confirmed];
+      setCollaboration((current) => ({
+        comments: [...(current?.comments ?? []).filter((comment) => comment.id !== confirmed.id), confirmed],
+        history: current?.history ?? [],
+      }));
       setCommentMessage('');
-      setCollaboration(await getTaskCollaboration(project.id, taskId));
+      await loadTaskCollaboration(selection);
     } catch (error) {
-      setCollaborationError(getBffProjectErrorMessage(error));
+      if (collaborationSelectionRef.current === selection) setCollaborationError(getBffProjectErrorMessage(error));
     } finally {
-      setCommentSaving(false);
+      if (commentRequestRef.current === request) {
+        commentRequestRef.current = null;
+        setCommentSaving(false);
+      }
     }
   };
 
@@ -943,8 +1005,15 @@ export function ProjectDetailModal({
 
                             {collaborationTaskId === task.id && (
                               <div className="mt-3 min-w-0 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
-                                {collaborationLoading && <p className="text-xs text-[#57606a]">Chargement du suivi...</p>}
-                                {collaborationError && <p className="text-xs font-medium text-[#cf222e]">{collaborationError}</p>}
+                                {collaborationLoading && <p role="status" className="text-xs text-[#57606a]">Chargement du suivi...</p>}
+                                {commentSaving && <p role="status" className="text-xs text-[#57606a]">Envoi du commentaire...</p>}
+                                {collaborationError && <p role="alert" className="text-xs font-medium text-[#cf222e] [overflow-wrap:anywhere]">{collaborationError}</p>}
+                                {collaborationError && (
+                                  <button type="button" disabled={collaborationLoading || commentSaving} className="mt-2 rounded-md border border-[#d0d7de] bg-white px-2 py-1 text-xs font-semibold text-[#24292f] disabled:opacity-50" onClick={() => {
+                                    const selection = collaborationSelectionRef.current;
+                                    if (selection && !commentRequestRef.current && !selection.loading) void loadTaskCollaboration(selection);
+                                  }}>Actualiser le suivi</button>
+                                )}
                                 {collaboration && (
                                   <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
                                     <div className="min-w-0">
@@ -960,8 +1029,10 @@ export function ProjectDetailModal({
                                       </div>
                                       {task.permissions?.canComment !== false && (
                                         <form className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row" onSubmit={(event) => void submitComment(event, task.id)}>
-                                          <input value={commentMessage} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => setCommentMessage(event.target.value)} />
-                                          <button type="submit" disabled={commentSaving || !commentMessage.trim()} className="min-h-8 shrink-0 rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
+                                          <input value={commentMessage} disabled={commentSaving} aria-label={`Commentaire pour ${task.title}`} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => {
+                                            if (!commentRequestRef.current) setCommentMessage(event.target.value);
+                                          }} />
+                                          <button type="submit" disabled={commentSaving || collaborationLoading || !commentMessage.trim()} className="min-h-8 shrink-0 rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
                                         </form>
                                       )}
                                     </div>
