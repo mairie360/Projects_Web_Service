@@ -16,6 +16,5 @@ export type ProjectCardProps = {
   onEdit?: (project: Project) => void;
   onDuplicate?: (project: Project) => void;
   onDelete?: (project: Project) => void;
-  onAddTask?: (project: Project, task: ProjectTaskDraft) => void;
+  onAddTask?: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
 };
-

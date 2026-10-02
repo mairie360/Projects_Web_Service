@@ -22,7 +22,7 @@ type KanbanBoardProps = {
   onProjectEdit?: (project: Project) => void;
   onProjectDuplicate?: (project: Project) => void;
   onProjectDelete?: (project: Project) => void;
-  onProjectTaskAdd?: (project: Project, task: ProjectTaskDraft) => void;
+  onProjectTaskAdd?: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onAddProject?: (status: Project['status']) => void;
   onMoveProject?: (project: Project, status: Project['status']) => Promise<void>;
 };
