@@ -92,6 +92,16 @@ ouvert et rend le focus à son bouton, sans perdre les choix. Création, éditio
 permissions et requêtes publiées restent inchangées ; aucun changement API/BFF,
 de dépendance ou d’environnement n’est nécessaire.
 
+## Visibilité d’une tâche liée
+
+Une URL projet/tâche met en évidence la tâche autorisée et lui donne le focus.
+Seul le contenu de la fiche défile : son en-tête et Fermer restent en place sur
+ordinateur et mobile. Une tâche arrivée plus tard est ciblée sans ramener la
+lecture lors d’un rafraîchissement sans rapport. La navigation normale reste en
+haut de la fiche. Les cibles absentes ou invalides gardent l’erreur explicite
+existante sans fausse fiche. Correction uniquement frontend ; la recette déployée
+Dashboard/multi-rôles reste distincte.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

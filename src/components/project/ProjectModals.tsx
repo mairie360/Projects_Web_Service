@@ -348,6 +348,7 @@ export function ProjectDetailModal({
   const focusedLinkedTaskRef = React.useRef<HTMLElement | null>(null);
   const overlayRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
   const titleId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
@@ -439,7 +440,15 @@ export function ProjectDetailModal({
       return;
     }
     if (!article || focusedLinkedTaskRef.current === article) return;
-    article.scrollIntoView?.({ block: 'center' });
+    const content = contentRef.current;
+    if (!content) return;
+    const target = article.getBoundingClientRect();
+    const viewport = content.getBoundingClientRect();
+    const scrollTop = content.scrollTop;
+    const availableHeight = content.clientHeight;
+    // Scroll only the detail body: scrollIntoView also moves the outer dialog
+    // and can hide its fixed header and close button.
+    content.scrollTop = scrollTop + target.top - viewport.top - Math.max(0, (availableHeight - target.height) / 2);
     article.focus?.({ preventScroll: true });
     focusedLinkedTaskRef.current = article;
   }, [filteredTasks, highlightTaskId]);
@@ -558,7 +567,7 @@ export function ProjectDetailModal({
       <button type="button" aria-hidden="true" tabIndex={-1} className="absolute inset-0" onClick={onClose} />
 
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-hidden border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
-        <header className="flex items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
           <div className="min-w-0">
             <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
             <h2 id={titleId} className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
@@ -584,7 +593,7 @@ export function ProjectDetailModal({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
+        <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
               {project.permissions?.canCreateTask !== false && (
