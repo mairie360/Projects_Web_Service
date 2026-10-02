@@ -28,6 +28,8 @@ Business domain: Projects and tasks.
 ## Available capabilities
 
 - Project search, filtering, pagination and view switching.
+- The page and shared navigation use the reference's default 17px root scale and system font; the header remains rem-based (68px by default), and standard small-text tokens are preserved. No saved appearance preference or user identity is simulated.
+- The toolbar wraps its view selector when the search and filters need more space, including at wide desktop widths with the reference font scale.
 - Project and task creation and editing forms.
 - Details, statuses, collaboration and actions available according to BFF permissions.
 
