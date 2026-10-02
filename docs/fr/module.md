@@ -30,6 +30,7 @@ Domaine fonctionnel: Projets et tâches.
 ## Fonctions disponibles
 
 - Recherche, filtres, pagination et changement de vue des projets.
+- La page et la navigation commune reprennent l’échelle racine de 17px et la police système par défaut de la référence ; le header reste dimensionné en rem (68px par défaut), avec les tailles standard des petits textes. Aucune préférence d’apparence sauvegardée ni identité utilisateur n’est simulée.
 - Formulaires de création et modification de projets et tâches.
 - Détails, statuts, collaboration et actions disponibles selon les permissions du BFF.
 

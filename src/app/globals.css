@@ -6,6 +6,15 @@
 @source "../../src/";
 @source "../../node_modules/@mairie360/lib-components/dist/";
 
+/* The reference's root scale also sizes the shared rem-based navigation. */
+html {
+  font-size: 17px;
+}
+
+@theme inline {
+  --font-sans: system-ui, sans-serif;
+}
+
 :root {
   color-scheme: light;
 }
@@ -18,7 +27,7 @@ body {
 body {
   margin: 0;
   background: #f6f4f1;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 
 .projects-shell {
