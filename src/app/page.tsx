@@ -85,6 +85,7 @@ export default function ProjectsPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const retryPendingRef = useRef(false);
+  const pageRevisionRef = useRef(0);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
@@ -157,6 +158,8 @@ export default function ProjectsPage() {
 
   const refreshProjectsPage = useCallback(
     async (options: RefreshProjectsOptions = {}) => {
+      const revision = ++pageRevisionRef.current;
+      const isCurrent = () => revision === pageRevisionRef.current && !options.signal?.aborted;
       const nextSearch = options.search ?? searchTerm;
       const nextStatus = options.status ?? statusFilter;
       const nextPriority = options.priority ?? priorityFilter;
@@ -181,16 +184,18 @@ export default function ProjectsPage() {
           options.signal
         );
 
+        // Neither an older read nor an aborted filter request may undo a confirmed write.
+        if (!isCurrent()) return;
         setProjectsPage(response);
         setProjects(response.projects);
         setPageError('');
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (isAbortError(error) || !isCurrent()) return;
 
         setPageError(getBffProjectErrorMessage(error));
         if (options.throwOnError) throw error;
       } finally {
-        if (!options.signal?.aborted) {
+        if (isCurrent()) {
           setPageLoading(false);
         }
       }
@@ -227,6 +232,15 @@ export default function ProjectsPage() {
 
   const showError = (error: unknown) => {
     setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
+  };
+
+  const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false) => {
+    ++pageRevisionRef.current;
+    const confirmed = mergeProjectDetails(details);
+    setProjects((current) => current.some((project) => project.id === confirmed.id)
+      ? current.map((project) => project.id === confirmed.id ? confirmed : project)
+      : insert ? [...current, confirmed] : current);
+    // Page totals, options and pagination still belong to the last successful page DTO.
   };
 
   useEffect(() => {
@@ -327,6 +341,7 @@ export default function ProjectsPage() {
       showError(error);
       throw error;
     }
+    applyConfirmedProject(details);
     setSelectedProjectDetails(details);
     try {
       await refreshProjectsPage({ silent: true, throwOnError: true });
@@ -342,6 +357,7 @@ export default function ProjectsPage() {
 
     try {
       const details = await updateProject(project.id, { status });
+      applyConfirmedProject(details);
       setSelectedProjectDetails((current: ProjectDetailsResponse | null) => current?.project.id === project.id ? details : current);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
@@ -361,6 +377,7 @@ export default function ProjectsPage() {
     try {
       if (editingProjectId) {
         const details = await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm));
+        applyConfirmedProject(details);
 
         setCreateProjectOpen(false);
         setEditingProjectId(null);
@@ -373,6 +390,7 @@ export default function ProjectsPage() {
       }
 
       const details = await createProject(createProjectBodyFromForm(projectForm));
+      applyConfirmedProject(details, true);
 
       setSearchTerm('');
       setStatusFilter('all');
@@ -390,6 +408,7 @@ export default function ProjectsPage() {
   const duplicateProject = async (project: Project) => {
     try {
       const details = await duplicateBffProject(project.id);
+      applyConfirmedProject(details, true);
 
       setSearchTerm('');
       setStatusFilter('all');
@@ -412,6 +431,8 @@ export default function ProjectsPage() {
 
     try {
       await deleteBffProject(project.id);
+      ++pageRevisionRef.current;
+      setProjects((current) => current.filter((value) => value.id !== project.id));
       setProjectPendingDeletion(null);
       if (selectedProjectDetails?.project.id === project.id) setSelectedProjectDetails(null);
       if (editingProjectId === project.id) closeCreateProject();
@@ -493,6 +514,7 @@ export default function ProjectsPage() {
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
     try {
       const details = await closeBffProject(projectId, status);
+      applyConfirmedProject(details);
       setSelectedProjectDetails(details);
       await refreshProjectsPage({ silent: true });
       setAlert({
@@ -676,7 +698,7 @@ export default function ProjectsPage() {
                   <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-5 py-4 text-sm font-medium text-[#cf222e]">
                     <div>{pageError}</div>
                     {projects.length > 0 && (
-                      <p className="mt-2">Dernières données reçues : la liste n’a pas pu être actualisée.</p>
+                      <p className="mt-2">Dernières données reçues et confirmations conservées : la liste n’a pas pu être actualisée. Les statistiques restent celles de la dernière lecture réussie.</p>
                     )}
                     <button
                       type="button"

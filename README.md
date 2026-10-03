@@ -33,6 +33,16 @@ priority, deadline and view. It does not replay confirmed project/task writes;
 repeat activation is guarded while pending. A successful response replaces the
 data and clears the error. Existing BFF permissions and contracts are unchanged.
 
+Confirmed project writes are applied before the subsequent page refresh:
+create/duplicate append the returned project once; card/detail edits, moves,
+closure and suspension replace the received project; a successful DELETE 204
+removes only its target. Refused writes never apply submitted drafts. Older or
+aborted page reads cannot undo a later confirmation or overwrite a newer read
+error. Page-level totals, options and pagination remain the last successful
+page DTO, explicitly identified as such while a refresh is refused; they are
+not fabricated from a potentially filtered or incomplete list. Task/comment
+mutations are separate from this project-write recovery acceptance.
+
 `tests/projects-refresh-recovery.test.cjs` exercises the real page and the
 existing contract-gated proxy, using isolated test-only responses. These checks
 do not certify deployed BFF availability, authorization or persistence.
