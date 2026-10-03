@@ -21,6 +21,22 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 `npm test` lance les tests Node de contrat/sécurité et les tests de composants Vitest. Les réponses BFF des tests sont synthétiques et restent hors du code de production.
 
+### Refused page refreshes (MAIR-451)
+
+An initial page-read failure is announced and offers a keyboard-accessible
+`Réessayer` button. A refused refresh retains the last non-empty received
+projects in Kanban, grid and table views, with an explicit stale-data notice.
+An old empty response is not displayed as a newly confirmed empty result.
+
+Retry requests only `GET /projects-page` using the current search, status,
+priority, deadline and view. It does not replay confirmed project/task writes;
+repeat activation is guarded while pending. A successful response replaces the
+data and clears the error. Existing BFF permissions and contracts are unchanged.
+
+`tests/projects-refresh-recovery.test.cjs` exercises the real page and the
+existing contract-gated proxy, using isolated test-only responses. These checks
+do not certify deployed BFF availability, authorization or persistence.
+
 ## Contracts and background / Contrats et compléments
 
 - [BFF.md](BFF.md)

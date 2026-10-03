@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppShell } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
 
@@ -84,6 +84,7 @@ export default function ProjectsPage() {
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const retryPendingRef = useRef(false);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
@@ -208,6 +209,17 @@ export default function ProjectsPage() {
       window.clearTimeout(timeoutId);
     };
   }, [refreshProjectsPage]);
+
+  const retryProjectsPage = async () => {
+    if (pageLoading || retryPendingRef.current) return;
+    retryPendingRef.current = true;
+    try {
+      // Retry the read with current filters; never replay a confirmed mutation.
+      await refreshProjectsPage();
+    } finally {
+      retryPendingRef.current = false;
+    }
+  };
 
   const showInfo = (message: string) => {
     setAlert({ type: 'info', message });
@@ -660,13 +672,26 @@ export default function ProjectsPage() {
                   </div>
                 )}
 
-                {pageError && projects.length === 0 && !pageLoading && (
-                  <div className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-5 py-4 text-sm font-medium text-[#cf222e]">
-                    {pageError}
+                {pageError && (
+                  <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-5 py-4 text-sm font-medium text-[#cf222e]">
+                    <div>{pageError}</div>
+                    {projects.length > 0 && (
+                      <p className="mt-2">Dernières données reçues : la liste n’a pas pu être actualisée.</p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={pageLoading}
+                      aria-busy={pageLoading}
+                      className="mt-3 rounded-md border border-[#cf222e] bg-white px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cf222e] disabled:cursor-wait disabled:opacity-60"
+                      onClick={() => void retryProjectsPage()}
+                    >
+                      Réessayer
+                    </button>
+                    {pageLoading && <p role="status" className="mt-2">Actualisation des projets...</p>}
                   </div>
                 )}
 
-                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'kanban' && (
+                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
                     columns={projectsPage?.kanban.columns ?? []}
@@ -682,7 +707,7 @@ export default function ProjectsPage() {
                   />
                 )}
 
-                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'grid' && (
+                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
                     memberOptions={memberOptions}
@@ -695,7 +720,7 @@ export default function ProjectsPage() {
                   />
                 )}
 
-                {(!pageLoading || projects.length > 0) && !pageError && viewMode === 'table' && (
+                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'table' && (
                   <TableView
                     projects={filteredProjects}
                     onProjectOpen={openProjectDetails}
