@@ -58,10 +58,19 @@ replay. Console health and absence of horizontal overflow were checked. One
 held request also reached the existing 15-second proxy timeout and retained its
 draft; the explicit contract refusal was then verified separately.
 
-The mobile viewport request was ignored by the integrated browser (actual
-1280×720, including a new tab). **Mobile QA remains unverified**, and these
-desktop captures are not mobile evidence. No live BFF authentication/persistence
-or deployed environment is certified. Closure still requires mobile QA, green
+Mobile QA subsequently used an actual measured **390×844** viewport: the override
+must be applied to the selected recipe tab, not a background control tab.
+Creation and card editing each protected all fields and keyboard dismissal,
+retained the draft after an explicit refusal, and closed after a confirmed retry
+despite a failed refresh. The held card-edit attempt produced one PATCH and no
+contract violations; its final counter read was unavailable after the temporary
+fixture stopped, so that read is not claimed as evidence. The confirmed-save
+message and closed dialog were observed in the real UI; console and horizontal
+overflow checks passed. Earlier 1280×720 captures are desktop evidence only.
+
+No live BFF authentication/persistence or deployed environment is certified.
+The first PR CI failed the npm security audit on five high-severity findings;
+skipped build/release checks are not passes. Closure still requires green
 applicable CI, integration into main and an exact local-current refresh.
 
 No API/BFF, client/proxy, contract, dependency, shared library, security/workflow,
