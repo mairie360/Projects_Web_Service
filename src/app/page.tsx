@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppShell } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
 
@@ -89,6 +89,8 @@ export default function ProjectsPage() {
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+  const [projectFormPending, setProjectFormPending] = useState(false);
+  const projectFormPendingRef = useRef(false);
   // La session vient de la réponse /projects-page déjà chargée : aucun appel supplémentaire.
   const session = useMemo(() => authSessionFromAccess(projectsPage?.access ?? null), [projectsPage]);
 
@@ -256,6 +258,7 @@ export default function ProjectsPage() {
   };
 
   const openCreateProject = (status: Project['status'] = 'todo') => {
+    if (projectFormPendingRef.current) return;
     setProjectForm(createProjectFormState(status));
     setEditingProjectId(null);
     setProjectFormError('');
@@ -275,6 +278,7 @@ export default function ProjectsPage() {
   };
 
   const openEditProject = async (project: Project) => {
+    if (projectFormPendingRef.current) return;
     setEditingProjectId(project.id);
     setProjectFormError('');
     setOpenFilter(null);
@@ -291,12 +295,14 @@ export default function ProjectsPage() {
   };
 
   const closeCreateProject = () => {
+    if (projectFormPendingRef.current) return;
     setCreateProjectOpen(false);
     setEditingProjectId(null);
     setProjectFormError('');
   };
 
   const updateProjectForm = (patch: Partial<ProjectFormState>) => {
+    if (projectFormPendingRef.current) return;
     setProjectForm((current) => ({ ...current, ...patch }));
     if (projectFormError) setProjectFormError('');
   };
@@ -340,38 +346,51 @@ export default function ProjectsPage() {
 
   const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The ref also protects two events captured before React renders disabled controls.
+    if (projectFormPendingRef.current) return;
 
     if (!validateProjectForm(projectForm)) {
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
       return;
     }
 
+    projectFormPendingRef.current = true;
+    setProjectFormPending(true);
+    setProjectFormError('');
     try {
-      if (editingProjectId) {
-        const details = await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm));
+      const details = editingProjectId
+        ? await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm))
+        : await createProject(createProjectBodyFromForm(projectForm));
 
-        setCreateProjectOpen(false);
-        setEditingProjectId(null);
+      // Only the confirmed write discards the draft. A later read failure is not a refusal.
+      setCreateProjectOpen(false);
+      setEditingProjectId(null);
+      setProjectForm(createProjectFormState());
+      if (editingProjectId) {
         setSelectedProjectDetails((currentDetails) =>
           currentDetails?.project.id === editingProjectId ? details : currentDetails
         );
-        await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
-        return;
+      } else {
+        setSearchTerm('');
+        setStatusFilter('all');
+        setPriorityFilter('all');
+        setDueBeforeFilter('');
+        setSelectedProjectDetails(details);
       }
-
-      const details = await createProject(createProjectBodyFromForm(projectForm));
-
-      setSearchTerm('');
-      setStatusFilter('all');
-      setPriorityFilter('all');
-      setDueBeforeFilter('');
-      setCreateProjectOpen(false);
-      setSelectedProjectDetails(details);
-      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', silent: true });
-      setAlert({ type: 'success', message: `Projet "${details.project.title}" créé.` });
+      try {
+        await refreshProjectsPage(editingProjectId
+          ? { silent: true, throwOnError: true }
+          : { search: '', status: 'all', priority: 'all', dueBefore: '', silent: true, throwOnError: true });
+        setAlert({ type: 'success', message: `Projet "${details.project.title}" ${editingProjectId ? 'modifié' : 'créé'}.` });
+      } catch (error) {
+        setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
+      }
     } catch (error) {
-      showError(error);
+      // A refused write keeps every field and nested task, with an error inside the dialog.
+      setProjectFormError(getBffProjectErrorMessage(error));
+    } finally {
+      projectFormPendingRef.current = false;
+      setProjectFormPending(false);
     }
   };
 
@@ -545,6 +564,7 @@ export default function ProjectsPage() {
           mode={editingProjectId ? 'edit' : 'create'}
           form={projectForm}
           error={projectFormError}
+          pending={projectFormPending}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           statusOptions={projectStatusOptions}
