@@ -111,6 +111,21 @@ visibles sur ordinateur et mobile ; le focus des tâches liées, les sélecteurs
 multiples, l’annulation et le retour du focus gardent leur comportement existant.
 Aucun changement API/BFF, dépendance, donnée métier ou environnement.
 
+## Reprise des projets confirmés et formulaires en attente
+
+Kanban, grille et tableau conservent les projets reçus après une lecture refusée,
+annoncent les statistiques périmées et proposent une reprise GET seule protégée.
+Les réponses confirmées de création, duplication et modification sont appliquées
+avant le rafraîchissement, jamais remplacées par le brouillon ni annulées par une
+lecture ancienne. La reprise ne répète aucune écriture confirmée. La duplication
+protège sa source pendant l'écriture et la lecture suivante. Création et édition
+depuis une carte protègent champs, tâches imbriquées et fermeture clavier pendant
+l'attente, gardent le brouillon après refus et ferment après confirmation. La
+recette native en vrai 390×844 couvre ces interactions composées ; voir le README
+pour les preuves et gates main/déploiement restants. Le tableau vide du prototype
+après lecture refusée est volontairement corrigé. Contrats API/BFF et permissions
+inchangés ; aucune donnée de recette publiée.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

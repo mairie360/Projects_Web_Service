@@ -66,8 +66,9 @@ Local Node coverage, 29 component tests, TypeScript, contract checks, lint (four
 existing warnings, zero errors) and a one-worker production build passed. Native
 desktop 1280×720 QA against disposable contract fixtures exercised pending,
 refusal and confirmed retry across Kanban/grid/table, with no contract violations.
-Mobile remains unverified: the integrated browser retained an actual 1280×720
-viewport after requesting 390×844. No synthetic test data or temporary QA server
+That initial mobile attempt was unverified: the browser retained an actual
+1280×720 viewport. The later composed recipe below uses a measured 390×844.
+No synthetic test data or temporary QA server
 is included in the product. Actual-head CI and integration must pass separately.
 ## Frontend image packaging / Packaging des images frontend
 
@@ -151,9 +152,61 @@ copy, refused reads and read-only recovery: exactly one POST and one copy.
 This is preparation, not integration; do not close #208, #210 or #213 before
 actual applicable green CI and main/local-current delivery.
 
-Only merge into main after the prerequisite and all applicable actual-head CI
-are genuinely green. The local all-five rehearsal also includes #214 duplication,
-#212 shared UI and #207 packaging; it is not a main integration or deployment.
+Only merge into main after all applicable actual-head CI is genuinely green.
+The #214 candidate now includes published #207 packaging and #212 shared-UI
+commits as well as #209 read recovery and #211 form protection. This composition
+is not a main integration or deployment; the original checkout and local-current
+remain unchanged until those gates pass.
+
+### Composed comparison — 4 October 2026
+
+The five-slice candidate passed 202 Node tests (89.01% lines, 88.59% branches,
+79.60% functions), 31 React tests, the published BFF Project 0.4.0 contract check,
+TypeScript, lint (zero errors/four inherited warnings) and a one-worker Next
+16.3.6 production build. Temporary worker configuration was restored before
+commit. Source and tests match the all-five rehearsal; composition introduces
+no new client/proxy, contract, API/BFF or deployment changes.
+
+The preserved prototype's unchanged source/public files were built in a separate
+disposable reference runtime with the same installed dependency tree. This is a
+source comparison, not certification of its historical installation. Desktop
+1280×720 and actual mobile 390×844 measurements have identical project heading
+positions and no document overflow. When GET is refused, the reference hides
+its cards without a visible page retry; the candidate keeps received cards,
+announces stale page totals/options and recovers with GET only.
+
+Native 390×844 interactions covered grid duplication while switching to table,
+new-project fields/nested tasks, and card editing. Pending controls and keyboard
+dismissal remain protected; explicit refusal retains drafts; deliberate retry
+accepts the canonical response, closes the form and retains the confirmed
+copy/create/edit despite a failed following read. Read retry never repeats the
+write. The first candidate fixture session recorded 10 GET, four POST and one
+PATCH; a fresh edit-recovery session recorded four GET and two PATCH. Each had
+zero contract violations. These are separate fixture sessions, not a persistence
+test; the reference ledger contains two GET and no write.
+
+The QA servers stopped before an additional composed desktop duplication retry,
+so that interrupted attempt and its fetch error do not certify desktop duplication.
+Earlier isolated desktop evidence remains scoped to its recorded revision. Two
+initial resize screenshots also retained desktop dimensions and are not mobile
+proof; later pending/refusal/confirmed screenshots are genuinely 390×844.
+Remaining shared-shell row/icon/version differences, real authentication,
+multi-role acceptance, persistence and deployed ZAP/k6 are not certified here.
+No fixture data or QA helper enters production. Main CI, integration and exact
+local-current delivery remain mandatory before closing the linked issues.
+
+La composition #214 réunit les commits publiés #207/#212 et les protections
+#209/#211. Les 202 tests Node, 31 tests React, TypeScript, contrat, lint et build
+local passent. La comparaison avec les sources conservées confirme le défaut
+de lecture initial et sa correction, pas l'installation historique. En vrai
+390×844, duplication, création et édition conservent les brouillons refusés et
+les réponses confirmées sans rejouer l'écriture lors d'une reprise GET. Les deux
+sessions du candidat sont distinctes et sans violation de contrat. La tentative
+desktop interrompue n'est pas une réussite ; parité fine AppShell et recette
+déployée restent séparées. Aucune donnée de démonstration, API/BFF, approbation
+d'environnement ou pin de cluster ne change. Les tickets restent ouverts jusqu'à
+une vraie CI verte et la livraison main/local-current.
+
 ## Shared UI alignment / Alignement UI partagé — MAIR-180
 
 This consumer pins the published `@mairie360/lib-components@0.6.10`, including

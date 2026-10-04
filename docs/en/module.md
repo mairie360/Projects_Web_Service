@@ -121,6 +121,20 @@ on desktop and mobile; linked-task focus, multi-selects, cancellation and focus
 restoration retain their existing behavior. No API/BFF, dependency, business
 data or environment change is required.
 
+## Confirmed project recovery and pending forms
+
+Kanban, grid and table retain received projects when a refresh fails, announce
+stale page statistics and offer a guarded GET-only retry. Confirmed create,
+duplicate and edit responses are applied before refreshing, never replaced
+with submitted drafts or undone by an older read. Recovery never repeats a
+confirmed write. Duplication protects its source through the write and follow-up
+read. New-project/card-edit forms protect fields, nested tasks and keyboard
+dismissal while pending, retain drafts after refusal and close only after
+confirmation. Native 390×844 fixture QA covered these composed interactions;
+see the README for exact evidence and remaining main/deployment gates. The
+preserved reference's failed-refresh blank board is deliberately corrected.
+API/BFF contracts and permissions are unchanged; fixture data is never published.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).
