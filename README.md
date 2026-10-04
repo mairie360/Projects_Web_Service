@@ -56,3 +56,49 @@ do not certify deployed BFF availability, authorization or persistence.
 `BACKEND.md`, when present, includes proposed backend requirements; use the guides and versioned OpenAPI contract to identify current behavior.
 
 `BACKEND.md`, lorsqu’il est présent, contient des besoins backend proposés; consulter les guides et le contrat OpenAPI versionné pour identifier le comportement actuel.
+
+## Project form submission recovery (MAIR-459)
+
+Jira [MAIR-459](https://mairie-360.atlassian.net/browse/MAIR-459) and
+[issue #210](https://github.com/mairie360/Projects_Web_Service/issues/210) cover
+**New project** and **Edit from a card**, not the inline detail editor (MAIR-389)
+or the separate read-recovery PR #209.
+
+- A synchronous ref guards duplicate submissions before React can render the
+  pending UI. Pending fields (including nested tasks), cancel, close and Escape
+  cannot discard or alter the submitted draft; focus remains inside the dialog.
+- A refused write keeps the complete form and reports an accessible inline error.
+  A deliberate retry is possible. Only a confirmed POST/PATCH closes and resets
+  the form. A subsequent read failure reports the confirmed save separately and
+  does not invite another write.
+- `tests/projects-form-pending.test.cjs` drives the real page/form and unchanged
+  contract-gated HTTP routes for both modes, including synchronous duplicate
+  callbacks, refusal/retry and confirmed-write/failed-read states. Component
+  checks cover inherited disabled fields, focus trapping and accessible feedback.
+
+Native browser QA against disposable contract-validated fixtures reproduced two
+pending POSTs on the main snapshot and one per attempt on the candidate. Desktop
+creation and card editing (1280×720) retained fields/tasks on refusal, accepted a
+retry and closed after confirmation despite a failed refresh, without a write
+replay. Console health and absence of horizontal overflow were checked. One
+held request also reached the existing 15-second proxy timeout and retained its
+draft; the explicit contract refusal was then verified separately.
+
+Mobile QA subsequently used an actual measured **390×844** viewport: the override
+must be applied to the selected recipe tab, not a background control tab.
+Creation and card editing each protected all fields and keyboard dismissal,
+retained the draft after an explicit refusal, and closed after a confirmed retry
+despite a failed refresh. The held card-edit attempt produced one PATCH and no
+contract violations; its final counter read was unavailable after the temporary
+fixture stopped, so that read is not claimed as evidence. The confirmed-save
+message and closed dialog were observed in the real UI; console and horizontal
+overflow checks passed. Earlier 1280×720 captures are desktop evidence only.
+
+No live BFF authentication/persistence or deployed environment is certified.
+The first PR CI failed the npm security audit on five high-severity findings;
+skipped build/release checks are not passes. Closure still requires green
+applicable CI, integration into main and an exact local-current refresh.
+
+No API/BFF, client/proxy, contract, dependency, shared library, security/workflow,
+environment approval or cluster pin is changed. Fixture data stays outside
+production source and the preserved local-demo remains untouched.

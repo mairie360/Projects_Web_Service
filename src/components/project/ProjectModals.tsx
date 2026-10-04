@@ -63,6 +63,7 @@ export function CreateProjectModal({
   mode,
   form,
   error,
+  pending = false,
   memberOptions,
   labelOptions,
   statusOptions,
@@ -74,6 +75,7 @@ export function CreateProjectModal({
   mode: 'create' | 'edit';
   form: ProjectFormState;
   error: string;
+  pending?: boolean;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   statusOptions: FilterOption[];
@@ -86,6 +88,7 @@ export function CreateProjectModal({
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const dialogRef = React.useRef<HTMLFormElement>(null);
   const titleId = React.useId();
+  const feedbackId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
 
   React.useLayoutEffect(() => {
@@ -100,12 +103,16 @@ export function CreateProjectModal({
     };
   }, []);
 
+  React.useLayoutEffect(() => {
+    if (pending) dialogRef.current?.focus();
+  }, [pending]);
+
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.defaultPrevented || event.nativeEvent.isComposing) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      if (!pending) onClose();
       return;
     }
     if (event.key !== 'Tab') return;
@@ -115,7 +122,7 @@ export function CreateProjectModal({
       'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
     )).filter((element) => {
       const style = window.getComputedStyle(element);
-      return element.tabIndex >= 0 && !element.closest('[hidden], [aria-hidden="true"]') &&
+      return element.tabIndex >= 0 && !element.matches(':disabled') && !element.closest('[hidden], [aria-hidden="true"]') &&
         style.display !== 'none' && style.visibility !== 'hidden';
     });
     const first = focusable[0];
@@ -139,6 +146,8 @@ export function CreateProjectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={pending || error ? feedbackId : undefined}
+        aria-busy={pending}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
         className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
@@ -150,6 +159,7 @@ export function CreateProjectModal({
           </h2>
           <button
             type="button"
+            disabled={pending}
             aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#d7e3e7] transition hover:bg-[#3a3a3a] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6aada9]/45"
             onClick={onClose}
@@ -159,13 +169,16 @@ export function CreateProjectModal({
         </div>
 
         <div className="min-h-0 overflow-y-auto bg-[#f6f4f1] p-5">
+          {pending && (
+            <p id={feedbackId} role="status" className="mb-4 text-sm font-medium text-[#24292f]">Enregistrement en cours…</p>
+          )}
           {error && (
-            <div className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
+            <div id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
               {error}
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-5 border-0 p-0 lg:grid-cols-[minmax(0,1fr)_300px]">
             <section className="space-y-4">
               <div className="rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                 <FormField
@@ -282,18 +295,20 @@ export function CreateProjectModal({
                 </div>
               </div>
             </aside>
-          </div>
+          </fieldset>
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
           <Button
             label="Annuler"
+            disabled={pending}
             type="button"
             onClick={onClose}
             className="!h-9 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-[#fbfaf8] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#f1eee9]"
           />
           <Button
-            label={isEditMode ? 'Enregistrer' : 'Créer le projet'}
+            label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : 'Créer le projet'}
+            disabled={pending}
             type="submit"
             primary
             className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"

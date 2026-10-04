@@ -25,6 +25,40 @@ function FormHarness({ mode, onSubmit, fromMenu = false }) {
 }
 
 describe('project form dialogs', () => {
+  it.each(['create', 'edit'])('contains keyboard focus and protects every nested field during a pending %s write', async (mode) => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onClose = vi.fn();
+    const form = { ...createProjectFormState(), title: 'Brouillon visible', description: 'À conserver', dueDate: '2026-11-17' };
+    const props = { mode, form, error: '', memberOptions: [], labelOptions: [],
+      statusOptions: [{ value: 'todo', label: 'À faire' }], priorityOptions: [{ value: 'medium', label: 'Moyenne' }],
+      onChange, onClose, onSubmit: vi.fn() };
+    const { rerender } = render(<CreateProjectModal {...props} pending />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('aria-busy')).toBe('true');
+    expect(document.activeElement).toBe(dialog);
+    expect(within(dialog).getByRole('status').id).toBe(dialog.getAttribute('aria-describedby'));
+    for (const element of dialog.querySelectorAll('input, textarea, select, button')) expect(element.matches(':disabled')).toBe(true);
+    await user.tab();
+    expect(document.activeElement).toBe(dialog);
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(dialog);
+    await user.keyboard('{Escape}');
+    await user.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    await user.type(within(dialog).getByRole('textbox', { name: /Titre/ }), 'modification');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    const results = await axe(dialog);
+    expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
+    rerender(<CreateProjectModal {...props} pending={false} error="Écriture refusée" />);
+    expect(dialog.getAttribute('aria-busy')).toBe('false');
+    expect(within(dialog).getByRole('alert').id).toBe(dialog.getAttribute('aria-describedby'));
+    expect(within(dialog).getByRole('textbox', { name: /Titre/ }).value).toBe('Brouillon visible');
+    expect(within(dialog).getByRole('textbox', { name: /Titre/ }).matches(':disabled')).toBe(false);
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('returns to the still-present card actions trigger after editing from a dismissed menu', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
