@@ -10,11 +10,13 @@ export function ProjectActionsMenu({
   project,
   onEdit,
   onDuplicate,
+  duplicationPending = false,
   onDelete,
 }: {
   project: Project;
   onEdit?: (project: Project) => void;
   onDuplicate?: (project: Project) => void;
+  duplicationPending?: boolean;
   onDelete?: (project: Project) => void;
 }) {
   const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
@@ -95,7 +97,9 @@ export function ProjectActionsMenu({
           {canDuplicate && <button
             type="button"
             role="menuitem"
-            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
+            disabled={duplicationPending}
+            aria-busy={duplicationPending || undefined}
+            className="flex h-9 w-full items-center px-3 text-left transition enabled:hover:bg-[#0969da] enabled:hover:text-white disabled:cursor-wait disabled:opacity-50"
             onClick={runAction(onDuplicate)}
           >
             Dupliquer

@@ -149,6 +149,7 @@ function EmptyState() {
 
 export function GridView({
   projects,
+  duplicatingProjectIds = [],
   memberOptions,
   labelOptions,
   onProjectOpen,
@@ -158,6 +159,7 @@ export function GridView({
   onProjectTaskAdd,
 }: {
   projects: Project[];
+  duplicatingProjectIds?: string[];
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
@@ -175,6 +177,7 @@ export function GridView({
           key={project.id}
           project={project}
           variant="grid"
+          duplicationPending={duplicatingProjectIds.includes(project.id)}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           onOpen={onProjectOpen}
@@ -190,12 +193,14 @@ export function GridView({
 
 export function TableView({
   projects,
+  duplicatingProjectIds = [],
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
 }: {
   projects: Project[];
+  duplicatingProjectIds?: string[];
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
@@ -253,6 +258,7 @@ export function TableView({
                 <td className="px-5 py-4">
                   <ProjectActionsMenu
                     project={project}
+                    duplicationPending={duplicatingProjectIds.includes(project.id)}
                     onEdit={onProjectEdit}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}

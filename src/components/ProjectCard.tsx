@@ -23,6 +23,7 @@ export { PersonAvatar, PriorityLabel, PriorityPill, ProgressMeter, StatusPill } 
 
 function KanbanProjectCard({
   project,
+  duplicationPending,
   memberOptions,
   labelOptions,
   onOpen,
@@ -54,7 +55,7 @@ function KanbanProjectCard({
             <p className="mt-1 truncate text-xs text-[#57606a]">Mairie360 / projets {getProjectNumber(project)}</p>
           </div>
         </div>
-        <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
+        <ProjectActionsMenu project={project} duplicationPending={duplicationPending} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
       </div>
 
       <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-[#57606a]">{project.description}</p>
@@ -100,6 +101,7 @@ function KanbanProjectCard({
 
 function GridProjectCard({
   project,
+  duplicationPending,
   memberOptions,
   labelOptions,
   onOpen,
@@ -132,7 +134,7 @@ function GridProjectCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <ProjectActionsMenu project={project} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
+          <ProjectActionsMenu project={project} duplicationPending={duplicationPending} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
         </div>
       </div>
 
