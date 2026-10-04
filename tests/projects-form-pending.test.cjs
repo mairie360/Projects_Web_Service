@@ -103,7 +103,12 @@ for (const mode of ['create', 'edit']) {
 
   test(`${mode}: confirmed write closes the form even when the following read fails; no write replay`, async () => {
     await openForm(mode);
-    const details = fixtures.projectDetails(fixtures.projectListItem({ title: draft().title }), draft().taskItems);
+    const official = fixtures.projectListItem({
+      id: mode === 'create' ? 'project-created' : 'project-1',
+      title: 'Nom officiel confirmé',
+      permissions: { ...fixtures.projectListItem().permissions, canEdit: false },
+    });
+    const details = fixtures.projectDetails(official, draft().taskItems);
     harness.bffProject.on(method, path, { status: mode === 'create' ? 201 : 200, body: details });
     harness.bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Lecture indisponible')));
     await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
@@ -113,5 +118,15 @@ for (const mode of ['create', 'edit']) {
     assert.equal(view.props('Alert').type, 'info', 'the confirmed write must not be presented as refused');
     assert.match(view.props('Alert').message, /enregistré\. Actualisation impossible/);
     assert.equal(view.find('ProjectDetailModal').length, mode === 'create' ? 1 : 0);
+    const received = view.props('KanbanBoard').projects;
+    assert.equal(received.filter(project => project.id === official.id).length, 1);
+    assert.equal(received.find(project => project.id === official.id).title, official.title);
+    assert.equal(received.find(project => project.id === official.id).permissions.canEdit, false);
+    if (mode === 'create') await view.act(() => view.props('ProjectDetailModal').onClose());
+    harness.bffProject.on('get', '/projects-page', { body: fixtures.projectsPage(mode === 'create' ? [fixtures.projectListItem(), official] : [official]) });
+    await view.click((props, text, tag) => tag === 'button' && text === 'Réessayer');
+    await view.waitFor(() => view.hostElements((props, text, tag) => tag === 'button' && text === 'Réessayer').length === 0);
+    assert.equal(harness.bffProject.calls(path, method).length, 1, 'read recovery must not replay the confirmed form write');
+    assert.equal(view.find('CreateProjectModal').length, 0);
   });
 }

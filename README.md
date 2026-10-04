@@ -125,3 +125,17 @@ applicable CI, integration into main and an exact local-current refresh.
 No API/BFF, client/proxy, contract, dependency, shared library, security/workflow,
 environment approval or cluster pin is changed. Fixture data stays outside
 production source and the preserved local-demo remains untouched.
+
+### Composition with read recovery
+
+PR #211 now depends on read-recovery PR #209. Their page conflict is resolved
+by retaining the synchronous form guard and applying the confirmed POST/PATCH
+response before refreshing. Create inserts once; edit replaces only its target.
+Canonical titles and permissions come from that response, never the submitted
+draft. The extended form regression closes the created detail before activating
+the read-only retry and verifies that recovery sends no additional write.
+The save-information notice is distinct from the current page-read error.
+
+Only merge into main after the prerequisite and all applicable actual-head CI
+are genuinely green. The local all-five rehearsal also includes #214 duplication,
+#212 shared UI and #207 packaging; it is not a main integration or deployment.
