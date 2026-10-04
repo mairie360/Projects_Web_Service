@@ -69,6 +69,13 @@ refusal and confirmed retry across Kanban/grid/table, with no contract violation
 Mobile remains unverified: the integrated browser retained an actual 1280×720
 viewport after requesting 390×844. No synthetic test data or temporary QA server
 is included in the product. Actual-head CI and integration must pass separately.
+## Frontend image packaging / Packaging des images frontend
+
+MAIR-436 / #206 pins production and development to the official Node 24.21.0 Bookworm slim digest and the same exact Node version in both consumer workflows. Both Dockerfiles use `npm ci` with the tracked npm policy mounted readonly and the existing `node_auth_token` BuildKit secret required only during installation. Supply the credential through `--secret id=node_auth_token,env=NODE_AUTH_TOKEN`, never a build argument. Development keeps npm for its existing command; the non-root standalone production runner retains Node/curl and port 5001 without unused global package managers. All three Compose files adapt only the frontend build secret; the unnecessary development runtime credential mount is removed. Other services and runtime configuration are unchanged.
+
+The repository's required legacy status name is backed by a real blocking Semgrep and redacted Gitleaks job using reviewed immutable shared actions, complete frontend history and read-only contents access. The existing shared 4.0.2 audit remains enabled. No synthetic check or ruleset change is used. Tests in `tests/ci-policy.test.cjs` and `tests/required-security-check.test.cjs` guard this packaging and scanner configuration; actual image, scanner and isolated-stack outcomes still require CI evidence. This slice does not resolve MAIR-436's global permissions, push filters, dependency criteria or other frontends, and does not change product code, APIs/BFFs, contracts, business data, cluster pins or Staging/Prod approvals.
+
+La tranche MAIR-436 / #206 corrige uniquement le packaging consommateur Projects : Node 24.21.0 exact et digest officiel, installation reproductible avec secret temporaire requis/politique npm en lecture seule, aucun jeton d'installation exposé au runtime. Le contrôle GitHub requis exécute réellement les scanners bloquants, sans affaiblir les protections. Les critères globaux et les autres fronts restent ouverts ; les tests isolés ne prouvent pas un déploiement cluster ou la parité métier complète.
 
 ## Contracts and background / Contrats et compléments
 
