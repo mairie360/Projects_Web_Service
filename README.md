@@ -136,6 +136,14 @@ draft. The extended form regression closes the created detail before activating
 the read-only retry and verifies that recovery sends no additional write.
 The save-information notice is distinct from the current page-read error.
 
+PR #214 now includes the resolved #209/#211 composition while remaining targeted
+at main, with all main checks and approval requirements unchanged. Both form and
+duplication refs are retained. Its eighth duplication regression combines early
+repeat callbacks, a pending follow-up GET, view switching, an official confirmed
+copy, refused reads and read-only recovery: exactly one POST and one copy.
+This is preparation, not integration; do not close #208, #210 or #213 before
+actual applicable green CI and main/local-current delivery.
+
 Only merge into main after the prerequisite and all applicable actual-head CI
 are genuinely green. The local all-five rehearsal also includes #214 duplication,
 #212 shared UI and #207 packaging; it is not a main integration or deployment.

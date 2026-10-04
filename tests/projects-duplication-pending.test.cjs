@@ -93,6 +93,38 @@ test('guard remains active during the follow-up GET and across a view change', a
   } finally { pendingRead.release(); await Promise.allSettled(writes); pendingRead.restore(); }
 });
 
+test('pending duplicate and refused refresh compose across views without losing the confirmed copy or replaying POST', async () => {
+  await open();
+  const project = props().projects[0];
+  harness.bffProject.on('post', duplicatePath, { status: 201, body: copy });
+  harness.bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Relecture refusée')));
+  const pendingRead = pause('GET', path => path.startsWith('/projects-page'));
+  const writes = [];
+  try {
+    const originalCallbacks = props();
+    writes.push(originalCallbacks.onProjectDuplicate(project));
+    writes.push(originalCallbacks.onProjectDuplicate(project));
+    await view.waitFor(() => pendingRead.initiated() > 0);
+    await view.click('Grille');
+    writes.push(props('grid').onProjectDuplicate(project));
+    await view.settle();
+    assert.equal(harness.bffProject.calls(duplicatePath, 'post').length, 1);
+    assert.equal(props('grid').projects.filter(value => value.id === copy.project.id).length, 1);
+    assert.match(view.text(), /Duplication du projet/);
+    pendingRead.release();
+    await Promise.all(writes);
+    await view.waitFor(() => view.text().includes('Relecture refusée'));
+    assert.equal(props('grid').projects.find(value => value.id === copy.project.id).title, copy.project.title);
+    assert.doesNotMatch(view.text(), /Duplication du projet/);
+    harness.bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([project, copy.project]) });
+    await view.click((p, text, tag) => tag === 'button' && text === 'Réessayer');
+    await view.waitFor(() => !view.text().includes('Relecture refusée'));
+    assert.equal(harness.bffProject.calls(duplicatePath, 'post').length, 1);
+    assert.equal(props('grid').projects.filter(value => value.id === copy.project.id).length, 1);
+    assert.equal(harness.bffProject.requests.filter(request => request.method !== 'GET').length, 1);
+  } finally { pendingRead.release(); await Promise.allSettled(writes); pendingRead.restore(); }
+});
+
 test('a refused duplication preserves active filters and does not trigger a follow-up read', async () => {
   await open();
   await view.fire((p) => p.type === 'search', 'onChange', { target: { value: 'éclairage' } });
