@@ -15,6 +15,7 @@ type SelectOption = {
 
 type KanbanBoardProps = {
   projects: Project[];
+  duplicatingProjectIds?: string[];
   columns: Array<{ status: Project['status']; label: string }>;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
@@ -41,6 +42,7 @@ const columnPresentation: Record<Project['status'], KanbanColumnPresentation> = 
 
 export function KanbanBoard({
   projects,
+  duplicatingProjectIds = [],
   columns,
   memberOptions,
   labelOptions,
@@ -169,6 +171,7 @@ export function KanbanBoard({
                 >
                   <ProjectCard
                     project={project}
+                    duplicationPending={duplicatingProjectIds.includes(project.id)}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
                     onOpen={onProjectOpen}

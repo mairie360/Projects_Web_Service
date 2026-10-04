@@ -10,6 +10,7 @@ export type SelectOption = {
 export type ProjectCardProps = {
   project: Project;
   variant?: ProjectCardVariant;
+  duplicationPending?: boolean;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
   onOpen?: (project: Project) => void;

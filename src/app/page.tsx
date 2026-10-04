@@ -93,6 +93,8 @@ export default function ProjectsPage() {
   const [projectFormError, setProjectFormError] = useState('');
   const [projectFormPending, setProjectFormPending] = useState(false);
   const projectFormPendingRef = useRef(false);
+  const duplicatingProjects = useRef(new Set<string>());
+  const [duplicatingProjectIds, setDuplicatingProjectIds] = useState<string[]>([]);
   // La session vient de la réponse /projects-page déjà chargée : aucun appel supplémentaire.
   const session = useMemo(() => authSessionFromAccess(projectsPage?.access ?? null), [projectsPage]);
 
@@ -424,6 +426,10 @@ export default function ProjectsPage() {
   };
 
   const duplicateProject = async (project: Project) => {
+    if (project.permissions?.canDuplicate === false || duplicatingProjects.current.has(project.id)) return;
+    // Prevent a second event before React renders the disabled action.
+    duplicatingProjects.current.add(project.id);
+    setDuplicatingProjectIds((current) => [...current, project.id]);
     try {
       const details = await duplicateBffProject(project.id);
       applyConfirmedProject(details, true);
@@ -436,6 +442,9 @@ export default function ProjectsPage() {
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
       showError(error);
+    } finally {
+      duplicatingProjects.current.delete(project.id);
+      setDuplicatingProjectIds((current) => current.filter((id) => id !== project.id));
     }
   };
 
@@ -707,6 +716,11 @@ export default function ProjectsPage() {
               </section>
 
               <section className="pt-8">
+                {duplicatingProjectIds.length > 0 && (
+                  <p role="status" className="mb-4 text-sm font-medium text-[#57606a]">
+                    Duplication du projet en cours…
+                  </p>
+                )}
                 {pageLoading && projects.length === 0 && (
                   <div className="rounded-md border border-[#d9d5d0] bg-white px-5 py-8 text-sm font-medium text-[#57606a]">
                     Chargement des projets...
@@ -735,6 +749,7 @@ export default function ProjectsPage() {
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
+                    duplicatingProjectIds={duplicatingProjectIds}
                     columns={projectsPage?.kanban.columns ?? []}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
@@ -751,6 +766,7 @@ export default function ProjectsPage() {
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
+                    duplicatingProjectIds={duplicatingProjectIds}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
                     onProjectOpen={openProjectDetails}
@@ -764,6 +780,7 @@ export default function ProjectsPage() {
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'table' && (
                   <TableView
                     projects={filteredProjects}
+                    duplicatingProjectIds={duplicatingProjectIds}
                     onProjectOpen={openProjectDetails}
                     onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
