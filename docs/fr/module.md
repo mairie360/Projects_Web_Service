@@ -2,6 +2,12 @@
 
 ## Navigation des modules actifs
 
+Le CSS du front rétablit les cibles de 44px minimum et l’ombre de séparation
+de la sidebar de référence, sans recopier la navigation partagée. Dans le tiroir
+mobile, la sidebar reste sous Fermer ; le clavier et le retour du focus restent
+gérés par l’AppShell publié. Ce style ne simule aucune préférence sauvegardée,
+identité utilisateur ou version fictive (MAIR-180).
+
 Les menus ordinateur et mobile ne proposent plus les modules archivés E-mails
 et Fichiers, comme dans la version locale. L'ordre des autres modules et la
 visibilité réservée aux administrateurs restent inchangés ; Paramètres reste

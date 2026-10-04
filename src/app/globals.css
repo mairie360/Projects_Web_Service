@@ -35,6 +35,24 @@ body {
   color: #172033;
 }
 
+/* Match the reference presentation on the published navigation only. */
+aside[aria-label="Navigation principale"] {
+  position: relative;
+  z-index: 20;
+  box-shadow: 8px 0 24px rgb(12 28 48 / 28%);
+}
+
+aside[aria-label="Navigation principale"] > nav button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+/* Keep the library's explicit Close control above the mobile sidebar. */
+[role="dialog"][aria-label="Navigation mobile"]
+  aside[aria-label="Navigation principale"] {
+  z-index: 0;
+}
+
 .projects-shell > .flex > .flex > main {
   padding: 0;
   background: #f6f4f1;

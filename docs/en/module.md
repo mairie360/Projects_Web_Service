@@ -2,6 +2,12 @@
 
 ## Active-module navigation
 
+The frontend consumer restores the reference sidebar's minimum 44px targets
+and separating shadow without copying shared navigation. In the mobile drawer,
+the sidebar stays below the published Close button; its keyboard and focus
+behavior remain owned by AppShell. No saved appearance preference, user identity
+or fictitious version is supplied by this styling (MAIR-180).
+
 Desktop and mobile menus omit the archived E-mails and Files modules, matching
 the local presentation. The remaining module order and administrator visibility
 are unchanged; Settings remains available through the shared AppShell.

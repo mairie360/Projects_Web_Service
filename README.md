@@ -17,6 +17,15 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 ## Frontend checks / Vérifications du front
 
+The published sidebar keeps the reference's 44px minimum navigation targets and
+separating shadow. The mobile drawer lowers only its sidebar stacking level so
+the shared Close button stays reachable. These consumer styles do not replace
+AppShell or supply saved appearance preferences, identity or demo data (MAIR-180).
+
+La sidebar publiée reprend les cibles de navigation de 44px minimum et l’ombre
+de séparation de la référence. Son niveau d’empilement mobile reste sous Fermer,
+sans remplacer l’AppShell ni simuler des préférences ou données (MAIR-180).
+
 `npm test` runs the existing Node contract/security suite and the Vitest component suite. Use `npm run test:node` or `npm run test:components` for an isolated run. The component checks stub only the published BFF Project client and cover loading, failure, empty data, project/task deep links and basic keyboard/axe accessibility. They do not replace live BFF end-to-end or role-based browser tests.
 
 `npm test` lance les tests Node de contrat/sécurité et les tests de composants Vitest. Les réponses BFF des tests sont synthétiques et restent hors du code de production.
