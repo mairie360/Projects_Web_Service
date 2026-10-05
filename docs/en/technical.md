@@ -80,7 +80,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestrates views and forms. `bffProjectClient.ts` adapts the contract to the presentation model; `projectPageState.ts` centralizes page-state updates. Components in `src/components/project` implement forms and details.
+`src/app/page.tsx` composes the stable `useProjectsController` and
+`ProjectsWorkspace`. The controller retains the page's state/effects, read
+revisions and synchronous mutation guards; the workspace renders inferred props
+without extra reads or local business state. Creation and detail dialogs are
+directly imported from `CreateProjectModal.tsx` and `ProjectDetailModal.tsx`.
+Their existing hook order, callback bodies, focus and pending behavior are
+preserved. `bffProjectClient.ts` still adapts the contract and `projectPageState.ts`
+centralizes page-state updates. The detail's task/collaboration workflow remains
+a separate audit item; these boundaries do not certify logout revocation,
+metadata persistence, deployment or the whole MAIR-408 audit.
 
 The generic proxy reads the versioned OpenAPI contract to allow paths and methods. It preserves query parameters, binary bodies, statuses and useful headers, filters transport headers, disables caching and does not automatically follow redirects. Its timeout is 15 seconds.
 

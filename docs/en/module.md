@@ -159,6 +159,16 @@ see the README for exact evidence and remaining main/deployment gates. The
 preserved reference's failed-refresh blank board is deliberately corrected.
 API/BFF contracts and permissions are unchanged; fixture data is never published.
 
+## Page and dialog boundaries — MAIR-408
+
+List filters and Kanban/grid/table, project creation/editing, nested task drafts
+and detail follow-up keep their existing behavior. State and commands have a
+single page-lifetime controller; the view and two dialogs are stable, separate
+components. A background view refresh must not reset an open form's nested tasks,
+task search or an unsent comment. No new request, permission, data source or
+environment setting is introduced. Further detail-workflow audit and integration
+remain separate from this structural change.
+
 ## Role within Mairie360
 
 Associated repositories: [BFF_Project](https://github.com/mairie360/BFF_Project).

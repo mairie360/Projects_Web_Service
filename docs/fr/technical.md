@@ -82,7 +82,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestre vues et formulaires. `bffProjectClient.ts` adapte le contrat au modèle de présentation; `projectPageState.ts` centralise la mise à jour de l’état de page. Les composants du dossier `src/components/project` portent les formulaires et détails.
+`src/app/page.tsx` compose le contrôleur stable `useProjectsController` et
+`ProjectsWorkspace`. Le contrôleur conserve état/effets, révisions des lectures
+et gardes synchrones des mutations ; le rendu utilise ses props inférées sans
+lecture supplémentaire ni état métier dupliqué. Les dialogues sont importés
+directement depuis `CreateProjectModal.tsx` et `ProjectDetailModal.tsx`.
+Ordre des hooks, corps des callbacks, focus et protections pendant l'attente
+restent identiques. `bffProjectClient.ts` adapte toujours le contrat et
+`projectPageState.ts` centralise les mises à jour. Les tâches/collaborations du
+détail restent un volet d'audit distinct ; ce découpage ne certifie ni révocation,
+persistance des métadonnées, déploiement ou totalité de MAIR-408.
 
 Le proxy générique lit le contrat OpenAPI versionné pour autoriser chemins et méthodes. Il conserve paramètres de requête, corps binaire, statuts et en-têtes utiles, filtre les en-têtes de transport, désactive le cache et n’effectue pas de suivi automatique des redirections. Son délai est de 15 secondes.
 

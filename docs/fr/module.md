@@ -151,6 +151,17 @@ pour les preuves et gates main/déploiement restants. Le tableau vide du prototy
 après lecture refusée est volontairement corrigé. Contrats API/BFF et permissions
 inchangés ; aucune donnée de recette publiée.
 
+## Frontières de page et dialogues — MAIR-408
+
+Filtres et vues Kanban/grille/tableau, création/édition des projets, brouillons
+de tâches imbriquées et suivi du détail gardent leur comportement existant.
+L'état et les commandes ont un seul contrôleur lié à la durée de vie de la page ;
+le rendu et les deux dialogues sont des composants stables distincts. Une
+actualisation de vue ne réinitialise pas les tâches d'un formulaire ouvert,
+la recherche de tâches ou un commentaire non envoyé. Aucun nouvel appel, droit,
+source de données ou réglage d'environnement. Audit complémentaire du détail et
+intégration restent distincts de ce changement de structure.
+
 ## Place dans Mairie360
 
 Dépôts associés: [BFF_Project](https://github.com/mairie360/BFF_Project).

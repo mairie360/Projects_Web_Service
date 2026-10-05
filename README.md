@@ -263,6 +263,28 @@ déployée restent séparées. Aucune donnée de démonstration, API/BFF, approb
 d'environnement ou pin de cluster ne change. Les tickets restent ouverts jusqu'à
 une vraie CI verte et la livraison main/local-current.
 
+## Page and dialog boundaries / Frontières de page — MAIR-408
+
+The preserved prototype and previous candidate group page state, commands and
+rendering in one file. The route now composes a single `useProjectsController`
+and stable `ProjectsWorkspace`; creation and detail dialogs have direct separate
+modules. Existing state/command statements, render return and both dialogs'
+bodies/parameters are preserved; no new effect, network request or state owner.
+Structural tests and real-page regressions protect nested creation tasks, task
+search and unsent comments through underlying view refreshes. The remaining
+detail workflow, deployed authentication/revocation and metadata persistence
+are not declared complete. References: [MAIR-408](https://mairie-360.atlassian.net/browse/MAIR-408)
+and [issue219](https://github.com/mairie360/Projects_Web_Service/issues/219),
+created from GitHub Project3, in [PR214](https://github.com/mairie360/Projects_Web_Service/pull/214).
+
+Le prototype conservé et le candidat regroupaient état, actions et rendu.
+Le contrôleur garde leur durée de vie et leurs protections ; le rendu et les
+dialogues sont séparés sans changer corps des fonctions ou callbacks. Brouillons
+imbriqués, recherche de tâches et commentaires non envoyés restent conservés
+pendant une actualisation. Aucun API/BFF, client/proxy/auth/middleware/contrat,
+dépendance, workflow, droit, environnement, pin ou donnée de démonstration livré.
+CI verte, intégration et vérification du snapshot restent obligatoires.
+
 ## Shared UI alignment / Alignement UI partagé — MAIR-180
 
 This consumer pins the published `@mairie360/lib-components@0.6.10`, including

@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { describe, expect, it, vi } from 'vitest';
-import { CreateProjectModal } from '@/components/project/ProjectModals';
+import { CreateProjectModal } from '@/components/project/CreateProjectModal';
 import { ProjectActionsMenu } from '@/components/project-card/ProjectActionsMenu';
 import { createProjectFormState } from '@/lib/projectPageState';
 

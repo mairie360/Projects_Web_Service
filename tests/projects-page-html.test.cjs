@@ -404,6 +404,54 @@ test('creating a project posts the form, reloads the page and announces the succ
   assert.match(html, /Projet &quot;Fête de la musique&quot; créé\./);
 });
 
+test('module boundaries preserve a nested creation draft across view and page refreshes without writes', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Brouillon entre composants', description: 'À conserver',
+    responsible: fixtures.people.marie.id, dueDate: '2026-11-17',
+    taskItems: [fixtures.projectTask({ title: 'Tâche imbriquée à conserver' })],
+    totalTasks: 1, completedTasks: 0, progress: 0,
+  }));
+  const draft = structuredClone(view.props('CreateProjectModal').form);
+  for (const value of ['grid', 'table', 'kanban']) {
+    const reads = pageCalls().length;
+    await view.act(() => view.props('ViewToggle').onChange(value));
+    await view.waitFor(() => pageCalls().length === reads + 1);
+    assert.deepEqual(view.props('CreateProjectModal').form, draft);
+    assert.equal(view.find('CreateProjectModal').length, 1);
+    assert.match(view.text(), /Tâche imbriquée à conserver/);
+  }
+  await view.act(() => view.props('CreateProjectModal').onClose());
+  assert.equal(view.find('CreateProjectModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('module boundaries retain detail task search and comment drafts through underlying view refreshes', async () => {
+  await renderLoadedPage();
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.fire(props => props.placeholder === 'Rechercher une tâche', 'onChange', { target: { value: 'candélabres' } });
+  await view.click((props, text, tag) => tag === 'button' && text === 'Suivi');
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Commentaire non envoyé' } });
+  for (const value of ['grid', 'table']) {
+    const reads = pageCalls().length;
+    await view.act(() => view.props('ViewToggle').onChange(value));
+    await view.waitFor(() => pageCalls().length === reads + 1);
+    assert.equal(view.find('ProjectDetailModal').length, 1);
+    assert.match(view.html, /placeholder="Rechercher une tâche"[^>]*value="candélabres"/);
+    const comment = view.hostElements(props => props.placeholder === 'Ajouter un commentaire...');
+    assert.equal(comment.length, 1);
+    assert.equal(comment[0].props.value, 'Commentaire non envoyé');
+  }
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length, 1);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
 test('an incomplete creation form is refused in the page without any network call', async () => {
   await renderLoadedPage();
 

@@ -63,7 +63,7 @@ These commands run offline. After a bump, also move the `bff-project` image tags
 
 ## Architecture
 
-- **Shared shell and profile routing (MAIR-180)** — `src/app/page.tsx` uses
+- **Shared shell and profile routing (MAIR-180)** — `ProjectsWorkspace` uses
   the published-library `AppShell` with BFF-derived role/permissions and runtime
   destinations for active modules. Authenticated legacy `/profile` URLs redirect
   to validated `SETTINGS_FRONT_URL` in frontend middleware; invalid or missing
@@ -73,13 +73,22 @@ These commands run offline. After a bump, also move the `bff-project` image tags
 - **Contract-gated catch-all proxy** — `src/app/[...path]/route.ts` exports `proxyBffRequest` (`src/lib/bff-proxy.ts`) for every method. It matches the path against `contracts/openapi.json` `paths` (brace segments are wildcards): unknown path → 404, method not declared → 405 with `Allow`, `.`/`..` segments → 400; `/openapi.json` and `/swagger.json` are always forwarded. **A BFF route is therefore reachable from the browser only once the synced contract declares it.**
 - **`forwardToBff`** strips hop-by-hop headers and the `cookie` header, turns the `accessToken` cookie into `Authorization: Bearer` when no Authorization header is present, keeps the query string and raw (binary) body, uses `redirect: 'manual'`, a 15 s timeout and `Cache-Control: no-store`, preserves upstream status/headers (including `Set-Cookie`, empty 204/205/304 bodies) and returns a controlled 502 JSON error when the BFF is unreachable. `tests/proxy.test.cjs` pins this behaviour.
 - **BFF URL** — `BFF_PROJECT_BASE_URL` → `PROJECT_BFF_URL` → `NEXT_PUBLIC_BFF_PROJECT_BASE_URL`; resolved at request time on the server. Missing or invalid configuration returns an uncached 503 without contacting an upstream; configure an URL explicitly for local development too.
-- **Session** — there is no session adapter. The shell's session comes from BFF_Project's `access` block (`role`, `scope`, `can*`) in `GET /projects-page`; `src/app/page.tsx` derives it from the page response it already loads (`authSessionFromAccess`). Legacy profile routes are handled by frontend middleware without fetching business data.
+- **Session** — there is no session adapter. The shell's session comes from BFF_Project's `access` block (`role`, `scope`, `can*`) in `GET /projects-page`; `useProjectsController` derives it from the page response it already loads (`authSessionFromAccess`). Legacy profile routes are handled by frontend middleware without fetching business data.
 
   The published contract has no identity (name, e-mail), so the header shows the role label.
 - **Logout** — `logoutAndReload()` (`src/lib/auth-token.ts`) posts to the local `src/app/api/auth/logout/route.ts`, which only clears the `accessToken` cookie on `COOKIE_DOMAIN` (`src/lib/access-token-cookie.ts`, shared with the middleware). It then clears `localStorage` and reloads, and the middleware redirects to Login. The session is not revoked server-side: BFF_Project's contract has no logout route. The client calls it on any 401.
 - **Auth gate** — `src/middleware.ts` redirects every page request (matcher excludes `/api`, `/_next/static`, `/_next/image` and paths with a dot) to `LOGIN_FRONT_URL` when the `accessToken` cookie is missing or its JWT `exp` is past, clearing the cookie on `COOKIE_DOMAIN`. It only decodes the payload; signature validation is the BFF/Core's job. Note that the catch-all data routes (e.g. `/health`) also pass through it. For authenticated requests it also sets a per-request nonce `Content-Security-Policy` (built in `src/lib/content-security-policy.ts`, forwarded to Next.js via request headers), which is why `src/app/layout.tsx` forces dynamic rendering: a prerendered page would carry no nonce and its scripts would be blocked. Any new external origin (images, fonts, browser-side API calls) must be added to that policy.
 - **Client calls** — pages call same-origin paths (e.g. `/projects-page`, `/projects/*`) through clients that parse `{ error: { message } }` / `{ message }` bodies into typed errors. Requests never read, migrate or send a Bearer token from localStorage; the unchanged proxy uses the HttpOnly cookie when no explicit Authorization header is provided. Legacy token helpers remain isolated from client request construction, and existing logout cleanup still clears legacy storage (MAIR-408). Browser requests use manual redirects: an opaque redirect reloads the current protected document once per Location, before inspecting status or body, then rejects with `BffProjectNavigationRequiredError`. Existing middleware owns Login and the document return URL. Aborted responses cannot navigate; no mutation is automatically replayed. Generic network failures and 403/503 are not treated as expired sessions.
-- `src/app/page.tsx` orchestrates views and forms; `src/lib/bffProjectClient.ts` adapts the OpenAPI contract to the presentation model (`src/types/project.tsx`) and `src/lib/projectPageState.ts` centralises page-state updates.
+- **Stable page boundaries (MAIR-408)** — `src/app/page.tsx` composes one
+  `useProjectsController` and the top-level `ProjectsWorkspace`. The controller
+  owns the existing state, effects, read revisions and mutation guards for the
+  page's lifetime; the workspace renders its inferred props without extra reads
+  or duplicated state. `CreateProjectModal` and `ProjectDetailModal` have direct
+  module imports and stable component identities. Keep those boundaries during
+  rerenders so nested task/comment drafts, pending state and focus are retained.
+  `ProjectDetailModal` still contains the task/collaboration workflow; this split
+  does not complete that further audit or change session/revocation policy.
+- `src/lib/bffProjectClient.ts` adapts the OpenAPI contract to the presentation model (`src/types/project.tsx`) and `src/lib/projectPageState.ts` centralises page-state updates.
 - `src/components/project/` implements forms, modals, task editor and views; `src/components/project-card/` + `Kanban.tsx` / `ProjectCard.tsx` render cards. `src/lib/navigation.ts` supplies validated runtime destinations to the shared shell.
 - `next.config.ts` sets `output: 'standalone'` (required by the Dockerfile), `poweredByHeader: false` and static security headers on every route (`tests/security-headers.test.cjs` pins them, and the ZAP baseline fails without them). `*_FRONT_URL` destinations are read at runtime, not baked into the image.
 
