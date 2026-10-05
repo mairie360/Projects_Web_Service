@@ -17,6 +17,23 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 ## Frontend checks / Vérifications du front
 
+### Cookie session precedence / Priorité de la session cookie — MAIR-408
+
+Project reads and mutations no longer read, migrate or automatically send tokens
+from browser localStorage. A stale legacy token cannot override the cookie used
+by the unchanged proxy. No cookie means no storage-derived fallback session.
+Existing local logout cleanup and explicit-header proxy behavior are preserved;
+no API/BFF, auth route, middleware, contract or dependency is changed. The mixed
+audit's revocation, redirection, persistence and component-size concerns remain
+separate. Tracking: [issue216](https://github.com/mairie360/Projects_Web_Service/issues/216)
+and the existing composed PR214; integration requires the actual CI security gates.
+
+Les lectures et mutations Projects ne lisent, ne migrent et n’envoient plus
+automatiquement les jetons du stockage local. Un ancien jeton ne remplace plus
+le cookie utilisé par le proxy inchangé. Sans cookie, aucun fallback de stockage
+n’est réintroduit. Nettoyage au logout, proxy et authentification serveur restent
+inchangés. Les autres volets de MAIR-408 ne sont pas déclarés terminés.
+
 The published sidebar keeps the reference's 44px minimum navigation targets and
 separating shadow. The mobile drawer lowers only its sidebar stacking level so
 the shared Close button stays reachable. These consumer styles do not replace

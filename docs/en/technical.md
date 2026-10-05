@@ -1,5 +1,16 @@
 # Projects_Web_Service — Technical documentation
 
+## Frontend credential construction — MAIR-408
+
+`createRequestHeaders` only provides Accept and JSON Content-Type defaults and
+preserves caller-supplied headers. It does not invoke stored-token helpers. The
+unchanged same-origin proxy derives Authorization from the HttpOnly cookie when
+there is no explicit header; server authentication is not changed. Legacy
+helpers remain available but are not used by project request construction.
+Existing401 logout cleanup is preserved. Contract-backed client tests cover
+stale/current and legacy storage, cookie precedence, storage denial, reads and
+duplication; they do not prove browser storage or a deployed session end-to-end.
+
 ## Shared footer — MAIR-180
 
 The unchanged CI audit exposed the transitive tooling dependency

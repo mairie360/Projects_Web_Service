@@ -1,5 +1,13 @@
 # Projects_Web_Service — Module overview
 
+## Current session instead of stale local tokens (MAIR-408)
+
+Project reads and actions no longer use stored browser JWTs. The existing
+same-origin cookie session remains the sole automatic credential source through
+the unchanged proxy. Legacy storage is neither read nor migrated by requests;
+its existing logout cleanup is preserved. This frontend slice does not prove
+deployed authentication, server-side revocation or business-data persistence.
+
 ## Active-module navigation
 
 The frontend consumer restores the reference sidebar's minimum 44px targets

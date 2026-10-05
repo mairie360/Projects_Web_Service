@@ -18,7 +18,6 @@ import type {
 import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
-  getStoredAuthorizationHeader,
   logoutAndReload,
   storeAuthJwtToken,
 } from './auth-token';
@@ -147,14 +146,6 @@ function createRequestHeaders(init: RequestInit) {
 
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
-  }
-
-  if (!headers.has('Authorization')) {
-    const authorizationHeader = getStoredAuthorizationHeader();
-
-    if (authorizationHeader) {
-      headers.set('Authorization', authorizationHeader);
-    }
   }
 
   return headers;

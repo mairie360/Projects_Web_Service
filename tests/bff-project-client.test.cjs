@@ -67,8 +67,9 @@ describe('lecture des projets', () => {
     assert.equal(page.access.role, 'Responsable');
   });
 
-  test('sans filtre ni cookie, le jeton stocké (y compris la clé historique) sert d’Authorization', async () => {
+  test('sans cookie, aucun jeton de stockage actuel ou historique ne devient une Authorization', async () => {
     harness.cookies.clear();
+    harness.storage.setItem('mairie360.auth.jwt', 'stale-session');
     harness.storage.setItem('mairie360.projects.jwt', ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
@@ -76,18 +77,43 @@ describe('lecture des projets', () => {
 
     const call = onlyCall('/projects-page', 'get');
     assert.equal(call.url.search, '');
-    assert.equal(call.headers.authorization, bearer(fixtures.agents.alice));
-    assert.equal(client.getStoredBffProjectJwtToken(), fixtures.jwt(fixtures.agents.alice.id));
-    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), fixtures.jwt(fixtures.agents.alice.id));
+    assert.equal(call.headers.authorization, undefined);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'stale-session');
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
   });
 
-  test('un en-tête Authorization explicite n’est jamais remplacé par le cookie', async () => {
+  test('un jeton stocké ne remplace jamais la session valide du cookie', async () => {
     client.storeBffProjectJwtToken('Bearer explicit-session');
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
     await client.getProjectsPage({ view: 'kanban' });
 
-    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, 'Bearer explicit-session');
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
+    assert.equal(harness.cookies.has('accessToken'), true);
+  });
+
+  test('la lecture des projets ne lit ni ne migre le stockage hérité', async (t) => {
+    harness.storage.setItem('mairie360.projects.jwt', fixtures.jwt(fixtures.agents.alice.id));
+    const read = t.mock.method(harness.storage, 'getItem', () => { throw new Error('Storage inaccessible'); });
+    const write = t.mock.method(harness.storage, 'setItem', () => { throw new Error('Storage inaccessible'); });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
+
+    await client.getProjectsPage();
+
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(read.mock.callCount(), 0);
+    assert.equal(write.mock.callCount(), 0);
+  });
+
+  test('une mutation ne transmet aucun jeton stocké en remplacement du cookie', async () => {
+    harness.storage.setItem('mairie360.auth.jwt', 'expired-local-token');
+    bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: fixtures.projectDetails() });
+
+    await client.duplicateProject('project-1');
+
+    assert.equal(onlyCall('/projects/{projectId}/duplicate', 'post').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
   });
 
   test('clearStoredBffProjectJwtToken efface le jeton stocké', () => {

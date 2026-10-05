@@ -1,5 +1,14 @@
 # Projects_Web_Service — Présentation du module
 
+## Session courante plutôt que jeton local ancien (MAIR-408)
+
+Les lectures et actions Projects n’utilisent plus les JWT stockés dans le
+navigateur. Le cookie de session same-origin reste la seule source automatique
+de credentials via le proxy inchangé. Les requêtes ne lisent ni ne migrent le
+stockage hérité ; son nettoyage existant au logout est conservé. Cette tranche
+frontend ne certifie ni authentification déployée, révocation serveur ni
+persistance métier.
+
 ## Navigation des modules actifs
 
 Le CSS du front rétablit les cibles de 44px minimum et l’ombre de séparation

@@ -1,5 +1,17 @@
 # Projects_Web_Service — Documentation technique
 
+## Construction des credentials frontend — MAIR-408
+
+`createRequestHeaders` ajoute seulement Accept et Content-Type JSON par défaut
+et conserve les en-têtes explicitement fournis. Il n’appelle plus les helpers
+de jeton stocké. Le proxy same-origin inchangé dérive Authorization du cookie
+HttpOnly en l’absence d’en-tête explicite ; l’authentification serveur ne change
+pas. Les helpers historiques restent disponibles mais ne sont pas branchés sur
+la construction des requêtes Projects. Le cleanup existant après401 est conservé.
+Les tests client avec contrat couvrent stockage ancien/actuel/historique, priorité
+du cookie, stockage refusé, lectures et duplication ; ils ne certifient pas un
+stockage navigateur ou une session déployée de bout en bout.
+
 ## Pied de page partagé — MAIR-180
 
 L’audit CI inchangé a détecté la dépendance d’outillage transitive
