@@ -1,5 +1,15 @@
 # Projects_Web_Service — Présentation du module
 
+## Réouverture de la page protégée après redirection (MAIR-408)
+
+Si une lecture ou une action reçoit une redirection opaque, le front recharge
+une seule fois le document protégé courant. Le middleware existant choisit Login
+et le chemin de retour, pas la requête de données. Une lecture annulée ne navigue
+pas et une action n’est jamais rejouée automatiquement. Un vrai 401 conserve le
+logout local ; 403, indisponibilité et panne réseau ne deviennent pas des erreurs
+d’authentification. Aucun comportement API/BFF ou de route d’authentification ne
+change. Authentification déployée, révocation et persistance restent non certifiées.
+
 ## Session courante plutôt que jeton local ancien (MAIR-408)
 
 Les lectures et actions Projects n’utilisent plus les JWT stockés dans le

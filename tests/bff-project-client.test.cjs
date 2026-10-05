@@ -276,6 +276,78 @@ describe('écritures sur les tâches', () => {
 });
 
 describe('erreurs du BFF', () => {
+  test('les redirections opaques des lectures rechargent la page protégée sans inspecter ni suivre leur destination', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return Object.defineProperties({ type: 'opaqueredirect' }, {
+        status: { get() { throw new Error('opaque status must not be read'); } },
+        ok: { get() { throw new Error('opaque status must not be read'); } },
+        headers: { get() { throw new Error('opaque Location must not be read'); } },
+        json: { get() { throw new Error('opaque body must not be read'); } },
+      });
+    });
+
+    const results = await Promise.allSettled([
+      client.getProjectsPage({ q: 'éclairage' }),
+      client.getProjectDetails('project-1'),
+      client.getTaskCollaboration('project-1', 'task-1'),
+    ]);
+
+    assert.ok(results.every(result => result.status === 'rejected' && result.reason.name === 'BffProjectNavigationRequiredError'));
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 3);
+    assert.ok(requests.every(({ init }) => init.redirect === 'manual'));
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('une redirection opaque après mutation ne réémet pas automatiquement cette mutation', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.duplicateProject('project-1'), { name: 'BffProjectNavigationRequiredError' });
+
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].path, '/projects/project-1/duplicate');
+    assert.equal(requests[0].init.method, 'POST');
+    assert.equal(requests[0].init.redirect, 'manual');
+    assert.equal(requests[0].init.body, undefined);
+  });
+
+  test('une réponse opaque annulée ne déclenche aucune navigation', async (t) => {
+    const controller = new AbortController();
+    t.mock.method(global, 'fetch', async () => {
+      controller.abort();
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.getProjectsPage({}, controller.signal), { name: 'AbortError' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('un refus réseau générique ne devient ni une session expirée ni une navigation', async (t) => {
+    t.mock.method(global, 'fetch', async () => { throw new TypeError('Network unavailable'); });
+
+    await assert.rejects(client.getProjectsPage(), { name: 'TypeError', message: 'Network unavailable' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
   test('les erreurs ApiError documentées deviennent des BffProjectError typées', async () => {
     const cases = [
       [400, () => client.createProject(client.createProjectBodyFromForm(projectForm())), 'post', '/projects', fixtures.apiError('BAD_REQUEST', 'Titre requis', [{ path: 'title' }])],

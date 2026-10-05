@@ -17,6 +17,36 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 ## Frontend checks / Vérifications du front
 
+### Protected navigation after a redirect / Navigation protégée après redirection — MAIR-408
+
+Project requests use manual redirects. An opaque redirect reopens the current
+protected page once, so the existing middleware chooses Login and the return URL;
+the client never reads the hidden Location or follows a data-route destination.
+Aborted reads cannot navigate, and mutations are never automatically replayed.
+Real 401 replies retain the existing local logout; 403, service and network
+failures remain ordinary errors. API/BFF, middleware, proxy and auth routes are
+unchanged. This does not certify deployed authentication or server revocation.
+
+Une redirection opaque recharge une seule fois la page protégée courante, sans
+lire sa destination masquée ni rejouer une écriture. Le middleware existant
+garde le choix de Login et du chemin de retour. Une lecture annulée ne navigue
+pas ; 403, indisponibilité et erreur réseau ne déclenchent aucune déconnexion.
+La recette isolée ne constitue pas une validation de l’authentification déployée.
+
+Validation on 5 October: 210 Node tests, 31 component tests, TypeScript,
+published contract, lint (four inherited warnings) and production build pass.
+Native 1280×720 QA reproduces the expired-cookie defect on main and verifies
+the candidate's document return path, existing401 logout and read-only recovery
+after403/503. The fixture ledger records eight upstream GET and no writes or
+contract violations. The requested390×844 override stayed1280×720, so mobile
+is not validated. Login is a labelled QA landing; integration still requires
+all actual-head CI gates. No test fixture is shipped in product source.
+
+Vérifications du5octobre : 210testsNode,31composants, types, contrat, lint
+et build réussis. Recette native1280×720 avant/après qualifiée ; huitGET,
+aucune écriture amont ni violation de contrat. Login reste une destination
+QA étiquetée. Mobile non validé et intégration conditionnée aux CI réelles.
+
 ### Cookie session precedence / Priorité de la session cookie — MAIR-408
 
 Project reads and mutations no longer read, migrate or automatically send tokens

@@ -1,5 +1,15 @@
 # Projects_Web_Service — Module overview
 
+## Reopening the protected page after a redirect (MAIR-408)
+
+When a read or action receives an opaque redirect, the frontend reopens the
+current protected document once. Existing middleware owns the Login destination
+and return path, not the data request. An aborted read does not navigate and an
+action is never replayed automatically. A real 401 keeps existing local logout;
+403, unavailable-service and network errors do not become authentication errors.
+No API/BFF or authentication-route behavior changes. Deployed authentication,
+server revocation and durable data remain outside this isolated verification.
+
 ## Current session instead of stale local tokens (MAIR-408)
 
 Project reads and actions no longer use stored browser JWTs. The existing

@@ -1,5 +1,16 @@
 # Projects_Web_Service — Documentation technique
 
+## Redirections opaques du client navigateur — MAIR-408
+
+`requestBff` impose `redirect: 'manual'` puis vérifie l’AbortSignal après réception.
+Le type `opaqueredirect` est traité avant statut, en-têtes et corps :
+`BffProjectNavigationRequiredError` signale la navigation sans supposer un 401
+ni inspecter Location. Un WeakSet indexé par Location limite les réponses
+parallèles à un rechargement du document ; aucune lecture ni mutation n’est
+rejouée. Le middleware inchangé construit Login et le retour au document initial.
+Le cleanup 401 existant reste conservé. Erreurs réseau et vrais 403/503 ne
+rechargent pas la page. Routes, méthodes et payloads contractuels sont inchangés.
+
 ## Construction des credentials frontend — MAIR-408
 
 `createRequestHeaders` ajoute seulement Accept et Content-Type JSON par défaut
