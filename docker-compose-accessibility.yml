@@ -1,15 +1,14 @@
-# Stack de test de sécurité dynamique (DAST) ISOLÉE pour le front Projects (Projects_Web_Service).
+# Accessibility (RGAA) test stack of the projects front (MAIR-316 / MAIR-317).
 #
-#   ./security_test.sh (local: builds the front when IMAGE_REF is empty,
-#                       NODE_AUTH_TOKEN exported for the build)
-#   IMAGE_REF=<image>:dev-<sha> ./security_test.sh   (CI, MAIR-317: the published image)
+#   ./accessibility_test.sh        (local: builds the front when IMAGE_REF is empty)
 #
-# security-scan (OWASP ZAP baseline) explore l'application Next.js servie par
-# l'image de production (Dockerfile, sortie standalone) avec un cookie de session
-# accessToken valide (replacer), comme un navigateur authentifié : pages, assets,
-# en-têtes HTTP et routes relayées vers BFF Project. Sort en échec sur toute alerte
-# WARN/FAIL non neutralisée dans .zap/rules.tsv (les alertes informatives y sont
-# passées à IGNORE).
+# Same stack as docker-compose-security.yml (database + seed, core-api, project-api, bff-user,
+# bff-project), plus the data of the RGAA states (init-accessibility.sql, seeder-a11y), with the
+# front on ${IMAGE_REF} (staging-<sha> in the CI, release-prod job) and, instead of ZAP, the runner
+# of the RGAA engine of mairie360/CICD (cicd-repo/tests/a11y), which plays the states of rgaa.yaml
+# and writes rgaa-report/. Each state is played as one of the users of rgaa.yaml, with an
+# accessToken the engine signs with the JWT_SECRET below. Exit codes: 0 ok, 1 state unreachable /
+# undeclared criterion, 2 invalid rgaa.yaml, 3 rate below RGAA_MIN_RATE.
 
 volumes:
   postgres-data:
@@ -26,8 +25,8 @@ x-db-env: &db-env
   DB_HOST: postgres
   DB_PORT: 5432
 
-# JWT_SECRET identique sur toute la chaîne : le cookie accessToken du front est
-# relayé tel quel (Bearer) à BFF_Project, seul BFF de ce front, puis à BFF User et aux APIs.
+# Same JWT_SECRET along the chain: the accessToken cookie of the front is relayed as is (Bearer)
+# to BFF_Project, the only BFF of this front, then to BFF User and the APIs.
 x-api-env: &api-env
   <<: *db-env
   HOST: "0.0.0.0"
@@ -38,7 +37,7 @@ x-api-env: &api-env
 services:
   postgres:
     image: ${DB_IMAGE:-ghcr.io/mairie360/database:1.3.0}
-    container_name: projects-front-sec-db
+    container_name: projects-front-a11y-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -57,7 +56,7 @@ services:
 
   liquibase:
     image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:1.3.0}
-    container_name: projects-front-sec-liquibase
+    container_name: projects-front-a11y-liquibase
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,7 +73,7 @@ services:
 
   seeder:
     image: postgres:18-alpine
-    container_name: projects-front-sec-seeder
+    container_name: projects-front-a11y-seeder
     depends_on:
       liquibase:
         condition: service_completed_successfully
@@ -87,9 +86,26 @@ services:
     networks:
       - backend
 
+  # Data of the RGAA states (init-accessibility.sql): accessibility stack only, ZAP / k6 keep the
+  # minimal seed of init-test.sql.
+  seeder-a11y:
+    image: postgres:18-alpine
+    container_name: projects-front-a11y-seeder-a11y
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+    volumes:
+      - ./init-accessibility.sql:/init-accessibility.sql:ro
+    environment:
+      PGPASSWORD: password
+    command: >
+      sh -c "psql -v ON_ERROR_STOP=1 -h postgres -U postgres -d mairie_360_database -f /init-accessibility.sql"
+    networks:
+      - backend
+
   redis:
     image: redis:8.4.0-bookworm
-    container_name: projects-front-sec-redis
+    container_name: projects-front-a11y-redis
     expose:
       - "6379"
     volumes:
@@ -104,7 +120,7 @@ services:
 
   core-api:
     image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:1.2.0}
-    container_name: projects-front-sec-core-api
+    container_name: projects-front-a11y-core-api
     depends_on:
       liquibase:
         condition: service_completed_successfully
@@ -118,12 +134,11 @@ services:
       - "3000"
     networks:
       - backend
-    # L'image publiée est "distroless" (ni shell ni curl) : la disponibilité est
-    # sondée depuis le conteneur core-api-ready ci-dessous.
+    # The published image is distroless (no shell, no curl): core-api-ready below probes it.
 
   core-api-ready:
     image: curlimages/curl:latest
-    container_name: projects-front-sec-core-api-ready
+    container_name: projects-front-a11y-core-api-ready
     depends_on:
       core-api:
         condition: service_started
@@ -135,7 +150,7 @@ services:
 
   project-api:
     image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:0.5.1}
-    container_name: projects-front-sec-project-api
+    container_name: projects-front-a11y-project-api
     depends_on:
       liquibase:
         condition: service_completed_successfully
@@ -149,12 +164,11 @@ services:
       - "3001"
     networks:
       - backend
-    # L'image publiée est "distroless" (ni shell ni curl) : la disponibilité est
-    # sondée depuis le conteneur project-api-ready ci-dessous.
+    # The published image is distroless (no shell, no curl): project-api-ready below probes it.
 
   project-api-ready:
     image: curlimages/curl:latest
-    container_name: projects-front-sec-project-api-ready
+    container_name: projects-front-a11y-project-api-ready
     depends_on:
       project-api:
         condition: service_started
@@ -166,9 +180,9 @@ services:
 
   bff-user:
     image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:0.5.0}
-    container_name: projects-front-sec-bff-user
+    container_name: projects-front-a11y-bff-user
     depends_on:
-      seeder:
+      seeder-a11y:
         condition: service_completed_successfully
       core-api-ready:
         condition: service_completed_successfully
@@ -186,7 +200,7 @@ services:
 
   bff-user-ready:
     image: curlimages/curl:latest
-    container_name: projects-front-sec-bff-user-ready
+    container_name: projects-front-a11y-bff-user-ready
     depends_on:
       bff-user:
         condition: service_started
@@ -198,9 +212,9 @@ services:
 
   bff-project:
     image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:0.4.0}
-    container_name: projects-front-sec-bff-project
+    container_name: projects-front-a11y-bff-project
     depends_on:
-      seeder:
+      seeder-a11y:
         condition: service_completed_successfully
       core-api-ready:
         condition: service_completed_successfully
@@ -226,7 +240,7 @@ services:
 
   bff-project-ready:
     image: curlimages/curl:latest
-    container_name: projects-front-sec-bff-project-ready
+    container_name: projects-front-a11y-bff-project-ready
     depends_on:
       bff-project:
         condition: service_started
@@ -237,24 +251,35 @@ services:
       - backend
 
   projects-front:
-    # Published image (dev-<sha> in the CI, MAIR-317); the test script builds one locally.
+    # Published image (staging-<sha> in the CI); accessibility_test.sh builds one locally.
     image: ${IMAGE_REF:?IMAGE_REF must name the front image to test}
-    container_name: projects-front-sec-front
+    container_name: projects-front-a11y-front
     depends_on:
       bff-project-ready:
         condition: service_completed_successfully
+    # Every variable the front reads: a missing front URL hides links of the shell or renders an
+    # error page instead of the page under test. Other fronts are not started (dummy URLs).
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: 5001
-      # The unauthenticated health probe expects a redirect, not a missing-login 503.
-      LOGIN_FRONT_URL: "${LOGIN_FRONT_URL:-http://login-front.invalid/}"
       BFF_PROJECT_BASE_URL: http://bff-project:4001
+      COOKIE_DOMAIN: projects-front
+      PROJECT_FRONT_URL: http://projects-front:5001/
+      LOGIN_FRONT_URL: http://login-front.invalid/
+      DASHBOARD_FRONT_URL: http://dashboard-front.invalid/
+      CALENDAR_FRONT_URL: http://calendar-front.invalid/
+      MESSAGE_FRONT_URL: http://message-front.invalid/
+      ELEARNING_FRONT_URL: http://elearning-front.invalid/
+      SETTINGS_FRONT_URL: http://settings-front.invalid/
+      ADMINISTRATION_FRONT_URL: http://administration-front.invalid/
+      EMAIL_FRONT_URL: http://email-front.invalid/
+      FILES_FRONT_URL: http://files-front.invalid/
     expose:
       - "5001"
     networks:
       - backend
-    # curl est installé dans l'image runner. Sans cookie, le middleware répond 307
-    # (redirection Login) : curl -f l'accepte, seul un statut >= 400 échoue.
+    # curl is installed in the runner image. Without a cookie the middleware answers 307 (redirect
+    # to Login): curl -f accepts it, only a status >= 400 fails.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:5001/"]
       interval: 10s
@@ -262,30 +287,25 @@ services:
       retries: 10
       start_period: 30s
 
-  security-scan:
-    image: zaproxy/zap-stable
-    container_name: projects-front-sec-zap
+  a11y:
+    image: ${A11Y_RUNNER_IMAGE:?A11Y_RUNNER_IMAGE comes from cicd-repo/tests/a11y/runner-image}
+    # Run as the caller (accessibility_test.sh exports them), so that rgaa-report/ and
+    # .rgaa-ai-cache/ are not root-owned in the checkout.
+    user: "${RGAA_UID:-0}:${RGAA_GID:-0}"
+    container_name: projects-front-a11y-runner
     depends_on:
       projects-front:
         condition: service_healthy
+    command: ["sh", "/engine/run.sh"]
+    environment:
+      RGAA_MIN_RATE: ${RGAA_MIN_RATE:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      RGAA_AI_MODEL: ${RGAA_AI_MODEL:-}
     volumes:
-      - ./.zap/rules.tsv:/zap/wrk/rules.tsv:ro
-    # zap-baseline.py : spider + scan passif (adapté à une interface web, là où
-    #   les BFFs rejouent leur OpenAPI avec zap-api-scan.py).
-    # -c rules.tsv : les alertes informatives sont passées à IGNORE, toute autre
-    #   alerte (WARN/FAIL) fait sortir zap-baseline.py en code != 0.
-    # -z ... replacer : injecte le cookie accessToken (JWT HS256 statique sub=2,
-    #   role=user, exp=2100, signé avec JWT_SECRET=b"secret") sur chaque requête,
-    #   sinon le middleware Next.js redirige toutes les pages vers le front Login.
-    command:
-      - zap-baseline.py
-      - -t
-      - http://projects-front:5001/
-      - -m
-      - "3"
-      - -c
-      - rules.tsv
-      - -z
-      - "-config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Cookie -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwicm9sZSI6InVzZXIiLCJleHAiOjQxMDI0NDQ4MDB9.qjXr3pV4v8hvkbv_ufmNqaPqhDTbOGfTUeEXxa1z70U"
+      - ./cicd-repo/tests/a11y:/engine:ro
+      - ./rgaa.yaml:/scope/rgaa.yaml:ro
+      - ./rgaa-report:/report
+      - ./.rgaa-ai-cache:/ai-cache
     networks:
       - backend
