@@ -1,5 +1,29 @@
 import type { ProjectTask } from '../types/project';
 
+export type TaskConfirmation = { revision: number; task: ProjectTask | null };
+
+export function taskConfirmationsAfter(
+  latest: ReadonlyMap<string, TaskConfirmation> | undefined,
+  revision: number
+): Map<string, ProjectTask | null> {
+  const changes = new Map<string, ProjectTask | null>();
+  for (const [id, confirmation] of latest ?? []) {
+    if (confirmation.revision > revision) changes.set(id, confirmation.task);
+  }
+  return changes;
+}
+
+// A coherent later read can refine a receipt or confirm its absence. Retain
+// that actual read for project writes still in flight, without inventing tasks.
+export function reconcileTaskConfirmations(
+  latest: ReadonlyMap<string, TaskConfirmation>,
+  tasks: ProjectTask[]
+): Map<string, TaskConfirmation> {
+  const received = new Map(tasks.map(task => [task.id, task]));
+  return new Map([...latest].map(([id, confirmation]) =>
+    [id, { revision: confirmation.revision, task: received.get(id) ?? null }]));
+}
+
 // Only confirmed receipts/deletions belong here, never submitted drafts.
 export function applyTaskConfirmations(
   tasks: ProjectTask[] | undefined,

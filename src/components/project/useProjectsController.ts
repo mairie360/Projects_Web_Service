@@ -35,7 +35,7 @@ import { getActiveFrontHrefs } from '../../lib/navigation';
 import { authSessionFromAccess } from '../../lib/auth-session';
 import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
-import { applyTaskConfirmations } from '../../lib/projectTaskConfirmations';
+import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
@@ -65,8 +65,9 @@ type ProjectQueryState = {
 };
 
 type DetailSelection = { projectId: string; readRevision: number };
-type TaskConfirmations = { revision: number; changes: Map<string, ProjectTask | null> };
+type TaskConfirmations = { revision: number; changes: Map<string, ProjectTask | null>; latest: Map<string, TaskConfirmation> };
 type SelectedProjectDetails = { project: Project; taskItems: ProjectTask[] };
+type ConfirmedProject = { details: SelectedProjectDetails; newerTasks: boolean };
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
@@ -338,13 +339,29 @@ export function useProjectsController() {
     setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
   };
 
-  const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false) => {
+  const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false, taskRevision?: number): ConfirmedProject => {
     ++pageRevisionRef.current;
-    const confirmed = mergeProjectDetails(details);
+    const confirmations = taskConfirmationsRef.current.get(details.project.id);
+    const changes = taskRevision === undefined ? new Map<string, ProjectTask | null>()
+      : taskConfirmationsAfter(confirmations?.latest, taskRevision);
+    const taskItems = applyTaskConfirmations(details.taskItems, changes);
+    const confirmed = { ...mergeProjectDetails(details), taskItems };
+    // Even a successful intervening GET may have cleared the pending overlay.
+    // Keep newer tasks through this project's subsequent catalogue refresh;
+    // only a new coherent detail GET reconciles this mixed-age presentation.
+    if (confirmations && taskRevision !== undefined) {
+      // This response is authoritative over tasks confirmed before its request.
+      // Do not let their old pending overlays undo it in the next page GET.
+      for (const [id, confirmation] of confirmations.latest) {
+        if (confirmation.revision <= taskRevision) confirmations.changes.delete(id);
+      }
+      for (const [id, task] of changes) confirmations.changes.set(id, task);
+    }
     setProjects((current) => current.some((project) => project.id === confirmed.id)
       ? current.map((project) => project.id === confirmed.id ? confirmed : project)
       : insert ? [...current, confirmed] : current);
     // Page totals, options and pagination still belong to the last successful page DTO.
+    return { details: { project: confirmed, taskItems }, newerTasks: changes.size > 0 };
   };
 
   const beginDetailSelection = useCallback((projectId: string) => {
@@ -366,10 +383,13 @@ export function useProjectsController() {
     setDetailRefreshPending(false);
   }, []);
 
-  const updateSelectedProject = (details: ProjectDetailsResponse, selection: DetailSelection | null) => {
+  const updateSelectedProject = ({ details, newerTasks }: ConfirmedProject, selection: DetailSelection | null) => {
     if (!selection || detailSelectionRef.current !== selection || selection.projectId !== details.project.id) return;
     ++selection.readRevision;
     setSelectedProjectDetails(details);
+    if (newerTasks) {
+      setDetailRefreshError(current => current || 'Des tâches ont été confirmées pendant la modification du projet. Vérifiez la fiche pour actualiser les compteurs et la progression.');
+    }
   };
 
   useEffect(() => () => { detailSelectionRef.current = null; }, []);
@@ -399,7 +419,11 @@ export function useProjectsController() {
         if (!isCurrent()) return null;
         if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
         assertProjectDetailsIdentity(projectId, details);
-        taskConfirmationsRef.current.get(projectId)?.changes.clear();
+        const confirmations = taskConfirmationsRef.current.get(projectId);
+        if (confirmations) {
+          confirmations.latest = reconcileTaskConfirmations(confirmations.latest, details.taskItems);
+          confirmations.changes.clear();
+        }
         completeTaskVerifications(projectId);
         return details;
       } catch (error) {
@@ -459,7 +483,11 @@ export function useProjectsController() {
       throw error;
     }
     if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
-    taskConfirmationsRef.current.get(projectId)?.changes.clear();
+    const confirmations = taskConfirmationsRef.current.get(projectId);
+    if (confirmations) {
+      confirmations.latest = reconcileTaskConfirmations(confirmations.latest, details.taskItems);
+      confirmations.changes.clear();
+    }
     completeTaskVerifications(projectId);
     const projectWithTasks = mergeProjectDetails(details);
 
@@ -479,7 +507,10 @@ export function useProjectsController() {
     const previous = taskConfirmationsRef.current.get(projectId);
     const changes = new Map(previous?.changes);
     changes.set(taskId, task);
-    taskConfirmationsRef.current.set(projectId, { revision: (previous?.revision ?? 0) + 1, changes });
+    const revision = (previous?.revision ?? 0) + 1;
+    const latest = new Map(previous?.latest);
+    latest.set(taskId, { revision, task });
+    taskConfirmationsRef.current.set(projectId, { revision, changes, latest });
     ++pageRevisionRef.current;
     setProjects(current => current.map(project => project.id === projectId
       ? { ...project, taskItems: applyTaskConfirmations(project.taskItems, changes) } : project));
@@ -573,6 +604,7 @@ export function useProjectsController() {
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
     const selection = detailSelectionRef.current;
+    const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     if (!validateProjectForm(form)) {
       const error = new Error('Les champs obligatoires doivent être renseignés.');
       showError(error);
@@ -586,8 +618,8 @@ export function useProjectsController() {
       showError(error);
       throw error;
     }
-    applyConfirmedProject(details);
-    updateSelectedProject(details, selection);
+    const confirmed = applyConfirmedProject(details, false, taskRevision);
+    updateSelectedProject(confirmed, selection);
     try {
       await refreshProjectsPage({ silent: true, throwOnError: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
@@ -601,10 +633,11 @@ export function useProjectsController() {
     if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
 
     const selection = detailSelectionRef.current;
+    const taskRevision = taskConfirmationsRef.current.get(project.id)?.revision ?? 0;
     try {
       const details = await updateProject(project.id, { status });
-      applyConfirmedProject(details);
-      updateSelectedProject(details, selection);
+      const confirmed = applyConfirmedProject(details, false, taskRevision);
+      updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
     } catch (error) {
@@ -624,20 +657,21 @@ export function useProjectsController() {
 
     projectFormPendingRef.current = true;
     const selection = detailSelectionRef.current;
+    const taskRevision = editingProjectId ? taskConfirmationsRef.current.get(editingProjectId)?.revision ?? 0 : undefined;
     setProjectFormPending(true);
     setProjectFormError('');
     try {
       const details = editingProjectId
         ? await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm))
         : await createProject(createProjectBodyFromForm(projectForm));
-      applyConfirmedProject(details, !editingProjectId);
+      const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
 
       // Only the confirmed write discards the draft. A later read failure is not a refusal.
       setCreateProjectOpen(false);
       setEditingProjectId(null);
       setProjectForm(createProjectFormState());
       if (editingProjectId) {
-        updateSelectedProject(details, selection);
+        updateSelectedProject(confirmed, selection);
       } else {
         resetProjectFilters();
         beginDetailSelection(details.project.id);
@@ -782,7 +816,7 @@ export function useProjectsController() {
     setUnverifiedTasksByProject(new Map(taskVerificationsRef.current));
     // A read started before this uncertain confirmation cannot unlock it.
     const previous = taskConfirmationsRef.current.get(projectId);
-    taskConfirmationsRef.current.set(projectId, { revision: (previous?.revision ?? 0) + 1, changes: new Map(previous?.changes) });
+    taskConfirmationsRef.current.set(projectId, { revision: (previous?.revision ?? 0) + 1, changes: new Map(previous?.changes), latest: new Map(previous?.latest) });
     ++pageRevisionRef.current;
     setTaskWriteError(projectId, taskId, TASK_VERIFICATION_MESSAGE);
     showInfo(TASK_VERIFICATION_MESSAGE);
@@ -881,10 +915,11 @@ export function useProjectsController() {
 
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
     const selection = detailSelectionRef.current;
+    const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     try {
       const details = await closeBffProject(projectId, status);
-      applyConfirmedProject(details);
-      updateSelectedProject(details, selection);
+      const confirmed = applyConfirmedProject(details, false, taskRevision);
+      updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({
         type: 'success',

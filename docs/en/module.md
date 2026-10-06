@@ -1,5 +1,26 @@
 # Projects_Web_Service — Module overview
 
+## Project/task confirmation ordering (MAIR-408)
+
+Existing-target project edits (detail and card), Kanban moves and close/review
+requests capture the current task confirmation revision before sending their
+unchanged contract operation. Their late responses retain actual task receipts
+and deletion tombstones confirmed since that revision. An intervening coherent
+GET may refine or remove those tasks; that official result is retained too.
+The per-task journal keeps only its latest value, not a log of every write.
+Project metadata, permissions and statistics still come from the project DTO;
+no counter is inferred from the partial task overlay. Mixed-age detail exposes
+an explicit GET-only recovery without replaying either accepted write, and
+catalogue refreshes keep the newer tasks until coherent detail reconciliation.
+Project writes begun after a task confirmation remain authoritative over it.
+Creation and duplication do not inherit source task history. Closed, reopened
+or replaced consultation lifetimes and existing form guards remain unchanged.
+
+This corrects a candidate receipt-mixing regression, not identical behavior in
+the preserved prototype that waited for detail reads. Published Project0.4.0,
+API/BFF, authentication, dependencies, environments and old local versions are
+unchanged; fixture checks do not certify deployed persistence or all audit items.
+
 ## Task and detail identity (MAIR-408)
 
 Editing/status receipts must identify the requested task. A successful write

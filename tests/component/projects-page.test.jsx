@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/page";
-import { createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
+import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
@@ -15,6 +15,7 @@ vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   deleteProjectTask: vi.fn(),
   updateProjectTaskStatus: vi.fn(),
   updateProjectTask: vi.fn(),
+  closeProject: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -26,9 +27,56 @@ beforeEach(() => {
   vi.mocked(deleteProjectTask).mockReset();
   vi.mocked(updateProjectTaskStatus).mockReset();
   vi.mocked(updateProjectTask).mockReset();
+  vi.mocked(closeProject).mockReset();
 });
 
 describe("Projects page", () => {
+  it.each([false, true])("keeps a newer task and its draft after a late project close (detail read succeeds: %s)", async successfulRead => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    const task = fixtures.projectTask();
+    const other = fixtures.projectTask({ id: 'task-2', title: 'Autre tâche officielle' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [task, other]));
+    const write = Promise.withResolvers();
+    vi.mocked(closeProject).mockImplementationOnce(() => write.promise);
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await user.click(screen.getByRole('button', { name: 'Suspendre', exact: true }));
+    expect(closeProject).toHaveBeenCalledTimes(1);
+    const row = screen.getByRole('heading', { name: task.title }).closest('article');
+    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
+    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
+    await user.clear(title); await user.type(title, 'Brouillon à conserver');
+    const confirmed = fixtures.projectTask({ title: 'Tâche confirmée récemment', status: 'done' });
+    const verified = { ...confirmed, title: 'Tâche enrichie par lecture' };
+    vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
+    vi.mocked(getProjectsPage).mockRejectedValue(new Error('Liste temporairement refusée'));
+    if (successfulRead) vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
+    else vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Détail temporairement refusé'));
+    await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
+    const expected = successfulRead ? verified.title : confirmed.title;
+    expect(await screen.findByRole('heading', { name: expected })).toBeTruthy();
+    await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2 } }, [task, other])));
+    expect(await screen.findByRole('dialog', { name: 'Projet confirmé tardivement' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: expected })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
+    expect(title.value).toBe('Brouillon à conserver');
+    expect(screen.getByText('Tâches').parentElement.textContent).toContain('2/9');
+    expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', tasks: { total: 2, completed: 1 }, progress: 50 }, [verified, other]));
+    screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
+    expect(screen.getByRole('heading', { name: verified.title })).toBeTruthy();
+    expect(title.value).toBe('Brouillon à conserver');
+    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    expect(closeProject).toHaveBeenCalledTimes(1);
+    expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
+    screen.getByRole('button', { name: 'Fermer la fiche projet' }).focus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it("retains a submitted edit after an accepted mismatched receipt and permits only GET recovery", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
@@ -193,7 +241,7 @@ describe("Projects page", () => {
     await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
-    expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression proviennent de la dernière lecture réussie.')).toBeTruthy();
+    expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('');
     expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
     const retry = screen.getByRole('button', { name: 'Réessayer la fiche' });

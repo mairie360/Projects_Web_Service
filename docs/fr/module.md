@@ -1,5 +1,28 @@
 # Projects_Web_Service — Présentation du module
 
+## Ordre des confirmations projet et tâches (MAIR-408)
+
+Les éditions de projet existant (fiche et carte), déplacements Kanban et clôture/
+suspension capturent la révision des confirmations de tâches avant leur requête
+contractuelle inchangée. Une réponse projet tardive conserve les vraies tâches
+et suppressions confirmées depuis cette révision. Une lecture cohérente
+intermédiaire peut enrichir ou retirer ces tâches ; son résultat officiel reste
+préservé aussi. Le journal garde seulement la dernière valeur de chaque tâche,
+pas un historique de toutes les écritures. Métadonnées, permissions et
+statistiques viennent toujours du DTO projet ; aucun compteur n’est déduit des
+confirmations partielles. La fiche mêlant des réponses d’âges différents propose
+une reprise GET seule, sans renvoyer les écritures acceptées. Les relectures du
+catalogue gardent les tâches récentes jusqu’à réconciliation du détail. Une
+écriture projet commencée après une confirmation de tâche reste autoritaire.
+Création et duplication n’héritent pas des tâches du projet source. Consultations
+fermées, rouvertes ou remplacées et gardes de formulaire existantes sont conservées.
+
+Il s’agit d’une régression de mélange de réponses propre au candidat, pas d’un
+comportement identique du prototype préservé qui attendait les lectures de détail.
+Contrat publié Project0.4.0, API/BFF, authentification, dépendances, environnements
+et anciennes versions locales inchangés ; les fixtures ne certifient ni la
+persistance déployée ni tous les éléments de l’audit.
+
 ## Identité des tâches et de la fiche (MAIR-408)
 
 La confirmation d’une édition ou d’un statut doit identifier la tâche demandée.

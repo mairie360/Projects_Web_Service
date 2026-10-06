@@ -463,7 +463,7 @@ export function ProjectDetailModal({
               {refreshError && (
                 <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
                   <p>{refreshError}</p>
-                  <p className="mt-2 text-[#57606a]">Les tâches confirmées restent affichées. Les compteurs et la progression proviennent de la dernière lecture réussie.</p>
+                  <p className="mt-2 text-[#57606a]">Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.</p>
                   <button type="button" disabled={refreshPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending} onClick={() => void onRetry?.()}
                     className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
                     {refreshPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
