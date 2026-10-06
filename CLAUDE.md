@@ -93,13 +93,14 @@ These commands run offline. After a bump, also move the `bff-project` image tags
 
 `docker-compose.yml` (with `development.Dockerfile`, which runs `npm run dev` as a non-root user and reads `NODE_AUTH_TOKEN` as a build secret) starts Postgres + Liquibase + Redis (`dev-latest` GHCR images), `project-api` (3001), `bff-project` (4001, `ghcr.io/mairie360/bff-project:<contract package version>`, overridable with `BFF_PROJECT_IMAGE`) and this front on host port **5001 → container 3000**, with `docker compose watch` syncing `src/`. Core API and BFF User are not in this stack (Core is commented out), so BFF_Project cannot resolve sessions there without extra services. `nginx.conf` is a leftover and nothing references it.
 
-## Isolated security & performance tests
+## Isolated security, performance & accessibility tests
 
-Same pattern as the APIs/BFFs, adapted to a web front. Not part of `npm test`; they need Docker and `NODE_AUTH_TOKEN` (the front image is built from the production `Dockerfile`).
+Same pattern as the APIs/BFFs, adapted to a web front. Not part of `npm test`; they need Docker, and `NODE_AUTH_TOKEN` when they build the front image from the production `Dockerfile`.
 
 - `./security_test.sh` → `docker-compose-security.yml`: full isolated upstream stack (Postgres + Liquibase + `init-test.sql` seed, Redis, Core API, BFF User (a dependency of BFF_Project only; the front service is only wired to `bff-project`), BFF_Project and its dependencies; published GHCR images, versions overridable via `*_IMAGE` env vars) + this front, then `zap-baseline.py` (spider + passive scan) authenticated with a static `accessToken` cookie. Any WARN/FAIL alert not set to IGNORE in `.zap/rules.tsv` fails the run.
 - `./performance_test.sh` → `docker-compose-performance.yml`: same stack + k6 running `load-test.js` (pages, `/health`, `/projects-page` through the proxy) with a JWT minted from `JWT_SECRET`; thresholds fail the run.
-- Test user is id 2 (seeded in `init-test.sql`); every service shares `JWT_SECRET=b"secret"`. `TARGET_IMAGE` lets the stacks reuse a pre-built front image. These files are excluded from the image by `.dockerignore`.
+- `./accessibility_test.sh` → `docker-compose-accessibility.yml`: same stack, plus `init-accessibility.sql` (seeder `seeder-a11y`: Responsable users 10 / 11, User 12, projects 101-104 / 111 and their tasks), + the RGAA runner of `mairie360/CICD` (`cicd-repo/tests/a11y`, cloned at the pinned `cicd_version`), which plays the states of `rgaa.yaml` with JWTs it signs and writes `rgaa-report/`. The CI runs it in `release-prod` on `staging-<sha>`.
+- Test user is id 2 (seeded in `init-test.sql`); every service shares `JWT_SECRET=b"secret"`. The front runs on `${IMAGE_REF}` (the CI passes `<image>:dev-<sha>`); the scripts build `projects-front:local` with the `node_auth_token` BuildKit secret when it is empty. These files are excluded from the image by `.dockerignore`.
 
 ## Pull request reviewers
 

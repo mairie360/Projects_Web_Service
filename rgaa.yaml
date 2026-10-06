@@ -1,0 +1,278 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/mairie360/CICD/main/tests/a11y/rgaa.schema.json
+# RGAA 4.1.2 scope of the projects front (MAIR-316), checked by the RGAA job of mairie360/CICD
+# frontend-cicd.yml in release-prod, on the staging-<sha> image (format: CICD README, "RGAA scope").
+version: 1
+target: http://projects-front:5001
+
+# Same JWT_SECRET as the services of docker-compose-accessibility.yml: the engine signs an
+# accessToken for the user of the state (as:), the front relays it to bff-project, which resolves
+# the user through bff-user / core-api. The role claim is ignored: roles come from the database.
+session:
+  jwt_secret: b"secret"
+
+users:
+  # Responsable (init-accessibility.sql): owns the projects of the board, can create and manage
+  # projects. Used by every non-mutating state.
+  manager:
+    id: 10
+    role: responsable
+  # Responsable owning only project 111, for project-duplicated (writes a project): the states run
+  # in parallel, the ones played as manager must not see the copy.
+  creator:
+    id: 11
+    role: responsable
+  # Seed user of init-test.sql (role User), member of two projects: read-only board.
+  agent:
+    id: 2
+    role: user
+  # Role User without any project: empty board.
+  newcomer:
+    id: 12
+    role: user
+
+criteria:
+  # Images: the icons of the shell, the toolbar, the cards and the dialogs.
+  - "1.1"
+  - "1.2"
+  - "1.3"
+  # 1.4-1.9: no CAPTCHA, chart, image of text or figure caption.
+  # 2.x: no frame. 4.x: no media.
+  - "3.1"
+  - "3.2"
+  - "3.3"
+  # Data table of the "Tableau" view. 5.1-5.2: simple table (one header row), no summary needed;
+  # 5.3, 5.8: no layout table.
+  - "5.4"
+  - "5.5"
+  - "5.6"
+  - "5.7"
+  # Links: the navigation of the shell (lib-components AppShell).
+  - "6.1"
+  - "6.2"
+  # Scripts: tabs of the views, filter listboxes, card menus, dialogs, status messages.
+  # 7.2: no script with an alternative; 7.4: filters and views update the page, no change of context.
+  - "7.1"
+  - "7.3"
+  - "7.5"
+  - "8.1"
+  - "8.2"
+  - "8.3"
+  - "8.4"
+  - "8.5"
+  - "8.6"
+  - "8.9"
+  # 8.7, 8.8: no text in another language; 8.10: no right-to-left text.
+  - "9.1"
+  - "9.2"
+  - "9.3"
+  # 9.4: no quotation.
+  - "10.1"
+  - "10.2"
+  - "10.3"
+  - "10.4"
+  - "10.5"
+  - "10.6"
+  - "10.7"
+  - "10.8"
+  - "10.9"
+  - "10.10"
+  - "10.11"
+  - "10.12"
+  # Tooltips of the icon buttons (lib-components ToolTip).
+  - "10.13"
+  - "10.14"
+  # Search, filters, project and task forms, comments.
+  - "11.1"
+  - "11.2"
+  - "11.3"
+  - "11.4"
+  - "11.5"
+  - "11.6"
+  - "11.7"
+  - "11.8"
+  - "11.9"
+  - "11.10"
+  - "11.11"
+  - "11.12"
+  - "11.13"
+  # 12.1-12.5: one page per front, the navigation between fronts is the shell (12.6); no site map
+  # nor site search. 12.10: no keyboard shortcut.
+  - "12.6"
+  - "12.7"
+  - "12.8"
+  - "12.9"
+  - "12.11"
+  # 13.1: the success / error alerts close themselves after 3 s.
+  - "13.1"
+  # 13.2: no new window; 13.3-13.8: no document, cryptic or moving content.
+  - "13.9"
+  # Drag and drop of the cards between the columns of the board (path-based gesture).
+  - "13.10"
+  - "13.11"
+  # 13.12: no device motion.
+
+states:
+  # Board of a Responsable: Kanban view (default), the other views, filters and empty result.
+  - id: board-kanban
+    as: manager
+    route: /
+    steps:
+      - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
+  - id: board-grid
+    as: manager
+    route: /
+    steps:
+      - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
+      - click: { role: tab, name: Grille }
+      - wait_for: { text: 1/3 tâches }
+  - id: board-table
+    as: manager
+    route: /
+    steps:
+      - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
+      - click: { role: tab, name: Tableau }
+      - wait_for: { role: columnheader, name: Progression }
+  - id: status-filter-open
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Tous les statuts }
+      - wait_for: { role: listbox, name: Filtrer par statut }
+  - id: priority-filter-open
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Toutes les priorités }
+      - wait_for: { role: listbox, name: Filtrer par priorité }
+  - id: search-no-result
+    description: Grid view with a search that matches no project (empty state)
+    as: manager
+    route: /
+    steps:
+      - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
+      - click: { role: tab, name: Grille }
+      - fill: { role: searchbox, value: introuvable }
+      - wait_for: { text: Aucun projet ne correspond aux filtres sélectionnés. }
+  - id: task-composer
+    description: Inline task form of a card opened
+    as: manager
+    route: /
+    steps:
+      - click: { selector: '[data-project-id="project-102"] button:has-text("Ajouter une tâche")' }
+      - wait_for: { role: form, name: Créer une tâche }
+  # Card menu and the dialogs it opens (the deletion stops at the confirmation).
+  - id: card-menu-open
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Actions pour Plan de mobilité douce }
+      - wait_for: { role: menu }
+  - id: delete-confirmation
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Actions pour Plan de mobilité douce }
+      - click: { role: menuitem, name: Supprimer }
+      - wait_for: { role: dialog, name: Supprimer le projet }
+  - id: edit-project-dialog
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Actions pour Plan de mobilité douce }
+      - click: { role: menuitem, name: Modifier }
+      - wait_for: { role: dialog, name: Modifier le projet }
+  # New project dialog: empty, submitted empty (browser validation), then without an assignee.
+  - id: new-project-dialog
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Nouveau projet }
+      - wait_for: { role: dialog, name: Nouveau projet }
+  - id: new-project-empty-submit
+    description: Submitted empty (browser validation of the required fields)
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Nouveau projet }
+      - click: { role: button, name: Créer le projet }
+  - id: new-project-errors
+    description: Required fields filled but no assignee (error message of the form)
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Nouveau projet }
+      - fill: { selector: "#project-title", value: Réfection du gymnase }
+      - fill: { selector: "#project-description", value: Remplacement du sol sportif. }
+      - fill: { selector: "#project-due-date", value: "2026-05-01" }
+      - click: { role: button, name: Créer le projet }
+      - wait_for: { text: Les champs obligatoires doivent être renseignés. }
+  # Detail dialog of a project.
+  - id: project-detail
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
+      - wait_for: { role: button, name: Fermer la fiche projet }
+  - id: project-detail-edit
+    description: Inline edition of the project in the detail dialog
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
+      - click: { role: button, name: Modifier, exact: true }
+      - wait_for: { role: form, name: Modifier le projet }
+  - id: task-delete-confirmation
+    description: Inline confirmation of a task deletion (stops there)
+    as: manager
+    route: /
+    steps:
+      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
+      - click: { role: button, name: Supprimer Diagnostic énergétique }
+      - wait_for: { text: Supprimer définitivement cette tâche ? }
+  - id: deep-link-task
+    description: Link to a task (?project=&task=), the detail opens on the highlighted task
+    as: manager
+    route: /?project=project-101&task=task-1002
+    steps:
+      - wait_for: { selector: 'article[aria-current="true"]' }
+  - id: task-collaboration
+    description: Comments and history of a task
+    as: manager
+    route: /?project=project-101&task=task-1002
+    steps:
+      - click: { selector: 'article[aria-current="true"] button:has-text("Suivi")' }
+      - wait_for: { role: textbox, name: Commentaire pour Remplacement des fenêtres }
+  - id: deep-link-invalid
+    description: Invalid project link (error alert)
+    as: manager
+    route: /?project=a&project=b
+    steps:
+      - wait_for: { text: Lien de projet invalide. }
+  # Writing state, with its own user.
+  - id: project-duplicated
+    description: Success message after a duplication
+    as: creator
+    route: /
+    steps:
+      - click: { role: button, name: Actions pour Marché de Noël }
+      - click: { role: menuitem, name: Dupliquer }
+      - wait_for: { text: dupliqué. }
+  # Role User: read-only board and detail.
+  - id: agent-board
+    as: agent
+    route: /
+    steps:
+      - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
+  - id: agent-project-detail
+    as: agent
+    route: /
+    steps:
+      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
+      - wait_for: { role: button, name: Fermer la fiche projet }
+  # No project at all.
+  - id: empty-board
+    as: newcomer
+    route: /
+    steps:
+      - click: { role: tab, name: Grille }
+      - wait_for: { text: Aucun projet ne correspond aux filtres sélectionnés. }
