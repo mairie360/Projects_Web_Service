@@ -467,6 +467,150 @@ test('an incomplete creation form is refused in the page without any network cal
 // callbacks or host elements (buttons, inputs) of the rendered page.
 
 const alertText = () => view.find('Alert')[0]?.props.message;
+
+const pagedFixture = (page) => fixtures.projectsPage([
+  fixtures.projectListItem({ id: `project-${page}`, title: `Projet page ${page}` }),
+], { pagination: { page, limit: 50, total: 85, hasNextPage: page === 1 } });
+
+test('pagination uses confirmed DTO metadata in all views and preserves current-page view queries', async () => {
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  view = mount(React.createElement(ProjectsPage));
+  await view.waitFor(() => view.find('ProjectPagination').length === 1);
+  assert.match(view.text(), /Page 1 · 85 projets/);
+  await view.act(() => view.props('ProjectPagination').onChange('previous'));
+  assert.equal(pageCalls().length, 1);
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  assert.doesNotMatch(view.text(), /Projet page 1/);
+  assert.match(view.text(), /Page 2 · 85 projets/);
+  await view.act(() => view.props('ProjectPagination').onChange('next'));
+  assert.equal(pageCalls().length, 2);
+  for (const mode of ['grid', 'table', 'kanban']) {
+    await view.act(() => view.props('ViewToggle').onChange(mode));
+    await view.waitFor(() => pageCalls().at(-1).view === mode && !view.props('ProjectPagination').pending);
+    assert.equal(pageCalls().at(-1).page, '2');
+    assert.match(view.text(), /Projet page 2/);
+    assert.equal(view.find(mode === 'grid' ? 'GridView' : mode === 'table' ? 'TableView' : 'KanbanBoard').length, 1);
+  }
+  await view.click(props => props['aria-label'] === 'Page précédente');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 1);
+  assert.equal(pageCalls().at(-1).limit, '50');
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('each changed project filter resets to page one while retaining all other query values', async () => {
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  view = mount(React.createElement(ProjectsPage));
+  await view.waitFor(() => view.find('ProjectPagination').length === 1);
+  const controls = [
+    () => view.props('SearchInput').onChange('Projet'),
+    () => view.props('FilterSelect', 0).onChange('in-progress'),
+    () => view.props('FilterSelect', 1).onChange('high'),
+    () => view.fire(props => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } }),
+  ];
+  for (const change of controls) {
+    await view.click(props => props['aria-label'] === 'Page suivante');
+    await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+    const count = pageCalls().length;
+    await view.act(change);
+    assert.equal(view.props('ProjectPagination').pending, true);
+    await view.waitFor(() => pageCalls().length === count + 1 && !view.props('ProjectPagination').pending);
+    assert.equal(pageCalls().at(-1).page, '1');
+  }
+  assert.deepEqual(pageCalls().at(-1), { q: 'Projet', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'kanban', page: '1', limit: '50' });
+  const count = pageCalls().length;
+  await view.act(() => {
+    view.props('SearchInput').onChange('Projet');
+    view.props('FilterSelect', 0).onChange('in-progress');
+    view.props('FilterSelect', 1).onChange('high');
+    view.props('ViewToggle').onChange('kanban');
+  });
+  assert.equal(pageCalls().length, count);
+  assert.equal(view.props('ProjectPagination').pending, false);
+});
+
+test('a refused page navigation preserves page one and GET retry targets the failed page without writes', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Page suivante refusée')));
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(html => html.includes('Page suivante refusée'));
+  assert.equal(pageCalls().at(-1).page, '2');
+  assert.match(view.text(), /Page 1 · 85 projets|Projet page 1/);
+  assert.equal(view.props('ProjectPagination').stale, true);
+  await view.act(() => view.props('ProjectPagination').onChange('next'));
+  assert.equal(pageCalls().length, 2);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '2']);
+  assert.equal(view.props('ProjectPagination').stale, false);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('pagination refuses contract-shaped inconsistent metadata and recovers without fabricated totals', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', { body: pagedFixture(1) });
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(html => html.includes('La pagination reçue est incohérente'));
+  assert.equal(view.props('ProjectPagination').pagination.page, 1);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  const { isProjectPaginationValid } = requireTs('src/lib/projectPagination.ts');
+  for (const invalid of [null, {}, { page: 2, limit: 0, total: 85, hasNextPage: false }, { page: 2, limit: 50, total: -1, hasNextPage: false }, { page: 2, limit: 50, total: 85, hasNextPage: 'false' }, { page: 2, limit: 50, total: 85, hasNextPage: true }]) {
+    assert.equal(isProjectPaginationValid(invalid, 2), false);
+  }
+  assert.equal(isProjectPaginationValid(pagedFixture(1).pagination, 0), false);
+});
+
+test('paging guards repeated events and ignores a late page after a newer filter read', async (t) => {
+  await renderLoadedPage(pagedFixture(1));
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const originalFetch = global.fetch;
+  t.mock.method(global, 'fetch', async (target, init) => {
+    const response = await originalFetch(target, init);
+    if (String(target).includes('/projects-page') && String(target).includes('page=2')) await gate;
+    return response;
+  });
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  const navigate = view.props('ProjectPagination').onChange;
+  let first, second;
+  await view.act(() => { first = navigate('next'); second = navigate('next'); });
+  await second;
+  await view.waitFor(() => pageCalls().length === 2);
+  assert.equal(view.props('ProjectPagination').pending, true);
+  await view.act(() => view.props('SearchInput').onChange('Projet'));
+  await view.waitFor(() => pageCalls().length === 3 && !view.props('ProjectPagination').pending);
+  release();
+  await first;
+  await view.settle();
+  assert.equal(view.props('ProjectPagination').pagination.page, 1);
+  assert.match(view.text(), /Projet page 1/);
+  assert.doesNotMatch(view.text(), /Projet page 2/);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '1']);
+});
+
+test('a confirmed duplicate from page two retries page one after a refused refresh without repeating POST', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: fixtures.projectDetails(fixtures.projectListItem({ id: 'project-3', title: 'Copie confirmée depuis la page deux' })) });
+  bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Première page refusée après duplication')));
+  await view.act(() => view.props('KanbanBoard').onProjectDuplicate(view.props('KanbanBoard').projects[0]));
+  assert.equal(pageCalls().at(-1).page, '1');
+  assert.equal(view.props('ProjectPagination').pagination.page, 2, 'only the last confirmed metadata is labelled');
+  assert.match(view.text(), /Copie confirmée depuis la page deux/);
+  assert.equal(view.props('ProjectPagination').stale, true);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(1) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 1);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '1', '1']);
+  assert.equal(bffProject.calls('/projects/{projectId}/duplicate', 'post').length, 1);
+});
+
 const openDetails = async () => {
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));

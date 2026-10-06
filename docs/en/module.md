@@ -1,5 +1,22 @@
 # Projects_Web_Service — Module overview
 
+## Project result pages (MAIR-472)
+
+Previous/Next navigation is shared by Kanban, Grid and Table. The page number,
+total and next-page availability come only from validated BFF pagination metadata;
+the partial received array is not a global count. A page click sends one existing
+GET with the current filters. Search, status, priority and deadline changes reset
+to page one; view changes preserve the requested page. Pending reads disable paging
+and repeated events, and late responses cannot overwrite a newer query or confirmed
+mutation. A refused or inconsistent read retains the last confirmed page and exposes
+an explicit GET-only retry for the requested page. No mutation is replayed.
+
+Both the preserved prototype and the prior front lacked paging controls and always
+requested page one: this is an inherited gap correction, not historical reference
+parity. The existing published 0.4.0 operation is unchanged. No environment, dependency,
+API/BFF, permission or deployment change is required. Fixture validation does not
+certify the deployed service's results or persistence; integration still requires CI.
+
 ## Reopening the protected page after a redirect (MAIR-408)
 
 When a read or action receives an opaque redirect, the frontend reopens the

@@ -1,5 +1,25 @@
 # Projects_Web_Service — Présentation du module
 
+## Pages de résultats des projets (MAIR-472)
+
+La navigation Précédent/Suivant est commune aux vues Kanban, Grille et Tableau.
+Le numéro, le total et la disponibilité de la page suivante viennent uniquement
+des métadonnées BFF validées, jamais du nombre de projets partiellement reçus.
+Un changement de page envoie un seul GET existant avec les filtres courants.
+Recherche, statut, priorité et échéance repartent à la première page ; un changement
+de vue conserve la page demandée. Les lectures en attente bloquent la pagination
+et les doubles événements. Une réponse tardive ne remplace pas une requête plus
+récente ni une mutation confirmée. Un refus ou une réponse incohérente conserve
+la dernière page confirmée et propose un réessai explicite du GET demandé,
+sans rejouer aucune mutation.
+
+Le prototype préservé et l’ancien front demandaient toujours la première page,
+sans commandes de pagination : il s’agit d’un manque hérité corrigé, pas d’une
+fonctionnalité historiquement présente dans la référence. L’opération publiée
+0.4.0 reste inchangée. Aucun changement d’environnement, dépendance, API/BFF,
+permission ou déploiement. Les fixtures ne certifient pas les résultats ni la
+persistance du service déployé ; l’intégration reste soumise à la CI.
+
 ## Réouverture de la page protégée après redirection (MAIR-408)
 
 Si une lecture ou une action reçoit une redirection opaque, le front recharge

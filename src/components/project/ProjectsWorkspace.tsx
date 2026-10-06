@@ -7,6 +7,7 @@ import { KanbanBoard } from '../Kanban';
 import { ActionButton } from './ProjectFormControls';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ProjectDetailModal } from './ProjectDetailModal';
+import { ProjectPagination } from './ProjectPagination';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
 import { navigateToPage } from '../../lib/navigation';
 import { logoutAndReload } from '../../lib/auth-session';
@@ -51,6 +52,7 @@ export function ProjectsWorkspace({
   projectPriorityOptions,
   filteredProjects,
   retryProjectsPage,
+  changeProjectPage,
   openCreateProject,
   openProjectDetails,
   openEditProject,
@@ -299,6 +301,9 @@ export function ProjectsWorkspace({
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
                   />
+                )}
+                {projectsPage && (
+                  <ProjectPagination pagination={projectsPage.pagination} pending={pageLoading} stale={Boolean(pageError)} onChange={changeProjectPage} />
                 )}
               </section>
             </div>

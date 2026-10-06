@@ -19,6 +19,69 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it("paginates the real page by keyboard using confirmed BFF metadata", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getProjectsPage).mockImplementation(async ({ page }) => fixtures.projectsPage([
+      fixtures.projectListItem({ id: `project-${page}`, title: `Projet page ${page}` }),
+    ], { pagination: { page, limit: 50, total: 85, hasNextPage: page === 1 } }));
+    render(<ProjectsPage />);
+    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Page précédente" }).disabled).toBe(true);
+    screen.getByRole("button", { name: "Page suivante" }).focus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Page précédente" }).disabled).toBe(false);
+    expect(screen.queryByText("Projet page 1")).toBeNull();
+    expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2]);
+    await user.click(screen.getByRole("button", { name: "Page précédente" }));
+    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+    expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2, 1]);
+  });
+
+  it("guards pending paging, keeps the last confirmed page on refusal and retries only that GET", async () => {
+    const user = userEvent.setup();
+    let rejectRead;
+    vi.mocked(getProjectsPage)
+      .mockResolvedValueOnce(fixtures.projectsPage([fixtures.projectListItem()], {
+        pagination: { page: 1, limit: 50, total: 85, hasNextPage: true },
+      }))
+      .mockImplementationOnce(() => new Promise((resolve, reject) => { rejectRead = reject; }));
+    render(<ProjectsPage />);
+    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+    await user.dblClick(screen.getByRole("button", { name: "Page suivante" }));
+    await waitFor(() => expect(getProjectsPage).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(true);
+    rejectRead(new Error("Page suivante indisponible"));
+    expect(await screen.findByText("Page suivante indisponible")).toBeTruthy();
+    expect(screen.getByText("Page 1 · 85 projets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${fixtures.projectListItem().title}` })).toBeTruthy();
+    vi.mocked(getProjectsPage).mockResolvedValueOnce(fixtures.projectsPage([], {
+      pagination: { page: 2, limit: 50, total: 85, hasNextPage: false },
+    }));
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
+    expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2, 2]);
+    expect(screen.queryByText("Page suivante indisponible")).toBeNull();
+  });
+
+  it.each([
+    { page: 0, limit: 50, total: -1, hasNextPage: true },
+    null,
+    { page: 1, limit: 50, total: 85, hasNextPage: false },
+  ])("rejects inconsistent paging metadata %j without fabricating a total and can recover", async (pagination) => {
+    const user = userEvent.setup();
+    vi.mocked(getProjectsPage).mockResolvedValueOnce(fixtures.projectsPage([], {
+      pagination,
+    }));
+    render(<ProjectsPage />);
+    expect(await screen.findByText("La pagination reçue est incohérente. Réessayez le chargement des projets.")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Pagination des projets" })).toBeNull();
+    vi.mocked(getProjectsPage).mockResolvedValueOnce(fixtures.projectsPage([]));
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText("Page 1 · 0 projets")).toBeTruthy();
+  });
+
   it("shows loading and then an empty BFF-backed board without inventing a project", async () => {
     render(<ProjectsPage />);
 

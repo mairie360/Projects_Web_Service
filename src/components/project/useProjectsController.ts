@@ -32,6 +32,7 @@ import {
 import { getActiveFrontHrefs } from '../../lib/navigation';
 import { authSessionFromAccess } from '../../lib/auth-session';
 import { parseProjectDeepLink } from '../../lib/projectDeepLink';
+import { isProjectPaginationValid } from '../../lib/projectPagination';
 import type { Project, ProjectStatus, ProjectTaskDraft } from '../../types/project';
 
 type AlertState = {
@@ -46,6 +47,7 @@ type RefreshProjectsOptions = {
   priority?: string;
   dueBefore?: string;
   view?: ViewMode;
+  page?: number;
   silent?: boolean;
   throwOnError?: boolean;
 };
@@ -79,6 +81,9 @@ export function useProjectsController() {
   const [pageError, setPageError] = useState('');
   const retryPendingRef = useRef(false);
   const pageRevisionRef = useRef(0);
+  const requestedPageRef = useRef(1);
+  const pageReadPendingRef = useRef(false);
+  const navigationReadRef = useRef<AbortController | null>(null);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
@@ -162,10 +167,10 @@ export function useProjectsController() {
       const nextPriority = options.priority ?? priorityFilter;
       const nextDueBefore = options.dueBefore ?? dueBeforeFilter;
       const nextView = options.view ?? viewMode;
-
-      if (!options.silent) {
-        setPageLoading(true);
-      }
+      const nextPage = options.page ?? requestedPageRef.current;
+      pageReadPendingRef.current = true;
+      // Even a silent post-mutation refresh locks paging; retained rows stay mounted.
+      setPageLoading(true);
 
       try {
         const response = await getProjectsPage(
@@ -175,7 +180,7 @@ export function useProjectsController() {
             priority: nextPriority as Project['priority'] | 'all',
             dueBefore: nextDueBefore || undefined,
             view: nextView,
-            page: 1,
+            page: nextPage,
             limit: 50,
           },
           options.signal
@@ -183,6 +188,9 @@ export function useProjectsController() {
 
         // Neither an older read nor an aborted filter request may undo a confirmed write.
         if (!isCurrent()) return;
+        if (!isProjectPaginationValid(response.pagination, nextPage)) {
+          throw new Error('La pagination reçue est incohérente. Réessayez le chargement des projets.');
+        }
         setProjectsPage(response);
         setProjects(response.projects);
         setPageError('');
@@ -193,6 +201,7 @@ export function useProjectsController() {
         if (options.throwOnError) throw error;
       } finally {
         if (isCurrent()) {
+          pageReadPendingRef.current = false;
           setPageLoading(false);
         }
       }
@@ -208,12 +217,13 @@ export function useProjectsController() {
 
     return () => {
       controller.abort();
+      navigationReadRef.current?.abort();
       window.clearTimeout(timeoutId);
     };
   }, [refreshProjectsPage]);
 
   const retryProjectsPage = async () => {
-    if (pageLoading || retryPendingRef.current) return;
+    if (pageLoading || pageReadPendingRef.current || retryPendingRef.current) return;
     retryPendingRef.current = true;
     try {
       // Retry the read with current filters; never replay a confirmed mutation.
@@ -221,6 +231,53 @@ export function useProjectsController() {
     } finally {
       retryPendingRef.current = false;
     }
+  };
+
+  const changeProjectPage = async (direction: 'previous' | 'next') => {
+    const pagination = projectsPage?.pagination;
+    if (pageLoading || pageReadPendingRef.current || pageError || !pagination) return;
+    if (direction === 'previous' ? pagination.page <= 1 : !pagination.hasNextPage) return;
+    const nextPage = pagination.page + (direction === 'previous' ? -1 : 1);
+    requestedPageRef.current = nextPage;
+    setOpenFilter(null);
+    const controller = new AbortController();
+    navigationReadRef.current = controller;
+    // The event owns this read: changing the requested page must not schedule another GET.
+    await refreshProjectsPage({ page: nextPage, signal: controller.signal });
+  };
+
+  const prepareQueryChange = (firstPage: boolean) => {
+    ++pageRevisionRef.current;
+    navigationReadRef.current?.abort();
+    if (firstPage) requestedPageRef.current = 1;
+    pageReadPendingRef.current = true;
+    setPageLoading(true);
+  };
+
+  const changeSearchTerm = (value: string) => {
+    if (value === searchTerm) return;
+    prepareQueryChange(true);
+    setSearchTerm(value);
+  };
+  const changeStatusFilter = (value: string) => {
+    if (value === statusFilter) return;
+    prepareQueryChange(true);
+    setStatusFilter(value);
+  };
+  const changePriorityFilter = (value: string) => {
+    if (value === priorityFilter) return;
+    prepareQueryChange(true);
+    setPriorityFilter(value);
+  };
+  const changeDueBeforeFilter = (value: string) => {
+    if (value === dueBeforeFilter) return;
+    prepareQueryChange(true);
+    setDueBeforeFilter(value);
+  };
+  const changeViewMode = (value: ViewMode) => {
+    if (value === viewMode) return;
+    prepareQueryChange(false);
+    setViewMode(value);
   };
 
   const showInfo = (message: string) => {
@@ -395,6 +452,7 @@ export function useProjectsController() {
           currentDetails?.project.id === editingProjectId ? details : currentDetails
         );
       } else {
+        requestedPageRef.current = 1;
         setSearchTerm('');
         setStatusFilter('all');
         setPriorityFilter('all');
@@ -404,7 +462,7 @@ export function useProjectsController() {
       try {
         await refreshProjectsPage(editingProjectId
           ? { silent: true, throwOnError: true }
-          : { search: '', status: 'all', priority: 'all', dueBefore: '', silent: true, throwOnError: true });
+          : { search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true, throwOnError: true });
         setAlert({ type: 'success', message: `Projet "${details.project.title}" ${editingProjectId ? 'modifié' : 'créé'}.` });
       } catch (error) {
         setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
@@ -427,11 +485,12 @@ export function useProjectsController() {
       const details = await duplicateBffProject(project.id);
       applyConfirmedProject(details, true);
 
+      requestedPageRef.current = 1;
       setSearchTerm('');
       setStatusFilter('all');
       setPriorityFilter('all');
       setDueBeforeFilter('');
-      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', silent: true });
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
       showError(error);
@@ -561,15 +620,15 @@ export function useProjectsController() {
     linkedTaskId,
     setLinkedTaskId,
     viewMode,
-    setViewMode,
+    setViewMode: changeViewMode,
     statusFilter,
-    setStatusFilter,
+    setStatusFilter: changeStatusFilter,
     priorityFilter,
-    setPriorityFilter,
+    setPriorityFilter: changePriorityFilter,
     dueBeforeFilter,
-    setDueBeforeFilter,
+    setDueBeforeFilter: changeDueBeforeFilter,
     searchTerm,
-    setSearchTerm,
+    setSearchTerm: changeSearchTerm,
     openFilter,
     setOpenFilter,
     alert,
@@ -593,6 +652,7 @@ export function useProjectsController() {
     projectPriorityOptions,
     filteredProjects,
     retryProjectsPage,
+    changeProjectPage,
     openCreateProject,
     openProjectDetails,
     openEditProject,
