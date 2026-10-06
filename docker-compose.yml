@@ -121,7 +121,7 @@ services:
 
   project-api:
     container_name: project-api-front-projects-developpement
-    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:0.5.1}
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:1.0.0}
     ports:
       - "3001:3001"
     networks:
