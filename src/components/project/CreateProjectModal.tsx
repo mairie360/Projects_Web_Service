@@ -21,6 +21,7 @@ export function CreateProjectModal({
   verificationMessage = PROJECT_VERIFICATION_MESSAGE,
   verificationLabel = 'Vérifier le projet',
   verificationPendingLabel = 'Vérification du projet…',
+  confirmedCreationTitle,
   canSave = true,
   onVerify,
   memberOptions,
@@ -42,6 +43,7 @@ export function CreateProjectModal({
   verificationMessage?: string;
   verificationLabel?: string;
   verificationPendingLabel?: string;
+  confirmedCreationTitle?: string;
   canSave?: boolean;
   onVerify?: () => void | Promise<void>;
   memberOptions: FilterOption[];
@@ -54,7 +56,8 @@ export function CreateProjectModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const isEditMode = mode === 'edit';
-  const submitBlocked = pending || verificationRequired || verificationPending || !canSave;
+  const creationConfirmed = !isEditMode && confirmedCreationTitle !== undefined;
+  const submitBlocked = pending || verificationRequired || verificationPending || creationConfirmed || !canSave;
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const dialogRef = React.useRef<HTMLFormElement>(null);
   const verificationFeedbackRef = React.useRef<HTMLDivElement>(null);
@@ -81,8 +84,8 @@ export function CreateProjectModal({
   React.useLayoutEffect(() => {
     // After acceptance stops saving, bring the non-retryable confirmation
     // warning into the scrolling body. Later read retries must not steal typing.
-    if (verificationRequired && !pending) verificationFeedbackRef.current?.focus();
-  }, [verificationRequired, pending]);
+    if ((verificationRequired || creationConfirmed) && !pending) verificationFeedbackRef.current?.focus();
+  }, [verificationRequired, creationConfirmed, pending]);
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.defaultPrevented || event.nativeEvent.isComposing) return;
@@ -123,7 +126,7 @@ export function CreateProjectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={pending || error || verificationRequired ? feedbackId : undefined}
+        aria-describedby={pending || error || verificationRequired || creationConfirmed ? feedbackId : undefined}
         aria-busy={pending}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
@@ -159,6 +162,12 @@ export function CreateProjectModal({
               <button type="button" disabled={verificationPending || pending} aria-busy={verificationPending} onClick={() => void onVerify?.()} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
                 {verificationPending ? verificationPendingLabel : verificationLabel}
               </button>
+            </div>
+          )}
+          {creationConfirmed && (
+            <div ref={verificationFeedbackRef} tabIndex={-1} id={feedbackId} role="status" className="mb-4 rounded-md border border-[#9ac5e5] bg-[#ddf4ff] px-4 py-3 text-sm text-[#24292f] [overflow-wrap:anywhere]">
+              <p className="font-semibold">Création vérifiée : {confirmedCreationTitle}</p>
+              <p>La fiche a été vérifiée par lecture, sans répéter la création. Votre brouillon reste ci-dessous et ne sera pas renvoyé. Fermez ce formulaire pour démarrer un autre projet.</p>
             </div>
           )}
           {error && !verificationRequired && (
@@ -289,14 +298,14 @@ export function CreateProjectModal({
 
         <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
           <Button
-            label="Annuler"
+            label={creationConfirmed ? 'Fermer' : 'Annuler'}
             disabled={pending}
             type="button"
             onClick={onClose}
             className="!h-9 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-[#fbfaf8] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#f1eee9]"
           />
           <Button
-            label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : 'Créer le projet'}
+            label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : creationConfirmed ? 'Création vérifiée' : 'Créer le projet'}
             disabled={submitBlocked}
             type="submit"
             primary

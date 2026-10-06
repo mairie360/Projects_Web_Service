@@ -1,5 +1,27 @@
 # Projects_Web_Service — Présentation du module
 
+## Reprise en lecture d’un nouveau reçu distinct (MAIR-408)
+
+Une création/copie acceptée avec nouvel ID distinct mais tâches incohérentes
+conserve l’ID attesté par son reçu et propose un GET détail gardé. Une fiche
+cohérente de cet ID (consultation actuelle comprise) résout seulement l’incertitude
+capturée et applique les données reçues. Refus, fiche étrangère/IDs de tâches
+répétés ou consultation abandonnée ne la lèvent pas. Une ancienne lecture ne
+valide pas un reçu plus récent. Deux nouvelles écritures acceptées revendiquant
+un même ID en attente perdent leur attribution ; ligne semblable ne les confirme
+pas. Collision connue/ID vide/source restent limités à l’inspection du catalogue,
+sans fausse confirmation depuis titre/champs ni replay d’écriture.
+
+Après vérification de création, formulaire conserve derniers champs et tâche
+locale non ajoutée, mais ne peut plus envoyer de POST. Le retour vérifié reçoit
+le focus ; Fermer explicitement termine ce brouillon de création acceptée avant
+un nouveau formulaire vide. Reprise après fermeture ne rouvre pas le formulaire
+et ne remplace pas un autre éditeur/consultation. Copie vérifiée libère seulement
+sa source pour une nouvelle duplication volontaire ; vérifier n’écrit rien.
+Totaux/options restent ceux de la page serveur, pas calculés depuis la nouvelle
+carte. Garanties frontend de durée de page, pas persistance serveur/inter-session
+ni unicité globale prouvées. Client Project0.4.0, contrat et API/BFF inchangés.
+
 ## Reçus incertains de création et duplication (MAIR-408)
 
 Avant d’insérer un nouveau projet, le front vérifie son ID non vide contre ceux
@@ -23,8 +45,8 @@ acceptée dont le reçu réutilise un ID existant : le contrat publié ne fourni
 de corrélation de requête/reçu d’idempotence pour ce cas. L’avertissement ne fabrique
 aucun nouvel ID et ne confirme pas la ligne semblable d’un autre agent. Protection
 de durée de page seulement, pas reprise durable après rechargement du navigateur.
-La reprise frontend d’un ID distinct avec tâches imbriquées incohérentes reste à
-qualifier ; le catalogue seul ne termine pas ce cas. Le consommateur ne certifie
+Les IDs distincts avec tâches incohérentes utilisent maintenant la reprise
+qualifiée GET détail ci-dessus ; le catalogue seul ne termine pas ce cas. Le consommateur ne certifie
 pas l’unicité globale d’IDs distants jamais observés. Aucun changement de client,
 contrat/API/BFF ou environnement n’est introduit.
 

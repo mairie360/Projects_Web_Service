@@ -25,6 +25,34 @@ function FormHarness({ mode, onSubmit, fromMenu = false }) {
 }
 
 describe('project form dialogs', () => {
+  it('retains nested draft after coherent creation verification and only closes explicitly without another submit', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(), onClose = vi.fn();
+    const props = {
+      mode: 'create', form: { ...createProjectFormState(), title: 'Saisie locale conservée' }, error: '',
+      verificationRequired: true, memberOptions: [], labelOptions: [],
+      statusOptions: [{ value: 'todo', label: 'À faire' }], priorityOptions: [{ value: 'medium', label: 'Moyenne' }],
+      onChange: vi.fn(), onSubmit, onClose,
+    };
+    const { rerender } = render(<CreateProjectModal {...props} />);
+    const dialog = screen.getByRole('dialog'), form = within(dialog);
+    const nested = form.getByPlaceholderText('Ajouter une tâche...');
+    await user.type(nested, 'Tâche non ajoutée encore présente');
+    rerender(<CreateProjectModal {...props} verificationRequired={false} confirmedCreationTitle="Titre officiel vérifié" />);
+    expect(form.getByRole('status').textContent).toContain('Titre officiel vérifié');
+    expect(document.activeElement).toBe(form.getByRole('status'));
+    expect(nested.value).toBe('Tâche non ajoutée encore présente');
+    expect(form.getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Saisie locale conservée');
+    expect(form.getByRole('button', { name: 'Création vérifiée', exact: true }).disabled).toBe(true);
+    await user.click(form.getByRole('button', { name: 'Création vérifiée', exact: true }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    const results = await axe(dialog);
+    expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
+    form.getByRole('button', { name: 'Fermer', exact: true }).focus();
+    await user.keyboard('{Enter}');
+    expect(onClose).toHaveBeenCalledOnce(); expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('keeps an uncertain creation draft and nested task while keyboard catalogue recovery cannot repeat creation', async () => {
     const user = userEvent.setup();
     const onVerify = vi.fn(), onSubmit = vi.fn(), onClose = vi.fn();

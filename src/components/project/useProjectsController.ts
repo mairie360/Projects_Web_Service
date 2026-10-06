@@ -37,7 +37,7 @@ import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
-import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
+import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
 type AlertState = {
@@ -69,7 +69,8 @@ type DetailSelection = { projectId: string; readRevision: number };
 type TaskConfirmations = { revision: number; changes: Map<string, ProjectTask | null>; latest: Map<string, TaskConfirmation> };
 type SelectedProjectDetails = { project: Project; taskItems: ProjectTask[] };
 type ConfirmedProject = { details: SelectedProjectDetails; newerTasks: boolean };
-type NewProjectReceiptIssue = { kind: 'create' | 'duplicate'; title: string; sourceId?: string };
+type NewProjectReceiptIssue = { kind: 'create' | 'duplicate'; title: string; sourceId?: string; verificationId?: string };
+type VerifiedCreation = { id: string; title: string };
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
@@ -114,6 +115,12 @@ export function useProjectsController() {
     [...newProjectReceiptIssues.values()].flatMap(issue => issue.kind === 'duplicate' && issue.sourceId ? [issue.sourceId] : []),
   ), [newProjectReceiptIssues]);
   const uncertainCreationDraftRef = useRef<ProjectFormState | null>(null);
+  const verifiedCreationRef = useRef<VerifiedCreation | null>(null);
+  const [verifiedCreation, setVerifiedCreation] = useState<VerifiedCreation | null>(null);
+  const newProjectReceiptOwnersRef = useRef(new Map<string, string>());
+  const newProjectReceiptReadsRef = useRef(new Map<string, symbol>());
+  const [newProjectReceiptPendingKeys, setNewProjectReceiptPendingKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const [newProjectReceiptErrors, setNewProjectReceiptErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   const newProjectCatalogueReadRef = useRef(false);
   const [newProjectCatalogueReadPending, setNewProjectCatalogueReadPending] = useState(false);
   const [newProjectCatalogueReadError, setNewProjectCatalogueReadError] = useState('');
@@ -429,24 +436,65 @@ export function useProjectsController() {
 
   const requireNewProjectReceipt = (details: ProjectDetailsResponse, key: string, issue: NewProjectReceiptIssue, knownAtDispatch: ReadonlySet<string>) => {
     const id = details.project.id;
+    let verificationId: string | undefined;
     try {
       // A GET while this request is pending may already show its legitimately
       // created project. Reject pre-existing IDs and another confirmed write,
       // not that new read observation alone.
+      const otherOwner = newProjectReceiptOwnersRef.current.get(id);
+      if (otherOwner && otherOwner !== key) {
+        // Two accepted new writes claiming one ID are not attributable. Neither
+        // uncertainty may be resolved from a coincidentally matching GET.
+        const otherIssue = newProjectReceiptIssuesRef.current.get(otherOwner);
+        if (otherIssue) newProjectReceiptIssuesRef.current.set(otherOwner, { ...otherIssue, verificationId: undefined });
+        throw new Error('The new project identity has conflicting receipts.');
+      }
       if (!id.trim() || knownAtDispatch.has(id) || confirmedNewProjectIdsRef.current.has(id) || id === issue.sourceId) {
         throw new Error('The new project identity is not distinct.');
       }
+      newProjectReceiptOwnersRef.current.set(id, key);
+      verificationId = id;
       assertProjectDetailsIdentity(id, details);
     } catch {
-      newProjectReceiptIssuesRef.current.set(key, issue);
+      newProjectReceiptIssuesRef.current.set(key, { ...issue, verificationId });
       setNewProjectReceiptIssues(new Map(newProjectReceiptIssuesRef.current));
       if (issue.kind === 'create') uncertainCreationDraftRef.current = projectForm;
       ++pageRevisionRef.current;
       pageReadPendingRef.current = false;
       setPageLoading(false);
-      throw new NewProjectReceiptVerificationRequiredError();
+      throw new NewProjectReceiptVerificationRequiredError(verificationId ? NEW_PROJECT_TASK_VERIFICATION_MESSAGE : NEW_PROJECT_VERIFICATION_MESSAGE);
     }
   };
+
+  const completeNewProjectVerification = useCallback((details: ProjectDetailsResponse, captured: ReadonlyMap<string, NewProjectReceiptIssue>) => {
+    let resolved = false;
+    for (const [key, issue] of captured) {
+      if (issue.verificationId !== details.project.id || newProjectReceiptIssuesRef.current.get(key) !== issue) continue;
+      newProjectReceiptIssuesRef.current.delete(key);
+      resolved = true;
+      if (issue.kind === 'create') {
+        const result = { id: details.project.id, title: details.project.title };
+        verifiedCreationRef.current = result;
+        setVerifiedCreation(result);
+      }
+      setNewProjectReceiptErrors(current => {
+        const next = new Map(current);
+        next.delete(key);
+        return next;
+      });
+    }
+    if (!resolved) return;
+    knownProjectIdsRef.current.add(details.project.id);
+    confirmedNewProjectIdsRef.current.add(details.project.id);
+    setNewProjectReceiptIssues(new Map(newProjectReceiptIssuesRef.current));
+    const project = mergeProjectDetails(details);
+    ++pageRevisionRef.current;
+    pageReadPendingRef.current = false;
+    setPageLoading(false);
+    setProjects(current => current.some(row => row.id === project.id)
+      ? current.map(row => row.id === project.id ? project : row) : [...current, project]);
+    setAlert({ type: 'info', message: `Fiche "${project.title}" vérifiée par lecture. L’action n’a pas été répétée.` });
+  }, []);
 
   const readNewProjectCatalogue = async () => {
     if (newProjectCatalogueReadRef.current) return;
@@ -496,6 +544,7 @@ export function useProjectsController() {
   useEffect(() => () => {
     detailSelectionRef.current = null;
     projectFormOpeningRef.current = null;
+    newProjectReceiptReadsRef.current.clear();
   }, []);
 
   const completeTaskVerifications = useCallback((projectId: string) => {
@@ -519,12 +568,14 @@ export function useProjectsController() {
     while (isCurrent()) {
       const revision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
       const verification = projectVerificationsRef.current.get(projectId);
+      const newReceipts = new Map([...newProjectReceiptIssuesRef.current].filter(([, issue]) => issue.verificationId === projectId));
       try {
         const details = await getProjectDetails(projectId);
         if (!isCurrent()) return null;
         if (projectVerificationsRef.current.get(projectId) !== verification) return null;
         if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
         assertProjectDetailsIdentity(projectId, details);
+        knownProjectIdsRef.current.add(projectId);
         const confirmations = taskConfirmationsRef.current.get(projectId);
         if (confirmations) {
           confirmations.latest = reconcileTaskConfirmations(confirmations.latest, details.taskItems);
@@ -532,6 +583,7 @@ export function useProjectsController() {
         }
         completeTaskVerifications(projectId);
         completeProjectVerification(projectId, verification);
+        completeNewProjectVerification(details, newReceipts);
         return details;
       } catch (error) {
         if (!isCurrent()) return null;
@@ -545,7 +597,7 @@ export function useProjectsController() {
       }
     }
     return null;
-  }, [completeTaskVerifications, completeProjectVerification]);
+  }, [completeTaskVerifications, completeProjectVerification, completeNewProjectVerification]);
 
   useEffect(() => {
     const target = parseProjectDeepLink(window.location.search ?? '');
@@ -580,10 +632,12 @@ export function useProjectsController() {
       ? ++selection.readRevision : null;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     const verification = projectVerificationsRef.current.get(projectId);
+    const newReceipts = new Map([...newProjectReceiptIssuesRef.current].filter(([, issue]) => issue.verificationId === projectId));
     let details: ProjectDetailsResponse;
     try {
       details = await getProjectDetails(projectId);
       assertProjectDetailsIdentity(projectId, details);
+      knownProjectIdsRef.current.add(projectId);
     } catch (error) {
       if (projectVerificationsRef.current.get(projectId) !== verification) return null;
       if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
@@ -601,6 +655,9 @@ export function useProjectsController() {
     }
     completeTaskVerifications(projectId);
     completeProjectVerification(projectId, verification);
+    if (!selection || (detailSelectionRef.current === selection && selection.readRevision === revision)) {
+      completeNewProjectVerification(details, newReceipts);
+    }
     const projectWithTasks = mergeProjectDetails(details);
 
     setProjects((currentProjects) =>
@@ -681,6 +738,30 @@ export function useProjectsController() {
     } finally {
       projectVerificationReadsRef.current.delete(projectId);
       setProjectVerificationPendingIds(new Set(projectVerificationReadsRef.current));
+    }
+  };
+
+  const verifyNewProjectReceipt = async (key: string) => {
+    const issue = newProjectReceiptIssuesRef.current.get(key);
+    if (!issue) return;
+    if (!issue.verificationId) return readNewProjectCatalogue();
+    if (newProjectReceiptReadsRef.current.has(key)) return;
+    const request = Symbol('new project detail verification');
+    newProjectReceiptReadsRef.current.set(key, request);
+    setNewProjectReceiptPendingKeys(new Set(newProjectReceiptReadsRef.current.keys()));
+    setNewProjectReceiptErrors(current => { const next = new Map(current); next.delete(key); return next; });
+    const isCurrent = () => newProjectReceiptReadsRef.current.get(key) === request && newProjectReceiptIssuesRef.current.get(key) === issue;
+    try {
+      // Does not begin a consultation or replace the form: only the accepted
+      // receipt's distinct identity owns this read and its completion.
+      await readCurrentProjectDetails(issue.verificationId, isCurrent);
+    } catch (error) {
+      if (isCurrent()) setNewProjectReceiptErrors(current => new Map(current).set(key, getBffProjectErrorMessage(error)));
+    } finally {
+      if (newProjectReceiptReadsRef.current.get(key) === request) {
+        newProjectReceiptReadsRef.current.delete(key);
+        setNewProjectReceiptPendingKeys(new Set(newProjectReceiptReadsRef.current.keys()));
+      }
     }
   };
 
@@ -770,6 +851,13 @@ export function useProjectsController() {
     if (projectFormPendingRef.current) return;
     projectFormOpeningRef.current = null;
     if (!editingProjectId && newProjectReceiptIssuesRef.current.has('create')) uncertainCreationDraftRef.current = projectForm;
+    if (!editingProjectId && verifiedCreationRef.current) {
+      // Only explicit dismissal releases the accepted creation draft; a GET
+      // never makes the same create form capable of sending its POST again.
+      uncertainCreationDraftRef.current = null;
+      verifiedCreationRef.current = null;
+      setVerifiedCreation(null);
+    }
     setCreateProjectOpen(false);
     setEditingProjectId(null);
     setProjectFormError('');
@@ -836,7 +924,7 @@ export function useProjectsController() {
   const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // The ref also protects two events captured before React renders disabled controls.
-    if (projectFormPendingRef.current || (!editingProjectId && newProjectReceiptIssuesRef.current.has('create'))) return;
+    if (projectFormPendingRef.current || (!editingProjectId && (newProjectReceiptIssuesRef.current.has('create') || verifiedCreationRef.current))) return;
     projectFormOpeningRef.current = null;
 
     if (!validateProjectForm(projectForm)) {
@@ -890,8 +978,9 @@ export function useProjectsController() {
   const duplicateProject = async (project: Project) => {
     if (project.permissions?.canDuplicate === false || duplicatingProjects.current.has(project.id)) return;
     const key = `duplicate:${project.id}`;
-    if (newProjectReceiptIssuesRef.current.has(key)) {
-      showInfo(NEW_PROJECT_VERIFICATION_MESSAGE);
+    const uncertainReceipt = newProjectReceiptIssuesRef.current.get(key);
+    if (uncertainReceipt) {
+      showInfo(uncertainReceipt.verificationId ? NEW_PROJECT_TASK_VERIFICATION_MESSAGE : NEW_PROJECT_VERIFICATION_MESSAGE);
       return;
     }
     // Prevent a second event before React renders the disabled action.
@@ -907,7 +996,7 @@ export function useProjectsController() {
       await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
-      if (error instanceof NewProjectReceiptVerificationRequiredError) showInfo(NEW_PROJECT_VERIFICATION_MESSAGE);
+      if (error instanceof NewProjectReceiptVerificationRequiredError) showInfo(error.message);
       else showError(error);
     } finally {
       duplicatingProjects.current.delete(project.id);
@@ -1157,6 +1246,10 @@ export function useProjectsController() {
     projectVerificationPendingIds,
     projectVerificationErrors,
     newProjectReceiptIssues,
+    verifiedCreation,
+    newProjectReceiptPendingKeys,
+    newProjectReceiptErrors,
+    verifyNewProjectReceipt,
     unverifiedDuplicationSourceIds,
     newProjectCatalogueReadPending,
     newProjectCatalogueReadError,

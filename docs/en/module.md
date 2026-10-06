@@ -1,5 +1,27 @@
 # Projects_Web_Service — Module overview
 
+## Read-only recovery of a distinct new receipt (MAIR-408)
+
+When an accepted creation/copy identifies a distinct new project but supplies
+incoherent task IDs, keep that receipt's ID and offer a guarded detail GET. A
+coherent matching detail (including a current consultation of that project)
+resolves only its captured uncertainty and applies the received data. Refusal,
+foreign/duplicate-task details or an abandoned consultation cannot resolve it.
+Earlier reads do not clear a later receipt. Two accepted new writes claiming one
+pending ID lose that attribution; neither can be confirmed from a matching row.
+Known, empty or source-ID collisions still offer catalogue-only inspection and
+remain uncertain. No field/title matching or mutation replay is used.
+
+After creation verification, the open form keeps its latest fields and unsent
+nested task but remains unable to POST. Its verified feedback receives focus;
+explicit Close dismisses this accepted creation draft before a new blank form.
+A recovery after closing never reopens the form or replaces another editor or
+consultation. A verified copy releases only its source for a new deliberate
+duplication; the verification itself performs no write. Page totals/options
+remain server page data, not inferred from the new card. These are page-lifetime
+frontend guarantees, not backend persistence/session durability or proof of
+global uniqueness. Existing Project0.4.0 client, contract and API/BFF are unchanged.
+
 ## Uncertain creation and duplication receipts (MAIR-408)
 
 Before inserting a new project, the front checks its non-empty ID against IDs
@@ -23,8 +45,8 @@ creation whose receipt reused an existing ID: the published contract has no
 request correlation/idempotency receipt for this case. The warning stays honest,
 without inventing a new ID or confirming another user's similarly titled row.
 This is page-lifetime protection, not durable recovery across browser reloads.
-Further frontend recovery for a distinct new ID with incoherent nested task IDs
-remains to qualify; catalogue-only recovery does not complete that case. Unknown
+Distinct new IDs with incoherent nested tasks now use the qualified detail-GET
+recovery described above; catalogue-only recovery does not complete that case. Unknown
 remote IDs never seen by this page cannot be certified globally unique by a
 consumer. No client/contract/API/BFF or environment changes are introduced.
 

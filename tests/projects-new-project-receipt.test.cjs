@@ -62,12 +62,12 @@ for (const operation of ['create', 'duplicate']) {
       assert.deepEqual(view.props('ProjectsWorkspace').projects, rows);
       assert.deepEqual(view.props('ProjectDetailModal').project, selected);
       assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor(operation)), true);
-      assert.match(view.text(), /identité du nouveau projet n’est pas vérifiable/);
+      assert.match(view.text(), bad === 'task-collision' ? /tâches.*incohérentes/ : /identité du nouveau projet n’est pas vérifiable/);
       assert.doesNotMatch(view.text(), /Reçu non vérifié à ne pas appliquer/);
       if (operation === 'create') {
         assert.equal(view.props('CreateProjectModal').form.title, 'Brouillon de nouvelle création');
         assert.equal(view.props('CreateProjectModal').verificationRequired, true);
-        assert.equal(view.props('CreateProjectModal').verificationLabel, 'Actualiser le catalogue');
+        assert.equal(view.props('CreateProjectModal').verificationLabel, bad === 'task-collision' ? 'Vérifier le projet' : 'Actualiser le catalogue');
       }
       await view.act(() => perform(operation));
       assert.equal(writes().length, 1);
@@ -207,3 +207,155 @@ for (const mode of ['kanban', 'grid', 'table']) {
     assert.equal(writes().length, 1);
   });
 }
+
+for (const operation of ['create', 'duplicate']) {
+  for (const response of ['refused', 'foreign', 'repeated-tasks']) {
+    test(`${operation}: distinct receipt detail ${response} keeps uncertainty until a coherent GET only`, async () => {
+      await loaded(); await prepare(operation);
+      const created = f.projectListItem({ id: 'new-id', title: 'Projet vérifié par sa fiche' });
+      harness.bffProject.on('post', pathFor(operation), { status: 201, body: invalidReceipt('task-collision') });
+      await view.act(() => perform(operation));
+      const key = keyFor(operation);
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.get(key).verificationId, created.id);
+      if (operation === 'duplicate') assert.equal(view.props('ProjectsWorkspace').alert.message, 'Le nouveau projet est identifié, mais les tâches de son reçu sont incohérentes. Vérifiez sa fiche sans répéter l’action.');
+      const reads = harness.bffProject.requests.length;
+      const bad = response === 'refused' ? harness.errorReply(503, f.apiError('READ', 'Fiche indisponible'))
+        : { body: response === 'foreign' ? f.projectDetails(second) : invalidReceipt('task-collision') };
+      harness.bffProject.on('get', '/projects/{projectId}', bad);
+      await view.act(() => view.props('ProjectsWorkspace').verifyNewProjectReceipt(key));
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(key), true);
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptErrors.has(key), true);
+      assert.equal(harness.bffProject.requests.length, reads + 1);
+      assert.equal(harness.bffProject.requests.at(-1).path, `/projects/${created.id}`);
+      assert.equal(view.props('ProjectsWorkspace').projects.some(p => p.id === created.id), false);
+      harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created, [f.projectTask()]) });
+      await view.act(() => view.props('ProjectsWorkspace').verifyNewProjectReceipt(key));
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(key), false);
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptErrors.has(key), false);
+      assert.equal(view.props('ProjectsWorkspace').newProjectReceiptPendingKeys.size, 0);
+      assert.equal(view.props('ProjectsWorkspace').projects.find(p => p.id === created.id).title, created.title);
+      assert.equal(view.props('ProjectsWorkspace').projects.find(p => p.id === second.id).title, second.title);
+      assert.equal(writes().length, 1);
+      if (operation === 'create') {
+        assert.equal(view.props('CreateProjectModal').form.title, 'Brouillon de nouvelle création');
+        assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, created.title);
+        await view.act(() => perform(operation));
+        assert.equal(writes().length, 1, 'confirmed create form is still not a new POST');
+        await view.act(() => view.props('CreateProjectModal').onClose());
+        await view.act(() => view.props('ProjectsWorkspace').openCreateProject());
+        assert.equal(view.props('CreateProjectModal').form.title, '');
+        assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, undefined);
+      }
+    });
+  }
+
+  test(`${operation}: matching current consultation resolves distinct receipt without catalogue inference`, async () => {
+    await loaded(); await prepare(operation);
+    harness.bffProject.on('post', pathFor(operation), { status: 201, body: invalidReceipt('task-collision') });
+    await view.act(() => perform(operation));
+    const created = f.projectListItem({ id: 'new-id', title: 'Projet consulté vérifié' });
+    harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created) });
+    await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(created));
+    assert.equal(view.props('ProjectDetailModal').project.id, created.id);
+    assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor(operation)), false);
+    assert.equal(writes().length, 1);
+  });
+}
+
+test('two distinct-receipt verification dispatches share GET and retain a continued creation draft', async t => {
+  await loaded(); await prepare('create');
+  const created = f.projectListItem({ id: 'new-id', title: 'Confirmation officielle' });
+  harness.bffProject.on('post', '/projects', { status: 201, body: invalidReceipt('task-collision') });
+  await view.act(() => perform('create'));
+  harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created) });
+  const originalFetch = global.fetch;
+  let release, received, pending;
+  const gate = new Promise(resolve => { release = resolve; });
+  const ready = new Promise(resolve => { received = resolve; });
+  t.mock.method(global, 'fetch', async (...args) => {
+    const response = await originalFetch(...args);
+    if (args[0] === `/projects/${created.id}`) { received(); await gate; }
+    return response;
+  });
+  const reads = harness.bffProject.requests.length;
+  try {
+    await view.act(() => { pending = view.props('ProjectsWorkspace').verifyNewProjectReceipt('create'); });
+    await ready;
+    assert.equal(view.props('CreateProjectModal').verificationPending, true);
+    await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Saisie poursuivie pendant GET' }));
+    await view.act(() => view.props('ProjectsWorkspace').verifyNewProjectReceipt('create'));
+    assert.equal(harness.bffProject.requests.length, reads + 1);
+    release(); await pending; await view.settle();
+    assert.equal(view.props('CreateProjectModal').form.title, 'Saisie poursuivie pendant GET');
+    assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, created.title);
+    await view.act(() => perform('create'));
+    assert.equal(writes().length, 1);
+  } finally { release(); await pending; await view.settle(); }
+});
+
+test('two accepted new writes claiming the same pending identity cannot be attributed by a GET', async () => {
+  await loaded(); await prepare('create');
+  harness.bffProject.on('post', '/projects', { status: 201, body: invalidReceipt('task-collision') });
+  harness.bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: invalidReceipt('task-collision') });
+  await view.act(() => perform('create'));
+  await view.act(() => perform('duplicate'));
+  const issues = view.props('ProjectsWorkspace').newProjectReceiptIssues;
+  assert.equal(issues.get('create').verificationId, undefined);
+  assert.equal(issues.get(keyFor('duplicate')).verificationId, undefined);
+  const created = f.projectListItem({ id: 'new-id', title: 'Identité ambiguë' });
+  harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created) });
+  await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(created));
+  assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.size, 2);
+  assert.equal(view.props('ProjectsWorkspace').verifiedCreation, null);
+  assert.equal(writes().length, 2);
+});
+
+test('an abandoned consultation cannot resolve a distinct receipt or reopen another detail', async t => {
+  await loaded(); await prepare('duplicate');
+  harness.bffProject.on('post', pathFor('duplicate'), { status: 201, body: invalidReceipt('task-collision') });
+  await view.act(() => perform('duplicate'));
+  const created = f.projectListItem({ id: 'new-id', title: 'Fiche ancienne abandonnée' });
+  harness.bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: f.projectDetails(pathParams.projectId === created.id ? created : second) }));
+  const originalFetch = global.fetch;
+  let release, received, pending;
+  const gate = new Promise(resolve => { release = resolve; });
+  const ready = new Promise(resolve => { received = resolve; });
+  t.mock.method(global, 'fetch', async (...args) => {
+    const response = await originalFetch(...args);
+    if (args[0] === `/projects/${created.id}`) { received(); await gate; }
+    return response;
+  });
+  try {
+    await view.act(() => { pending = view.props('ProjectsWorkspace').openProjectDetails(created); });
+    await ready;
+    await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(second));
+    release(); await pending; await view.settle();
+    assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+    assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor('duplicate')), true);
+    assert.equal(writes().length, 1);
+  } finally { release(); await pending; await view.settle(); }
+});
+
+test('verification after closing creation leaves a different editor and consultation untouched', async () => {
+  await loaded(); await prepare('create');
+  harness.bffProject.on('post', '/projects', { status: 201, body: invalidReceipt('task-collision') });
+  await view.act(() => perform('create'));
+  await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Dernier brouillon avant fermeture' }));
+  await view.act(() => view.props('CreateProjectModal').onClose());
+  await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(second));
+  await view.act(() => view.props('ProjectsWorkspace').openEditProject(second));
+  await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Autre édition préservée' }));
+  const created = f.projectListItem({ id: 'new-id', title: 'Création vérifiée en arrière-plan' });
+  harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created) });
+  await view.act(() => view.props('ProjectsWorkspace').verifyNewProjectReceipt('create'));
+  assert.equal(view.props('CreateProjectModal').mode, 'edit');
+  assert.equal(view.props('CreateProjectModal').form.title, 'Autre édition préservée');
+  assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, undefined);
+  assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+  await view.act(() => view.props('CreateProjectModal').onClose());
+  await view.act(() => view.props('ProjectsWorkspace').openCreateProject());
+  assert.equal(view.props('CreateProjectModal').form.title, 'Dernier brouillon avant fermeture');
+  assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, created.title);
+  await view.act(() => perform('create'));
+  assert.equal(writes().length, 1);
+});

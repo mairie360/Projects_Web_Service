@@ -33,6 +33,32 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
+    const user = userEvent.setup(), first = fixtures.projectListItem();
+    const created = fixtures.projectListItem({ id: 'new-distinct-id', title: 'Copie canonique vérifiée' });
+    const task = fixtures.projectTask();
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([first]));
+    vi.mocked(duplicateProject).mockResolvedValue(fixtures.projectDetails(created, [task, { ...task }]));
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Fiche indisponible')).mockResolvedValue(fixtures.projectDetails(created, [task]));
+    render(<ProjectsPage />);
+    const opener = await screen.findByRole('button', { name: `Actions pour ${first.title}` });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Dupliquer', exact: true }));
+    const verify = await screen.findByRole('button', { name: 'Vérifier le projet', exact: true });
+    verify.focus(); await user.keyboard('{Enter}');
+    await screen.findByText('Fiche indisponible');
+    expect(duplicateProject).toHaveBeenCalledOnce();
+    verify.focus(); await user.keyboard('{Enter}');
+    await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${created.title}` });
+    expect(screen.queryByText(`Duplication non vérifiée : ${first.title}`)).toBeNull();
+    expect(getProjectDetails).toHaveBeenCalledTimes(2);
+    expect(getProjectDetails).toHaveBeenCalledWith(created.id);
+    expect(getProjectsPage).toHaveBeenCalledOnce();
+    await user.click(opener);
+    expect(screen.getByRole('menuitem', { name: 'Dupliquer', exact: true }).disabled).toBe(false);
+    expect(duplicateProject).toHaveBeenCalledOnce();
+  });
+
   it('keeps a collided duplication visible with GET-only recovery and no second duplicate POST', async () => {
     const user = userEvent.setup(), first = fixtures.projectListItem();
     const second = fixtures.projectListItem({ id: 'project-2', title: 'Carte existante intacte' });
