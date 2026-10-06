@@ -13,6 +13,17 @@ scanner jobs are retained. Protected integration and exact-main/current-local
 verification remain required; this composition is not a deployment or proof
 of backend authorization, persistence or global accessibility.
 
+## Nested-task deadline ownership (MAIR-408)
+
+A new task with no date choice follows the project's current deadline, including
+after typing its year through intermediate native values. Choosing a task date
+or explicitly clearing it makes that date independent of later project edits.
+Editing an existing task preserves its own date (including an empty date), ID
+and creation date. Canceling that edit starts a new unchosen date default without
+altering the existing task. Already-added tasks do not follow later project-date
+changes. The submitted contract body contains only the resolved string dates;
+no private default marker or local task identity is transmitted.
+
 ## Independent nested task drafts (MAIR-408)
 
 The project form allocates each new nested task a local identity distinct from

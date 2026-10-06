@@ -454,6 +454,51 @@ test('same-tick nested task drafts keep independent states in the actual project
   assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 1);
 });
 
+test('nested task deadline ownership reaches the actual project-create payload without private markers', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Projet avec échéances propres', description: 'Reprise des dates de tâches',
+    responsible: fixtures.people.marie.id,
+  }));
+  for (const value of ['0002-11-18', '0020-11-18', '0202-11-18', '2026-11-18']) {
+    await view.fire(props => props.id === 'project-due-date', 'onChange', { target: { value } });
+  }
+  assert.equal(view.hostElements(props => props.id === 'project-form-task-due-date')[0].props.value, '2026-11-18');
+  const addDraft = async title => {
+    await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: title } });
+    await view.click('Ajouter la tâche');
+  };
+  await addDraft('Échéance héritée');
+  await view.fire(props => props.id === 'project-form-task-due-date', 'onChange', { target: { value: '2026-10-21' } });
+  await addDraft('Échéance choisie');
+  await view.fire(props => props.id === 'project-form-task-due-date', 'onChange', { target: { value: '' } });
+  await addDraft('Sans échéance volontaire');
+  await view.fire(props => props.id === 'project-due-date', 'onChange', { target: { value: '2027-01-01' } });
+  assert.equal(view.hostElements(props => props.id === 'project-form-task-due-date')[0].props.value, '');
+  const draft = view.props('CreateProjectModal').form;
+  assert.deepEqual(draft.taskItems.map(task => task.dueDate), ['2026-11-18', '2026-10-21', '']);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+  const created = fixtures.projectListItem({
+    id: 'project-date-qa', title: draft.title, dueDate: '2027-01-01',
+    tasks: { total: 3, completed: 0 }, progress: 0,
+  });
+  const officialTasks = draft.taskItems.map((task, index) => fixtures.projectTask({
+    id: `official-date-${index + 1}`, title: task.title, dueDate: task.dueDate,
+    status: task.status, completed: task.completed,
+  }));
+  bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, officialTasks) });
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([fixtures.projectListItem(), created]) });
+  await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
+  await view.waitFor(() => view.find('CreateProjectModal').length === 0);
+  const writes = bffProject.calls('/projects', 'post');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].body.dueDate, '2027-01-01');
+  assert.deepEqual(writes[0].body.taskItems.map(task => task.dueDate), ['2026-11-18', '2026-10-21', '']);
+  assert.equal(writes[0].body.taskItems.some(task => Object.hasOwn(task, 'id') || task.dueDate === null), false);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 1);
+});
+
 test('module boundaries preserve a nested creation draft across view and page refreshes without writes', async () => {
   await renderLoadedPage();
   await view.click('Nouveau projet');

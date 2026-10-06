@@ -1,5 +1,16 @@
 # Projects_Web_Service — Technical documentation
 
+## Nested-task date default — MAIR-408
+
+`ProjectTasksEditor` keeps a private `string | null` draft date: `null` means
+unchosen, while any string (including `''`) is owned by the task. The rendered
+and saved date is `draft.dueDate ?? form.dueDate`, not a copy in an effect.
+Existing task dates stay strings. The sentinel never changes `TaskFormState`,
+the presentation task, contract DTO, proxy or BFF. Component regressions cover
+intermediate years, a titled draft, chosen/cleared dates, existing-task edits
+and cancellation; the real page/harness regression checks the single project
+POST's parent/nested dates, absence of markers/IDs and canonical receipt.
+
 ## Opaque redirects in the browser client — MAIR-408
 
 `requestBff` sets `redirect: 'manual'` and checks the AbortSignal after the

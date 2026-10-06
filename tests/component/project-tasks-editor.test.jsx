@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,14 +12,20 @@ const memberOptions = [
   { label: 'Marie Durand', name: 'Marie Durand', value: '3' },
 ];
 
-function Editor({ responsible = '', taskItems = [] }) {
-  const [form, setForm] = React.useState(() => ({ ...createProjectFormState(), responsible, taskItems }));
+function Editor({ responsible = '', taskItems = [], dueDate = '' }) {
+  const [form, setForm] = React.useState(() => ({ ...createProjectFormState(), responsible, taskItems, dueDate }));
 
   return (
     <>
       <button type="button" onClick={() => setForm((current) => ({ ...current, responsible: '3' }))}>
         Choisir Marie pour le projet
       </button>
+      <input
+        aria-label="Échéance du projet de test"
+        type="date"
+        value={form.dueDate}
+        onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+      />
       <ProjectTasksEditor
         form={form}
         memberOptions={memberOptions}
@@ -167,5 +173,92 @@ describe('ProjectTasksEditor local task identities', () => {
     expect(tasks().slice(0, 2)).toEqual(existing);
     expect(tasks()[2].id).not.toBe(existing[0].id);
     expect(tasks()[2].id).not.toBe(existing[1].id);
+  });
+});
+
+describe('ProjectTasksEditor deadline ownership', () => {
+  const projectDate = () => screen.getByLabelText('Échéance du projet de test');
+  const taskDate = () => screen.getByLabelText('Échéance', { exact: true });
+  const changeProjectDate = value => fireEvent.change(projectDate(), { target: { value } });
+  const tasks = () => JSON.parse(screen.getByTestId('tasks').textContent);
+  const addTask = async user => {
+    await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Échéance reçue du projet');
+    await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
+  };
+
+  it('follows the final project date instead of retaining an intermediate native year', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="3" />);
+    for (const value of ['0002-11-18', '0020-11-18', '0202-11-18', '2026-11-18']) changeProjectDate(value);
+    expect(taskDate().value).toBe('2026-11-18');
+    await addTask(user);
+    expect(tasks()[0].dueDate).toBe('2026-11-18');
+  });
+
+  it('keeps a new deadline unchosen even when another draft field already contains text', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Texte conservé');
+    changeProjectDate('2026-12-31');
+    expect(screen.getByPlaceholderText('Ajouter une tâche...').value).toBe('Texte conservé');
+    expect(taskDate().value).toBe('2026-12-31');
+    await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
+    expect(tasks()[0]).toMatchObject({ title: 'Texte conservé', dueDate: '2026-12-31' });
+  });
+
+  it('preserves an explicitly chosen task date when the project date changes', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    fireEvent.change(taskDate(), { target: { value: '2026-10-21' } });
+    changeProjectDate('2026-12-31');
+    expect(taskDate().value).toBe('2026-10-21');
+    await addTask(user);
+    expect(tasks()[0].dueDate).toBe('2026-10-21');
+  });
+
+  it('preserves an explicitly cleared task date rather than replacing it with a project default', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    fireEvent.change(taskDate(), { target: { value: '' } });
+    changeProjectDate('2026-12-31');
+    expect(taskDate().value).toBe('');
+    await addTask(user);
+    expect(tasks()[0].dueDate).toBe('');
+  });
+
+  for (const dueDate of ['', '2026-10-21']) {
+    it(`editing an existing task retains its own ${dueDate ? 'chosen' : 'blank'} date and identity`, async () => {
+      const user = userEvent.setup();
+      const existing = fixtures.projectTask({ id: 'existing-date-task', title: 'Tâche existante', dueDate });
+      render(<Editor responsible="3" dueDate="2026-11-18" taskItems={[existing]} />);
+      await user.click(within(screen.getByRole('heading', { name: 'Tâche existante' }).closest('article'))
+        .getByRole('button', { name: 'Modifier' }));
+      changeProjectDate('2026-12-31');
+      expect(taskDate().value).toBe(dueDate);
+      await user.clear(screen.getByPlaceholderText('Ajouter une tâche...'));
+      await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Tâche existante corrigée');
+      await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+      // This case verifies date/identity ownership, not unrelated receipt labels
+      // or the existing assignee-order normalization.
+      expect(tasks()[0]).toMatchObject({
+        id: existing.id, title: 'Tâche existante corrigée',
+        dueDate, createdAt: existing.createdAt,
+      });
+    });
+  }
+
+  it('canceling an existing edit creates a fresh unchosen date without changing the existing task', async () => {
+    const user = userEvent.setup();
+    const existing = fixtures.projectTask({ id: 'existing-cancel-task', title: 'Tâche conservée', dueDate: '2026-10-21' });
+    render(<Editor responsible="3" dueDate="2026-11-18" taskItems={[existing]} />);
+    await user.click(within(screen.getByRole('heading', { name: 'Tâche conservée' }).closest('article'))
+      .getByRole('button', { name: 'Modifier' }));
+    changeProjectDate('2026-12-31');
+    await user.click(screen.getByRole('button', { name: 'Annuler', exact: true }));
+    changeProjectDate('2027-01-01');
+    expect(taskDate().value).toBe('2027-01-01');
+    await addTask(user);
+    expect(tasks()[0]).toEqual(existing);
+    expect(tasks()[1].dueDate).toBe('2027-01-01');
   });
 });

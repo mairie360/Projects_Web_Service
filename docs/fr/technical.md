@@ -1,5 +1,16 @@
 # Projects_Web_Service — Documentation technique
 
+## Défaut de date des tâches imbriquées — MAIR-408
+
+`ProjectTasksEditor` conserve une date privée `string | null` : `null` signifie
+non choisie, toute chaîne (y compris `''`) appartient à la tâche. La date rendue
+et enregistrée est `draft.dueDate ?? form.dueDate`, sans copie dans un effet.
+Les dates des tâches existantes restent des chaînes. Le marqueur ne modifie ni
+`TaskFormState`, ni la tâche de présentation, ni le DTO, proxy ou BFF. Les
+régressions composant couvrent années intermédiaires, brouillon titré, choix,
+effacement, édition et annulation ; la régression page/harnais réel vérifie les
+dates parent/tâches du POST unique, l’absence de marqueur/ID et le reçu canonique.
+
 ## Redirections opaques du client navigateur — MAIR-408
 
 `requestBff` impose `redirect: 'manual'` puis vérifie l’AbortSignal après réception.

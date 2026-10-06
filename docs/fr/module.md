@@ -14,6 +14,18 @@ Intégration protégée et vérification main/copie locale exacte restent requis
 cette composition ne vaut ni déploiement, ni preuve d'autorisation serveur,
 de persistance ou d'accessibilité globale.
 
+## Échéance propre aux tâches imbriquées (MAIR-408)
+
+Une nouvelle tâche sans choix de date suit l’échéance actuelle du projet, y
+compris pendant la saisie native de son année. Choisir une date pour la tâche
+ou l’effacer explicitement la rend indépendante des changements du projet.
+L’édition d’une tâche existante conserve sa propre date (même vide), sa clé et
+sa date de création. Annuler cette édition crée un nouveau défaut non choisi
+sans altérer la tâche existante. Les tâches déjà ajoutées ne suivent pas les
+changements ultérieurs de date du projet. Le corps contractuel ne transmet que
+les dates résolues sous forme de chaînes ; aucun marqueur privé de défaut ni
+identité locale de tâche n’est envoyé.
+
 ## Brouillons de tâches imbriquées indépendants (MAIR-408)
 
 Le formulaire projet attribue à chaque nouvelle tâche une clé locale distincte
