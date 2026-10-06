@@ -1,5 +1,19 @@
 # Projects_Web_Service — Module overview
 
+## Confirmed tasks and detail recovery (MAIR-408)
+
+Accepted creation, editing and status responses keep the normalized canonical
+task and its received permissions visible; confirmed deletion removes only its
+target. No draft is applied on a refused write. Partial task confirmations do
+not recalculate project totals or progress. After a refused detail read, the
+dialog explains that those statistics belong to the last successful server read
+and offers a guarded keyboard-accessible GET-only retry. Recovery replaces the
+detail and server statistics without resubmitting a write. Older task reads cannot
+erase newer confirmations; a still-current opening rereads after a task confirmed
+while its earlier response was pending. Closed/replaced dialogs stay closed.
+The published Project0.4.0 operations and authentication remain unchanged. This
+isolated frontend behavior does not certify durable backend persistence.
+
 ## Current project detail lifetime (MAIR-408)
 
 Each direct or deep-link opening has its own transient selection identity. A

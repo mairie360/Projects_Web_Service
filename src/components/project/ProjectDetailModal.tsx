@@ -26,6 +26,9 @@ export function ProjectDetailModal({
   statusOptions,
   priorityOptions,
   onClose,
+  refreshError = '',
+  refreshPending = false,
+  onRetry,
   onUpdateProject,
   onAddTask,
   onUpdateTask,
@@ -41,6 +44,9 @@ export function ProjectDetailModal({
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
   onClose: () => void;
+  refreshError?: string;
+  refreshPending?: boolean;
+  onRetry?: () => void | Promise<void>;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
@@ -442,6 +448,16 @@ export function ProjectDetailModal({
         <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
+              {refreshError && (
+                <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
+                  <p>{refreshError}</p>
+                  <p className="mt-2 text-[#57606a]">Les tâches confirmées restent affichées. Les compteurs et la progression proviennent de la dernière lecture réussie.</p>
+                  <button type="button" disabled={refreshPending || mutationPending} aria-busy={refreshPending} onClick={() => void onRetry?.()}
+                    className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
+                    {refreshPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
+                  </button>
+                </div>
+              )}
               {project.permissions?.canCreateTask !== false && (
                 <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">

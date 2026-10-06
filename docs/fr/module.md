@@ -1,5 +1,19 @@
 # Projects_Web_Service — Présentation du module
 
+## Tâches confirmées et reprise de la fiche (MAIR-408)
+
+Création, édition et statut acceptés gardent la tâche canonique normalisée et ses
+permissions reçues ; une suppression confirmée retire seulement sa cible. Aucun
+brouillon n’est appliqué après refus d’écriture. Les confirmations partielles ne
+recalculent ni totaux ni progression du projet. Après refus de lecture, la fiche
+explique que ces statistiques viennent de la dernière lecture serveur réussie
+et propose une reprise GET seule, gardée et accessible au clavier. La réussite
+remplace détail et statistiques reçus sans renvoyer une écriture. Les anciennes
+lectures de tâches ne peuvent effacer les confirmations récentes ; une ouverture
+toujours souhaitée relit après confirmation survenue pendant sa réponse précédente.
+Les dialogues fermés ou remplacés restent fermés. Opérations Project0.4.0 publiées
+et authentification inchangées, pas certification de persistance backend déployée.
+
 ## Durée de vie du détail projet courant (MAIR-408)
 
 Chaque ouverture directe ou par lien possède sa propre identité transitoire.

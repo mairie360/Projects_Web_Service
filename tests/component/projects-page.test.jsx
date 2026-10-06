@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/page";
-import { duplicateProject, getProjectDetails, getProjectsPage } from "@/lib/bffProjectClient";
+import { createProjectTask, duplicateProject, getProjectDetails, getProjectsPage } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
@@ -11,6 +11,7 @@ vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   getProjectDetails: vi.fn(),
   getProjectsPage: vi.fn(),
   duplicateProject: vi.fn(),
+  createProjectTask: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -18,9 +19,45 @@ beforeEach(() => {
   vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([]));
   vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails());
   vi.mocked(duplicateProject).mockReset();
+  vi.mocked(createProjectTask).mockReset();
 });
 
 describe("Projects page", () => {
+  it("keeps a canonical created task on detail failure and retries GET only by keyboard", async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    const confirmed = fixtures.projectTask({ id: 'task-confirmed', title: 'Tâche canonique reçue' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    let finishRecovery;
+    vi.mocked(getProjectDetails)
+      .mockResolvedValueOnce(fixtures.projectDetails(project))
+      .mockRejectedValueOnce(new Error('Détail temporairement refusé'))
+      .mockImplementationOnce(() => new Promise(resolve => { finishRecovery = resolve; }));
+    vi.mocked(createProjectTask).mockResolvedValueOnce(confirmed);
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
+    await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
+    expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
+    expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression proviennent de la dernière lecture réussie.')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('');
+    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    const retry = screen.getByRole('button', { name: 'Réessayer la fiche' });
+    retry.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(getProjectDetails).toHaveBeenCalledTimes(3));
+    expect(retry.disabled).toBe(true);
+    expect(retry.getAttribute('aria-busy')).toBe('true');
+    await user.dblClick(retry);
+    expect(getProjectDetails).toHaveBeenCalledTimes(3);
+    await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
+    expect(screen.getByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
+    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/3');
+    expect(createProjectTask).toHaveBeenCalledTimes(1);
+    expect(createProjectTask.mock.calls[0][1].title).toBe('Brouillon soumis');
+  });
+
   it.each([false, true])("keeps the newest project selection when the earlier detail settles late (refused: %s)", async refused => {
     const user = userEvent.setup();
     const first = fixtures.projectListItem();
