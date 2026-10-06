@@ -1,5 +1,22 @@
 # Projects_Web_Service — Module overview
 
+## Existing-project receipt identity (MAIR-408)
+
+Inline/card edits, Kanban status changes and close/review verify the requested
+project ID and unique non-empty task IDs before applying a successful receipt.
+An incoherent accepted response never replaces another card, the current detail
+or the retained draft. Its target remains explicitly unverified and these project
+writes cannot be repeated until a coherent GET of that project succeeds.
+
+Accessible recovery remains in the card form, detail and persistent workspace
+notice after closing. Verification sends one GET, not another write, and preserves
+the current draft. Failed/foreign reads and catalogue refreshes cannot clear
+uncertainty. Reads begun before the uncertain receipt cannot unlock it; unrelated
+projects and newer detail selections remain independent. Received edit/close
+permissions are consumed without changing server access. Creation/duplication
+receipt identity and collision handling remain separate work, not certified by
+this existing-target guard. No client, contract, API/BFF or environment changes.
+
 ## Card-form opening lifetime (MAIR-459, MAIR-408)
 
 Each card edit opening owns a distinct transient identity, even for the same

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
+import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
 import { Button, ToolTip } from '@mairie360/lib-components';
 import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
@@ -29,6 +30,8 @@ export function ProjectDetailModal({
   onClose,
   refreshError = '',
   refreshPending = false,
+  projectVerificationRequired = false,
+  projectVerificationPending = false,
   pendingTaskIds,
   taskWriteErrors,
   unverifiedTaskIds,
@@ -50,6 +53,8 @@ export function ProjectDetailModal({
   onClose: () => void;
   refreshError?: string;
   refreshPending?: boolean;
+  projectVerificationRequired?: boolean;
+  projectVerificationPending?: boolean;
   pendingTaskIds?: ReadonlySet<string>;
   taskWriteErrors?: ReadonlyMap<string, string>;
   unverifiedTaskIds?: ReadonlySet<string>;
@@ -64,6 +69,7 @@ export function ProjectDetailModal({
   const [editingProject, setEditingProject] = React.useState(false);
   const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [projectEditError, setProjectEditError] = React.useState('');
+  const [projectEditVerificationError, setProjectEditVerificationError] = React.useState(false);
   const [projectSaving, setProjectSaving] = React.useState(false);
   const projectSavingRef = React.useRef(false);
   const projectEditIdRef = React.useRef(project.id);
@@ -335,7 +341,8 @@ export function ProjectDetailModal({
 
   const submitProjectEdit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (projectSavingRef.current || taskSavingRef.current) return;
+    if (projectSavingRef.current || taskSavingRef.current || projectVerificationRequired || projectVerificationPending) return;
+    setProjectEditVerificationError(false);
 
     const title = projectEditForm.title.trim();
     const description = projectEditForm.description.trim();
@@ -355,6 +362,7 @@ export function ProjectDetailModal({
       editingProjectRef.current = false;
       setEditingProject(false);
     } catch (error) {
+      setProjectEditVerificationError(error instanceof ProjectReceiptVerificationRequiredError);
       setProjectEditError(getBffProjectErrorMessage(error));
     } finally {
       projectSavingRef.current = false;
@@ -437,7 +445,7 @@ export function ProjectDetailModal({
           <div className="flex shrink-0 items-center gap-2">
             {project.permissions?.canEdit !== false && <button
               type="button"
-              disabled={mutationPending}
+              disabled={mutationPending || (projectVerificationRequired && !editingProject)}
               className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
               onClick={toggleProjectEdit}
             >
@@ -463,10 +471,10 @@ export function ProjectDetailModal({
               {refreshError && (
                 <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
                   <p>{refreshError}</p>
-                  <p className="mt-2 text-[#57606a]">Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.</p>
-                  <button type="button" disabled={refreshPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending} onClick={() => void onRetry?.()}
+                  <p className="mt-2 text-[#57606a]">{projectVerificationRequired ? 'Le dernier projet vérifié reste affiché. Aucune écriture supplémentaire ne sera envoyée par cette vérification.' : 'Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.'}</p>
+                  <button type="button" disabled={refreshPending || projectVerificationPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending || projectVerificationPending} onClick={() => void onRetry?.()}
                     className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                    {refreshPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
+                    {refreshPending || projectVerificationPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
                   </button>
                 </div>
               )}
@@ -823,7 +831,7 @@ export function ProjectDetailModal({
                     <p className="mt-1 text-xs text-[#57606a]">Les tâches restent visibles pendant l’édition.</p>
                   </div>
 
-                  {projectEditError && (
+                  {projectEditError && (!projectEditVerificationError || projectVerificationRequired) && (
                     <div role="alert" className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-3 py-2 text-xs font-medium text-[#cf222e]">
                       {projectEditError}
                     </div>
@@ -913,6 +921,7 @@ export function ProjectDetailModal({
                     <Button
                       label="Enregistrer"
                       type="submit"
+                      disabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
                       primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
@@ -989,6 +998,7 @@ export function ProjectDetailModal({
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           type="button"
+                          disabled={projectVerificationRequired || projectVerificationPending}
                           className="h-9 rounded-md border border-[#d0d7de] bg-white text-xs font-semibold text-[#57606a] hover:bg-[#f1eee9]"
                           onClick={() => void onCloseProject(project.id, 'review')}
                         >
@@ -996,6 +1006,7 @@ export function ProjectDetailModal({
                         </button>
                         <button
                           type="button"
+                          disabled={projectVerificationRequired || projectVerificationPending}
                           className="h-9 rounded-md bg-[#1a7f37] text-xs font-semibold text-white hover:bg-[#116329]"
                           onClick={() => void onCloseProject(project.id, 'done')}
                         >

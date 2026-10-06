@@ -37,6 +37,7 @@ import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
+import { ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
 type AlertState = {
@@ -98,6 +99,11 @@ export function useProjectsController() {
   const [taskWriteErrorsByProject, setTaskWriteErrorsByProject] = useState(() => new Map<string, ReadonlyMap<string, string>>());
   const taskVerificationsRef = useRef(new Map<string, ReadonlySet<string>>());
   const [unverifiedTasksByProject, setUnverifiedTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
+  const projectVerificationsRef = useRef(new Map<string, symbol>());
+  const [unverifiedProjectIds, setUnverifiedProjectIds] = useState<ReadonlySet<string>>(() => new Set());
+  const projectVerificationReadsRef = useRef(new Set<string>());
+  const [projectVerificationPendingIds, setProjectVerificationPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [projectVerificationErrors, setProjectVerificationErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -340,6 +346,46 @@ export function useProjectsController() {
     setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
   };
 
+  const completeProjectVerification = useCallback((projectId: string, verification: symbol | undefined) => {
+    if (!verification || projectVerificationsRef.current.get(projectId) !== verification) return;
+    projectVerificationsRef.current.delete(projectId);
+    setUnverifiedProjectIds(new Set(projectVerificationsRef.current.keys()));
+    setProjectVerificationErrors(current => {
+      const next = new Map(current);
+      next.delete(projectId);
+      return next;
+    });
+  }, []);
+
+  const requireProjectReceipt = (projectId: string, details: ProjectDetailsResponse) => {
+    try {
+      assertProjectDetailsIdentity(projectId, details);
+    } catch {
+      // A 2xx response was received: do not turn uncertain acceptance into a
+      // retryable refusal or apply another project's DTO to the page.
+      projectVerificationsRef.current.set(projectId, Symbol('project receipt verification'));
+      setUnverifiedProjectIds(new Set(projectVerificationsRef.current.keys()));
+      ++pageRevisionRef.current;
+      pageReadPendingRef.current = false;
+      setPageLoading(false);
+      const selection = detailSelectionRef.current;
+      if (selection?.projectId === projectId) {
+        ++selection.readRevision;
+        detailRetryRef.current = null;
+        setDetailRefreshPending(false);
+        setDetailRefreshError(PROJECT_VERIFICATION_MESSAGE);
+      }
+      throw new ProjectReceiptVerificationRequiredError();
+    }
+  };
+
+  const requireVerifiedProject = (projectId: string, permission: 'canEdit' | 'canClose' = 'canEdit') => {
+    if (projectVerificationsRef.current.has(projectId)) throw new ProjectReceiptVerificationRequiredError();
+    if (projects.find(project => project.id === projectId)?.permissions?.[permission] === false) {
+      throw new Error('Cette opération sur le projet est non autorisée.');
+    }
+  };
+
   const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false, taskRevision?: number): ConfirmedProject => {
     ++pageRevisionRef.current;
     const confirmations = taskConfirmationsRef.current.get(details.project.id);
@@ -418,9 +464,11 @@ export function useProjectsController() {
     // of its write. Stop rereading as soon as this opening is superseded.
     while (isCurrent()) {
       const revision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
+      const verification = projectVerificationsRef.current.get(projectId);
       try {
         const details = await getProjectDetails(projectId);
         if (!isCurrent()) return null;
+        if (projectVerificationsRef.current.get(projectId) !== verification) return null;
         if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
         assertProjectDetailsIdentity(projectId, details);
         const confirmations = taskConfirmationsRef.current.get(projectId);
@@ -429,9 +477,11 @@ export function useProjectsController() {
           confirmations.changes.clear();
         }
         completeTaskVerifications(projectId);
+        completeProjectVerification(projectId, verification);
         return details;
       } catch (error) {
         if (!isCurrent()) return null;
+        if (projectVerificationsRef.current.get(projectId) !== verification) return null;
         // Existing session/permission decisions and navigation remain terminal;
         // do not repeat their side effects as task-read recovery.
         if (error instanceof BffProjectNavigationRequiredError ||
@@ -441,7 +491,7 @@ export function useProjectsController() {
       }
     }
     return null;
-  }, [completeTaskVerifications]);
+  }, [completeTaskVerifications, completeProjectVerification]);
 
   useEffect(() => {
     const target = parseProjectDeepLink(window.location.search ?? '');
@@ -475,17 +525,20 @@ export function useProjectsController() {
     const revision = selection && detailSelectionRef.current === selection && selection.projectId === projectId
       ? ++selection.readRevision : null;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
+    const verification = projectVerificationsRef.current.get(projectId);
     let details: ProjectDetailsResponse;
     try {
       details = await getProjectDetails(projectId);
       assertProjectDetailsIdentity(projectId, details);
     } catch (error) {
+      if (projectVerificationsRef.current.get(projectId) !== verification) return null;
       if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
       if (selection && detailSelectionRef.current === selection && selection.readRevision === revision) {
         setDetailRefreshError(getBffProjectErrorMessage(error));
       }
       throw error;
     }
+    if (projectVerificationsRef.current.get(projectId) !== verification) return null;
     if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
     const confirmations = taskConfirmationsRef.current.get(projectId);
     if (confirmations) {
@@ -493,6 +546,7 @@ export function useProjectsController() {
       confirmations.changes.clear();
     }
     completeTaskVerifications(projectId);
+    completeProjectVerification(projectId, verification);
     const projectWithTasks = mergeProjectDetails(details);
 
     setProjects((currentProjects) =>
@@ -533,6 +587,7 @@ export function useProjectsController() {
   const retryProjectDetails = async () => {
     const selection = detailSelectionRef.current;
     if (!selection || detailRetryRef.current) return;
+    if (projectVerificationsRef.current.has(selection.projectId)) return verifyProjectReceipt(selection.projectId);
     const request = Symbol('detail recovery');
     detailRetryRef.current = request;
     setDetailRefreshPending(true);
@@ -551,6 +606,27 @@ export function useProjectsController() {
         detailRetryRef.current = null;
         setDetailRefreshPending(false);
       }
+    }
+  };
+
+  const verifyProjectReceipt = async (projectId: string) => {
+    const verification = projectVerificationsRef.current.get(projectId);
+    if (!verification || projectVerificationReadsRef.current.has(projectId)) return;
+    projectVerificationReadsRef.current.add(projectId);
+    setProjectVerificationPendingIds(new Set(projectVerificationReadsRef.current));
+    const selection = detailSelectionRef.current;
+    try {
+      const details = await refreshProjectDetails(projectId, selection);
+      if (details && !projectVerificationsRef.current.has(projectId)) {
+        showInfo(`Fiche "${details.project.title}" vérifiée par lecture. L’action n’a pas été répétée.`);
+      }
+    } catch (error) {
+      if (projectVerificationsRef.current.get(projectId) === verification) {
+        setProjectVerificationErrors(current => new Map(current).set(projectId, getBffProjectErrorMessage(error)));
+      }
+    } finally {
+      projectVerificationReadsRef.current.delete(projectId);
+      setProjectVerificationPendingIds(new Set(projectVerificationReadsRef.current));
     }
   };
 
@@ -581,10 +657,13 @@ export function useProjectsController() {
     if (projectFormPendingRef.current || project.permissions?.canEdit === false) return;
     const opening = Symbol('project form opening');
     projectFormOpeningRef.current = opening;
-    const isCurrent = () => projectFormOpeningRef.current === opening && !projectFormPendingRef.current;
+    const verification = projectVerificationsRef.current.get(project.id);
+    const isCurrent = () => projectFormOpeningRef.current === opening && !projectFormPendingRef.current &&
+      projectVerificationsRef.current.get(project.id) === verification;
     setOpenFilter(null);
     let form = projectToFormState(project);
     let formError = '';
+    let verifiedDetail = false;
     const denyEdit = (error: unknown) => {
       // A newly denied current project cannot keep its older editor available.
       if (editingProjectId === project.id) {
@@ -608,6 +687,7 @@ export function useProjectsController() {
         return;
       }
       form = projectToFormState(mergeProjectDetails(details));
+      verifiedDetail = true;
     } catch (error) {
       if (!isCurrent() || isAbortError(error)) return;
       if (error instanceof BffProjectNavigationRequiredError ||
@@ -629,6 +709,7 @@ export function useProjectsController() {
     setProjectForm(form);
     setProjectFormError(formError);
     setCreateProjectOpen(true);
+    if (verifiedDetail) completeProjectVerification(project.id, verification);
   };
 
   const closeCreateProject = () => {
@@ -651,6 +732,7 @@ export function useProjectsController() {
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
+    requireVerifiedProject(projectId);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     if (!validateProjectForm(form)) {
@@ -666,6 +748,7 @@ export function useProjectsController() {
       showError(error);
       throw error;
     }
+    requireProjectReceipt(projectId, details);
     const confirmed = applyConfirmedProject(details, false, taskRevision);
     updateSelectedProject(confirmed, selection);
     try {
@@ -683,7 +766,9 @@ export function useProjectsController() {
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(project.id)?.revision ?? 0;
     try {
+      requireVerifiedProject(project.id);
       const details = await updateProject(project.id, { status });
+      requireProjectReceipt(project.id, details);
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
@@ -710,9 +795,11 @@ export function useProjectsController() {
     setProjectFormPending(true);
     setProjectFormError('');
     try {
+      if (editingProjectId) requireVerifiedProject(editingProjectId);
       const details = editingProjectId
         ? await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm))
         : await createProject(createProjectBodyFromForm(projectForm));
+      if (editingProjectId) requireProjectReceipt(editingProjectId, details);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
 
       // Only the confirmed write discards the draft. A later read failure is not a refusal.
@@ -736,7 +823,7 @@ export function useProjectsController() {
       }
     } catch (error) {
       // A refused write keeps every field and nested task, with an error inside the dialog.
-      setProjectFormError(getBffProjectErrorMessage(error));
+      if (!(error instanceof ProjectReceiptVerificationRequiredError)) setProjectFormError(getBffProjectErrorMessage(error));
     } finally {
       projectFormPendingRef.current = false;
       setProjectFormPending(false);
@@ -966,7 +1053,9 @@ export function useProjectsController() {
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     try {
+      requireVerifiedProject(projectId, 'canClose');
       const details = await closeBffProject(projectId, status);
+      requireProjectReceipt(projectId, details);
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
@@ -999,6 +1088,10 @@ export function useProjectsController() {
     pendingTaskIds,
     taskWriteErrors,
     unverifiedTaskIds,
+    unverifiedProjectIds,
+    projectVerificationPendingIds,
+    projectVerificationErrors,
+    verifyProjectReceipt,
     retryProjectDetails,
     linkedTaskId,
     viewMode,

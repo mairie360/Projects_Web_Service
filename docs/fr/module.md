@@ -1,5 +1,23 @@
 # Projects_Web_Service — Présentation du module
 
+## Identité du reçu de projet existant (MAIR-408)
+
+Édition fiche/carte, déplacement Kanban et clôture/suspension vérifient le projet
+demandé et les identifiants de tâches uniques/non vides avant d’appliquer le reçu.
+Une réponse acceptée incohérente ne remplace ni autre carte, ni fiche courante,
+ni brouillon conservé. Sa cible reste explicitement à vérifier et ces écritures
+projet ne sont pas répétées tant qu’un GET cohérent de ce projet n’a pas abouti.
+
+La reprise accessible reste dans le formulaire, la fiche et un avertissement
+persistant du workspace après fermeture. Une vérification envoie un seul GET,
+aucune nouvelle écriture, et conserve le brouillon. Lecture refusée/étrangère ou
+refresh du catalogue ne lèvent pas l’incertitude ; une lecture commencée avant
+le reçu incertain ne la lève pas non plus. Autres projets et nouvelles sélections
+de fiche restent indépendants. Les permissions d’édition/clôture reçues sont
+consommées sans changer les accès serveur. Identité/collisions des reçus de
+création/duplication encore à traiter séparément, pas validées par cette garde
+de cible existante. Aucun client/contrat/API/BFF/environnement modifié.
+
 ## Durée de vie de l’ouverture du formulaire de carte (MAIR-459, MAIR-408)
 
 Chaque ouverture d’édition possède une identité transitoire distincte, même pour

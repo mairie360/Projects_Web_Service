@@ -12,6 +12,7 @@ import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './Pr
 import { navigateToPage } from '../../lib/navigation';
 import { logoutAndReload } from '../../lib/auth-session';
 import type { ProjectsController } from './useProjectsController';
+import { PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function ProjectsWorkspace({
   projectsPage,
@@ -22,6 +23,10 @@ export function ProjectsWorkspace({
   pendingTaskIds,
   taskWriteErrors,
   unverifiedTaskIds,
+  unverifiedProjectIds,
+  projectVerificationPendingIds,
+  projectVerificationErrors,
+  verifyProjectReceipt,
   retryProjectDetails,
   linkedTaskId,
   viewMode,
@@ -115,6 +120,8 @@ export function ProjectsWorkspace({
           onClose={closeProjectDetails}
           refreshError={detailRefreshError}
           refreshPending={detailRefreshPending}
+          projectVerificationRequired={unverifiedProjectIds.has(selectedProject.id)}
+          projectVerificationPending={projectVerificationPendingIds.has(selectedProject.id)}
           pendingTaskIds={pendingTaskIds}
           taskWriteErrors={taskWriteErrors}
           unverifiedTaskIds={unverifiedTaskIds}
@@ -135,6 +142,11 @@ export function ProjectsWorkspace({
           form={projectForm}
           error={projectFormError}
           pending={projectFormPending}
+          verificationRequired={!!editingProjectId && unverifiedProjectIds.has(editingProjectId)}
+          verificationPending={!!editingProjectId && projectVerificationPendingIds.has(editingProjectId)}
+          verificationError={editingProjectId ? projectVerificationErrors.get(editingProjectId) : undefined}
+          canSave={!editingProjectId || projects.find(project => project.id === editingProjectId)?.permissions?.canEdit !== false}
+          onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : undefined}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           statusOptions={projectStatusOptions}
@@ -155,6 +167,18 @@ export function ProjectsWorkspace({
         className="projects-shell"
       >
             <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+              {[...unverifiedProjectIds].map(projectId => {
+                const title = projects.find(project => project.id === projectId)?.title ?? projectId;
+                const pending = projectVerificationPendingIds.has(projectId);
+                return <div key={projectId} role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
+                  <p className="font-semibold">{title}</p>
+                  <p>{PROJECT_VERIFICATION_MESSAGE}</p>
+                  {projectVerificationErrors.get(projectId) && <p className="mt-2">{projectVerificationErrors.get(projectId)}</p>}
+                  <button type="button" disabled={pending} aria-busy={pending} onClick={() => void verifyProjectReceipt(projectId)} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
+                    {pending ? 'Vérification du projet…' : `Vérifier le projet ${title}`}
+                  </button>
+                </div>;
+              })}
               {alert && (
                 <div className="mb-5">
                   <Alert

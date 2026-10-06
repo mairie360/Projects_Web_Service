@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/page";
-import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
+import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProject, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
@@ -16,6 +16,7 @@ vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   updateProjectTaskStatus: vi.fn(),
   updateProjectTask: vi.fn(),
   closeProject: vi.fn(),
+  updateProject: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -28,9 +29,81 @@ beforeEach(() => {
   vi.mocked(updateProjectTaskStatus).mockReset();
   vi.mocked(updateProjectTask).mockReset();
   vi.mocked(closeProject).mockReset();
+  vi.mocked(updateProject).mockReset();
 });
 
 describe("Projects page", () => {
+  it('keeps a card draft and unsent local task after an uncertain project receipt until keyboard GET verification', async () => {
+    const user=userEvent.setup(), project=fixtures.projectListItem({dueDate:'2026-12-15'});
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project));
+    vi.mocked(updateProject).mockResolvedValueOnce(fixtures.projectDetails({...project,id:'project-2',title:'Projet étranger interdit'}));
+    render(<ProjectsPage/>);
+    await user.click(await screen.findByRole('button',{name:`Actions pour ${project.title}`}));
+    await user.click(screen.getByRole('menuitem',{name:'Modifier',exact:true}));
+    const dialog=await screen.findByRole('dialog',{name:'Modifier le projet'}), form=within(dialog);
+    const title=form.getByRole('textbox',{name:'Titre*',exact:true});
+    await user.clear(title);await user.type(title,'Brouillon qui reste à moi');
+    const nested=form.getByPlaceholderText('Ajouter une tâche...');await user.type(nested,'Tâche non ajoutée');
+    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
+    expect(await form.findByRole('alert')).toHaveProperty('textContent',expect.stringMatching(/acceptée.*confirmation de projet.*incohérente/));
+    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    expect(title.value).toBe('Brouillon qui reste à moi');expect(nested.value).toBe('Tâche non ajoutée');
+    expect(screen.queryByText('Projet étranger interdit')).toBeNull();
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Lecture indisponible pour vérifier'));
+    const verify=form.getByRole('button',{name:'Vérifier le projet',exact:true});verify.focus();await user.keyboard('{Enter}');
+    await form.findByText('Lecture indisponible pour vérifier');
+    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,title:'Lecture officielle du projet'}));
+    verify.focus();await user.keyboard('{Enter}');
+    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(false));
+    expect(title.value).toBe('Brouillon qui reste à moi');expect(nested.value).toBe('Tâche non ajoutée');
+    expect(form.queryByRole('alert')).toBeNull();expect(updateProject).toHaveBeenCalledOnce();expect(getProjectDetails).toHaveBeenCalledTimes(3);
+  });
+
+  it('retains inline project fields and consumes a newly denied edit permission after verification',async()=>{
+    const user=userEvent.setup(),project=fixtures.projectListItem({dueDate:'2026-12-15'});
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project,[]));
+    vi.mocked(updateProject).mockResolvedValueOnce(fixtures.projectDetails({...project,id:'project-2'},[]));
+    render(<ProjectsPage/>);
+    await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
+    const dialog=await screen.findByRole('dialog'),detail=within(dialog);
+    await user.click(detail.getByRole('button',{name:'Modifier',exact:true}));
+    const form=within(detail.getByRole('form',{name:'Modifier le projet'})),title=form.getByLabelText(/^Titre/);
+    await user.clear(title);await user.type(title,'Brouillon inline retenu');
+    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
+    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true));
+    expect(title.value).toBe('Brouillon inline retenu');
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,permissions:{...project.permissions,canEdit:false,canClose:false}},[]));
+    const retry=detail.getByRole('button',{name:'Réessayer la fiche',exact:true});retry.focus();await user.keyboard('{Enter}');
+    await waitFor(()=>expect(detail.queryByRole('button',{name:'Réessayer la fiche',exact:true})).toBeNull());
+    expect(title.value).toBe('Brouillon inline retenu');expect(form.queryByRole('alert')).toBeNull();
+    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    expect(detail.queryByRole('button',{name:'Clôturer',exact:true})).toBeNull();expect(updateProject).toHaveBeenCalledOnce();
+  });
+
+  it('keeps persistent project recovery after closing the detail and does not duplicate its GET',async()=>{
+    const user=userEvent.setup(),project=fixtures.projectListItem({dueDate:'2026-12-15'}),other=fixtures.projectListItem({id:'project-2',title:'Autre carte intacte',dueDate:'2026-12-15'});
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project,other]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project,[]));
+    vi.mocked(closeProject).mockResolvedValueOnce(fixtures.projectDetails({...other,title:'Titre étranger ne pas afficher'},[]));
+    render(<ProjectsPage/>);
+    await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
+    const detail=within(await screen.findByRole('dialog'));await user.click(detail.getByRole('button',{name:'Clôturer',exact:true}));
+    await waitFor(()=>expect(detail.getByRole('button',{name:'Clôturer',exact:true}).disabled).toBe(true));
+    detail.getByRole('button',{name:'Fermer la fiche projet',exact:true}).focus();
+    await user.keyboard('{Escape}');expect(screen.queryByRole('dialog')).toBeNull();
+    const read=Promise.withResolvers();vi.mocked(getProjectDetails).mockImplementationOnce(()=>read.promise);
+    const verify=screen.getByRole('button',{name:`Vérifier le projet ${project.title}`,exact:true});
+    verify.focus();await user.keyboard('{Enter}');await user.click(verify);
+    expect(verify.disabled).toBe(true);expect(getProjectDetails).toHaveBeenCalledTimes(2);
+    await act(async()=>read.resolve(fixtures.projectDetails({...project,title:'Projet vérifié sans répéter'},[])));
+    await waitFor(()=>expect(screen.queryByRole('button',{name:`Vérifier le projet ${project.title}`,exact:true})).toBeNull());
+    expect(screen.getByRole('button',{name:`Ouvrir la fiche du projet ${other.title}`})).toBeTruthy();
+    expect(screen.queryByText('Titre étranger ne pas afficher')).toBeNull();expect(closeProject).toHaveBeenCalledOnce();
+  });
+
   it.each([false, true])('retains the latest card form and its typed draft after an obsolete read (refused: %s)', async refused => {
     const user = userEvent.setup();
     const first = fixtures.projectListItem();

@@ -8,12 +8,18 @@ import type { Project } from '../../types/project';
 import { type FilterOption, type ProjectFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { ProjectTasksEditor } from './ProjectTasksEditor';
+import { PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function CreateProjectModal({
   mode,
   form,
   error,
   pending = false,
+  verificationRequired = false,
+  verificationPending = false,
+  verificationError,
+  canSave = true,
+  onVerify,
   memberOptions,
   labelOptions,
   statusOptions,
@@ -27,6 +33,11 @@ export function CreateProjectModal({
   form: ProjectFormState;
   error: string;
   pending?: boolean;
+  verificationRequired?: boolean;
+  verificationPending?: boolean;
+  verificationError?: string;
+  canSave?: boolean;
+  onVerify?: () => void | Promise<void>;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   statusOptions: FilterOption[];
@@ -98,7 +109,7 @@ export function CreateProjectModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={pending || error ? feedbackId : undefined}
+        aria-describedby={pending || error || verificationRequired ? feedbackId : undefined}
         aria-busy={pending}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
@@ -127,7 +138,16 @@ export function CreateProjectModal({
           {pending && (
             <p id={feedbackId} role="status" className="mb-4 text-sm font-medium text-[#24292f]">Enregistrement en cours…</p>
           )}
-          {error && (
+          {verificationRequired && (
+            <div id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e] [overflow-wrap:anywhere]">
+              <p>{PROJECT_VERIFICATION_MESSAGE}</p>
+              {verificationError && <p className="mt-2">{verificationError}</p>}
+              <button type="button" disabled={verificationPending || pending} aria-busy={verificationPending} onClick={() => void onVerify?.()} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
+                {verificationPending ? 'Vérification du projet…' : 'Vérifier le projet'}
+              </button>
+            </div>
+          )}
+          {error && !verificationRequired && (
             <div id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
               {error}
             </div>
@@ -263,7 +283,7 @@ export function CreateProjectModal({
           />
           <Button
             label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : 'Créer le projet'}
-            disabled={pending}
+            disabled={pending || verificationRequired || verificationPending || !canSave}
             type="submit"
             primary
             className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
