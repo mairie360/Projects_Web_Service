@@ -16,9 +16,8 @@ import type { ProjectsController } from './useProjectsController';
 export function ProjectsWorkspace({
   projectsPage,
   projects,
-  setSelectedProjectDetails,
+  closeProjectDetails,
   linkedTaskId,
-  setLinkedTaskId,
   viewMode,
   setViewMode,
   statusFilter,
@@ -106,7 +105,7 @@ export function ProjectsWorkspace({
           labelOptions={labelOptions}
           statusOptions={projectStatusOptions}
           priorityOptions={projectPriorityOptions}
-          onClose={() => { setSelectedProjectDetails(null); setLinkedTaskId(null); }}
+          onClose={closeProjectDetails}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
           onUpdateTask={updateProjectTask}

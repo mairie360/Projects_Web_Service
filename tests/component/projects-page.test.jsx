@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,31 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it.each([false, true])("keeps the newest project selection when the earlier detail settles late (refused: %s)", async refused => {
+    const user = userEvent.setup();
+    const first = fixtures.projectListItem();
+    const second = fixtures.projectListItem({ id: 'project-2', title: 'Projet choisi ensuite' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([first, second]));
+    let resolveFirst, rejectFirst;
+    vi.mocked(getProjectDetails).mockImplementationOnce(() => new Promise((resolve, reject) => {
+      resolveFirst = resolve; rejectFirst = reject;
+    })).mockResolvedValueOnce(fixtures.projectDetails(second));
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${first.title}` }));
+    await user.click(screen.getByRole('button', { name: `Ouvrir la fiche du projet ${second.title}` }));
+    expect(await screen.findByRole('dialog', { name: second.title })).toBeTruthy();
+    await act(async () => {
+      if (refused) rejectFirst(new Error('Erreur ancienne hors contexte'));
+      else resolveFirst(fixtures.projectDetails(first));
+    });
+    expect(screen.getByRole('dialog', { name: second.title })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: first.title })).toBeNull();
+    expect(screen.queryByText('Erreur ancienne hors contexte')).toBeNull();
+    expect(getProjectDetails.mock.calls.map(([id]) => id)).toEqual([first.id, second.id]);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it.each([false, true])("keeps the current view after pending duplication and GET-only recovery (refused refresh: %s)", async (refusedRefresh) => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();

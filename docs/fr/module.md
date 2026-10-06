@@ -1,5 +1,18 @@
 # Projects_Web_Service — Présentation du module
 
+## Durée de vie du détail projet courant (MAIR-408)
+
+Chaque ouverture directe ou par lien possède sa propre identité transitoire.
+Une ancienne réussite ou erreur ne remplace pas le détail courant. Fermer
+invalide cette consultation, même lorsque le même projet est rouvert. Les
+actualisations de tâches et confirmations de projet/cycle de vie ne mettent à
+jour que le dialogue toujours courant ; une création volontaire ouvre toujours
+son nouveau projet confirmé. Lectures et écritures acceptées ne sont pas
+rejouées ; brouillons, permissions et comportement clavier existants restent
+inchangés. Ces courses héritées sont distinctes du panneau de collaboration de
+tâche et des besoins de persistance backend. Contrat Project0.4.0 publié,
+client/proxy/authentification et environnements inchangés.
+
 ## Requête courante après une écriture en attente (MAIR-451)
 
 Les lectures implicites suivant une écriture utilisent recherche, statut, priorité,

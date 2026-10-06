@@ -60,6 +60,8 @@ type ProjectQueryState = {
   view: ViewMode;
 };
 
+type DetailSelection = { projectId: string; readRevision: number };
+
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
 }
@@ -78,6 +80,8 @@ export function useProjectsController() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<ProjectDetailsResponse | null>(null);
   const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
+  // Each opening owns a distinct lifetime, even when reopening the same ID.
+  const detailSelectionRef = useRef<DetailSelection | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -325,6 +329,27 @@ export function useProjectsController() {
     // Page totals, options and pagination still belong to the last successful page DTO.
   };
 
+  const beginDetailSelection = useCallback((projectId: string) => {
+    const selection = { projectId, readRevision: 0 };
+    detailSelectionRef.current = selection;
+    setLinkedTaskId(null);
+    return selection;
+  }, []);
+
+  const closeProjectDetails = useCallback(() => {
+    detailSelectionRef.current = null;
+    setSelectedProjectDetails(null);
+    setLinkedTaskId(null);
+  }, []);
+
+  const updateSelectedProject = (details: ProjectDetailsResponse, selection: DetailSelection | null) => {
+    if (!selection || detailSelectionRef.current !== selection || selection.projectId !== details.project.id) return;
+    ++selection.readRevision;
+    setSelectedProjectDetails(details);
+  };
+
+  useEffect(() => () => { detailSelectionRef.current = null; }, []);
+
   useEffect(() => {
     const target = parseProjectDeepLink(window.location.search ?? '');
     if (!target) return;
@@ -334,8 +359,10 @@ export function useProjectsController() {
     }
 
     let active = true;
+    const selection = beginDetailSelection(target.projectId);
+    const revision = ++selection.readRevision;
     void getProjectDetails(target.projectId).then((details) => {
-      if (!active) return;
+      if (!active || detailSelectionRef.current !== selection || selection.readRevision !== revision) return;
       if (target.taskId && !details.taskItems.some((task: { id: string }) => task.id === target.taskId)) {
         setAlert({ type: 'error', message: 'La tâche demandée est introuvable dans ce projet.' });
         return;
@@ -343,12 +370,16 @@ export function useProjectsController() {
       setSelectedProjectDetails(details);
       setLinkedTaskId(target.taskId);
     }).catch((error) => {
-      if (active) setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
+      if (active && detailSelectionRef.current === selection && selection.readRevision === revision) {
+        setAlert({ type: 'error', message: getBffProjectErrorMessage(error) });
+      }
     });
     return () => { active = false; };
-  }, []);
+  }, [beginDetailSelection]);
 
-  const refreshProjectDetails = async (projectId: string) => {
+  const refreshProjectDetails = async (projectId: string, selection: DetailSelection | null) => {
+    const revision = selection && detailSelectionRef.current === selection && selection.projectId === projectId
+      ? ++selection.readRevision : null;
     const details = await getProjectDetails(projectId);
     const projectWithTasks = mergeProjectDetails(details);
 
@@ -356,7 +387,7 @@ export function useProjectsController() {
       currentProjects.map((project) => (project.id === projectId ? { ...project, ...projectWithTasks } : project))
     );
 
-    if (selectedProjectDetails?.project.id === projectId) {
+    if (revision !== null && selection && detailSelectionRef.current === selection && selection.readRevision === revision) {
       setSelectedProjectDetails(details);
     }
 
@@ -374,12 +405,14 @@ export function useProjectsController() {
 
   const openProjectDetails = async (project: Project) => {
     setOpenFilter(null);
-    setLinkedTaskId(null);
+    const selection = beginDetailSelection(project.id);
+    const revision = ++selection.readRevision;
 
     try {
-      setSelectedProjectDetails(await getProjectDetails(project.id));
+      const details = await getProjectDetails(project.id);
+      if (detailSelectionRef.current === selection && selection.readRevision === revision) setSelectedProjectDetails(details);
     } catch (error) {
-      showError(error);
+      if (detailSelectionRef.current === selection && selection.readRevision === revision) showError(error);
     }
   };
 
@@ -414,6 +447,7 @@ export function useProjectsController() {
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
+    const selection = detailSelectionRef.current;
     if (!validateProjectForm(form)) {
       const error = new Error('Les champs obligatoires doivent être renseignés.');
       showError(error);
@@ -428,7 +462,7 @@ export function useProjectsController() {
       throw error;
     }
     applyConfirmedProject(details);
-    setSelectedProjectDetails(details);
+    updateSelectedProject(details, selection);
     try {
       await refreshProjectsPage({ silent: true, throwOnError: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
@@ -441,10 +475,11 @@ export function useProjectsController() {
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
     if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
 
+    const selection = detailSelectionRef.current;
     try {
       const details = await updateProject(project.id, { status });
       applyConfirmedProject(details);
-      setSelectedProjectDetails((current: ProjectDetailsResponse | null) => current?.project.id === project.id ? details : current);
+      updateSelectedProject(details, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
     } catch (error) {
@@ -463,6 +498,7 @@ export function useProjectsController() {
     }
 
     projectFormPendingRef.current = true;
+    const selection = detailSelectionRef.current;
     setProjectFormPending(true);
     setProjectFormError('');
     try {
@@ -476,11 +512,10 @@ export function useProjectsController() {
       setEditingProjectId(null);
       setProjectForm(createProjectFormState());
       if (editingProjectId) {
-        setSelectedProjectDetails((currentDetails) =>
-          currentDetails?.project.id === editingProjectId ? details : currentDetails
-        );
+        updateSelectedProject(details, selection);
       } else {
         resetProjectFilters();
+        beginDetailSelection(details.project.id);
         setSelectedProjectDetails(details);
       }
       try {
@@ -533,7 +568,7 @@ export function useProjectsController() {
       ++pageRevisionRef.current;
       setProjects((current) => current.filter((value) => value.id !== project.id));
       setProjectPendingDeletion(null);
-      if (selectedProjectDetails?.project.id === project.id) setSelectedProjectDetails(null);
+      if (detailSelectionRef.current?.projectId === project.id) closeProjectDetails();
       if (editingProjectId === project.id) closeCreateProject();
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Projet "${project.title}" supprimé.` });
@@ -543,6 +578,7 @@ export function useProjectsController() {
   };
 
   const addProjectTask = async (project: Project, taskDraft: ProjectTaskDraft) => {
+    const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
     if (!title) return;
 
@@ -554,7 +590,7 @@ export function useProjectsController() {
     }
     // The write is confirmed. A failed refresh must not offer the same POST again.
     try {
-      await refreshProjectDetails(project.id);
+      await refreshProjectDetails(project.id, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Tâche "${title}" ajoutée à "${project.title}".` });
     } catch (error) {
@@ -563,6 +599,7 @@ export function useProjectsController() {
   };
 
   const updateProjectTask = async (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
+    const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
     if (!title) return;
 
@@ -573,7 +610,7 @@ export function useProjectsController() {
       throw error;
     }
     try {
-      await refreshProjectDetails(projectId);
+      await refreshProjectDetails(projectId, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Tâche "${title}" modifiée.` });
     } catch (error) {
@@ -586,9 +623,10 @@ export function useProjectsController() {
     taskId: string,
     status: ProjectStatus
   ) => {
+    const selection = detailSelectionRef.current;
     try {
       const updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
-      await refreshProjectDetails(projectId);
+      await refreshProjectDetails(projectId, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({
         type: 'success',
@@ -600,9 +638,10 @@ export function useProjectsController() {
   };
 
   const deleteProjectTask = async (projectId: string, taskId: string, taskTitle: string) => {
+    const selection = detailSelectionRef.current;
     try {
       await deleteBffProjectTask(projectId, taskId);
-      await refreshProjectDetails(projectId);
+      await refreshProjectDetails(projectId, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
     } catch (error) {
@@ -611,10 +650,11 @@ export function useProjectsController() {
   };
 
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
+    const selection = detailSelectionRef.current;
     try {
       const details = await closeBffProject(projectId, status);
       applyConfirmedProject(details);
-      setSelectedProjectDetails(details);
+      updateSelectedProject(details, selection);
       await refreshProjectsPage({ silent: true });
       setAlert({
         type: 'success',
@@ -636,9 +676,8 @@ export function useProjectsController() {
   return {
     projectsPage,
     projects,
-    setSelectedProjectDetails,
+    closeProjectDetails,
     linkedTaskId,
-    setLinkedTaskId,
     viewMode,
     setViewMode: changeViewMode,
     statusFilter,

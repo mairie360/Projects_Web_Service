@@ -1,5 +1,17 @@
 # Projects_Web_Service — Module overview
 
+## Current project detail lifetime (MAIR-408)
+
+Each direct or deep-link opening has its own transient selection identity. A
+slower previous success or error cannot replace the current detail. Closing
+invalidates that lifetime, including when the same project is reopened. Task
+refreshes and confirmed project/lifecycle updates only update the still-current
+dialog; intentional creation still opens its confirmed new project. Reads and
+accepted writes are not replayed, and existing task drafts, permissions and
+keyboard behavior remain unchanged. This corrects inherited selection races,
+not the independent task collaboration panel or all backend persistence needs.
+Published Project0.4.0, client/proxy/authentication and environments are unchanged.
+
 ## Current query after a pending write (MAIR-451)
 
 Implicit post-write catalogue reads use the search, status, priority, deadline,
