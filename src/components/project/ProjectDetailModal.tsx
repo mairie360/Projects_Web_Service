@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { Button, ToolTip } from '@mairie360/lib-components';
 import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
@@ -30,6 +31,7 @@ export function ProjectDetailModal({
   refreshPending = false,
   pendingTaskIds,
   taskWriteErrors,
+  unverifiedTaskIds,
   onRetry,
   onUpdateProject,
   onAddTask,
@@ -50,6 +52,7 @@ export function ProjectDetailModal({
   refreshPending?: boolean;
   pendingTaskIds?: ReadonlySet<string>;
   taskWriteErrors?: ReadonlyMap<string, string>;
+  unverifiedTaskIds?: ReadonlySet<string>;
   onRetry?: () => void | Promise<void>;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
@@ -68,6 +71,7 @@ export function ProjectDetailModal({
   const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
+  const [taskFormVerificationError, setTaskFormVerificationError] = React.useState(false);
   const [taskSaving, setTaskSaving] = React.useState(false);
   const taskSavingRef = React.useRef(false);
   const taskProjectIdRef = React.useRef(project.id);
@@ -362,6 +366,8 @@ export function ProjectDetailModal({
     event.preventDefault();
     if (taskSavingRef.current || projectSavingRef.current) return;
     if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
+    if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
+    setTaskFormVerificationError(false);
 
     const title = taskForm.title.trim();
     if (!title) {
@@ -396,6 +402,7 @@ export function ProjectDetailModal({
       setEditingTaskId(null);
     } catch (error) {
       setTaskFormError(getBffProjectErrorMessage(error));
+      setTaskFormVerificationError(error instanceof ProjectTaskVerificationRequiredError);
     } finally {
       taskSavingRef.current = false;
       setTaskSaving(false);
@@ -403,7 +410,7 @@ export function ProjectDetailModal({
   };
 
   const editTask = (task: ProjectTask) => {
-    if (taskSavingRef.current || projectSavingRef.current || pendingTaskIds?.has(task.id)) return;
+    if (taskSavingRef.current || projectSavingRef.current || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
     setTaskForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setTaskFormError('');
@@ -480,7 +487,9 @@ export function ProjectDetailModal({
                     onChange={(event) => updateTaskForm({ title: event.target.value })}
                   />
 
-                  {taskFormError && <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+                  {taskFormError && (!taskFormVerificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) && (
+                    <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>
+                  )}
                   {taskSaving && <p role="status" className="text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -540,7 +549,7 @@ export function ProjectDetailModal({
                     <Button
                       label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
-                      disabled={!!editingTaskId && !!pendingTaskIds?.has(editingTaskId)}
+                      disabled={!!editingTaskId && (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId))}
                       primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
@@ -619,6 +628,7 @@ export function ProjectDetailModal({
                       const canEditTask = task.permissions?.canEdit !== false;
                       const canDeleteTask = task.permissions?.canDelete !== false;
                       const taskPending = pendingTaskIds?.has(task.id) ?? false;
+                      const taskMutationBlocked = taskPending || (unverifiedTaskIds?.has(task.id) ?? false);
 
                       return (
                         <article
@@ -632,7 +642,7 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={mutationPending || taskPending || !canUpdateStatus}
+                            disabled={mutationPending || taskMutationBlocked || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
@@ -660,12 +670,12 @@ export function ProjectDetailModal({
                                   <MessageSquare className="h-3.5 w-3.5" />
                                   Suivi
                                 </button>
-                                {canEditTask && <TaskEditButton disabled={mutationPending || taskPending} onClick={() => editTask(task)} />}
+                                {canEditTask && <TaskEditButton disabled={mutationPending || taskMutationBlocked} onClick={() => editTask(task)} />}
                                 {canDeleteTask && deletingTaskId !== task.id && (
                                   <button
                                     type="button"
                                     aria-label={`Supprimer ${task.title}`}
-                                    disabled={mutationPending || taskPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
                                     onClick={() => setDeletingTaskId(task.id)}
                                   >
@@ -680,7 +690,7 @@ export function ProjectDetailModal({
                                   <span className="sr-only">Statut de {task.title}</span>
                                   <select
                                     aria-label={`Statut de ${task.title}`}
-                                    disabled={mutationPending || taskPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     value={task.status}
                                     className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
                                     onChange={(event) =>
@@ -734,7 +744,7 @@ export function ProjectDetailModal({
                                   <button type="button" disabled={mutationPending} className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 font-semibold text-[#24292f]" onClick={() => setDeletingTaskId(null)}>Annuler</button>
                                   <button
                                     type="button"
-                                    disabled={mutationPending || taskPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     className="rounded-md bg-[#cf222e] px-2 py-1 font-semibold text-white"
                                     onClick={() => {
                                       setDeletingTaskId(null);

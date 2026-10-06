@@ -1,5 +1,20 @@
 # Projects_Web_Service — Module overview
 
+## Task and detail identity (MAIR-408)
+
+Editing/status receipts must identify the requested task. A successful write
+with an inconsistent receipt is not a refusal: no unrelated row is replaced,
+and the affected task is protected until a coherent detail read verifies it.
+One verification GET is attempted; failure offers explicit GET-only recovery,
+never a replay of the accepted write. Drafts and other task actions remain
+available under the existing shared saving-form locks. Detail reads must name
+the requested project and contain unique, non-empty task IDs. Inconsistent or
+older reads cannot replace the consultation or release uncertainty. A later
+coherent read, including reopening the project, restores official data and
+unlocks its affected tasks without changing contract operations or server data.
+Verification does not certify that the service applied the user's submitted
+values; inspect the authoritative returned data before another action.
+
 ## Pending task writes (MAIR-408)
 
 Status, deletion and editing of the same existing task share a synchronous

@@ -1,5 +1,20 @@
 # Projects_Web_Service — Présentation du module
 
+## Identité des tâches et de la fiche (MAIR-408)
+
+La confirmation d’une édition ou d’un statut doit identifier la tâche demandée.
+Une écriture réussie avec une réponse incohérente n’est pas un refus : aucune
+autre ligne n’est remplacée et la cible reste protégée jusqu’à une lecture
+cohérente. Une vérification GET est tentée ; son échec permet une reprise GET
+explicite, jamais la répétition de l’écriture acceptée. Les brouillons et les
+autres tâches restent disponibles sous les verrous de formulaire existants.
+Le détail doit correspondre au projet demandé et présenter des identifiants de
+tâches uniques et non vides. Une lecture incohérente ou ancienne ne remplace pas
+la fiche et ne lève pas l’incertitude. Une lecture cohérente ultérieure, y compris
+une réouverture, restitue les données officielles et déverrouille les cibles.
+Contrat et données serveur inchangés ; vérifier les valeurs reçues avant une
+nouvelle action, car cette lecture ne prouve pas que la saisie a été appliquée.
+
 ## Écritures de tâches en attente (MAIR-408)
 
 Statut, suppression et édition d’une même tâche existante partagent une garde

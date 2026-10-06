@@ -21,6 +21,7 @@ export function ProjectsWorkspace({
   detailRefreshPending,
   pendingTaskIds,
   taskWriteErrors,
+  unverifiedTaskIds,
   retryProjectDetails,
   linkedTaskId,
   viewMode,
@@ -115,6 +116,7 @@ export function ProjectsWorkspace({
           refreshPending={detailRefreshPending}
           pendingTaskIds={pendingTaskIds}
           taskWriteErrors={taskWriteErrors}
+          unverifiedTaskIds={unverifiedTaskIds}
           onRetry={retryProjectDetails}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}

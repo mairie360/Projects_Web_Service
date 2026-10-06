@@ -36,6 +36,7 @@ import { authSessionFromAccess } from '../../lib/auth-session';
 import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations } from '../../lib/projectTaskConfirmations';
+import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
 type AlertState = {
@@ -94,6 +95,8 @@ export function useProjectsController() {
   const taskWritesRef = useRef(new Set<string>());
   const [pendingTasksByProject, setPendingTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
   const [taskWriteErrorsByProject, setTaskWriteErrorsByProject] = useState(() => new Map<string, ReadonlyMap<string, string>>());
+  const taskVerificationsRef = useRef(new Map<string, ReadonlySet<string>>());
+  const [unverifiedTasksByProject, setUnverifiedTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -371,6 +374,21 @@ export function useProjectsController() {
 
   useEffect(() => () => { detailSelectionRef.current = null; }, []);
 
+  const completeTaskVerifications = useCallback((projectId: string) => {
+    const ids = taskVerificationsRef.current.get(projectId);
+    if (!ids) return;
+    taskVerificationsRef.current.delete(projectId);
+    setUnverifiedTasksByProject(new Map(taskVerificationsRef.current));
+    setTaskWriteErrorsByProject(current => {
+      const next = new Map(current);
+      const errors = new Map(current.get(projectId));
+      for (const id of ids) errors.delete(id);
+      if (errors.size) next.set(projectId, errors);
+      else next.delete(projectId);
+      return next;
+    });
+  }, []);
+
   const readCurrentProjectDetails = useCallback(async (projectId: string, isCurrent: () => boolean) => {
     // A task confirmed during an opening requires a fresh GET, never a replay
     // of its write. Stop rereading as soon as this opening is superseded.
@@ -380,7 +398,9 @@ export function useProjectsController() {
         const details = await getProjectDetails(projectId);
         if (!isCurrent()) return null;
         if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
+        assertProjectDetailsIdentity(projectId, details);
         taskConfirmationsRef.current.get(projectId)?.changes.clear();
+        completeTaskVerifications(projectId);
         return details;
       } catch (error) {
         if (!isCurrent()) return null;
@@ -393,7 +413,7 @@ export function useProjectsController() {
       }
     }
     return null;
-  }, []);
+  }, [completeTaskVerifications]);
 
   useEffect(() => {
     const target = parseProjectDeepLink(window.location.search ?? '');
@@ -430,6 +450,7 @@ export function useProjectsController() {
     let details: ProjectDetailsResponse;
     try {
       details = await getProjectDetails(projectId);
+      assertProjectDetailsIdentity(projectId, details);
     } catch (error) {
       if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
       if (selection && detailSelectionRef.current === selection && selection.readRevision === revision) {
@@ -439,6 +460,7 @@ export function useProjectsController() {
     }
     if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
     taskConfirmationsRef.current.get(projectId)?.changes.clear();
+    completeTaskVerifications(projectId);
     const projectWithTasks = mergeProjectDetails(details);
 
     setProjects((currentProjects) =>
@@ -721,6 +743,10 @@ export function useProjectsController() {
   };
 
   const runTaskWrite = async (projectId: string, taskId: string, write: () => Promise<void>, rejectIfPending = false) => {
+    if (taskVerificationsRef.current.get(projectId)?.has(taskId)) {
+      if (rejectIfPending) throw new ProjectTaskVerificationRequiredError();
+      return;
+    }
     // Tuple encoding avoids collisions between arbitrary project/task IDs.
     const key = JSON.stringify([projectId, taskId]);
     if (taskWritesRef.current.has(key)) {
@@ -751,6 +777,28 @@ export function useProjectsController() {
     }
   };
 
+  const verifyInconsistentTaskReceipt = async (projectId: string, taskId: string, selection: DetailSelection | null) => {
+    taskVerificationsRef.current.set(projectId, new Set(taskVerificationsRef.current.get(projectId)).add(taskId));
+    setUnverifiedTasksByProject(new Map(taskVerificationsRef.current));
+    // A read started before this uncertain confirmation cannot unlock it.
+    const previous = taskConfirmationsRef.current.get(projectId);
+    taskConfirmationsRef.current.set(projectId, { revision: (previous?.revision ?? 0) + 1, changes: new Map(previous?.changes) });
+    ++pageRevisionRef.current;
+    setTaskWriteError(projectId, taskId, TASK_VERIFICATION_MESSAGE);
+    showInfo(TASK_VERIFICATION_MESSAGE);
+    try {
+      const details = await refreshProjectDetails(projectId, selection);
+      if (!details) return false;
+      showInfo('La fiche a été vérifiée par lecture. Consultez les données reçues avant toute nouvelle action.');
+      await refreshProjectsPage({ silent: true });
+      return true;
+    } catch {
+      // The accepted write is never replayed. Only a coherent detail GET may
+      // release this target; uncertainty stays distinct from write refusal.
+      return false;
+    }
+  };
+
   const updateProjectTask = async (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
     const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
@@ -763,6 +811,10 @@ export function useProjectsController() {
       } catch (error) {
         showTaskWriteError(projectId, taskId, error);
         throw error;
+      }
+      if (confirmed.id !== taskId) {
+        if (!await verifyInconsistentTaskReceipt(projectId, taskId, selection)) throw new ProjectTaskVerificationRequiredError();
+        return;
       }
       applyConfirmedTask(projectId, confirmed.id, confirmed, selection);
       try {
@@ -787,6 +839,10 @@ export function useProjectsController() {
         updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
       } catch (error) {
         showTaskWriteError(projectId, taskId, error);
+        return;
+      }
+      if (updatedTask.id !== taskId) {
+        await verifyInconsistentTaskReceipt(projectId, taskId, selection);
         return;
       }
       applyConfirmedTask(projectId, updatedTask.id, updatedTask, selection);
@@ -843,6 +899,7 @@ export function useProjectsController() {
   const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
   const pendingTaskIds = pendingTasksByProject.get(selectedProject?.id ?? '') ?? new Set<string>();
   const taskWriteErrors = taskWriteErrorsByProject.get(selectedProject?.id ?? '') ?? new Map<string, string>();
+  const unverifiedTaskIds = unverifiedTasksByProject.get(selectedProject?.id ?? '') ?? new Set<string>();
   const canCreateProject =
     projectsPage?.access?.canCreateProject ?? false;
   const pageTitle = projectsPage?.page.title ?? 'Projets';
@@ -857,6 +914,7 @@ export function useProjectsController() {
     detailRefreshPending,
     pendingTaskIds,
     taskWriteErrors,
+    unverifiedTaskIds,
     retryProjectDetails,
     linkedTaskId,
     viewMode,
