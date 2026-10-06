@@ -150,6 +150,7 @@ function EmptyState() {
 export function GridView({
   projects,
   duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   memberOptions,
   labelOptions,
   onProjectOpen,
@@ -160,6 +161,7 @@ export function GridView({
 }: {
   projects: Project[];
   duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
@@ -178,6 +180,7 @@ export function GridView({
           project={project}
           variant="grid"
           duplicationPending={duplicatingProjectIds.includes(project.id)}
+          duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           onOpen={onProjectOpen}
@@ -194,6 +197,7 @@ export function GridView({
 export function TableView({
   projects,
   duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
@@ -201,6 +205,7 @@ export function TableView({
 }: {
   projects: Project[];
   duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
@@ -259,6 +264,7 @@ export function TableView({
                   <ProjectActionsMenu
                     project={project}
                     duplicationPending={duplicatingProjectIds.includes(project.id)}
+                    duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
                     onEdit={onProjectEdit}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}

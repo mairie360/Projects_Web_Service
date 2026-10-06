@@ -1,5 +1,33 @@
 # Projects_Web_Service — Présentation du module
 
+## Reçus incertains de création et duplication (MAIR-408)
+
+Avant d’insérer un nouveau projet, le front vérifie son ID non vide contre ceux
+déjà observés avant l’envoi (source de duplication comprise), et exige des
+IDs de tâches uniques/non vides. Une réponse acceptée incohérente ne remplace ni
+carte/fiche existante ni brouillon de création. Répéter cette création ou dupliquer
+à nouveau sa source n’envoie pas de POST. Les éditions des autres projets restent
+indépendantes ; fermer puis rouvrir la création conserve son brouillon connu.
+Un GET pendant l’attente peut déjà afficher le nouveau projet de cette requête
+avant l’arrivée de son POST : ce seul constat n’est pas une collision. Un ID
+déjà confirmé par une autre création/duplication ne peut toujours pas être repris.
+L’avertissement de création reçoit le focus à la fin de l’écriture acceptée ; les
+lectures suivantes du catalogue ne reprennent pas le focus pendant la saisie.
+La soumission bloquée est visuellement grisée. Kanban/grille/table gardent l’action
+source « Copie à vérifier » désactivée, distincte de la duplication en cours, sans
+modifier les permissions serveur reçues ni bloquer les autres projets.
+
+Le retour persistant propose une lecture du catalogue gardée, jamais un replay.
+Catalogue réussi ou champs saisis similaires ne peuvent identifier une création
+acceptée dont le reçu réutilise un ID existant : le contrat publié ne fournit pas
+de corrélation de requête/reçu d’idempotence pour ce cas. L’avertissement ne fabrique
+aucun nouvel ID et ne confirme pas la ligne semblable d’un autre agent. Protection
+de durée de page seulement, pas reprise durable après rechargement du navigateur.
+La reprise frontend d’un ID distinct avec tâches imbriquées incohérentes reste à
+qualifier ; le catalogue seul ne termine pas ce cas. Le consommateur ne certifie
+pas l’unicité globale d’IDs distants jamais observés. Aucun changement de client,
+contrat/API/BFF ou environnement n’est introduit.
+
 ## Identité du reçu de projet existant (MAIR-408)
 
 Édition fiche/carte, déplacement Kanban et clôture/suspension vérifient le projet

@@ -25,6 +25,40 @@ function FormHarness({ mode, onSubmit, fromMenu = false }) {
 }
 
 describe('project form dialogs', () => {
+  it('keeps an uncertain creation draft and nested task while keyboard catalogue recovery cannot repeat creation', async () => {
+    const user = userEvent.setup();
+    const onVerify = vi.fn(), onSubmit = vi.fn(), onClose = vi.fn();
+    const props = {
+      mode: 'create', form: { ...createProjectFormState(), title: 'Création incertaine conservée' }, error: '',
+      verificationRequired: true, verificationMessage: 'Identité du nouveau projet non vérifiable.',
+      verificationLabel: 'Actualiser le catalogue', verificationPendingLabel: 'Actualisation du catalogue…',
+      memberOptions: [], labelOptions: [], statusOptions: [{ value: 'todo', label: 'À faire' }],
+      priorityOptions: [{ value: 'medium', label: 'Moyenne' }], onVerify, onChange: vi.fn(), onSubmit, onClose,
+    };
+    const { rerender } = render(<CreateProjectModal {...props} />);
+    const dialog = screen.getByRole('dialog'), form = within(dialog);
+    expect(document.activeElement).toBe(form.getByRole('alert'));
+    const nested = form.getByPlaceholderText('Ajouter une tâche...');
+    await user.type(nested, 'Tâche locale non envoyée');
+    expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
+    expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).className).toContain('!bg-[#a5bca9]');
+    const verify = form.getByRole('button', { name: 'Actualiser le catalogue', exact: true });
+    verify.focus(); await user.keyboard('{Enter}');
+    expect(onVerify).toHaveBeenCalledOnce(); expect(onSubmit).not.toHaveBeenCalled();
+    rerender(<CreateProjectModal {...props} verificationPending />);
+    expect(form.getByRole('button', { name: 'Actualisation du catalogue…', exact: true }).disabled).toBe(true);
+    expect(nested.value).toBe('Tâche locale non envoyée');
+    rerender(<CreateProjectModal {...props} verificationError="Lecture du catalogue refusée" />);
+    expect(form.getByRole('alert').textContent).toContain('Lecture du catalogue refusée');
+    expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
+    expect(form.getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Création incertaine conservée');
+    expect(nested.value).toBe('Tâche locale non envoyée');
+    const results = await axe(dialog);
+    expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
+    await user.keyboard('{Escape}'); expect(onClose).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('captures activity in the unsent nested task before it changes the project draft', async () => {
     const user = userEvent.setup();
     const onInteract = vi.fn();

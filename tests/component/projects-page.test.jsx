@@ -33,6 +33,35 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it('keeps a collided duplication visible with GET-only recovery and no second duplicate POST', async () => {
+    const user = userEvent.setup(), first = fixtures.projectListItem();
+    const second = fixtures.projectListItem({ id: 'project-2', title: 'Carte existante intacte' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([first, second]));
+    vi.mocked(duplicateProject).mockResolvedValue(fixtures.projectDetails({ ...second, title: 'Collision interdite' }));
+    render(<ProjectsPage />);
+    const opener = await screen.findByRole('button', { name: `Actions pour ${first.title}` });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Dupliquer', exact: true }));
+    await screen.findByText(`Duplication non vérifiée : ${first.title}`);
+    expect(screen.queryByText('Collision interdite')).toBeNull();
+    expect(screen.getByRole('button', { name: `Ouvrir la fiche du projet ${second.title}` })).toBeTruthy();
+    expect(getProjectsPage).toHaveBeenCalledOnce();
+    await user.click(opener);
+    const blocked = screen.getByRole('menuitem', { name: 'Copie à vérifier', exact: true });
+    expect(blocked.disabled).toBe(true);
+    await user.click(blocked);
+    expect(duplicateProject).toHaveBeenCalledOnce();
+    await user.keyboard('{Escape}');
+    const retry = screen.getByRole('button', { name: 'Actualiser le catalogue', exact: true });
+    retry.focus(); await user.keyboard('{Enter}');
+    await waitFor(() => expect(retry.disabled).toBe(false));
+    expect(getProjectsPage).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(`Duplication non vérifiée : ${first.title}`)).toBeTruthy();
+    await user.click(opener);
+    expect(screen.getByRole('menuitem', { name: 'Copie à vérifier', exact: true }).disabled).toBe(true);
+    expect(duplicateProject).toHaveBeenCalledOnce();
+  });
+
   it('keeps a card draft and unsent local task after an uncertain project receipt until keyboard GET verification', async () => {
     const user=userEvent.setup(), project=fixtures.projectListItem({dueDate:'2026-12-15'});
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));

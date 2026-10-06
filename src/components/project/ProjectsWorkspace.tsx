@@ -12,7 +12,7 @@ import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './Pr
 import { navigateToPage } from '../../lib/navigation';
 import { logoutAndReload } from '../../lib/auth-session';
 import type { ProjectsController } from './useProjectsController';
-import { PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
+import { NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function ProjectsWorkspace({
   projectsPage,
@@ -26,6 +26,11 @@ export function ProjectsWorkspace({
   unverifiedProjectIds,
   projectVerificationPendingIds,
   projectVerificationErrors,
+  newProjectReceiptIssues,
+  unverifiedDuplicationSourceIds,
+  newProjectCatalogueReadPending,
+  newProjectCatalogueReadError,
+  readNewProjectCatalogue,
   verifyProjectReceipt,
   retryProjectDetails,
   linkedTaskId,
@@ -142,11 +147,14 @@ export function ProjectsWorkspace({
           form={projectForm}
           error={projectFormError}
           pending={projectFormPending}
-          verificationRequired={!!editingProjectId && unverifiedProjectIds.has(editingProjectId)}
-          verificationPending={!!editingProjectId && projectVerificationPendingIds.has(editingProjectId)}
-          verificationError={editingProjectId ? projectVerificationErrors.get(editingProjectId) : undefined}
+          verificationRequired={editingProjectId ? unverifiedProjectIds.has(editingProjectId) : newProjectReceiptIssues.has('create')}
+          verificationPending={editingProjectId ? projectVerificationPendingIds.has(editingProjectId) : newProjectCatalogueReadPending}
+          verificationError={editingProjectId ? projectVerificationErrors.get(editingProjectId) : newProjectCatalogueReadError}
+          verificationMessage={editingProjectId ? PROJECT_VERIFICATION_MESSAGE : NEW_PROJECT_VERIFICATION_MESSAGE}
+          verificationLabel={editingProjectId ? 'Vérifier le projet' : 'Actualiser le catalogue'}
+          verificationPendingLabel={editingProjectId ? 'Vérification du projet…' : 'Actualisation du catalogue…'}
           canSave={!editingProjectId || projects.find(project => project.id === editingProjectId)?.permissions?.canEdit !== false}
-          onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : undefined}
+          onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : readNewProjectCatalogue()}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           statusOptions={projectStatusOptions}
@@ -167,6 +175,16 @@ export function ProjectsWorkspace({
         className="projects-shell"
       >
             <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+              {[...newProjectReceiptIssues].map(([key, issue]) => (
+                <div key={key} role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
+                  <p className="font-semibold">{issue.kind === 'create' ? 'Création' : 'Duplication'} non vérifiée : {issue.title}</p>
+                  <p>{NEW_PROJECT_VERIFICATION_MESSAGE}</p>
+                  {newProjectCatalogueReadError && <p className="mt-2">{newProjectCatalogueReadError}</p>}
+                  <button type="button" disabled={newProjectCatalogueReadPending} aria-busy={newProjectCatalogueReadPending} onClick={() => void readNewProjectCatalogue()} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
+                    {newProjectCatalogueReadPending ? 'Actualisation du catalogue…' : 'Actualiser le catalogue'}
+                  </button>
+                </div>
+              ))}
               {[...unverifiedProjectIds].map(projectId => {
                 const title = projects.find(project => project.id === projectId)?.title ?? projectId;
                 const pending = projectVerificationPendingIds.has(projectId);
@@ -302,6 +320,7 @@ export function ProjectsWorkspace({
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
+                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     columns={projectsPage?.kanban.columns ?? []}
                     memberOptions={memberOptions}
@@ -319,6 +338,7 @@ export function ProjectsWorkspace({
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
+                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
@@ -333,6 +353,7 @@ export function ProjectsWorkspace({
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'table' && (
                   <TableView
                     projects={filteredProjects}
+                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     onProjectOpen={openProjectDetails}
                     onProjectEdit={openEditProject}

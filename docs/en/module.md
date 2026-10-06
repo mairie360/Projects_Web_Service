@@ -1,5 +1,33 @@
 # Projects_Web_Service — Module overview
 
+## Uncertain creation and duplication receipts (MAIR-408)
+
+Before inserting a new project, the front checks its non-empty ID against IDs
+already observed before dispatch (including a duplication's source), and
+requires unique non-empty task IDs. An incoherent accepted response does not
+replace any existing card/detail or discard the creation draft. Repeated creation
+or duplication of that source cannot send another POST. Unrelated project edits
+remain independent; closing and reopening creation retains its known draft.
+An intervening GET may legitimately display this request's new project before
+its POST response arrives; that observation alone is not a collision. An ID
+already confirmed by another creation/duplication still cannot be reused.
+The creation warning receives focus when the accepted write finishes; later
+catalogue retries do not steal focus from continued draft editing.
+Blocked form submission is visually muted. Kanban/grid/table keep a disabled
+“Copie à vérifier” source action, distinct from pending duplication, without
+altering the received server permissions or blocking other projects.
+
+Persistent feedback offers a guarded catalogue GET, never a write replay. A
+successful catalogue or matching submitted fields cannot identify an accepted
+creation whose receipt reused an existing ID: the published contract has no
+request correlation/idempotency receipt for this case. The warning stays honest,
+without inventing a new ID or confirming another user's similarly titled row.
+This is page-lifetime protection, not durable recovery across browser reloads.
+Further frontend recovery for a distinct new ID with incoherent nested task IDs
+remains to qualify; catalogue-only recovery does not complete that case. Unknown
+remote IDs never seen by this page cannot be certified globally unique by a
+consumer. No client/contract/API/BFF or environment changes are introduced.
+
 ## Existing-project receipt identity (MAIR-408)
 
 Inline/card edits, Kanban status changes and close/review verify the requested

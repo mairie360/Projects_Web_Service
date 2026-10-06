@@ -37,7 +37,7 @@ import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
-import { ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
+import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
 type AlertState = {
@@ -69,6 +69,7 @@ type DetailSelection = { projectId: string; readRevision: number };
 type TaskConfirmations = { revision: number; changes: Map<string, ProjectTask | null>; latest: Map<string, TaskConfirmation> };
 type SelectedProjectDetails = { project: Project; taskItems: ProjectTask[] };
 type ConfirmedProject = { details: SelectedProjectDetails; newerTasks: boolean };
+type NewProjectReceiptIssue = { kind: 'create' | 'duplicate'; title: string; sourceId?: string };
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
@@ -104,6 +105,18 @@ export function useProjectsController() {
   const projectVerificationReadsRef = useRef(new Set<string>());
   const [projectVerificationPendingIds, setProjectVerificationPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [projectVerificationErrors, setProjectVerificationErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
+  // IDs are learned only from coherent server reads/confirmations, never drafts.
+  const knownProjectIdsRef = useRef(new Set<string>());
+  const confirmedNewProjectIdsRef = useRef(new Set<string>());
+  const newProjectReceiptIssuesRef = useRef(new Map<string, NewProjectReceiptIssue>());
+  const [newProjectReceiptIssues, setNewProjectReceiptIssues] = useState<ReadonlyMap<string, NewProjectReceiptIssue>>(() => new Map());
+  const unverifiedDuplicationSourceIds = useMemo(() => new Set(
+    [...newProjectReceiptIssues.values()].flatMap(issue => issue.kind === 'duplicate' && issue.sourceId ? [issue.sourceId] : []),
+  ), [newProjectReceiptIssues]);
+  const uncertainCreationDraftRef = useRef<ProjectFormState | null>(null);
+  const newProjectCatalogueReadRef = useRef(false);
+  const [newProjectCatalogueReadPending, setNewProjectCatalogueReadPending] = useState(false);
+  const [newProjectCatalogueReadError, setNewProjectCatalogueReadError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -232,6 +245,7 @@ export function useProjectsController() {
         if (!isProjectPaginationValid(response.pagination, nextPage)) {
           throw new Error('La pagination reçue est incohérente. Réessayez le chargement des projets.');
         }
+        for (const project of response.projects) knownProjectIdsRef.current.add(project.id);
         setProjectsPage(response);
         setProjects(response.projects.map((project: Project) => {
           const changes = taskConfirmationsRef.current.get(project.id)?.changes;
@@ -387,6 +401,8 @@ export function useProjectsController() {
   };
 
   const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false, taskRevision?: number): ConfirmedProject => {
+    knownProjectIdsRef.current.add(details.project.id);
+    if (insert) confirmedNewProjectIdsRef.current.add(details.project.id);
     ++pageRevisionRef.current;
     const confirmations = taskConfirmationsRef.current.get(details.project.id);
     const changes = taskRevision === undefined ? new Map<string, ProjectTask | null>()
@@ -409,6 +425,44 @@ export function useProjectsController() {
       : insert ? [...current, confirmed] : current);
     // Page totals, options and pagination still belong to the last successful page DTO.
     return { details: { project: confirmed, taskItems }, newerTasks: changes.size > 0 };
+  };
+
+  const requireNewProjectReceipt = (details: ProjectDetailsResponse, key: string, issue: NewProjectReceiptIssue, knownAtDispatch: ReadonlySet<string>) => {
+    const id = details.project.id;
+    try {
+      // A GET while this request is pending may already show its legitimately
+      // created project. Reject pre-existing IDs and another confirmed write,
+      // not that new read observation alone.
+      if (!id.trim() || knownAtDispatch.has(id) || confirmedNewProjectIdsRef.current.has(id) || id === issue.sourceId) {
+        throw new Error('The new project identity is not distinct.');
+      }
+      assertProjectDetailsIdentity(id, details);
+    } catch {
+      newProjectReceiptIssuesRef.current.set(key, issue);
+      setNewProjectReceiptIssues(new Map(newProjectReceiptIssuesRef.current));
+      if (issue.kind === 'create') uncertainCreationDraftRef.current = projectForm;
+      ++pageRevisionRef.current;
+      pageReadPendingRef.current = false;
+      setPageLoading(false);
+      throw new NewProjectReceiptVerificationRequiredError();
+    }
+  };
+
+  const readNewProjectCatalogue = async () => {
+    if (newProjectCatalogueReadRef.current) return;
+    newProjectCatalogueReadRef.current = true;
+    setNewProjectCatalogueReadPending(true);
+    setNewProjectCatalogueReadError('');
+    try {
+      await refreshProjectsPage({ silent: true, throwOnError: true });
+      // The contract has no creation request ID/idempotency receipt. Even a
+      // matching title or successful read cannot identify this accepted write.
+    } catch (error) {
+      setNewProjectCatalogueReadError(getBffProjectErrorMessage(error));
+    } finally {
+      newProjectCatalogueReadRef.current = false;
+      setNewProjectCatalogueReadPending(false);
+    }
   };
 
   const beginDetailSelection = useCallback((projectId: string) => {
@@ -633,7 +687,7 @@ export function useProjectsController() {
   const openCreateProject = (status: Project['status'] = 'todo') => {
     if (projectFormPendingRef.current) return;
     projectFormOpeningRef.current = null;
-    setProjectForm(createProjectFormState(status));
+    setProjectForm(uncertainCreationDraftRef.current ?? createProjectFormState(status));
     setEditingProjectId(null);
     setProjectFormError('');
     setOpenFilter(null);
@@ -715,6 +769,7 @@ export function useProjectsController() {
   const closeCreateProject = () => {
     if (projectFormPendingRef.current) return;
     projectFormOpeningRef.current = null;
+    if (!editingProjectId && newProjectReceiptIssuesRef.current.has('create')) uncertainCreationDraftRef.current = projectForm;
     setCreateProjectOpen(false);
     setEditingProjectId(null);
     setProjectFormError('');
@@ -781,7 +836,7 @@ export function useProjectsController() {
   const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // The ref also protects two events captured before React renders disabled controls.
-    if (projectFormPendingRef.current) return;
+    if (projectFormPendingRef.current || (!editingProjectId && newProjectReceiptIssuesRef.current.has('create'))) return;
     projectFormOpeningRef.current = null;
 
     if (!validateProjectForm(projectForm)) {
@@ -792,6 +847,7 @@ export function useProjectsController() {
     projectFormPendingRef.current = true;
     const selection = detailSelectionRef.current;
     const taskRevision = editingProjectId ? taskConfirmationsRef.current.get(editingProjectId)?.revision ?? 0 : undefined;
+    const knownAtDispatch = new Set(knownProjectIdsRef.current);
     setProjectFormPending(true);
     setProjectFormError('');
     try {
@@ -800,6 +856,7 @@ export function useProjectsController() {
         ? await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm))
         : await createProject(createProjectBodyFromForm(projectForm));
       if (editingProjectId) requireProjectReceipt(editingProjectId, details);
+      else requireNewProjectReceipt(details, 'create', { kind: 'create', title: projectForm.title }, knownAtDispatch);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
 
       // Only the confirmed write discards the draft. A later read failure is not a refusal.
@@ -823,7 +880,7 @@ export function useProjectsController() {
       }
     } catch (error) {
       // A refused write keeps every field and nested task, with an error inside the dialog.
-      if (!(error instanceof ProjectReceiptVerificationRequiredError)) setProjectFormError(getBffProjectErrorMessage(error));
+      if (!(error instanceof ProjectReceiptVerificationRequiredError) && !(error instanceof NewProjectReceiptVerificationRequiredError)) setProjectFormError(getBffProjectErrorMessage(error));
     } finally {
       projectFormPendingRef.current = false;
       setProjectFormPending(false);
@@ -832,18 +889,26 @@ export function useProjectsController() {
 
   const duplicateProject = async (project: Project) => {
     if (project.permissions?.canDuplicate === false || duplicatingProjects.current.has(project.id)) return;
+    const key = `duplicate:${project.id}`;
+    if (newProjectReceiptIssuesRef.current.has(key)) {
+      showInfo(NEW_PROJECT_VERIFICATION_MESSAGE);
+      return;
+    }
     // Prevent a second event before React renders the disabled action.
     duplicatingProjects.current.add(project.id);
     setDuplicatingProjectIds((current) => [...current, project.id]);
+    const knownAtDispatch = new Set(knownProjectIdsRef.current);
     try {
       const details = await duplicateBffProject(project.id);
+      requireNewProjectReceipt(details, key, { kind: 'duplicate', title: project.title, sourceId: project.id }, knownAtDispatch);
       applyConfirmedProject(details, true);
 
       resetProjectFilters();
       await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
-      showError(error);
+      if (error instanceof NewProjectReceiptVerificationRequiredError) showInfo(NEW_PROJECT_VERIFICATION_MESSAGE);
+      else showError(error);
     } finally {
       duplicatingProjects.current.delete(project.id);
       setDuplicatingProjectIds((current) => current.filter((id) => id !== project.id));
@@ -1091,6 +1156,11 @@ export function useProjectsController() {
     unverifiedProjectIds,
     projectVerificationPendingIds,
     projectVerificationErrors,
+    newProjectReceiptIssues,
+    unverifiedDuplicationSourceIds,
+    newProjectCatalogueReadPending,
+    newProjectCatalogueReadError,
+    readNewProjectCatalogue,
     verifyProjectReceipt,
     retryProjectDetails,
     linkedTaskId,

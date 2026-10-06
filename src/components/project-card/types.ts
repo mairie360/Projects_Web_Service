@@ -11,6 +11,7 @@ export type ProjectCardProps = {
   project: Project;
   variant?: ProjectCardVariant;
   duplicationPending?: boolean;
+  duplicationVerificationRequired?: boolean;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
   onOpen?: (project: Project) => void;

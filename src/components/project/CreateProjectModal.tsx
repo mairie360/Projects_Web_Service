@@ -18,6 +18,9 @@ export function CreateProjectModal({
   verificationRequired = false,
   verificationPending = false,
   verificationError,
+  verificationMessage = PROJECT_VERIFICATION_MESSAGE,
+  verificationLabel = 'Vérifier le projet',
+  verificationPendingLabel = 'Vérification du projet…',
   canSave = true,
   onVerify,
   memberOptions,
@@ -36,6 +39,9 @@ export function CreateProjectModal({
   verificationRequired?: boolean;
   verificationPending?: boolean;
   verificationError?: string;
+  verificationMessage?: string;
+  verificationLabel?: string;
+  verificationPendingLabel?: string;
   canSave?: boolean;
   onVerify?: () => void | Promise<void>;
   memberOptions: FilterOption[];
@@ -48,8 +54,10 @@ export function CreateProjectModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const isEditMode = mode === 'edit';
+  const submitBlocked = pending || verificationRequired || verificationPending || !canSave;
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const dialogRef = React.useRef<HTMLFormElement>(null);
+  const verificationFeedbackRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
   const feedbackId = React.useId();
   const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
@@ -69,6 +77,12 @@ export function CreateProjectModal({
   React.useLayoutEffect(() => {
     if (pending) dialogRef.current?.focus();
   }, [pending]);
+
+  React.useLayoutEffect(() => {
+    // After acceptance stops saving, bring the non-retryable confirmation
+    // warning into the scrolling body. Later read retries must not steal typing.
+    if (verificationRequired && !pending) verificationFeedbackRef.current?.focus();
+  }, [verificationRequired, pending]);
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
     if (event.defaultPrevented || event.nativeEvent.isComposing) return;
@@ -139,11 +153,11 @@ export function CreateProjectModal({
             <p id={feedbackId} role="status" className="mb-4 text-sm font-medium text-[#24292f]">Enregistrement en cours…</p>
           )}
           {verificationRequired && (
-            <div id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e] [overflow-wrap:anywhere]">
-              <p>{PROJECT_VERIFICATION_MESSAGE}</p>
+            <div ref={verificationFeedbackRef} tabIndex={-1} id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e] [overflow-wrap:anywhere]">
+              <p>{verificationMessage}</p>
               {verificationError && <p className="mt-2">{verificationError}</p>}
               <button type="button" disabled={verificationPending || pending} aria-busy={verificationPending} onClick={() => void onVerify?.()} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                {verificationPending ? 'Vérification du projet…' : 'Vérifier le projet'}
+                {verificationPending ? verificationPendingLabel : verificationLabel}
               </button>
             </div>
           )}
@@ -283,10 +297,10 @@ export function CreateProjectModal({
           />
           <Button
             label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : 'Créer le projet'}
-            disabled={pending || verificationRequired || verificationPending || !canSave}
+            disabled={submitBlocked}
             type="submit"
             primary
-            className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+            className={`!h-9 !min-h-0 !rounded-md !px-4 !text-sm !font-semibold !text-white ${submitBlocked ? '!border-[#a5bca9] !bg-[#a5bca9] !cursor-not-allowed' : '!border-[#2da44e] !bg-[#2da44e] hover:!bg-[#2c974b]'}`}
           />
         </div>
       </form>

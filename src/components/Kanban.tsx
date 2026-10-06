@@ -16,6 +16,7 @@ type SelectOption = {
 type KanbanBoardProps = {
   projects: Project[];
   duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   columns: Array<{ status: Project['status']; label: string }>;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
@@ -43,6 +44,7 @@ const columnPresentation: Record<Project['status'], KanbanColumnPresentation> = 
 export function KanbanBoard({
   projects,
   duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   columns,
   memberOptions,
   labelOptions,
@@ -172,6 +174,7 @@ export function KanbanBoard({
                   <ProjectCard
                     project={project}
                     duplicationPending={duplicatingProjectIds.includes(project.id)}
+                    duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
                     memberOptions={memberOptions}
                     labelOptions={labelOptions}
                     onOpen={onProjectOpen}

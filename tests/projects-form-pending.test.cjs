@@ -84,7 +84,7 @@ for (const mode of ['create', 'edit']) {
       assert.equal(view.props('CreateProjectModal').error, 'Écriture indisponible');
       assert.match(view.html, /role="alert"[^>]*>Écriture indisponible/);
       assert.doesNotMatch(view.html, /<fieldset[^>]*disabled=""/);
-      const details = fixtures.projectDetails(fixtures.projectListItem({ title: draft().title }), draft().taskItems);
+      const details = fixtures.projectDetails(fixtures.projectListItem({ id: mode === 'create' ? 'project-created' : 'project-1', title: draft().title }), draft().taskItems);
       harness.bffProject.on(method, path, { status: mode === 'create' ? 201 : 200, body: details });
       await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
       assert.equal(harness.bffProject.calls(path, method).length, 2);
