@@ -20,6 +20,7 @@ export function CreateProjectModal({
   priorityOptions,
   onChange,
   onClose,
+  onInteract,
   onSubmit,
 }: {
   mode: 'create' | 'edit';
@@ -32,6 +33,7 @@ export function CreateProjectModal({
   priorityOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
   onClose: () => void;
+  onInteract?: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const isEditMode = mode === 'edit';
@@ -100,6 +102,9 @@ export function CreateProjectModal({
         aria-busy={pending}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
+        onKeyDownCapture={onInteract}
+        onPointerDownCapture={onInteract}
+        onChangeCapture={onInteract}
         className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
         onSubmit={onSubmit}
       >

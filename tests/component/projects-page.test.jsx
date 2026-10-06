@@ -31,6 +31,74 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it.each([false, true])('retains the latest card form and its typed draft after an obsolete read (refused: %s)', async refused => {
+    const user = userEvent.setup();
+    const first = fixtures.projectListItem();
+    const second = fixtures.projectListItem({ id: 'project-2', title: 'Projet choisi ensuite' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([first, second]));
+    const earlier = Promise.withResolvers();
+    vi.mocked(getProjectDetails).mockImplementationOnce(() => earlier.promise)
+      .mockResolvedValueOnce(fixtures.projectDetails(second));
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Actions pour ${first.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
+    const opener = screen.getByRole('button', { name: `Actions pour ${second.title}` });
+    await user.click(opener);
+    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
+    const title = within(dialog).getByRole('textbox', { name: 'Titre*', exact: true });
+    expect(title.value).toBe(second.title);
+    await user.clear(title); await user.type(title, 'Brouillon du projet choisi ensuite');
+    await act(async () => refused ? earlier.reject(new Error('Ancienne lecture refusée')) : earlier.resolve(fixtures.projectDetails(first)));
+    expect(title.value).toBe('Brouillon du projet choisi ensuite');
+    expect(screen.queryByText('Ancienne lecture refusée')).toBeNull();
+    expect(getProjectDetails.mock.calls.map(([id]) => id)).toEqual([first.id, second.id]);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('preserves a creation and its unsent nested task while an old card opening finishes', async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    const earlier = Promise.withResolvers();
+    vi.mocked(getProjectDetails).mockImplementationOnce(() => earlier.promise);
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Actions pour ${project.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
+    const opener = screen.getByRole('button', { name: 'Nouveau projet', exact: true });
+    await user.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
+    await user.type(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }), 'Brouillon de création');
+    await user.type(within(dialog).getByPlaceholderText('Ajouter une tâche...'), 'Tâche non envoyée');
+    await act(async () => earlier.resolve(fixtures.projectDetails(project)));
+    expect(screen.getByRole('dialog', { name: 'Nouveau projet' })).toBe(dialog);
+    expect(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Brouillon de création');
+    expect(within(dialog).getByPlaceholderText('Ajouter une tâche...').value).toBe('Tâche non envoyée');
+    expect(getProjectDetails).toHaveBeenCalledTimes(1);
+    const close = within(dialog).getByRole('button', { name: 'Fermer la création de projet' });
+    close.focus(); await user.keyboard('{Enter}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('announces the current read fallback inside its correctly targeted card form', async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Chargement récent indisponible'));
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Actions pour ${project.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
+    expect(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe(project.title);
+    expect(within(dialog).getByRole('alert').textContent).toContain('Chargement récent indisponible');
+    expect(within(dialog).getByRole('alert').textContent).toContain('projet déjà affiché');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it.each([false, true])("keeps a newer task and its draft after a late project close (detail read succeeds: %s)", async successfulRead => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();

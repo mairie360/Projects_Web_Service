@@ -124,6 +124,7 @@ export function useProjectsController() {
   const [projectFormError, setProjectFormError] = useState('');
   const [projectFormPending, setProjectFormPending] = useState(false);
   const projectFormPendingRef = useRef(false);
+  const projectFormOpeningRef = useRef<symbol | null>(null);
   const duplicatingProjects = useRef(new Set<string>());
   const [duplicatingProjectIds, setDuplicatingProjectIds] = useState<string[]>([]);
   // La session vient de la réponse /projects-page déjà chargée : aucun appel supplémentaire.
@@ -392,7 +393,10 @@ export function useProjectsController() {
     }
   };
 
-  useEffect(() => () => { detailSelectionRef.current = null; }, []);
+  useEffect(() => () => {
+    detailSelectionRef.current = null;
+    projectFormOpeningRef.current = null;
+  }, []);
 
   const completeTaskVerifications = useCallback((projectId: string) => {
     const ids = taskVerificationsRef.current.get(projectId);
@@ -552,6 +556,7 @@ export function useProjectsController() {
 
   const openCreateProject = (status: Project['status'] = 'todo') => {
     if (projectFormPendingRef.current) return;
+    projectFormOpeningRef.current = null;
     setProjectForm(createProjectFormState(status));
     setEditingProjectId(null);
     setProjectFormError('');
@@ -573,24 +578,62 @@ export function useProjectsController() {
   };
 
   const openEditProject = async (project: Project) => {
-    if (projectFormPendingRef.current) return;
-    setEditingProjectId(project.id);
-    setProjectFormError('');
+    if (projectFormPendingRef.current || project.permissions?.canEdit === false) return;
+    const opening = Symbol('project form opening');
+    projectFormOpeningRef.current = opening;
+    const isCurrent = () => projectFormOpeningRef.current === opening && !projectFormPendingRef.current;
     setOpenFilter(null);
+    let form = projectToFormState(project);
+    let formError = '';
+    const denyEdit = (error: unknown) => {
+      // A newly denied current project cannot keep its older editor available.
+      if (editingProjectId === project.id) {
+        setCreateProjectOpen(false);
+        setEditingProjectId(null);
+      }
+      showError(error);
+    };
 
     try {
       const details = await getProjectDetails(project.id);
-      setProjectForm(projectToFormState(mergeProjectDetails(details)));
+      if (!isCurrent()) return;
+      try {
+        assertProjectDetailsIdentity(project.id, details);
+      } catch (error) {
+        showError(error);
+        return;
+      }
+      if (details.project.permissions?.canEdit === false) {
+        denyEdit(new Error('La modification de ce projet est non autorisée.'));
+        return;
+      }
+      form = projectToFormState(mergeProjectDetails(details));
     } catch (error) {
-      setProjectForm(projectToFormState(project));
+      if (!isCurrent() || isAbortError(error)) return;
+      if (error instanceof BffProjectNavigationRequiredError ||
+          (error instanceof BffProjectError && (error.status === 401 || error.status === 403))) {
+        denyEdit(error);
+        return;
+      }
+      // Retain the existing displayed-record fallback, but disclose that its
+      // newer detail could not be read. Never use a foreign/denied detail.
+      formError = `Les données récentes n’ont pas pu être chargées : ${getBffProjectErrorMessage(error)}. Le formulaire reprend le projet déjà affiché.`;
       showError(error);
     }
 
+    if (!isCurrent()) return;
+    // Commit target and fields together; a waiting replacement must not
+    // silently retarget a currently displayed draft before its data arrives.
+    projectFormOpeningRef.current = null;
+    setEditingProjectId(project.id);
+    setProjectForm(form);
+    setProjectFormError(formError);
     setCreateProjectOpen(true);
   };
 
   const closeCreateProject = () => {
     if (projectFormPendingRef.current) return;
+    projectFormOpeningRef.current = null;
     setCreateProjectOpen(false);
     setEditingProjectId(null);
     setProjectFormError('');
@@ -598,8 +641,13 @@ export function useProjectsController() {
 
   const updateProjectForm = (patch: Partial<ProjectFormState>) => {
     if (projectFormPendingRef.current) return;
+    projectFormOpeningRef.current = null;
     setProjectForm((current) => ({ ...current, ...patch }));
     if (projectFormError) setProjectFormError('');
+  };
+
+  const keepProjectFormCurrent = () => {
+    if (!projectFormPendingRef.current) projectFormOpeningRef.current = null;
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
@@ -649,6 +697,7 @@ export function useProjectsController() {
     event.preventDefault();
     // The ref also protects two events captured before React renders disabled controls.
     if (projectFormPendingRef.current) return;
+    projectFormOpeningRef.current = null;
 
     if (!validateProjectForm(projectForm)) {
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
@@ -990,6 +1039,7 @@ export function useProjectsController() {
     openProjectDetails,
     openEditProject,
     closeCreateProject,
+    keepProjectFormCurrent,
     updateProjectForm,
     updateProjectFromForm,
     moveProjectStatus,

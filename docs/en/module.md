@@ -1,5 +1,29 @@
 # Projects_Web_Service — Module overview
 
+## Card-form opening lifetime (MAIR-459, MAIR-408)
+
+Each card edit opening owns a distinct transient identity, even for the same
+project ID. Obsolete successes and refusals cannot replace another editor, reopen
+a dismissed form or overwrite a new creation. Target and loaded fields are
+committed together: a waiting replacement cannot silently retarget the form
+already displayed. Continuing its draft, closing, creating or submitting
+invalidates the pending opening; existing write locks still protect every saved
+field. No write is sent by an opening or replayed by its cancellation.
+Form-level activity capture includes local nested-task fields that do not yet
+update the project draft. A deliberate project-owner change remounts its form
+to prevent another project's unsent nested draft from crossing that boundary;
+ordinary same-owner updates keep the form identity and its drafts.
+
+The received detail must identify the requested project and unique task IDs.
+An explicitly denied card/detail edit permission or terminal 401/403/navigation
+does not supply a stale editor; a newly denied current project closes its older
+editor. A current non-terminal read failure preserves the existing displayed-card
+fallback with an accessible in-form warning that fresh data could not be read.
+This is frontend consumption of existing permissions, not a server access change.
+Published Project0.4.0, clients, authentication and environments are unchanged.
+The preserved prototype's unguarded opening is an inherited gap; correcting it
+does not certify deployed rights/persistence or complete the broader module audit.
+
 ## Project/task confirmation ordering (MAIR-408)
 
 Existing-target project edits (detail and card), Kanban moves and close/review

@@ -25,6 +25,26 @@ function FormHarness({ mode, onSubmit, fromMenu = false }) {
 }
 
 describe('project form dialogs', () => {
+  it('captures activity in the unsent nested task before it changes the project draft', async () => {
+    const user = userEvent.setup();
+    const onInteract = vi.fn();
+    const onChange = vi.fn();
+    render(<CreateProjectModal mode="create" form={createProjectFormState()} error=""
+      memberOptions={[]} labelOptions={[]}
+      statusOptions={[{ value: 'todo', label: 'À faire' }, { value: 'review', label: 'En revue' }]}
+      priorityOptions={[{ value: 'medium', label: 'Moyenne' }]}
+      onChange={onChange} onClose={vi.fn()} onSubmit={vi.fn()} onInteract={onInteract} />);
+    const title = screen.getByPlaceholderText('Ajouter une tâche...');
+    await user.type(title, 'Brouillon local de tâche');
+    expect(title.value).toBe('Brouillon local de tâche');
+    expect(onInteract).toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    onInteract.mockClear();
+    await user.selectOptions(document.getElementById('project-form-task-status'), 'review');
+    expect(onInteract).toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it.each(['create', 'edit'])('contains keyboard focus and protects every nested field during a pending %s write', async (mode) => {
     const user = userEvent.setup();
     const onChange = vi.fn();

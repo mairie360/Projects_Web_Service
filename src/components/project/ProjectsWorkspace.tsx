@@ -62,6 +62,7 @@ export function ProjectsWorkspace({
   openProjectDetails,
   openEditProject,
   closeCreateProject,
+  keepProjectFormCurrent,
   updateProjectForm,
   updateProjectFromForm,
   moveProjectStatus,
@@ -129,6 +130,7 @@ export function ProjectsWorkspace({
 
       {createProjectOpen && (
         <CreateProjectModal
+          key={editingProjectId ?? 'create'}
           mode={editingProjectId ? 'edit' : 'create'}
           form={projectForm}
           error={projectFormError}
@@ -139,6 +141,7 @@ export function ProjectsWorkspace({
           priorityOptions={projectPriorityOptions}
           onChange={updateProjectForm}
           onClose={closeCreateProject}
+          onInteract={keepProjectFormCurrent}
           onSubmit={saveProject}
         />
       )}

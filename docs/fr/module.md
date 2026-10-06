@@ -1,5 +1,31 @@
 # Projects_Web_Service — Présentation du module
 
+## Durée de vie de l’ouverture du formulaire de carte (MAIR-459, MAIR-408)
+
+Chaque ouverture d’édition possède une identité transitoire distincte, même pour
+le même projet. Les réussites et refus obsolètes ne remplacent pas un autre
+formulaire, ne rouvrent pas une fenêtre fermée et n’écrasent pas une nouvelle
+création. Cible et champs chargés sont appliqués ensemble : une ouverture en
+attente ne recible pas silencieusement le formulaire affiché. Poursuivre son
+brouillon, fermer, créer ou soumettre invalide cette ouverture ; les gardes
+d’écriture existantes continuent à protéger tous les champs envoyés. L’ouverture
+et son annulation n’envoient ni ne rejouent aucune écriture.
+La capture d’activité du formulaire inclut les champs locaux de tâche qui ne
+mettent pas encore à jour le brouillon du projet. Un changement volontaire de
+propriétaire remonte son formulaire afin qu’un brouillon imbriqué non envoyé
+ne traverse pas cette frontière ; les mises à jour de la même cible gardent
+l’identité du formulaire et ses brouillons.
+
+La fiche reçue doit identifier le projet demandé et des tâches uniques. Un
+refus explicite de permission d’édition ou une réponse terminale401/403/navigation
+ne fournit pas de formulaire périmé ; un refus courant ferme l’ancien éditeur
+de ce projet. Un échec de lecture courant non terminal conserve le repli existant
+sur la carte déjà affichée, avec avertissement accessible dans le formulaire.
+Il s’agit de consommer les permissions existantes, pas de changer les accès serveur.
+Contrat Project0.4.0 publié, clients, authentification et environnements inchangés.
+L’ouverture sans garde du prototype est un manque hérité ; sa correction ne
+certifie ni les droits/persistances déployés ni la fin de l’audit global.
+
 ## Ordre des confirmations projet et tâches (MAIR-408)
 
 Les éditions de projet existant (fiche et carte), déplacements Kanban et clôture/
