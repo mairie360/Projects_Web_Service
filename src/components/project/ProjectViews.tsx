@@ -149,6 +149,11 @@ function EmptyState() {
 
 export function GridView({
   projects,
+  taskCreationStates,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
+  duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   memberOptions,
   labelOptions,
   onProjectOpen,
@@ -158,6 +163,11 @@ export function GridView({
   onProjectTaskAdd,
 }: {
   projects: Project[];
+  taskCreationStates?: ReadonlyMap<string, import('./TaskCreationNotice').TaskCreationState>;
+  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
+  onPreserveTaskDraft?: import('../project-card/types').ProjectCardProps['onPreserveTaskDraft'];
+  duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
@@ -175,6 +185,11 @@ export function GridView({
           key={project.id}
           project={project}
           variant="grid"
+          taskCreationState={taskCreationStates?.get(project.id)}
+          onInspectTaskCreation={onInspectTaskCreation}
+          onPreserveTaskDraft={onPreserveTaskDraft}
+          duplicationPending={duplicatingProjectIds.includes(project.id)}
+          duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           onOpen={onProjectOpen}
@@ -190,12 +205,16 @@ export function GridView({
 
 export function TableView({
   projects,
+  duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
 }: {
   projects: Project[];
+  duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
@@ -222,11 +241,20 @@ export function TableView({
             {projects.map((project) => (
               <tr
                 key={project.id}
-                className="cursor-pointer transition hover:bg-[#f8f6f3]"
-                onClick={() => onProjectOpen(project)}
+                className={`${project.permissions?.canView === false ? '' : 'cursor-pointer '}transition hover:bg-[#f8f6f3]`}
+                onClick={() => { if (project.permissions?.canView !== false) onProjectOpen(project); }}
               >
                 <td className="max-w-[360px] px-5 py-4">
-                  <div className="truncate text-base font-semibold text-[#172033]">{project.title}</div>
+                  <button
+                    type="button"
+                    aria-label={`Ouvrir la fiche du projet ${project.title}`}
+                    aria-haspopup="dialog"
+                    disabled={project.permissions?.canView === false}
+                    className="block w-full truncate text-left text-base font-semibold text-[#172033] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0969da] disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={(event) => { event.stopPropagation(); onProjectOpen(project); }}
+                  >
+                    {project.title}
+                  </button>
                   <div className="truncate text-sm text-[#5e6873]">{project.description}</div>
                 </td>
                 <td className="px-5 py-4">
@@ -253,6 +281,8 @@ export function TableView({
                 <td className="px-5 py-4">
                   <ProjectActionsMenu
                     project={project}
+                    duplicationPending={duplicatingProjectIds.includes(project.id)}
+                    duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
                     onEdit={onProjectEdit}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}

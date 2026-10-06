@@ -18,7 +18,6 @@ import type {
 import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
-  getStoredAuthorizationHeader,
   logoutAndReload,
   storeAuthJwtToken,
 } from './auth-token';
@@ -75,6 +74,15 @@ export class BffProjectError extends Error {
     this.details = details;
   }
 }
+
+export class BffProjectNavigationRequiredError extends Error {
+  constructor() {
+    super('Une redirection nécessite de rouvrir la page des projets.');
+    this.name = 'BffProjectNavigationRequiredError';
+  }
+}
+
+const navigatingLocations = new WeakSet<Location>();
 
 function uniquePreservingOrder(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
@@ -149,14 +157,6 @@ function createRequestHeaders(init: RequestInit) {
     headers.set('Content-Type', 'application/json');
   }
 
-  if (!headers.has('Authorization')) {
-    const authorizationHeader = getStoredAuthorizationHeader();
-
-    if (authorizationHeader) {
-      headers.set('Authorization', authorizationHeader);
-    }
-  }
-
   return headers;
 }
 
@@ -188,7 +188,22 @@ async function requestBff<T>(path: string, init: RequestInit = {}) {
   const response = await fetch(path, {
     ...init,
     headers: createRequestHeaders(init),
+    redirect: 'manual',
   });
+
+  // A superseded filter read must not navigate after its response arrives.
+  init.signal?.throwIfAborted();
+
+  if (response.type === 'opaqueredirect') {
+    // Opaque responses expose neither status nor Location. Reopen the current
+    // protected document so the existing middleware owns Login and return URL.
+    // Never follow a data-route redirect or automatically replay a mutation.
+    if (typeof window !== 'undefined' && !navigatingLocations.has(window.location)) {
+      navigatingLocations.add(window.location);
+      window.location.reload();
+    }
+    throw new BffProjectNavigationRequiredError();
+  }
 
   if (response.status === 401) {
     await logoutAndReload();

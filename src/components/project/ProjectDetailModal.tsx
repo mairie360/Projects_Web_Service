@@ -1,56 +1,17 @@
 'use client';
 
 import React from 'react';
+import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
+import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
+import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
 import { Button, ToolTip } from '@mairie360/lib-components';
-import {
-  CalendarDays,
-  CheckSquare2,
-  CircleDot,
-  History,
-  ListChecks,
-  MessageSquare,
-  Search,
-  Square,
-  Trash2,
-  X,
-} from 'lucide-react';
-
-import {
-  formatProjectDate,
-  PersonAvatar,
-  PriorityPill,
-  ProgressMeter,
-  StatusPill,
-} from '../ProjectCard';
-import type {
-  Project,
-  ProjectStatus,
-  ProjectTask,
-  ProjectTaskDraft,
-  TaskCollaboration,
-  TaskComment,
-} from '../../types/project';
+import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
+import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
+import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import {
-  createPersonFromOptionValue,
-  createTaskFormState,
-  getPersonValue,
-  getUniqueValues,
-  projectToFormState,
-  type FilterOption,
-  type ProjectFormState,
-  type TaskFormState,
-} from '../../lib/projectPageState';
-import {
-  FieldLabel,
-  FormField,
-  MultiSelectField,
-  SelectField,
-  TaskEditButton,
-  TextAreaField,
-  fieldClassName,
-} from './ProjectFormControls';
-import { ProjectTasksEditor, taskToFormState } from './ProjectTasksEditor';
+import { createPersonFromOptionValue, createTaskFormState, getPersonValue, getUniqueValues, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
+import { taskToFormState } from './ProjectTasksEditor';
 
 type TaskFollowUpSelection = {
   projectId: string;
@@ -58,251 +19,6 @@ type TaskFollowUpSelection = {
   confirmedComments: TaskComment[];
   loading: boolean;
 };
-
-export function CreateProjectModal({
-  mode,
-  form,
-  error,
-  memberOptions,
-  labelOptions,
-  statusOptions,
-  priorityOptions,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  mode: 'create' | 'edit';
-  form: ProjectFormState;
-  error: string;
-  memberOptions: FilterOption[];
-  labelOptions: FilterOption[];
-  statusOptions: FilterOption[];
-  priorityOptions: FilterOption[];
-  onChange: (patch: Partial<ProjectFormState>) => void;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-}) {
-  const isEditMode = mode === 'edit';
-  const overlayRef = React.useRef<HTMLDivElement>(null);
-  const dialogRef = React.useRef<HTMLFormElement>(null);
-  const titleId = React.useId();
-  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
-
-  React.useLayoutEffect(() => {
-    if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const overlay = overlayRef.current;
-    dialogRef.current?.focus();
-    return () => {
-      if (opener?.isConnected && (overlay?.contains(document.activeElement) || document.activeElement === document.body)) {
-        opener.focus();
-      }
-    };
-  }, []);
-
-  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
-    if (event.defaultPrevented || event.nativeEvent.isComposing) return;
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    if (event.key !== 'Tab') return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )).filter((element) => {
-      const style = window.getComputedStyle(element);
-      return element.tabIndex >= 0 && !element.closest('[hidden], [aria-hidden="true"]') &&
-        style.display !== 'none' && style.visibility !== 'hidden';
-    });
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!first) {
-      event.preventDefault();
-      dialog.focus();
-    } else if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-
-  return (
-    <div ref={overlayRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <form
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        onKeyDown={handleDialogKeyDown}
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
-        onSubmit={onSubmit}
-      >
-        <div className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#2b2b2b] px-5 py-3">
-          <h2 id={titleId} className="truncate text-base font-semibold text-white">
-            {isEditMode ? 'Modifier le projet' : 'Nouveau projet'}
-          </h2>
-          <button
-            type="button"
-            aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#d7e3e7] transition hover:bg-[#3a3a3a] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6aada9]/45"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
-
-        <div className="min-h-0 overflow-y-auto bg-[#f6f4f1] p-5">
-          {error && (
-            <div className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
-              {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="space-y-4">
-              <div className="rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-                <FormField
-                  id="project-title"
-                  label="Titre"
-                  value={form.title}
-                  required
-                  placeholder="Ajouter un titre..."
-                  onChange={(title) => onChange({ title })}
-                />
-              </div>
-
-              <div className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
-                <div className="flex h-10 items-center border-b border-[#dedbd6] bg-[#f1eee9] px-3">
-                  <span className="rounded-md border border-[#d0d7de] bg-white px-3 py-1 text-xs font-semibold text-[#24292f]">
-                    Écrire
-                  </span>
-                </div>
-                <div className="p-4">
-                  <TextAreaField
-                    id="project-description"
-                    label="Description"
-                    value={form.description}
-                    required
-                    placeholder="Ajouter une description, des critères d'acceptation ou des notes..."
-                    onChange={(description) => onChange({ description })}
-                  />
-                </div>
-              </div>
-
-              <ProjectTasksEditor
-                form={form}
-                memberOptions={memberOptions}
-                labelOptions={labelOptions}
-                statusOptions={statusOptions}
-                priorityOptions={priorityOptions}
-                onChange={onChange}
-              />
-            </section>
-
-            <aside className="space-y-4 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-              <div>
-                <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
-                <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
-              </div>
-
-              <SelectField
-                id="project-status"
-                label="Statut"
-                value={form.status}
-                options={statusOptions}
-                onChange={(status) => onChange({ status: status as Project['status'] })}
-              />
-
-              <SelectField
-                id="project-priority"
-                label="Priorité"
-                value={form.priority}
-                options={priorityOptions}
-                onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
-              />
-
-              <SelectField
-                id="project-responsible"
-                label="Assigné principal"
-                value={form.responsible}
-                options={responsibleOptions}
-                onChange={(responsible) => onChange({ responsible })}
-              />
-
-              <MultiSelectField
-                id="project-assignees"
-                label="Assignés"
-                values={form.assignees}
-                options={memberOptions}
-                placeholder="Choisir un ou plusieurs assignés"
-                onChange={(assignees) => onChange({ assignees })}
-              />
-
-              <MultiSelectField
-                id="project-labels"
-                label="Étiquettes"
-                values={form.labels}
-                options={labelOptions}
-                placeholder="Choisir une ou plusieurs étiquettes"
-                onChange={(labels) => onChange({ labels })}
-              />
-
-              <div>
-                <FieldLabel htmlFor="project-due-date" label="Échéance" required />
-                <input
-                  id="project-due-date"
-                  type="date"
-                  value={form.dueDate}
-                  required
-                  className={fieldClassName}
-                  onChange={(event) => onChange({ dueDate: event.target.value })}
-                />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
-                <ProgressMeter value={form.progress} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
-                  <div className="text-xs font-semibold text-[#57606a]">Terminées</div>
-                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.completedTasks}</div>
-                </div>
-                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
-                  <div className="text-xs font-semibold text-[#57606a]">Total</div>
-                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.totalTasks}</div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
-          <Button
-            label="Annuler"
-            type="button"
-            onClick={onClose}
-            className="!h-9 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-[#fbfaf8] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#f1eee9]"
-          />
-          <Button
-            label={isEditMode ? 'Enregistrer' : 'Créer le projet'}
-            type="submit"
-            primary
-            className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
-          />
-        </div>
-      </form>
-    </div>
-  );
-}
 
 export function ProjectDetailModal({
   project,
@@ -313,6 +29,17 @@ export function ProjectDetailModal({
   statusOptions,
   priorityOptions,
   onClose,
+  refreshError = '',
+  refreshPending = false,
+  projectVerificationRequired = false,
+  projectVerificationPending = false,
+  pendingTaskIds,
+  taskWriteErrors,
+  unverifiedTaskIds,
+  taskCreationState,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
+  onRetry,
   onUpdateProject,
   onAddTask,
   onUpdateTask,
@@ -328,26 +55,44 @@ export function ProjectDetailModal({
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
   onClose: () => void;
+  refreshError?: string;
+  refreshPending?: boolean;
+  projectVerificationRequired?: boolean;
+  projectVerificationPending?: boolean;
+  pendingTaskIds?: ReadonlySet<string>;
+  taskWriteErrors?: ReadonlyMap<string, string>;
+  unverifiedTaskIds?: ReadonlySet<string>;
+  taskCreationState?: TaskCreationState;
+  onInspectTaskCreation?: () => void | Promise<void>;
+  onPreserveTaskDraft?: (patch: Partial<TaskFormState>) => void;
+  onRetry?: () => void | Promise<void>;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
-  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void;
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void | Promise<void>;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
   onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
 }) {
   const [editingProject, setEditingProject] = React.useState(false);
   const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [projectEditError, setProjectEditError] = React.useState('');
+  const [projectEditVerificationError, setProjectEditVerificationError] = React.useState(false);
   const [projectSaving, setProjectSaving] = React.useState(false);
   const projectSavingRef = React.useRef(false);
   const projectEditIdRef = React.useRef(project.id);
   const editingProjectRef = React.useRef(false);
-  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? createTaskFormState(project));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
+  const [taskFormVerificationError, setTaskFormVerificationError] = React.useState(false);
   const [taskSaving, setTaskSaving] = React.useState(false);
   const taskSavingRef = React.useRef(false);
+  const taskCreationNoticeRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (taskCreationState?.uncertainTitle && !taskSaving && !editingTaskId) taskCreationNoticeRef.current?.focus();
+  }, [taskCreationState?.uncertainTitle, taskSaving, editingTaskId]);
   const taskProjectIdRef = React.useRef(project.id);
+  const officialProjectRef = React.useRef<Project | null>(null);
   const [taskSearch, setTaskSearch] = React.useState('');
   const [taskStatusFilter, setTaskStatusFilter] = React.useState('all');
   const [taskPriorityFilter, setTaskPriorityFilter] = React.useState('all');
@@ -438,6 +183,10 @@ export function ProjectDetailModal({
   }, [taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
 
   React.useEffect(() => {
+    // Retained input changes are not a new official project response: do not
+    // reset task searches/filters or unrelated editors on each keystroke.
+    if (officialProjectRef.current === project) return;
+    officialProjectRef.current = project;
     const projectChanged = taskProjectIdRef.current !== project.id;
     // Official refreshes update defaults, never an active same-project draft.
     if (projectEditIdRef.current !== project.id || !editingProjectRef.current) {
@@ -450,7 +199,7 @@ export function ProjectDetailModal({
     // A same-project refresh must not discard an unsaved task or its retry.
     if (projectChanged) {
       taskProjectIdRef.current = project.id;
-      setTaskForm(createTaskFormState(project));
+      setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
       setEditingTaskId(null);
       setTaskFormError('');
       collaborationSelectionRef.current = null;
@@ -466,7 +215,7 @@ export function ProjectDetailModal({
     setTaskPriorityFilter('all');
     setTaskDueFilter('');
     setDeletingTaskId(null);
-  }, [project]);
+  }, [project, taskCreationState?.draft]);
 
   React.useEffect(() => () => {
     collaborationSelectionRef.current = null;
@@ -581,6 +330,7 @@ export function ProjectDetailModal({
 
   const updateTaskForm = (patch: Partial<TaskFormState>) => {
     setTaskForm((current) => ({ ...current, ...patch }));
+    if (!editingTaskId && taskCreationState?.uncertainTitle) onPreserveTaskDraft?.(patch);
     if (taskFormError) setTaskFormError('');
   };
 
@@ -608,7 +358,8 @@ export function ProjectDetailModal({
 
   const submitProjectEdit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (projectSavingRef.current || taskSavingRef.current) return;
+    if (projectSavingRef.current || taskSavingRef.current || projectVerificationRequired || projectVerificationPending) return;
+    setProjectEditVerificationError(false);
 
     const title = projectEditForm.title.trim();
     const description = projectEditForm.description.trim();
@@ -628,6 +379,7 @@ export function ProjectDetailModal({
       editingProjectRef.current = false;
       setEditingProject(false);
     } catch (error) {
+      setProjectEditVerificationError(error instanceof ProjectReceiptVerificationRequiredError);
       setProjectEditError(getBffProjectErrorMessage(error));
     } finally {
       projectSavingRef.current = false;
@@ -638,6 +390,10 @@ export function ProjectDetailModal({
   const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (taskSavingRef.current || projectSavingRef.current) return;
+    if (!editingTaskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return;
+    if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
+    if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
+    setTaskFormVerificationError(false);
 
     const title = taskForm.title.trim();
     if (!title) {
@@ -672,6 +428,7 @@ export function ProjectDetailModal({
       setEditingTaskId(null);
     } catch (error) {
       setTaskFormError(getBffProjectErrorMessage(error));
+      setTaskFormVerificationError(error instanceof ProjectTaskVerificationRequiredError || error instanceof NewTaskReceiptVerificationRequiredError);
     } finally {
       taskSavingRef.current = false;
       setTaskSaving(false);
@@ -679,7 +436,7 @@ export function ProjectDetailModal({
   };
 
   const editTask = (task: ProjectTask) => {
-    if (taskSavingRef.current || projectSavingRef.current) return;
+    if (taskSavingRef.current || projectSavingRef.current || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
     setTaskForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setTaskFormError('');
@@ -687,7 +444,7 @@ export function ProjectDetailModal({
 
   const cancelTaskEdit = () => {
     if (taskSavingRef.current || projectSavingRef.current) return;
-    setTaskForm(createTaskFormState(project));
+    setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
     setEditingTaskId(null);
     setTaskFormError('');
   };
@@ -706,7 +463,7 @@ export function ProjectDetailModal({
           <div className="flex shrink-0 items-center gap-2">
             {project.permissions?.canEdit !== false && <button
               type="button"
-              disabled={mutationPending}
+              disabled={mutationPending || (projectVerificationRequired && !editingProject)}
               className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
               onClick={toggleProjectEdit}
             >
@@ -729,6 +486,16 @@ export function ProjectDetailModal({
         <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
+              {refreshError && (
+                <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
+                  <p>{refreshError}</p>
+                  <p className="mt-2 text-[#57606a]">{projectVerificationRequired ? 'Le dernier projet vérifié reste affiché. Aucune écriture supplémentaire ne sera envoyée par cette vérification.' : 'Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.'}</p>
+                  <button type="button" disabled={refreshPending || projectVerificationPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending || projectVerificationPending} onClick={() => void onRetry?.()}
+                    className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
+                    {refreshPending || projectVerificationPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
+                  </button>
+                </div>
+              )}
               {project.permissions?.canCreateTask !== false && (
                 <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
@@ -746,7 +513,9 @@ export function ProjectDetailModal({
                     onChange={(event) => updateTaskForm({ title: event.target.value })}
                   />
 
-                  {taskFormError && <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>}
+                  {taskFormError && (!taskFormVerificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) && (
+                    <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>
+                  )}
                   {taskSaving && <p role="status" className="text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -806,12 +575,16 @@ export function ProjectDetailModal({
                     <Button
                       label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
+                      disabled={editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle)}
                       primary
-                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b] disabled:!cursor-not-allowed disabled:!opacity-50"
                     />
                   </div>
                   </fieldset>
                   </form>
+                  <div ref={taskCreationNoticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+                    <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
+                  </div>
                 </div>
               )}
 
@@ -825,6 +598,10 @@ export function ProjectDetailModal({
                     {project.tasks.completed}/{project.tasks.total}
                   </span>
                 </div>
+
+                {pendingTaskIds && [...pendingTaskIds].some(id => !tasks.some(task => task.id === id)) && (
+                  <p role="status" className="px-4 py-2 text-xs text-[#57606a]">Actualisation des tâches en cours…</p>
+                )}
 
                 {tasks.length > 0 && (
                   <div className="grid grid-cols-1 gap-2 border-b border-[#dedbd6] bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -879,10 +656,13 @@ export function ProjectDetailModal({
                       const canUpdateStatus = task.permissions?.canUpdateStatus !== false;
                       const canEditTask = task.permissions?.canEdit !== false;
                       const canDeleteTask = task.permissions?.canDelete !== false;
+                      const taskPending = pendingTaskIds?.has(task.id) ?? false;
+                      const taskMutationBlocked = taskPending || (unverifiedTaskIds?.has(task.id) ?? false);
 
                       return (
                         <article
                           key={task.id}
+                          aria-busy={taskPending || undefined}
                           ref={isLinkedTask ? highlightedTaskRef : undefined}
                           tabIndex={isLinkedTask ? -1 : undefined}
                           aria-current={isLinkedTask ? 'true' : undefined}
@@ -891,7 +671,7 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={mutationPending || !canUpdateStatus}
+                            disabled={mutationPending || taskMutationBlocked || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
@@ -919,12 +699,12 @@ export function ProjectDetailModal({
                                   <MessageSquare className="h-3.5 w-3.5" />
                                   Suivi
                                 </button>
-                                {canEditTask && <TaskEditButton disabled={mutationPending} onClick={() => editTask(task)} />}
+                                {canEditTask && <TaskEditButton disabled={mutationPending || taskMutationBlocked} onClick={() => editTask(task)} />}
                                 {canDeleteTask && deletingTaskId !== task.id && (
                                   <button
                                     type="button"
                                     aria-label={`Supprimer ${task.title}`}
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
                                     onClick={() => setDeletingTaskId(task.id)}
                                   >
@@ -939,7 +719,7 @@ export function ProjectDetailModal({
                                   <span className="sr-only">Statut de {task.title}</span>
                                   <select
                                     aria-label={`Statut de ${task.title}`}
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     value={task.status}
                                     className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
                                     onChange={(event) =>
@@ -983,6 +763,9 @@ export function ProjectDetailModal({
                               ))}
                             </div>
 
+                            {taskPending && <p role="status" className="mt-2 text-xs text-[#57606a]">Opération sur la tâche en cours…</p>}
+                            {taskWriteErrors?.get(task.id) && <p role="alert" className="mt-2 text-xs text-[#cf222e] [overflow-wrap:anywhere]">{taskWriteErrors.get(task.id)}</p>}
+
                             {deletingTaskId === task.id && (
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-2 text-xs text-[#cf222e]">
                                 <span>Supprimer définitivement cette tâche ?</span>
@@ -990,7 +773,7 @@ export function ProjectDetailModal({
                                   <button type="button" disabled={mutationPending} className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 font-semibold text-[#24292f]" onClick={() => setDeletingTaskId(null)}>Annuler</button>
                                   <button
                                     type="button"
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskMutationBlocked}
                                     className="rounded-md bg-[#cf222e] px-2 py-1 font-semibold text-white"
                                     onClick={() => {
                                       setDeletingTaskId(null);
@@ -1069,7 +852,7 @@ export function ProjectDetailModal({
                     <p className="mt-1 text-xs text-[#57606a]">Les tâches restent visibles pendant l’édition.</p>
                   </div>
 
-                  {projectEditError && (
+                  {projectEditError && (!projectEditVerificationError || projectVerificationRequired) && (
                     <div role="alert" className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-3 py-2 text-xs font-medium text-[#cf222e]">
                       {projectEditError}
                     </div>
@@ -1159,6 +942,7 @@ export function ProjectDetailModal({
                     <Button
                       label="Enregistrer"
                       type="submit"
+                      disabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
                       primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
@@ -1235,6 +1019,7 @@ export function ProjectDetailModal({
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           type="button"
+                          disabled={projectVerificationRequired || projectVerificationPending}
                           className="h-9 rounded-md border border-[#d0d7de] bg-white text-xs font-semibold text-[#57606a] hover:bg-[#f1eee9]"
                           onClick={() => void onCloseProject(project.id, 'review')}
                         >
@@ -1242,6 +1027,7 @@ export function ProjectDetailModal({
                         </button>
                         <button
                           type="button"
+                          disabled={projectVerificationRequired || projectVerificationPending}
                           className="h-9 rounded-md bg-[#1a7f37] text-xs font-semibold text-white hover:bg-[#116329]"
                           onClick={() => void onCloseProject(project.id, 'done')}
                         >

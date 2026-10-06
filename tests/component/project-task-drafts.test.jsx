@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectDetailModal } from "@/components/project/ProjectModals";
+import { ProjectDetailModal } from "@/components/project/ProjectDetailModal";
 import { TaskComposer } from "@/components/project-card/TaskComposer";
+import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
@@ -27,6 +28,32 @@ function deferred() {
 }
 
 describe("Project task save confirmation", () => {
+  it('retains a card draft on uncertain acceptance and disables both native and programmatic submissions after inspection', async () => {
+    const user = userEvent.setup(), values = props();
+    const onInspect = vi.fn(), onPreserveDraft = vi.fn();
+    values.onAddTask.mockRejectedValue(new NewTaskReceiptVerificationRequiredError());
+    const { rerender } = render(<TaskComposer {...values} onInspect={onInspect} onPreserveDraft={onPreserveDraft} />);
+    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
+    const input = screen.getByLabelText('Titre de la tâche', { exact: true });
+    await user.type(input, 'Brouillon carte accepté');
+    await user.click(screen.getByRole('button', { name: 'Ajouter', exact: true }));
+    const state = { uncertainTitle: 'Brouillon carte accepté', draft: { title: 'Brouillon carte accepté', status: 'review', priority: 'low', assignees: ['1'], labels: ['voirie'], dueDate: '2026-11-17' } };
+    rerender(<TaskComposer {...values} creationState={state} onInspect={onInspect} onPreserveDraft={onPreserveDraft} />);
+    expect(screen.getByRole('button', { name: 'Ajouter', exact: true }).disabled).toBe(true);
+    expect(input.value).toBe('Brouillon carte accepté');
+    expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
+    await user.type(input, ' gardé');
+    expect(onPreserveDraft).toHaveBeenLastCalledWith(values.project.id, { title: 'Brouillon carte accepté gardé' });
+    fireEvent.submit(input.closest('form'));
+    expect(values.onAddTask).toHaveBeenCalledOnce();
+    const inspect = screen.getByRole('button', { name: 'Inspecter les tâches du projet' });
+    inspect.focus(); await user.keyboard('{Enter}');
+    expect(onInspect).toHaveBeenCalledWith(values.project.id);
+    await user.click(screen.getByRole('button', { name: 'Annuler', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Création à inspecter', exact: true }));
+    expect(screen.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon carte accepté gardé');
+    expect(values.onAddTask).toHaveBeenCalledOnce();
+  });
   it.each(["create", "edit"])("preserves every detail %s field and edit mode on refusal, then resets only after confirmed retry", async (mode) => {
     const user = userEvent.setup();
     const values = props();

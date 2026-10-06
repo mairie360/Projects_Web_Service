@@ -1,5 +1,28 @@
 # Projects_Web_Service — Documentation technique
 
+## Redirections opaques du client navigateur — MAIR-408
+
+`requestBff` impose `redirect: 'manual'` puis vérifie l’AbortSignal après réception.
+Le type `opaqueredirect` est traité avant statut, en-têtes et corps :
+`BffProjectNavigationRequiredError` signale la navigation sans supposer un 401
+ni inspecter Location. Un WeakSet indexé par Location limite les réponses
+parallèles à un rechargement du document ; aucune lecture ni mutation n’est
+rejouée. Le middleware inchangé construit Login et le retour au document initial.
+Le cleanup 401 existant reste conservé. Erreurs réseau et vrais 403/503 ne
+rechargent pas la page. Routes, méthodes et payloads contractuels sont inchangés.
+
+## Construction des credentials frontend — MAIR-408
+
+`createRequestHeaders` ajoute seulement Accept et Content-Type JSON par défaut
+et conserve les en-têtes explicitement fournis. Il n’appelle plus les helpers
+de jeton stocké. Le proxy same-origin inchangé dérive Authorization du cookie
+HttpOnly en l’absence d’en-tête explicite ; l’authentification serveur ne change
+pas. Les helpers historiques restent disponibles mais ne sont pas branchés sur
+la construction des requêtes Projects. Le cleanup existant après401 est conservé.
+Les tests client avec contrat couvrent stockage ancien/actuel/historique, priorité
+du cookie, stockage refusé, lectures et duplication ; ils ne certifient pas un
+stockage navigateur ou une session déployée de bout en bout.
+
 ## Pied de page partagé — MAIR-180
 
 L’audit CI inchangé a détecté la dépendance d’outillage transitive
@@ -59,7 +82,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestre vues et formulaires. `bffProjectClient.ts` adapte le contrat au modèle de présentation; `projectPageState.ts` centralise la mise à jour de l’état de page. Les composants du dossier `src/components/project` portent les formulaires et détails.
+`src/app/page.tsx` compose le contrôleur stable `useProjectsController` et
+`ProjectsWorkspace`. Le contrôleur conserve état/effets, révisions des lectures
+et gardes synchrones des mutations ; le rendu utilise ses props inférées sans
+lecture supplémentaire ni état métier dupliqué. Les dialogues sont importés
+directement depuis `CreateProjectModal.tsx` et `ProjectDetailModal.tsx`.
+Ordre des hooks, corps des callbacks, focus et protections pendant l'attente
+restent identiques. `bffProjectClient.ts` adapte toujours le contrat et
+`projectPageState.ts` centralise les mises à jour. Les tâches/collaborations du
+détail restent un volet d'audit distinct ; ce découpage ne certifie ni révocation,
+persistance des métadonnées, déploiement ou totalité de MAIR-408.
 
 Le proxy générique lit le contrat OpenAPI versionné pour autoriser chemins et méthodes. Il conserve paramètres de requête, corps binaire, statuts et en-têtes utiles, filtre les en-têtes de transport, désactive le cache et n’effectue pas de suivi automatique des redirections. Son délai est de 15 secondes.
 

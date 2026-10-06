@@ -166,7 +166,10 @@ test('dragging a project changes only its status and reloads the Kanban from the
   await view.fire((props) => props['data-project-id'] === project.id, 'onDragStart', { dataTransfer });
   await view.fire((props) => props['data-project-status'] === 'review', 'onDragOver', { dataTransfer });
   await view.fire((props) => props['data-project-status'] === 'review', 'onDrop', { dataTransfer });
-  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review');
+  // The canonical PATCH can update the card before the following GET settles.
+  // A recorded read is not completion of the detached onDrop callback.
+  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review' &&
+    alertText() === `Statut du projet "${project.title}" mis à jour.`);
 
   assert.equal(dataTransfer.effectAllowed, 'move');
   assert.equal(dataTransfer.dropEffect, 'move');
@@ -268,6 +271,43 @@ test('switching the view reloads the page with the new view and renders the tabl
   assert.equal(pageCalls()[1].view, 'table');
   assert.equal(view.find('KanbanBoard').length, 0);
   assert.match(view.text(), /Rénovation de l’éclairage public/);
+});
+
+test('Table exposes a named detail button, stops row bubbling and uses only the existing detail GET', async () => {
+  const project = fixtures.projectListItem();
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  await view.act(() => view.props('ViewToggle').onChange('table'));
+  await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
+  const name = `Ouvrir la fiche du projet ${project.title}`;
+  const openers = view.hostElements((props, text, tag) => tag === 'button' && props['aria-label'] === name);
+  assert.equal(openers.length, 1);
+  assert.equal(openers[0].props['aria-haspopup'], 'dialog');
+  assert.match(openers[0].props.className, /focus-visible:outline/);
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
+  let stopped = 0;
+  await view.act(() => openers[0].props.onClick({ stopPropagation() { stopped++; } }));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  assert.equal(stopped, 1);
+  assert.equal(view.props('ProjectDetailModal').project.id, project.id);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+  await view.act(() => view.props('ProjectDetailModal').onClose());
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
+});
+
+test('Table preserves a received view refusal without sending a detail GET from its row', async () => {
+  const project = fixtures.projectListItem();
+  project.permissions = { ...project.permissions, canView: false };
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  await view.act(() => view.props('ViewToggle').onChange('table'));
+  await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
+  const opener = view.hostElements((props, text, tag) => tag === 'button' && props['aria-label'] === `Ouvrir la fiche du projet ${project.title}`)[0];
+  assert.equal(opener.props.disabled, true);
+  const row = view.hostElements((props, text, tag) => tag === 'tr' && !!props.onClick)[0];
+  await view.act(() => row.props.onClick());
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 0);
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
 });
 
 test('opening a project loads its details and renders them in the modal', async () => {
@@ -404,6 +444,101 @@ test('creating a project posts the form, reloads the page and announces the succ
   assert.match(html, /Projet &quot;Fête de la musique&quot; créé\./);
 });
 
+test('same-tick nested task drafts keep independent states in the actual project-create payload', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Projet avec tâches indépendantes', description: 'Recette des clés locales',
+    responsible: fixtures.people.marie.id, dueDate: '2026-11-17',
+  }));
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 1791290000000;
+    for (const title of ['Première tâche', 'Deuxième tâche']) {
+      await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: title } });
+      await view.click('Ajouter la tâche');
+    }
+  } finally {
+    Date.now = originalNow;
+  }
+  const draftIds = view.props('CreateProjectModal').form.taskItems.map(task => task.id);
+  assert.equal(new Set(draftIds).size, 2);
+  await view.click(props => props['aria-label'] === 'Marquer Première tâche comme terminée');
+  assert.deepEqual(view.props('CreateProjectModal').form.taskItems.map(task => task.completed), [true, false]);
+  await view.act(() => view.find('TaskEditButton')[1].props.onClick());
+  await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Deuxième tâche corrigée' } });
+  await view.click('Enregistrer la tâche');
+  const draft = view.props('CreateProjectModal').form;
+  assert.deepEqual(draft.taskItems.map(task => task.id), draftIds);
+  assert.deepEqual(draft.taskItems.map(task => task.title), ['Première tâche', 'Deuxième tâche corrigée']);
+  assert.deepEqual([draft.totalTasks, draft.completedTasks, draft.progress], [2, 1, 50]);
+  const created = fixtures.projectListItem({ id: 'project-9', title: draft.title });
+  const officialTasks = [
+    fixtures.projectTask({ id: 'official-1', title: 'Première tâche', status: 'done', completed: true }),
+    fixtures.projectTask({ id: 'official-2', title: 'Deuxième tâche corrigée', status: 'todo', completed: false }),
+  ];
+  bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, officialTasks) });
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([fixtures.projectListItem(), created]) });
+  await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
+  await view.waitFor(() => view.find('CreateProjectModal').length === 0);
+  const writes = bffProject.calls('/projects', 'post');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0].body.taskItems.map(task => [task.title, task.status]), [
+    ['Première tâche', 'done'], ['Deuxième tâche corrigée', 'todo'],
+  ]);
+  assert.equal(writes[0].body.taskItems.some(task => Object.hasOwn(task, 'id')), false,
+    'presentation-only draft identities must not become claimed server task identities');
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 1);
+});
+
+test('module boundaries preserve a nested creation draft across view and page refreshes without writes', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Brouillon entre composants', description: 'À conserver',
+    responsible: fixtures.people.marie.id, dueDate: '2026-11-17',
+    taskItems: [fixtures.projectTask({ title: 'Tâche imbriquée à conserver' })],
+    totalTasks: 1, completedTasks: 0, progress: 0,
+  }));
+  const draft = structuredClone(view.props('CreateProjectModal').form);
+  for (const value of ['grid', 'table', 'kanban']) {
+    const reads = pageCalls().length;
+    await view.act(() => view.props('ViewToggle').onChange(value));
+    await view.waitFor(() => pageCalls().length === reads + 1);
+    assert.deepEqual(view.props('CreateProjectModal').form, draft);
+    assert.equal(view.find('CreateProjectModal').length, 1);
+    assert.match(view.text(), /Tâche imbriquée à conserver/);
+  }
+  await view.act(() => view.props('CreateProjectModal').onClose());
+  assert.equal(view.find('CreateProjectModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('module boundaries retain detail task search and comment drafts through underlying view refreshes', async () => {
+  await renderLoadedPage();
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.fire(props => props.placeholder === 'Rechercher une tâche', 'onChange', { target: { value: 'candélabres' } });
+  await view.click((props, text, tag) => tag === 'button' && text === 'Suivi');
+  await view.waitFor(html => html.includes('Devis reçu.'));
+  await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Commentaire non envoyé' } });
+  for (const value of ['grid', 'table']) {
+    const reads = pageCalls().length;
+    await view.act(() => view.props('ViewToggle').onChange(value));
+    await view.waitFor(() => pageCalls().length === reads + 1);
+    assert.equal(view.find('ProjectDetailModal').length, 1);
+    assert.match(view.html, /placeholder="Rechercher une tâche"[^>]*value="candélabres"/);
+    const comment = view.hostElements(props => props.placeholder === 'Ajouter un commentaire...');
+    assert.equal(comment.length, 1);
+    assert.equal(comment[0].props.value, 'Commentaire non envoyé');
+  }
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+  assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length, 1);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
 test('an incomplete creation form is refused in the page without any network call', async () => {
   await renderLoadedPage();
 
@@ -419,6 +554,150 @@ test('an incomplete creation form is refused in the page without any network cal
 // callbacks or host elements (buttons, inputs) of the rendered page.
 
 const alertText = () => view.find('Alert')[0]?.props.message;
+
+const pagedFixture = (page) => fixtures.projectsPage([
+  fixtures.projectListItem({ id: `project-${page}`, title: `Projet page ${page}` }),
+], { pagination: { page, limit: 50, total: 85, hasNextPage: page === 1 } });
+
+test('pagination uses confirmed DTO metadata in all views and preserves current-page view queries', async () => {
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  view = mount(React.createElement(ProjectsPage));
+  await view.waitFor(() => view.find('ProjectPagination').length === 1);
+  assert.match(view.text(), /Page 1 · 85 projets/);
+  await view.act(() => view.props('ProjectPagination').onChange('previous'));
+  assert.equal(pageCalls().length, 1);
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  assert.doesNotMatch(view.text(), /Projet page 1/);
+  assert.match(view.text(), /Page 2 · 85 projets/);
+  await view.act(() => view.props('ProjectPagination').onChange('next'));
+  assert.equal(pageCalls().length, 2);
+  for (const mode of ['grid', 'table', 'kanban']) {
+    await view.act(() => view.props('ViewToggle').onChange(mode));
+    await view.waitFor(() => pageCalls().at(-1).view === mode && !view.props('ProjectPagination').pending);
+    assert.equal(pageCalls().at(-1).page, '2');
+    assert.match(view.text(), /Projet page 2/);
+    assert.equal(view.find(mode === 'grid' ? 'GridView' : mode === 'table' ? 'TableView' : 'KanbanBoard').length, 1);
+  }
+  await view.click(props => props['aria-label'] === 'Page précédente');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 1);
+  assert.equal(pageCalls().at(-1).limit, '50');
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('each changed project filter resets to page one while retaining all other query values', async () => {
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  view = mount(React.createElement(ProjectsPage));
+  await view.waitFor(() => view.find('ProjectPagination').length === 1);
+  const controls = [
+    () => view.props('SearchInput').onChange('Projet'),
+    () => view.props('FilterSelect', 0).onChange('in-progress'),
+    () => view.props('FilterSelect', 1).onChange('high'),
+    () => view.fire(props => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } }),
+  ];
+  for (const change of controls) {
+    await view.click(props => props['aria-label'] === 'Page suivante');
+    await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+    const count = pageCalls().length;
+    await view.act(change);
+    assert.equal(view.props('ProjectPagination').pending, true);
+    await view.waitFor(() => pageCalls().length === count + 1 && !view.props('ProjectPagination').pending);
+    assert.equal(pageCalls().at(-1).page, '1');
+  }
+  assert.deepEqual(pageCalls().at(-1), { q: 'Projet', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'kanban', page: '1', limit: '50' });
+  const count = pageCalls().length;
+  await view.act(() => {
+    view.props('SearchInput').onChange('Projet');
+    view.props('FilterSelect', 0).onChange('in-progress');
+    view.props('FilterSelect', 1).onChange('high');
+    view.props('ViewToggle').onChange('kanban');
+  });
+  assert.equal(pageCalls().length, count);
+  assert.equal(view.props('ProjectPagination').pending, false);
+});
+
+test('a refused page navigation preserves page one and GET retry targets the failed page without writes', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Page suivante refusée')));
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(html => html.includes('Page suivante refusée'));
+  assert.equal(pageCalls().at(-1).page, '2');
+  assert.match(view.text(), /Page 1 · 85 projets|Projet page 1/);
+  assert.equal(view.props('ProjectPagination').stale, true);
+  await view.act(() => view.props('ProjectPagination').onChange('next'));
+  assert.equal(pageCalls().length, 2);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '2']);
+  assert.equal(view.props('ProjectPagination').stale, false);
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
+});
+
+test('pagination refuses contract-shaped inconsistent metadata and recovers without fabricated totals', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', { body: pagedFixture(1) });
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(html => html.includes('La pagination reçue est incohérente'));
+  assert.equal(view.props('ProjectPagination').pagination.page, 1);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  const { isProjectPaginationValid } = requireTs('src/lib/projectPagination.ts');
+  for (const invalid of [null, {}, { page: 2, limit: 0, total: 85, hasNextPage: false }, { page: 2, limit: 50, total: -1, hasNextPage: false }, { page: 2, limit: 50, total: 85, hasNextPage: 'false' }, { page: 2, limit: 50, total: 85, hasNextPage: true }]) {
+    assert.equal(isProjectPaginationValid(invalid, 2), false);
+  }
+  assert.equal(isProjectPaginationValid(pagedFixture(1).pagination, 0), false);
+});
+
+test('paging guards repeated events and ignores a late page after a newer filter read', async (t) => {
+  await renderLoadedPage(pagedFixture(1));
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.after(() => release());
+  const originalFetch = global.fetch;
+  t.mock.method(global, 'fetch', async (target, init) => {
+    const response = await originalFetch(target, init);
+    if (String(target).includes('/projects-page') && String(target).includes('page=2')) await gate;
+    return response;
+  });
+  bffProject.on('get', '/projects-page', ({ url }) => ({ body: pagedFixture(Number(url.searchParams.get('page'))) }));
+  const navigate = view.props('ProjectPagination').onChange;
+  let first, second;
+  await view.act(() => { first = navigate('next'); second = navigate('next'); });
+  await second;
+  await view.waitFor(() => pageCalls().length === 2);
+  assert.equal(view.props('ProjectPagination').pending, true);
+  await view.act(() => view.props('SearchInput').onChange('Projet'));
+  await view.waitFor(() => pageCalls().length === 3 && !view.props('ProjectPagination').pending);
+  release();
+  await first;
+  await view.settle();
+  assert.equal(view.props('ProjectPagination').pagination.page, 1);
+  assert.match(view.text(), /Projet page 1/);
+  assert.doesNotMatch(view.text(), /Projet page 2/);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '1']);
+});
+
+test('a confirmed duplicate from page two retries page one after a refused refresh without repeating POST', async () => {
+  await renderLoadedPage(pagedFixture(1));
+  bffProject.on('get', '/projects-page', { body: pagedFixture(2) });
+  await view.click(props => props['aria-label'] === 'Page suivante');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 2);
+  bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: fixtures.projectDetails(fixtures.projectListItem({ id: 'project-3', title: 'Copie confirmée depuis la page deux' })) });
+  bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Première page refusée après duplication')));
+  await view.act(() => view.props('KanbanBoard').onProjectDuplicate(view.props('KanbanBoard').projects[0]));
+  assert.equal(pageCalls().at(-1).page, '1');
+  assert.equal(view.props('ProjectPagination').pagination.page, 2, 'only the last confirmed metadata is labelled');
+  assert.match(view.text(), /Copie confirmée depuis la page deux/);
+  assert.equal(view.props('ProjectPagination').stale, true);
+  bffProject.on('get', '/projects-page', { body: pagedFixture(1) });
+  await view.click('Réessayer');
+  await view.waitFor(() => view.props('ProjectPagination').pagination.page === 1);
+  assert.deepEqual(pageCalls().map(query => query.page), ['1', '2', '1', '1']);
+  assert.equal(bffProject.calls('/projects/{projectId}/duplicate', 'post').length, 1);
+});
+
 const openDetails = async () => {
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
@@ -544,6 +823,39 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   assert.equal(view.props('KanbanBoard').projects.length, 0);
 });
 
+test('inline task pickers retain distinct names and count descriptions while submitting the chosen fields once', async () => {
+  const project = fixtures.projectListItem();
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
+  bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-picker-created', title: 'Tâche avec sélections' }) });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
+  await view.fire(props => props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Tâche avec sélections' } });
+  await view.click(props => props['aria-label'] === 'Étiquettes' && props['aria-haspopup'] === 'listbox');
+  await view.click((props, text) => props.role === 'option' && text === 'voirie');
+  await view.click(props => props['aria-label'] === 'Assignés' && props['aria-haspopup'] === 'listbox');
+  await view.click((props, text) => props.role === 'option' && text === 'Admin Mairie');
+  const names = ['Assignés', 'Étiquettes'];
+  const openers = names.map(name => view.hostElements(props => props['aria-label'] === name && props['aria-haspopup'] === 'listbox')[0]);
+  assert.ok(openers.every(Boolean));
+  const descriptions = openers.map(opener => opener.props['aria-describedby']);
+  assert.ok(descriptions.every(Boolean));
+  assert.notEqual(descriptions[0], descriptions[1]);
+  for (const [index, id] of descriptions.entries()) {
+    const summary = view.hostElements(props => props.id === id)[0];
+    assert.ok(summary);
+    assert.match(summary.props.className, /sr-only/);
+    assert.equal(summary.props.children.join(''), `${index === 0 ? 2 : 1} sélectionné(s)`);
+  }
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0, 'picker interactions are local');
+  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  await view.waitFor(() => alertText() === `Tâche "Tâche avec sélections" ajoutée à "${project.title}".`);
+  const calls = bffProject.calls('/projects/{projectId}/tasks', 'post');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body, { title: 'Tâche avec sélections', status: project.status, priority: project.priority, responsibleId: '3', assigneeIds: ['3', '1'], labels: ['voirie'], dueDate: '2026-12-15' });
+  assert.equal(calls[0].pathParams.projectId, project.id);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 1);
+});
+
 test('the task composer of a card refuses an empty title, then posts the task and refreshes the project', async () => {
   await renderLoadedPage();
 
@@ -553,7 +865,10 @@ test('the task composer of a card refuses an empty title, then posts the task an
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 0);
 
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' }) });
-  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem(), [fixtures.projectTask(), fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' })]) });
+  bffProject.on('get', '/projects/{projectId}', () => ({ body: fixtures.projectDetails(fixtures.projectListItem(), [
+    fixtures.projectTask(),
+    ...(bffProject.calls('/projects/{projectId}/tasks', 'post').length ? [fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' })] : []),
+  ]) }));
   await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Commander les mâts' } });
   assert.doesNotMatch(view.text(), /Le titre de la tâche est obligatoire\./);
   await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
@@ -562,7 +877,7 @@ test('the task composer of a card refuses an empty title, then posts the task an
   const [call] = bffProject.calls('/projects/{projectId}/tasks', 'post');
   assert.equal(call.pathParams.projectId, 'project-1');
   assert.equal(call.body.title, 'Commander les mâts');
-  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1, 'the project details are refreshed');
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'an unconsulted card establishes its baseline, then refreshes after confirmation');
   assert.equal(pageCalls().length, 2, 'the page is reloaded silently');
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/, 'the composer closes');
 });
@@ -600,7 +915,9 @@ for (const mode of ['create', 'edit']) {
 test('a confirmed inline task creation is not offered for retry when the following detail refresh fails', async () => {
   await renderLoadedPage();
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-confirmed', title: 'Tâche enregistrée' }) });
-  bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée')));
+  bffProject.on('get', '/projects/{projectId}', () => bffProject.calls('/projects/{projectId}/tasks', 'post').length
+    ? harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée'))
+    : { body: fixtures.projectDetails() });
   await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
   await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Tâche enregistrée' } });
   await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
@@ -608,6 +925,7 @@ test('a confirmed inline task creation is not offered for retry when the followi
   assert.match(view.text(), /Tâche "Tâche enregistrée" enregistrée\. Actualisation impossible : Actualisation refusée/);
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'only the post-confirmation read fails, not the pre-dispatch baseline');
   await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
   assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);

@@ -10,11 +10,15 @@ export function ProjectActionsMenu({
   project,
   onEdit,
   onDuplicate,
+  duplicationPending = false,
+  duplicationVerificationRequired = false,
   onDelete,
 }: {
   project: Project;
   onEdit?: (project: Project) => void;
   onDuplicate?: (project: Project) => void;
+  duplicationPending?: boolean;
+  duplicationVerificationRequired?: boolean;
   onDelete?: (project: Project) => void;
 }) {
   const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
@@ -95,10 +99,12 @@ export function ProjectActionsMenu({
           {canDuplicate && <button
             type="button"
             role="menuitem"
-            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
+            disabled={duplicationPending || duplicationVerificationRequired}
+            aria-busy={duplicationPending || undefined}
+            className={`flex h-9 w-full items-center px-3 text-left transition enabled:hover:bg-[#0969da] enabled:hover:text-white disabled:opacity-50 ${duplicationVerificationRequired ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'}`}
             onClick={runAction(onDuplicate)}
           >
-            Dupliquer
+            {duplicationVerificationRequired ? 'Copie à vérifier' : 'Dupliquer'}
           </button>}
           {canDelete && (canEdit || canDuplicate) && <div className="my-1 border-t border-[#d8dee4]" />}
           {canDelete && <button

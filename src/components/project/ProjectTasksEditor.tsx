@@ -40,6 +40,17 @@ function createTaskSummaryPatch(taskItems: ProjectTask[]): Pick<ProjectFormState
   };
 }
 
+function createDraftTaskId(taskItems: ProjectTask[]): string {
+  const base = `task-${Date.now()}`;
+  const existingIds = new Set(taskItems.map((task) => task.id));
+  let candidate = base;
+  let suffix = 0;
+  while (existingIds.has(candidate)) {
+    candidate = `${base}-${++suffix}`;
+  }
+  return candidate;
+}
+
 function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskFormState {
   return {
     title: '',
@@ -123,7 +134,7 @@ export function ProjectTasksEditor({
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const responsible = assignees[0];
     const task: ProjectTask = {
-      id: editingTaskId ?? `task-${Date.now()}`,
+      id: editingTaskId ?? createDraftTaskId(form.taskItems),
       title,
       status: taskForm.status,
       responsible,
