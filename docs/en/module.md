@@ -1,5 +1,18 @@
 # Projects_Web_Service — Module overview
 
+## Functional stabilization composition (6 October 2026)
+
+This candidate retains the functional work covered by the existing project,
+task, draft, read-recovery, pagination and packaging tickets. It composes the
+independent nested-task identity correction without the deferred table-keyboard
+entry and task-picker naming/focus commits. Those RGAA tickets remain open;
+their historical mixed candidate is not rewritten or considered delivered.
+Main's published CI4.1.1 reference and version input are adopted without RGAA
+parameters or weakened checks. The existing Node24.21.0 packaging and blocking
+scanner jobs are retained. Protected integration and exact-main/current-local
+verification remain required; this composition is not a deployment or proof
+of backend authorization, persistence or global accessibility.
+
 ## Independent nested task drafts (MAIR-408)
 
 The project form allocates each new nested task a local identity distinct from

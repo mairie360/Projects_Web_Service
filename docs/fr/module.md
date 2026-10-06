@@ -1,5 +1,19 @@
 # Projects_Web_Service — Présentation du module
 
+## Composition de stabilisation fonctionnelle (6 octobre 2026)
+
+Ce candidat conserve les corrections couvertes par les tickets existants de
+projets, tâches, brouillons, reprise de lecture, pagination et packaging. Il
+compose les identités indépendantes des tâches locales sans les commits
+reportés d'ouverture clavier du tableau et de noms/focus des sélecteurs.
+Ces tickets RGAA restent ouverts ; leur candidat mixte historique n'est ni
+réécrit ni considéré livré. La référence CI4.1.1 et son input publiés sur main
+sont adoptés sans paramètre RGAA ou affaiblissement des contrôles. Node24.21.0
+et les scanners bloquants déjà présents dans le candidat sont conservés.
+Intégration protégée et vérification main/copie locale exacte restent requises ;
+cette composition ne vaut ni déploiement, ni preuve d'autorisation serveur,
+de persistance ou d'accessibilité globale.
+
 ## Brouillons de tâches imbriquées indépendants (MAIR-408)
 
 Le formulaire projet attribue à chaque nouvelle tâche une clé locale distincte
