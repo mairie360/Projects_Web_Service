@@ -444,6 +444,53 @@ test('creating a project posts the form, reloads the page and announces the succ
   assert.match(html, /Projet &quot;Fête de la musique&quot; créé\./);
 });
 
+test('same-tick nested task drafts keep independent states in the actual project-create payload', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Projet avec tâches indépendantes', description: 'Recette des clés locales',
+    responsible: fixtures.people.marie.id, dueDate: '2026-11-17',
+  }));
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 1791290000000;
+    for (const title of ['Première tâche', 'Deuxième tâche']) {
+      await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: title } });
+      await view.click('Ajouter la tâche');
+    }
+  } finally {
+    Date.now = originalNow;
+  }
+  const draftIds = view.props('CreateProjectModal').form.taskItems.map(task => task.id);
+  assert.equal(new Set(draftIds).size, 2);
+  await view.click(props => props['aria-label'] === 'Marquer Première tâche comme terminée');
+  assert.deepEqual(view.props('CreateProjectModal').form.taskItems.map(task => task.completed), [true, false]);
+  await view.act(() => view.find('TaskEditButton')[1].props.onClick());
+  await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Deuxième tâche corrigée' } });
+  await view.click('Enregistrer la tâche');
+  const draft = view.props('CreateProjectModal').form;
+  assert.deepEqual(draft.taskItems.map(task => task.id), draftIds);
+  assert.deepEqual(draft.taskItems.map(task => task.title), ['Première tâche', 'Deuxième tâche corrigée']);
+  assert.deepEqual([draft.totalTasks, draft.completedTasks, draft.progress], [2, 1, 50]);
+  const created = fixtures.projectListItem({ id: 'project-9', title: draft.title });
+  const officialTasks = [
+    fixtures.projectTask({ id: 'official-1', title: 'Première tâche', status: 'done', completed: true }),
+    fixtures.projectTask({ id: 'official-2', title: 'Deuxième tâche corrigée', status: 'todo', completed: false }),
+  ];
+  bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, officialTasks) });
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([fixtures.projectListItem(), created]) });
+  await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
+  await view.waitFor(() => view.find('CreateProjectModal').length === 0);
+  const writes = bffProject.calls('/projects', 'post');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0].body.taskItems.map(task => [task.title, task.status]), [
+    ['Première tâche', 'done'], ['Deuxième tâche corrigée', 'todo'],
+  ]);
+  assert.equal(writes[0].body.taskItems.some(task => Object.hasOwn(task, 'id')), false,
+    'presentation-only draft identities must not become claimed server task identities');
+  assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 1);
+});
+
 test('module boundaries preserve a nested creation draft across view and page refreshes without writes', async () => {
   await renderLoadedPage();
   await view.click('Nouveau projet');

@@ -1,5 +1,15 @@
 # Projects_Web_Service — Module overview
 
+## Independent nested task drafts (MAIR-408)
+
+The project form allocates each new nested task a local identity distinct from
+all tasks already in that form, including when the clock repeats or moves
+backwards. Toggling or editing one task does not affect another task; editing
+retains its identity and creation date. These are presentation-only keys, not
+server identities: the existing project payload still sends task fields without
+local IDs. Received task identities, write guards, permissions and canonical
+confirmation rules remain unchanged. No API/BFF/contract change is required.
+
 ## Keyboard entry from Table (MAIR-310)
 
 Every Table project title is a named native button announcing its detail dialog.
