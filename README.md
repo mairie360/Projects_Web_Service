@@ -17,6 +17,23 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 ## Frontend checks / Vérifications du front
 
+### Image runtime maintenance / Maintenance du moteur d’images — issue #23
+
+The Next image runtime uses `sharp >=0.35.5` through the existing scoped
+override and lock, including the corrected prebuilt librsvg dependency.
+`tests/image-runtime.test.cjs` checks the installed/locked runtime and renders
+one harmless SVG to PNG. No business data, BFF contract or workflow changes.
+The seven-day npm policy and blocking security checks remain active. This
+partial correction does not resolve the independent braces/source-map-js
+findings or establish that the full CI is green.
+
+Le moteur d’images Next utilise `sharp >=0.35.5` via l’override ciblé et le
+verrou existants, avec librsvg corrigé. Les régressions vérifient la version
+réellement chargée et convertissent un SVG bénin en PNG. Aucun contrat BFF,
+workflow ou donnée métier ne change. Le délai npm de sept jours et les
+contrôles bloquants restent actifs ; les alertes indépendantes braces et
+source-map-js ne sont pas résolues par ce seul correctif.
+
 ### Protected navigation after a redirect / Navigation protégée après redirection — MAIR-408
 
 Project requests use manual redirects. An opaque redirect reopens the current

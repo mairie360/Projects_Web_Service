@@ -222,6 +222,15 @@ Toutes les réponses portent `X-Frame-Options: DENY`, `X-Content-Type-Options: n
 
 ## Synchronisation et vérifications
 
+La maintenance frontend suivie par l’issue #23 relève l’override sharp limité
+à Next vers `^0.35.5`. Le verrou ne change que sharp et ses binaires associés ;
+les versions du contrat Project publié, de la bibliothèque UI et de Next
+restent identiques. `tests/image-runtime.test.cjs` vérifie la version chargée
+et verrouillée, librsvg précompilé et une conversion SVG-to-PNG bénigne.
+Conserver le délai npm et l’audit bloquant intégral. La correction sharp ne
+supprime pas les alertes indépendantes braces/source-map-js, ne certifie pas
+une image déployée et n’autorise pas la fusion d’une CI en échec.
+
 Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :
 
 ```bash

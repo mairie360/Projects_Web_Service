@@ -220,6 +220,15 @@ Every response carries `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff
 
 ## Synchronization and verification
 
+The frontend dependency maintenance tracked in issue #23 raises the existing
+Next-scoped sharp override to `^0.35.5`. The lock changes only sharp and its
+platform binaries; the published Project contract, shared UI and Next pins
+remain unchanged. `tests/image-runtime.test.cjs` checks the locked/loaded
+release, its prebuilt librsvg dependency and a harmless SVG-to-PNG conversion.
+Keep the npm release-age policy and full blocking audit unchanged. Removing
+the sharp advisory does not remove the independent braces/source-map-js
+findings, certify deployed images or permit merging a failing CI.
+
 The contract comes from a **published** BFF_Project release. After a release, pin the new version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, never a `0.0.0-dev`/`staging` pre-release), move the `bff-project` image tags in `docker-compose*.yml` to the same version, then run:
 
 ```bash
