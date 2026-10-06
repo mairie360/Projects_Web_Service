@@ -8,6 +8,7 @@ import { createProjectFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
 
 const memberOptions = [
+  { label: 'Admin Mairie', name: 'Admin Mairie', value: '1' },
   { label: 'Alice Martin', name: 'Alice Martin', value: '2' },
   { label: 'Marie Durand', name: 'Marie Durand', value: '3' },
 ];
@@ -98,6 +99,87 @@ describe('ProjectTasksEditor task assignees', () => {
     expect(task.assignees).toEqual([expect.objectContaining({ id: '2' })]);
     expect(screen.getByPlaceholderText('Ajouter une tâche...').value).toBe('');
     expect(screen.queryByText('1 sélectionné(s)')).toBeNull();
+  });
+});
+
+describe('ProjectTasksEditor primary assignee ownership', () => {
+  const tasks = () => JSON.parse(screen.getByTestId('tasks').textContent);
+  const existingTask = overrides => fixtures.projectTask({
+    id: 'existing-assignee-task', title: 'Tâche assignée', dueDate: '2026-10-21', ...overrides,
+  });
+  const edit = async user => {
+    await user.click(within(screen.getByRole('heading', { name: 'Tâche assignée' }).closest('article'))
+      .getByRole('button', { name: 'Modifier' }));
+  };
+  const save = async user => user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+  const expectMembers = (task, ids) => {
+    expect(task.responsible.id).toBe(ids[0]);
+    expect(task.assignees.map(person => person.id)).toEqual(ids);
+  };
+
+  it('editing only a title keeps the existing primary and all selected assignees', async () => {
+    const user = userEvent.setup();
+    const existing = existingTask();
+    render(<Editor responsible="1" taskItems={[existing]} />);
+    await edit(user);
+    await user.clear(screen.getByPlaceholderText('Ajouter une tâche...'));
+    await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Titre corrigé seulement');
+    await save(user);
+    expectMembers(tasks()[0], ['3', '2']);
+    expect(tasks()[0]).toMatchObject({
+      id: existing.id, title: 'Titre corrigé seulement', dueDate: existing.dueDate,
+      createdAt: existing.createdAt, labels: existing.labels, status: existing.status,
+    });
+  });
+
+  for (const assignees of [[fixtures.people.alice, fixtures.people.marie], [fixtures.people.alice]]) {
+    it(`keeps the received primary even when the ${assignees.length === 1 ? 'selection omits it' : 'list places it second'}`, async () => {
+      const user = userEvent.setup();
+      render(<Editor responsible="1" taskItems={[existingTask({ assignees })]} />);
+      await edit(user);
+      await save(user);
+      expectMembers(tasks()[0], ['3', '2']);
+    });
+  }
+
+  it('new selection order is not replaced by lexicographic member sorting', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="1" />);
+    await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Marie puis Alice');
+    await user.click(screen.getByRole('button', { name: 'Assignés' }));
+    await user.click(screen.getByRole('option', { name: 'Marie Durand' }));
+    await user.click(screen.getByRole('option', { name: 'Alice Martin' }));
+    await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
+    expectMembers(tasks()[0], ['3', '2']);
+  });
+
+  it('adding another member during edit does not promote that member to primary', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    await edit(user);
+    await user.click(screen.getByRole('button', { name: 'Assignés' }));
+    await user.click(screen.getByRole('option', { name: 'Admin Mairie' }));
+    await save(user);
+    expectMembers(tasks()[0], ['3', '2', '1']);
+  });
+
+  it('explicit removal of the existing primary uses the next selected member', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    await edit(user);
+    await user.click(screen.getByRole('button', { name: 'Retirer Marie Durand' }));
+    await save(user);
+    expectMembers(tasks()[0], ['2']);
+  });
+
+  it('clearing every assignee retains the existing project-responsible fallback rule', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    await edit(user);
+    await user.click(screen.getByRole('button', { name: 'Retirer Marie Durand' }));
+    await user.click(screen.getByRole('button', { name: 'Retirer Alice Martin' }));
+    await save(user);
+    expectMembers(tasks()[0], ['1']);
   });
 });
 
@@ -238,8 +320,8 @@ describe('ProjectTasksEditor deadline ownership', () => {
       await user.clear(screen.getByPlaceholderText('Ajouter une tâche...'));
       await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Tâche existante corrigée');
       await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
-      // This case verifies date/identity ownership, not unrelated receipt labels
-      // or the existing assignee-order normalization.
+      // Date/identity ownership is separate from optional receipt labels;
+      // primary-assignee ownership has its own regressions above.
       expect(tasks()[0]).toMatchObject({
         id: existing.id, title: 'Tâche existante corrigée',
         dueDate, createdAt: existing.createdAt,

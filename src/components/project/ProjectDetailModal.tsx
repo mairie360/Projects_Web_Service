@@ -9,9 +9,9 @@ import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSqua
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import { createPersonFromOptionValue, createTaskFormState, getPersonValue, getUniqueValues, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { createPersonFromOptionValue, createTaskFormState, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
-import { taskToFormState } from './ProjectTasksEditor';
+import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
 type TaskFollowUpSelection = {
   projectId: string;
@@ -401,7 +401,7 @@ export function ProjectDetailModal({
       return;
     }
 
-    const assigneeValues = getUniqueValues(
+    const assigneeValues = uniqueAssigneesInOrder(
       taskForm.assignees.length > 0 ? taskForm.assignees : [getPersonValue(project.responsible)]
     );
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));

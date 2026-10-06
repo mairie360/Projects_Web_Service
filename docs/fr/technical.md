@@ -1,5 +1,16 @@
 # Projects_Web_Service — Documentation technique
 
+## Assignés de tâches ordonnés — MAIR-408
+
+`uniqueAssigneesInOrder` trimme, filtre et déduplique avec un `Set` ordonné, sans
+utiliser le helper trié de catalogue `getUniqueValues` (inchangé).
+`taskToFormState` place le responsable réellement reçu avant ses autres membres
+et déduplique. Sauvegardes imbriquées et fiche utilisent le même helper ordonné ;
+choix, retraits et fallback restent dans les handlers existants. Aucun nouvel
+effet, appel, champ de contrat, DTO ou backend. Les tests vérifient responsable
+et membres indépendamment des labels optionnels du reçu, puis les corps réels
+POST projet/POST-PATCH tâche et le refus/réessai explicite identique.
+
 ## Défaut de date des tâches imbriquées — MAIR-408
 
 `ProjectTasksEditor` conserve une date privée `string | null` : `null` signifie

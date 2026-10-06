@@ -13,6 +13,18 @@ scanner jobs are retained. Protected integration and exact-main/current-local
 verification remain required; this composition is not a deployment or proof
 of backend authorization, persistence or global accessibility.
 
+## Task primary-assignee ownership (MAIR-408)
+
+Nested project tasks and the project-detail task form deduplicate assignees
+without sorting IDs. New selections retain their first selected member as the
+primary. Editing initializes with the received responsible first, then the
+other supplied assignees, even if their array places that responsible elsewhere
+or does not repeat it. Editing unrelated fields or adding another member does
+not reassign the task. Explicit removal selects the next remaining member;
+clearing every selection retains the existing project-responsible fallback.
+The existing payload uses the resolved order, with no local task IDs. These
+frontend rules do not change backend authorization or assignment policy.
+
 ## Nested-task deadline ownership (MAIR-408)
 
 A new task with no date choice follows the project's current deadline, including

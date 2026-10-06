@@ -1,5 +1,16 @@
 # Projects_Web_Service — Technical documentation
 
+## Ordered task assignees — MAIR-408
+
+`uniqueAssigneesInOrder` trims, filters and deduplicates using insertion-order
+`Set`; it does not use the sorted catalogue helper `getUniqueValues` (unchanged).
+`taskToFormState` prefixes the actual received responsible before deduplicating
+its supplied members. Both nested and detail saves use the same ordered helper;
+picker choices, removal and fallback stay existing handlers. No new effect,
+request, contract field, DTO or backend change. Regression tests verify primary
+identity/membership independently of optional receipt labels, and actual project
+POST/detail POST/PATCH bodies plus refusal/identical explicit retry.
+
 ## Nested-task date default — MAIR-408
 
 `ProjectTasksEditor` keeps a private `string | null` draft date: `null` means

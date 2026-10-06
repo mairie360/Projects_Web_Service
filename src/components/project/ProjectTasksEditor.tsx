@@ -16,7 +16,6 @@ import {
   createPersonFromOptionValue,
   formatInputDate,
   getPersonValue,
-  getUniqueValues,
   type FilterOption,
   type ProjectFormState,
   type TaskFormState,
@@ -67,18 +66,21 @@ function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskDraftFo
 }
 
 export function taskToFormState(task: ProjectTask): TaskFormState {
-  const assigneeNames = task.assignees?.length
-    ? task.assignees.map(getPersonValue)
-    : [getPersonValue(task.responsible)];
+  const assigneeNames = [getPersonValue(task.responsible), ...(task.assignees ?? []).map(getPersonValue)];
 
   return {
     title: task.title,
     status: task.status,
     priority: task.priority,
-    assignees: getUniqueValues(assigneeNames),
+    assignees: uniqueAssigneesInOrder(assigneeNames),
     labels: task.labels,
     dueDate: task.dueDate,
   };
+}
+
+export function uniqueAssigneesInOrder(values: string[]): string[] {
+  // The first assignee carries the primary choice; sorting IDs reassigns tasks.
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 export function ProjectTasksEditor({
@@ -127,7 +129,7 @@ export function ProjectTasksEditor({
       return;
     }
 
-    const assigneeValues = getUniqueValues(
+    const assigneeValues = uniqueAssigneesInOrder(
       taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible]
     );
     if (assigneeValues.length === 0) {

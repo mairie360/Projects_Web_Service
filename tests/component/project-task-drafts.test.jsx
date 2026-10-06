@@ -96,6 +96,8 @@ describe("Project task save confirmation", () => {
     expect(save.mock.calls[1]).toEqual(save.mock.calls[0]);
     const draft = save.mock.calls[1].at(-1);
     expect(draft).toMatchObject({ title: before.title, status: "review", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
+    expect(draft.responsible.id).toBe("3");
+    expect(draft.assignees.map(person => person.id)).toEqual(mode === "edit" ? ["3", "2", "1"] : ["3", "1"]);
     expect(draft.assignees.map(person => person.id)).toContain("1");
     expect(dialog.queryByRole("alert")).toBeNull();
     expect(dialog.getByRole("button", { name: "Ajouter la tâche", exact: true })).toBeTruthy();

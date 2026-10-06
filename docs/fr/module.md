@@ -14,6 +14,18 @@ Intégration protégée et vérification main/copie locale exacte restent requis
 cette composition ne vaut ni déploiement, ni preuve d'autorisation serveur,
 de persistance ou d'accessibilité globale.
 
+## Responsable propre aux tâches (MAIR-408)
+
+Les tâches imbriquées et le formulaire de tâche de la fiche projet dédupliquent
+les assignés sans trier les IDs. Une nouvelle sélection garde son premier membre
+comme responsable. L’édition commence par le responsable reçu, puis les autres
+assignés fournis, même si leur tableau le place ailleurs ou ne le répète pas.
+Modifier un autre champ ou ajouter un membre ne réaffecte pas la tâche. Retirer
+explicitement le responsable sélectionne le prochain membre restant ; tout
+effacer conserve le fallback existant au responsable du projet. Le payload
+existant conserve cet ordre résolu, sans IDs locaux de tâches. Ces règles front
+ne modifient pas les droits ou la politique d’affectation côté serveur.
+
 ## Échéance propre aux tâches imbriquées (MAIR-408)
 
 Une nouvelle tâche sans choix de date suit l’échéance actuelle du projet, y

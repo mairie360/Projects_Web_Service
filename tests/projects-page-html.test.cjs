@@ -499,6 +499,36 @@ test('nested task deadline ownership reaches the actual project-create payload w
   assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 1);
 });
 
+test('nested task primary assignee order survives an unrelated edit in the project payload', async () => {
+  await renderLoadedPage();
+  await view.click('Nouveau projet');
+  await view.act(() => view.props('CreateProjectModal').onChange({
+    title: 'Projet assignés propres', description: 'Garder le responsable choisi', responsible: '1', dueDate: '2026-11-18',
+  }));
+  await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Marie puis Alice' } });
+  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'project-form-task-assignees').props.onChange(['3', '2']));
+  await view.click('Ajouter la tâche');
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Titre modifié uniquement' } });
+  await view.click('Enregistrer la tâche');
+  const created = fixtures.projectListItem({
+    id: 'project-assignee-qa', title: 'Projet assignés propres', responsible: fixtures.people.admin,
+    tasks: { total: 1, completed: 0 }, progress: 0,
+  });
+  const official = fixtures.projectTask({ id: 'official-assignee-task', title: 'Titre modifié uniquement' });
+  bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, [official]) });
+  bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([created]) });
+  await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
+  await view.waitFor(() => view.find('CreateProjectModal').length === 0);
+  const writes = bffProject.calls('/projects', 'post');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].body.responsibleId, '1');
+  assert.deepEqual(writes[0].body.taskItems[0].assigneeIds, ['3', '2']);
+  assert.equal(writes[0].body.taskItems[0].title, 'Titre modifié uniquement');
+  assert.equal(Object.hasOwn(writes[0].body.taskItems[0], 'id'), false);
+  assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 1);
+});
+
 test('module boundaries preserve a nested creation draft across view and page refreshes without writes', async () => {
   await renderLoadedPage();
   await view.click('Nouveau projet');
@@ -884,6 +914,42 @@ for (const mode of ['create', 'edit']) {
     assert.deepEqual(bffProject.calls(route, method)[1].body, bffProject.calls(route, method)[0].body);
     assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
     assert.doesNotMatch(view.text(), /Sauvegarde temporairement refusée/);
+  });
+}
+
+for (const mode of ['create', 'edit']) {
+  test(`detail task primary assignee survives ${mode} refusal and explicit retry through the actual route`, async () => {
+    await renderLoadedPage();
+    await openDetails();
+    if (mode === 'edit') await view.act(() => view.props('TaskEditButton').onClick());
+    await view.fire(props => props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Responsable conservé' } });
+    await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(
+      mode === 'edit' ? ['3', '2', '1'] : ['3', '1']
+    ));
+    const method = mode === 'edit' ? 'patch' : 'post';
+    const route = mode === 'edit' ? '/projects/{projectId}/tasks/{taskId}' : '/projects/{projectId}/tasks';
+    bffProject.on(method, route, harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Assignation refusée')));
+    await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
+    const expected = mode === 'edit' ? ['3', '2', '1'] : ['3', '1'];
+    const first = bffProject.calls(route, method)[0];
+    assert.equal(first.pathParams.projectId, 'project-1');
+    if (mode === 'edit') assert.equal(first.pathParams.taskId, 'task-1');
+    assert.equal(first.body.responsibleId, '3');
+    assert.deepEqual(first.body.assigneeIds, expected);
+    assert.match(view.text(), /Assignation refusée/);
+    const official = fixtures.projectTask({
+      id: mode === 'edit' ? 'task-1' : 'new-primary-task', title: 'Responsable conservé',
+      responsible: fixtures.people.marie,
+      assignees: expected.map(id => Object.values(fixtures.people).find(person => person.id === id)),
+    });
+    bffProject.on(method, route, { status: mode === 'edit' ? 200 : 201, body: official });
+    bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem(),
+      [official, fixtures.projectTask({ id: 'task-2', status: 'done' })]) });
+    await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
+    assert.equal(bffProject.calls(route, method).length, 2);
+    assert.deepEqual(bffProject.calls(route, method)[1].body, first.body);
+    assert.equal(view.props('ProjectDetailModal').tasks.find(task => task.id === official.id).responsible.id, '3');
+    assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 2);
   });
 }
 
