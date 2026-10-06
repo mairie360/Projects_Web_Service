@@ -52,6 +52,14 @@ type RefreshProjectsOptions = {
   throwOnError?: boolean;
 };
 
+type ProjectQueryState = {
+  search: string;
+  status: string;
+  priority: string;
+  dueBefore: string;
+  view: ViewMode;
+};
+
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
 }
@@ -84,6 +92,11 @@ export function useProjectsController() {
   const requestedPageRef = useRef(1);
   const pageReadPendingRef = useRef(false);
   const navigationReadRef = useRef<AbortController | null>(null);
+  // Async writes must read the latest event-owned query, not a render captured
+  // before their response. UI state remains the owner of the displayed controls.
+  const queryRef = useRef<ProjectQueryState>({
+    search: '', status: 'all', priority: 'all', dueBefore: '', view: 'kanban',
+  });
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
@@ -162,11 +175,12 @@ export function useProjectsController() {
     async (options: RefreshProjectsOptions = {}) => {
       const revision = ++pageRevisionRef.current;
       const isCurrent = () => revision === pageRevisionRef.current && !options.signal?.aborted;
-      const nextSearch = options.search ?? searchTerm;
-      const nextStatus = options.status ?? statusFilter;
-      const nextPriority = options.priority ?? priorityFilter;
-      const nextDueBefore = options.dueBefore ?? dueBeforeFilter;
-      const nextView = options.view ?? viewMode;
+      const query = queryRef.current;
+      const nextSearch = options.search ?? query.search;
+      const nextStatus = options.status ?? query.status;
+      const nextPriority = options.priority ?? query.priority;
+      const nextDueBefore = options.dueBefore ?? query.dueBefore;
+      const nextView = options.view ?? query.view;
       const nextPage = options.page ?? requestedPageRef.current;
       pageReadPendingRef.current = true;
       // Even a silent post-mutation refresh locks paging; retained rows stay mounted.
@@ -206,7 +220,7 @@ export function useProjectsController() {
         }
       }
     },
-    [dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]
+    []
   );
 
   useEffect(() => {
@@ -220,7 +234,7 @@ export function useProjectsController() {
       navigationReadRef.current?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [refreshProjectsPage]);
+  }, [refreshProjectsPage, dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]);
 
   const retryProjectsPage = async () => {
     if (pageLoading || pageReadPendingRef.current || retryPendingRef.current) return;
@@ -255,29 +269,43 @@ export function useProjectsController() {
   };
 
   const changeSearchTerm = (value: string) => {
-    if (value === searchTerm) return;
+    if (value === queryRef.current.search) return;
     prepareQueryChange(true);
+    queryRef.current = { ...queryRef.current, search: value };
     setSearchTerm(value);
   };
   const changeStatusFilter = (value: string) => {
-    if (value === statusFilter) return;
+    if (value === queryRef.current.status) return;
     prepareQueryChange(true);
+    queryRef.current = { ...queryRef.current, status: value };
     setStatusFilter(value);
   };
   const changePriorityFilter = (value: string) => {
-    if (value === priorityFilter) return;
+    if (value === queryRef.current.priority) return;
     prepareQueryChange(true);
+    queryRef.current = { ...queryRef.current, priority: value };
     setPriorityFilter(value);
   };
   const changeDueBeforeFilter = (value: string) => {
-    if (value === dueBeforeFilter) return;
+    if (value === queryRef.current.dueBefore) return;
     prepareQueryChange(true);
+    queryRef.current = { ...queryRef.current, dueBefore: value };
     setDueBeforeFilter(value);
   };
   const changeViewMode = (value: ViewMode) => {
-    if (value === viewMode) return;
+    if (value === queryRef.current.view) return;
     prepareQueryChange(false);
+    queryRef.current = { ...queryRef.current, view: value };
     setViewMode(value);
+  };
+
+  const resetProjectFilters = () => {
+    requestedPageRef.current = 1;
+    queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '' };
+    setSearchTerm('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setDueBeforeFilter('');
   };
 
   const showInfo = (message: string) => {
@@ -452,11 +480,7 @@ export function useProjectsController() {
           currentDetails?.project.id === editingProjectId ? details : currentDetails
         );
       } else {
-        requestedPageRef.current = 1;
-        setSearchTerm('');
-        setStatusFilter('all');
-        setPriorityFilter('all');
-        setDueBeforeFilter('');
+        resetProjectFilters();
         setSelectedProjectDetails(details);
       }
       try {
@@ -485,11 +509,7 @@ export function useProjectsController() {
       const details = await duplicateBffProject(project.id);
       applyConfirmedProject(details, true);
 
-      requestedPageRef.current = 1;
-      setSearchTerm('');
-      setStatusFilter('all');
-      setPriorityFilter('all');
-      setDueBeforeFilter('');
+      resetProjectFilters();
       await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {

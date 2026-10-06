@@ -1,5 +1,21 @@
 # Projects_Web_Service — Présentation du module
 
+## Requête courante après une écriture en attente (MAIR-451)
+
+Les lectures implicites suivant une écriture utilisent recherche, statut, priorité,
+échéance, vue et page demandée actuellement affichés, pas les valeurs capturées avant
+une écriture lente. Les événements de filtre mettent à jour l’instantané transitoire
+de façon synchrone ; la lecture temporisée existante suit toujours les contrôles
+affichés. Gardes des lectures tardives et réponses confirmées restent inchangées.
+Un refus d’actualisation conserve les données confirmées et la reprise GET seule,
+sans répéter une écriture acceptée.
+
+Création et duplication effacent volontairement les filtres et reviennent à la
+première page après confirmation, mais gardent la vue courante, même changée pendant
+l’attente. Le défaut de requête capturée est corrigé sans réintroduire d’optimisme
+ancien ni inventer données, permissions, compteurs ou opération backend. Contrat
+publié Project0.4.0, authentification, dépendances et environnements inchangés.
+
 ## Pages de résultats des projets (MAIR-472)
 
 La navigation Précédent/Suivant est commune aux vues Kanban, Grille et Tableau.

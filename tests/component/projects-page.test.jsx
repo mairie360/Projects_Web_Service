@@ -3,22 +3,72 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/page";
-import { getProjectDetails, getProjectsPage } from "@/lib/bffProjectClient";
+import { duplicateProject, getProjectDetails, getProjectsPage } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   ...(await importOriginal()),
   getProjectDetails: vi.fn(),
   getProjectsPage: vi.fn(),
+  duplicateProject: vi.fn(),
 }));
 
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
   vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([]));
   vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails());
+  vi.mocked(duplicateProject).mockReset();
 });
 
 describe("Projects page", () => {
+  it.each([false, true])("keeps the current view after pending duplication and GET-only recovery (refused refresh: %s)", async (refusedRefresh) => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    const copy = fixtures.projectListItem({ id: "project-confirmed-copy", title: "Éclairage copie confirmée" });
+    const pageBody = (query, rows) => fixtures.projectsPage(rows, {
+      pagination: { page: query.page, limit: 50, total: 85, hasNextPage: query.page === 1 },
+    });
+    vi.mocked(getProjectsPage).mockImplementation(async query => pageBody(query, [project]));
+    let resolveCopy;
+    vi.mocked(duplicateProject).mockImplementationOnce(() => new Promise(resolve => { resolveCopy = resolve; }));
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole("button", { name: `Actions pour ${project.title}` }));
+    await user.click(screen.getByRole("menuitem", { name: "Dupliquer" }));
+    expect(await screen.findByText("Duplication du projet en cours…")).toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Grille" }));
+    await user.type(screen.getByPlaceholderText("Rechercher des projets..."), "éclairage");
+    await waitFor(() => {
+      const query = getProjectsPage.mock.calls.at(-1)[0];
+      expect(query.view).toBe("grid");
+      expect(query.q).toBe("éclairage");
+      expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(false);
+    });
+    await user.click(screen.getByRole("button", { name: "Page suivante" }));
+    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
+    vi.mocked(getProjectsPage).mockImplementation(async query => {
+      if (refusedRefresh) throw new Error("Lecture après copie refusée");
+      return pageBody(query, [project, copy]);
+    });
+    resolveCopy(fixtures.projectDetails(copy));
+    await waitFor(() => expect(screen.queryByText("Duplication du projet en cours…")).toBeNull());
+    const expectedQuery = { q: undefined, status: "all", priority: "all", dueBefore: undefined, view: "grid", page: 1, limit: 50 };
+    expect(getProjectsPage.mock.calls.at(-1)[0]).toEqual(expectedQuery);
+    expect(screen.getByPlaceholderText("Rechercher des projets...").value).toBe("");
+    expect(screen.getByRole("tab", { name: "Grille" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${copy.title}` })).toBeTruthy();
+    if (refusedRefresh) {
+      expect(await screen.findByText("Lecture après copie refusée")).toBeTruthy();
+      expect(screen.getByText("Page 2 · 85 projets")).toBeTruthy();
+      vi.mocked(getProjectsPage).mockImplementation(async query => pageBody(query, [project, copy]));
+      screen.getByRole("button", { name: "Réessayer" }).focus();
+      await user.keyboard("{Enter}");
+      expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+      expect(screen.queryByText("Lecture après copie refusée")).toBeNull();
+      expect(getProjectsPage.mock.calls.at(-1)[0]).toEqual(expectedQuery);
+    }
+    expect(duplicateProject).toHaveBeenCalledExactlyOnceWith(project.id);
+  });
+
   it("paginates the real page by keyboard using confirmed BFF metadata", async () => {
     const user = userEvent.setup();
     vi.mocked(getProjectsPage).mockImplementation(async ({ page }) => fixtures.projectsPage([

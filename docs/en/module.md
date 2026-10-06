@@ -1,5 +1,20 @@
 # Projects_Web_Service — Module overview
 
+## Current query after a pending write (MAIR-451)
+
+Implicit post-write catalogue reads use the search, status, priority, deadline,
+view and requested page currently displayed, not values captured before a slow
+write. Query events update the transient snapshot synchronously; the existing
+debounced read still follows the displayed controls. Late-read guards and confirmed
+responses remain unchanged. A refused refresh keeps confirmed data and its GET-only
+recovery; no accepted write is repeated.
+
+Creation and duplication deliberately clear filters and return to page one after
+confirmation, but keep the current view, including when it changed while pending.
+This closes a captured-query defect without reproducing old optimistic state or
+inventing records, permissions, counters or backend operations. Published Project
+0.4.0, authentication, dependencies and environments are unchanged.
+
 ## Project result pages (MAIR-472)
 
 Previous/Next navigation is shared by Kanban, Grid and Table. The page number,
