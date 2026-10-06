@@ -823,6 +823,39 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   assert.equal(view.props('KanbanBoard').projects.length, 0);
 });
 
+test('inline task pickers retain distinct names and count descriptions while submitting the chosen fields once', async () => {
+  const project = fixtures.projectListItem();
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
+  bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-picker-created', title: 'Tâche avec sélections' }) });
+  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
+  await view.fire(props => props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Tâche avec sélections' } });
+  await view.click(props => props['aria-label'] === 'Étiquettes' && props['aria-haspopup'] === 'listbox');
+  await view.click((props, text) => props.role === 'option' && text === 'voirie');
+  await view.click(props => props['aria-label'] === 'Assignés' && props['aria-haspopup'] === 'listbox');
+  await view.click((props, text) => props.role === 'option' && text === 'Admin Mairie');
+  const names = ['Assignés', 'Étiquettes'];
+  const openers = names.map(name => view.hostElements(props => props['aria-label'] === name && props['aria-haspopup'] === 'listbox')[0]);
+  assert.ok(openers.every(Boolean));
+  const descriptions = openers.map(opener => opener.props['aria-describedby']);
+  assert.ok(descriptions.every(Boolean));
+  assert.notEqual(descriptions[0], descriptions[1]);
+  for (const [index, id] of descriptions.entries()) {
+    const summary = view.hostElements(props => props.id === id)[0];
+    assert.ok(summary);
+    assert.match(summary.props.className, /sr-only/);
+    assert.equal(summary.props.children.join(''), `${index === 0 ? 2 : 1} sélectionné(s)`);
+  }
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0, 'picker interactions are local');
+  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  await view.waitFor(() => alertText() === `Tâche "Tâche avec sélections" ajoutée à "${project.title}".`);
+  const calls = bffProject.calls('/projects/{projectId}/tasks', 'post');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body, { title: 'Tâche avec sélections', status: project.status, priority: project.priority, responsibleId: '3', assigneeIds: ['3', '1'], labels: ['voirie'], dueDate: '2026-12-15' });
+  assert.equal(calls[0].pathParams.projectId, project.id);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 1);
+});
+
 test('the task composer of a card refuses an empty title, then posts the task and refreshes the project', async () => {
   await renderLoadedPage();
 

@@ -27,6 +27,8 @@ function CompactMultiSelect({
 }) {
   const [open, setOpen] = React.useState(false);
   const fieldRef = React.useRef<HTMLDivElement>(null);
+  const openerRef = React.useRef<HTMLButtonElement>(null);
+  const summaryId = React.useId();
   const selectedOptions = options.filter((option) => values.includes(option.value));
 
   React.useEffect(() => {
@@ -38,7 +40,10 @@ function CompactMultiSelect({
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape') return;
+      const ownsFocus = fieldRef.current?.contains(document.activeElement);
+      setOpen(false);
+      if (ownsFocus) openerRef.current?.focus();
     };
 
     document.addEventListener('mousedown', closeOnOutsideClick);
@@ -62,15 +67,19 @@ function CompactMultiSelect({
   return (
     <div ref={fieldRef} className="relative">
       <button
+        ref={openerRef}
         type="button"
         className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-[#d0d7de] bg-white px-2 text-left text-xs text-[#24292f] outline-none transition hover:bg-[#f6f8fa] focus-visible:border-[#0969da] focus-visible:ring-2 focus-visible:ring-[#0969da]/20"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={label}
+        aria-describedby={summaryId}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className={selectedOptions.length > 0 ? 'truncate' : 'truncate text-[#6e7781]'}>
+        <span aria-hidden="true" className={selectedOptions.length > 0 ? 'truncate' : 'truncate text-[#6e7781]'}>
           {selectedOptions.length > 0 ? `${selectedOptions.length} sélectionné(s)` : label}
         </span>
+        <span id={summaryId} className="sr-only">{selectedOptions.length} sélectionné(s)</span>
         <Tag className="h-3.5 w-3.5 shrink-0 text-[#57606a]" strokeWidth={1.8} />
       </button>
 

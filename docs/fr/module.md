@@ -1,5 +1,18 @@
 # Projects_Web_Service — Présentation du module
 
+## Sélecteurs clavier de la création de tâche sur carte (MAIR-408)
+
+Les boutons Assignés et Étiquettes gardent des noms accessibles distincts,
+même lorsque leurs compteurs sont identiques. Le compteur reste visible et
+associé comme description accessible au bon bouton. Échap depuis une option
+ferme le menu et rend le focus à son ouvreur ; depuis un autre champ, la
+fermeture ne vole pas le focus. Deux menus ouverts au clavier ne restaurent
+que le focus du champ actif. Le clic extérieur conserve sa cible. Sélections
+et brouillon restent locaux jusqu’à Ajouter ; aucune requête ne vient de la
+navigation des menus. Annulation volontaire depuis le titre, gardes de
+sauvegarde/incertitude, choix reçus et permissions restent inchangés. Aucun
+changement API/BFF/contrat/environnement n’est requis.
+
 ## Brouillons de tâches imbriquées indépendants (MAIR-408)
 
 Le formulaire projet attribue à chaque nouvelle tâche une clé locale distincte

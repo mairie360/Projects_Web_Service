@@ -1,5 +1,17 @@
 # Projects_Web_Service — Module overview
 
+## Keyboard task pickers on project cards (MAIR-408)
+
+Assignés and Étiquettes keep distinct accessible button names even when their
+selected counts match. Each count remains visible and describes its own
+button accessibly. Escape from an option closes the menu and restores its
+opener; Escape from another field closes without stealing focus. When two
+menus were opened by keyboard, only the active picker restores focus. An
+outside pointer click keeps its target. Choices and draft remain local until
+Add; menu navigation sends no request. Deliberate cancellation from the title,
+save/uncertainty guards, supplied choices and permissions remain unchanged.
+No API/BFF/contract/environment change is required.
+
 ## Independent nested task drafts (MAIR-408)
 
 The project form allocates each new nested task a local identity distinct from
