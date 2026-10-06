@@ -91,6 +91,9 @@ export function useProjectsController() {
   const [detailRefreshError, setDetailRefreshError] = useState('');
   const [detailRefreshPending, setDetailRefreshPending] = useState(false);
   const detailRetryRef = useRef<symbol | null>(null);
+  const taskWritesRef = useRef(new Set<string>());
+  const [pendingTasksByProject, setPendingTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
+  const [taskWriteErrorsByProject, setTaskWriteErrorsByProject] = useState(() => new Map<string, ReadonlyMap<string, string>>());
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -700,26 +703,76 @@ export function useProjectsController() {
     }
   };
 
+  const setTaskWriteError = (projectId: string, taskId: string, message?: string) => {
+    setTaskWriteErrorsByProject(current => {
+      const next = new Map(current);
+      const errors = new Map(current.get(projectId));
+      if (message) errors.set(taskId, message);
+      else errors.delete(taskId);
+      if (errors.size) next.set(projectId, errors);
+      else next.delete(projectId);
+      return next;
+    });
+  };
+
+  const showTaskWriteError = (projectId: string, taskId: string, error: unknown) => {
+    setTaskWriteError(projectId, taskId, getBffProjectErrorMessage(error));
+    showError(error);
+  };
+
+  const runTaskWrite = async (projectId: string, taskId: string, write: () => Promise<void>, rejectIfPending = false) => {
+    // Tuple encoding avoids collisions between arbitrary project/task IDs.
+    const key = JSON.stringify([projectId, taskId]);
+    if (taskWritesRef.current.has(key)) {
+      // An edit form must retain its draft, not interpret a skipped write as a
+      // confirmation and clear itself. Row status/delete repeats are ignored.
+      if (rejectIfPending) throw new Error('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
+      return;
+    }
+    taskWritesRef.current.add(key);
+    setTaskWriteError(projectId, taskId);
+    setPendingTasksByProject(current => {
+      const next = new Map(current);
+      next.set(projectId, new Set(current.get(projectId)).add(taskId));
+      return next;
+    });
+    try {
+      await write();
+    } finally {
+      taskWritesRef.current.delete(key);
+      setPendingTasksByProject(current => {
+        const next = new Map(current);
+        const tasks = new Set(current.get(projectId));
+        tasks.delete(taskId);
+        if (tasks.size) next.set(projectId, tasks);
+        else next.delete(projectId);
+        return next;
+      });
+    }
+  };
+
   const updateProjectTask = async (projectId: string, taskId: string, taskDraft: ProjectTaskDraft) => {
     const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
     if (!title) return;
 
-    let confirmed: ProjectTask;
-    try {
-      confirmed = await updateBffProjectTask(projectId, taskId, taskBodyFromDraft(taskDraft));
-    } catch (error) {
-      showError(error);
-      throw error;
-    }
-    applyConfirmedTask(projectId, confirmed.id, confirmed, selection);
-    try {
-      if (!await refreshProjectDetails(projectId, selection)) return;
-      await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Tâche "${confirmed.title}" modifiée.` });
-    } catch (error) {
-      showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
-    }
+    return runTaskWrite(projectId, taskId, async () => {
+      let confirmed: ProjectTask;
+      try {
+        confirmed = await updateBffProjectTask(projectId, taskId, taskBodyFromDraft(taskDraft));
+      } catch (error) {
+        showTaskWriteError(projectId, taskId, error);
+        throw error;
+      }
+      applyConfirmedTask(projectId, confirmed.id, confirmed, selection);
+      try {
+        if (!await refreshProjectDetails(projectId, selection)) return;
+        await refreshProjectsPage({ silent: true });
+        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" modifiée.` });
+      } catch (error) {
+        showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+      }
+    }, true);
   };
 
   const changeProjectTaskStatus = async (
@@ -728,42 +781,46 @@ export function useProjectsController() {
     status: ProjectStatus
   ) => {
     const selection = detailSelectionRef.current;
-    let updatedTask: ProjectTask;
-    try {
-      updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
-    } catch (error) {
-      showError(error);
-      return;
-    }
-    applyConfirmedTask(projectId, updatedTask.id, updatedTask, selection);
-    try {
-      if (!await refreshProjectDetails(projectId, selection)) return;
-      await refreshProjectsPage({ silent: true });
-      setAlert({
-        type: 'success',
-        message: `Statut de la tâche "${updatedTask.title}" mis à jour : ${updatedTask.statusLabel ?? status}.`,
-      });
-    } catch (error) {
-      showInfo(`Tâche "${updatedTask.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
-    }
+    return runTaskWrite(projectId, taskId, async () => {
+      let updatedTask: ProjectTask;
+      try {
+        updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
+      } catch (error) {
+        showTaskWriteError(projectId, taskId, error);
+        return;
+      }
+      applyConfirmedTask(projectId, updatedTask.id, updatedTask, selection);
+      try {
+        if (!await refreshProjectDetails(projectId, selection)) return;
+        await refreshProjectsPage({ silent: true });
+        setAlert({
+          type: 'success',
+          message: `Statut de la tâche "${updatedTask.title}" mis à jour : ${updatedTask.statusLabel ?? status}.`,
+        });
+      } catch (error) {
+        showInfo(`Tâche "${updatedTask.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+      }
+    });
   };
 
   const deleteProjectTask = async (projectId: string, taskId: string, taskTitle: string) => {
     const selection = detailSelectionRef.current;
-    try {
-      await deleteBffProjectTask(projectId, taskId);
-    } catch (error) {
-      showError(error);
-      return;
-    }
-    applyConfirmedTask(projectId, taskId, null, selection);
-    try {
-      if (!await refreshProjectDetails(projectId, selection)) return;
-      await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
-    } catch (error) {
-      showInfo(`Tâche "${taskTitle}" supprimée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
-    }
+    return runTaskWrite(projectId, taskId, async () => {
+      try {
+        await deleteBffProjectTask(projectId, taskId);
+      } catch (error) {
+        showTaskWriteError(projectId, taskId, error);
+        return;
+      }
+      applyConfirmedTask(projectId, taskId, null, selection);
+      try {
+        if (!await refreshProjectDetails(projectId, selection)) return;
+        await refreshProjectsPage({ silent: true });
+        setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
+      } catch (error) {
+        showInfo(`Tâche "${taskTitle}" supprimée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+      }
+    });
   };
 
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
@@ -784,6 +841,8 @@ export function useProjectsController() {
 
   const selectedProject = selectedProjectDetails?.project ?? null;
   const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
+  const pendingTaskIds = pendingTasksByProject.get(selectedProject?.id ?? '') ?? new Set<string>();
+  const taskWriteErrors = taskWriteErrorsByProject.get(selectedProject?.id ?? '') ?? new Map<string, string>();
   const canCreateProject =
     projectsPage?.access?.canCreateProject ?? false;
   const pageTitle = projectsPage?.page.title ?? 'Projets';
@@ -796,6 +855,8 @@ export function useProjectsController() {
     closeProjectDetails,
     detailRefreshError,
     detailRefreshPending,
+    pendingTaskIds,
+    taskWriteErrors,
     retryProjectDetails,
     linkedTaskId,
     viewMode,

@@ -19,6 +19,8 @@ export function ProjectsWorkspace({
   closeProjectDetails,
   detailRefreshError,
   detailRefreshPending,
+  pendingTaskIds,
+  taskWriteErrors,
   retryProjectDetails,
   linkedTaskId,
   viewMode,
@@ -111,6 +113,8 @@ export function ProjectsWorkspace({
           onClose={closeProjectDetails}
           refreshError={detailRefreshError}
           refreshPending={detailRefreshPending}
+          pendingTaskIds={pendingTaskIds}
+          taskWriteErrors={taskWriteErrors}
           onRetry={retryProjectDetails}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}

@@ -28,6 +28,8 @@ export function ProjectDetailModal({
   onClose,
   refreshError = '',
   refreshPending = false,
+  pendingTaskIds,
+  taskWriteErrors,
   onRetry,
   onUpdateProject,
   onAddTask,
@@ -46,11 +48,13 @@ export function ProjectDetailModal({
   onClose: () => void;
   refreshError?: string;
   refreshPending?: boolean;
+  pendingTaskIds?: ReadonlySet<string>;
+  taskWriteErrors?: ReadonlyMap<string, string>;
   onRetry?: () => void | Promise<void>;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
-  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void;
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void | Promise<void>;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
   onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
 }) {
@@ -357,6 +361,7 @@ export function ProjectDetailModal({
   const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (taskSavingRef.current || projectSavingRef.current) return;
+    if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
 
     const title = taskForm.title.trim();
     if (!title) {
@@ -398,7 +403,7 @@ export function ProjectDetailModal({
   };
 
   const editTask = (task: ProjectTask) => {
-    if (taskSavingRef.current || projectSavingRef.current) return;
+    if (taskSavingRef.current || projectSavingRef.current || pendingTaskIds?.has(task.id)) return;
     setTaskForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setTaskFormError('');
@@ -452,7 +457,7 @@ export function ProjectDetailModal({
                 <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
                   <p>{refreshError}</p>
                   <p className="mt-2 text-[#57606a]">Les tâches confirmées restent affichées. Les compteurs et la progression proviennent de la dernière lecture réussie.</p>
-                  <button type="button" disabled={refreshPending || mutationPending} aria-busy={refreshPending} onClick={() => void onRetry?.()}
+                  <button type="button" disabled={refreshPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending} onClick={() => void onRetry?.()}
                     className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
                     {refreshPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
                   </button>
@@ -535,6 +540,7 @@ export function ProjectDetailModal({
                     <Button
                       label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
+                      disabled={!!editingTaskId && !!pendingTaskIds?.has(editingTaskId)}
                       primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
@@ -554,6 +560,10 @@ export function ProjectDetailModal({
                     {project.tasks.completed}/{project.tasks.total}
                   </span>
                 </div>
+
+                {pendingTaskIds && [...pendingTaskIds].some(id => !tasks.some(task => task.id === id)) && (
+                  <p role="status" className="px-4 py-2 text-xs text-[#57606a]">Actualisation des tâches en cours…</p>
+                )}
 
                 {tasks.length > 0 && (
                   <div className="grid grid-cols-1 gap-2 border-b border-[#dedbd6] bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -608,10 +618,12 @@ export function ProjectDetailModal({
                       const canUpdateStatus = task.permissions?.canUpdateStatus !== false;
                       const canEditTask = task.permissions?.canEdit !== false;
                       const canDeleteTask = task.permissions?.canDelete !== false;
+                      const taskPending = pendingTaskIds?.has(task.id) ?? false;
 
                       return (
                         <article
                           key={task.id}
+                          aria-busy={taskPending || undefined}
                           ref={isLinkedTask ? highlightedTaskRef : undefined}
                           tabIndex={isLinkedTask ? -1 : undefined}
                           aria-current={isLinkedTask ? 'true' : undefined}
@@ -620,7 +632,7 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={mutationPending || !canUpdateStatus}
+                            disabled={mutationPending || taskPending || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
@@ -648,12 +660,12 @@ export function ProjectDetailModal({
                                   <MessageSquare className="h-3.5 w-3.5" />
                                   Suivi
                                 </button>
-                                {canEditTask && <TaskEditButton disabled={mutationPending} onClick={() => editTask(task)} />}
+                                {canEditTask && <TaskEditButton disabled={mutationPending || taskPending} onClick={() => editTask(task)} />}
                                 {canDeleteTask && deletingTaskId !== task.id && (
                                   <button
                                     type="button"
                                     aria-label={`Supprimer ${task.title}`}
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskPending}
                                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
                                     onClick={() => setDeletingTaskId(task.id)}
                                   >
@@ -668,7 +680,7 @@ export function ProjectDetailModal({
                                   <span className="sr-only">Statut de {task.title}</span>
                                   <select
                                     aria-label={`Statut de ${task.title}`}
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskPending}
                                     value={task.status}
                                     className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
                                     onChange={(event) =>
@@ -712,6 +724,9 @@ export function ProjectDetailModal({
                               ))}
                             </div>
 
+                            {taskPending && <p role="status" className="mt-2 text-xs text-[#57606a]">Opération sur la tâche en cours…</p>}
+                            {taskWriteErrors?.get(task.id) && <p role="alert" className="mt-2 text-xs text-[#cf222e] [overflow-wrap:anywhere]">{taskWriteErrors.get(task.id)}</p>}
+
                             {deletingTaskId === task.id && (
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-2 text-xs text-[#cf222e]">
                                 <span>Supprimer définitivement cette tâche ?</span>
@@ -719,7 +734,7 @@ export function ProjectDetailModal({
                                   <button type="button" disabled={mutationPending} className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 font-semibold text-[#24292f]" onClick={() => setDeletingTaskId(null)}>Annuler</button>
                                   <button
                                     type="button"
-                                    disabled={mutationPending}
+                                    disabled={mutationPending || taskPending}
                                     className="rounded-md bg-[#cf222e] px-2 py-1 font-semibold text-white"
                                     onClick={() => {
                                       setDeletingTaskId(null);

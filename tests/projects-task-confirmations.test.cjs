@@ -69,7 +69,7 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
   });
 }
 
-test('an older task refresh cannot erase a newer confirmation or its recovery error', async t => {
+test('an older task refresh cannot erase a newer independent-task confirmation or its recovery error', async t => {
   await loaded();
   let release;
   const gate = new Promise(resolve => { release = resolve; });
@@ -87,13 +87,14 @@ test('an older task refresh cannot erase a newer confirmation or its recovery er
   let pending;
   await view.act(() => { pending = view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'); });
   await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'get').length === 2);
-  const current = f.projectTask({ title: 'Dernière confirmation', status: 'review' });
+  const current = f.projectTask({ id: other.id, title: 'Dernière confirmation', status: 'review' });
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: current });
   bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('LATEST_READ', 'Dernière relecture refusée')));
-  await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'review'));
+  await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, other.id, 'review'));
   release(); await pending; await view.settle();
-  assert.equal(view.props('ProjectDetailModal').tasks[0].title, current.title);
-  assert.equal(view.props('KanbanBoard').projects[0].taskItems[0].title, current.title);
+  assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === other.id).title, current.title);
+  assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === task.id).title, first.title);
+  assert.equal(view.props('KanbanBoard').projects[0].taskItems.find(value => value.id === other.id).title, current.title);
   assert.equal(view.props('ProjectDetailModal').refreshError, 'Dernière relecture refusée');
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length, 2);
 });

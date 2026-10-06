@@ -1,5 +1,26 @@
 # Projects_Web_Service — Présentation du module
 
+## Écritures de tâches en attente (MAIR-408)
+
+Statut, suppression et édition d’une même tâche existante partagent une garde
+synchrone projet/tâche jusqu’à la confirmation et la fin des relectures. Aucune
+commande répétée ou contradictoire ne renvoie d’écriture pendant cette attente ;
+les autres tâches et projets restent indépendants. La ligne concernée annonce
+l’attente et désactive ses actions de mutation. Un brouillon d’édition reste
+disponible, mais ne peut être envoyé pendant une autre écriture sur sa tâche.
+Une édition ignorée ne devient jamais une fausse confirmation vidant le formulaire.
+La suppression confirmée retire immédiatement sa ligne et annonce la relecture
+encore active. Le refus libère la garde pour une nouvelle tentative volontaire ;
+un refus de relecture conserve les vraies données confirmées et donne une reprise
+GET seule. Fermer puis rouvrir le détail ne contourne pas la garde portée par la
+page et ne rouvre pas une consultation abandonnée. Contrat, permissions et
+authentification inchangés : ce n’est pas un verrou distribué/backend ni une
+garantie de persistance serveur.
+Le motif d’un refus reste visible sur sa ligne, y compris après réouverture du
+même projet ; une nouvelle tentative efface seulement l’erreur de sa cible.
+Les verrous de formulaire partagés conservent les champs envoyés et empêchent
+de remplacer un formulaire pendant son enregistrement.
+
 ## Tâches confirmées et reprise de la fiche (MAIR-408)
 
 Création, édition et statut acceptés gardent la tâche canonique normalisée et ses

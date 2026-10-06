@@ -1,9 +1,9 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/page";
-import { createProjectTask, duplicateProject, getProjectDetails, getProjectsPage } from "@/lib/bffProjectClient";
+import { createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProjectTaskStatus } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
@@ -12,6 +12,8 @@ vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   getProjectsPage: vi.fn(),
   duplicateProject: vi.fn(),
   createProjectTask: vi.fn(),
+  deleteProjectTask: vi.fn(),
+  updateProjectTaskStatus: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -20,9 +22,88 @@ beforeEach(() => {
   vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails());
   vi.mocked(duplicateProject).mockReset();
   vi.mocked(createProjectTask).mockReset();
+  vi.mocked(deleteProjectTask).mockReset();
+  vi.mocked(updateProjectTaskStatus).mockReset();
 });
 
 describe("Projects page", () => {
+  it("shows a scoped pending status guard, retains an edit draft and leaves other tasks usable", async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    const task = fixtures.projectTask();
+    const other = fixtures.projectTask({ id: 'task-2', title: 'Autre tâche reçue' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project, [task, other]));
+    const write = Promise.withResolvers();
+    vi.mocked(updateProjectTaskStatus).mockImplementationOnce(() => write.promise);
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
+    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
+    await user.click(within(firstRow).getByRole('button', { name: 'Modifier', exact: true }));
+    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
+    await user.clear(title);
+    await user.type(title, 'Brouillon conservé');
+    const toggle = within(firstRow).getByRole('button', { name: `Marquer ${task.title} comme terminée` });
+    await user.dblClick(toggle);
+    expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
+    expect(firstRow.getAttribute('aria-busy')).toBe('true');
+    expect(within(firstRow).getByRole('status').textContent).toBe('Opération sur la tâche en cours…');
+    expect(toggle.disabled).toBe(true);
+    expect(within(firstRow).getByRole('combobox', { name: `Statut de ${task.title}` }).disabled).toBe(true);
+    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
+    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
+    expect(title.value).toBe('Brouillon conservé');
+    await act(async () => write.reject(new Error('Écriture refusée')));
+    expect(await within(firstRow).findByRole('alert')).toBeTruthy();
+    expect(within(firstRow).getByRole('alert').textContent).toContain('Écriture refusée');
+    expect(toggle.disabled).toBe(false);
+    expect(firstRow.getAttribute('aria-busy')).toBeNull();
+    expect(title.value).toBe('Brouillon conservé');
+    const confirmed = fixtures.projectTask({ title: 'Statut canonique reçu', status: 'done', completed: true });
+    vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
+    toggle.focus(); await user.keyboard('{Enter}');
+    expect(await screen.findByRole('heading', { name: confirmed.title })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('Brouillon conservé');
+    expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
+    expect(updateProjectTaskStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it("guards a pending delete, retains other rows and retries only the refused read", async () => {
+    const user = userEvent.setup();
+    const project = fixtures.projectListItem();
+    const task = fixtures.projectTask();
+    const other = fixtures.projectTask({ id: 'task-2', title: 'Autre tâche reçue' });
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [task, other]));
+    const write = Promise.withResolvers();
+    vi.mocked(deleteProjectTask).mockImplementationOnce(() => write.promise);
+    render(<ProjectsPage />);
+    await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
+    await user.click(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
+    await user.click(within(firstRow).getByRole('button', { name: 'Supprimer', exact: true }));
+    expect(firstRow.getAttribute('aria-busy')).toBe('true');
+    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
+    await user.dblClick(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
+    expect(deleteProjectTask).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
+    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
+    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
+    await act(async () => write.resolve());
+    expect(await screen.findByRole('button', { name: 'Réessayer la fiche' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: task.title })).toBeNull();
+    expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, tasks: { total: 1, completed: 0 } }, [other]));
+    screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
+    expect(deleteProjectTask).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Tâches').parentElement.textContent).toContain('0/1');
+  });
+
   it("keeps a canonical created task on detail failure and retries GET only by keyboard", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();

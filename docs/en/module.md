@@ -1,5 +1,24 @@
 # Projects_Web_Service — Module overview
 
+## Pending task writes (MAIR-408)
+
+Status, deletion and editing of the same existing task share a synchronous
+project/task guard through confirmation and follow-up reads. Repeated or
+conflicting commands cannot submit a second write while it is active; other
+tasks and projects remain independent. The affected row shows an accessible
+busy status and disables its mutation controls. An existing edit draft remains
+available, but cannot be submitted during another write to that task. A skipped
+edit is never treated as a confirmation that could clear its form. Confirmed
+deletion removes its row immediately and announces the remaining read activity.
+Refusal releases the guard for a deliberate retry; a refused follow-up read
+retains the actual confirmed data and offers only GET recovery. Closing and
+reopening a detail does not bypass the page-owned guard or reopen an abandoned
+consultation. Published contract operations, permissions and authentication are
+unchanged; this is not distributed/backend locking or a persistence guarantee.
+Write refusals remain visible on their task row, including after reopening the
+same project; a new deliberate attempt clears only that task's error. Shared
+form locks still protect submitted fields and prevent replacing a saving form.
+
 ## Confirmed tasks and detail recovery (MAIR-408)
 
 Accepted creation, editing and status responses keep the normalized canonical
