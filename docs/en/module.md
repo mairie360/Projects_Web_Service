@@ -1,5 +1,17 @@
 # Projects_Web_Service — Module overview
 
+## Keyboard entry from Table (MAIR-310)
+
+Every Table project title is a named native button announcing its detail dialog.
+Tab exposes visible focus; Enter/Space or a pointer click invoke the existing
+detail callback once, without bubbling into the row. Clicking elsewhere on an
+authorized row remains available; action-menu controls remain independent.
+An explicit received `canView: false` disables both title and row opening,
+without changing server permissions or unrelated menu permissions. The existing
+named dialog, keyboard containment, Escape/Close and return to a still-present
+opener remain unchanged. Refused GETs do not fabricate a detail; deliberate retry
+still uses the published GET. No API/BFF/contract/environment change is required.
+
 ## Uncertain new-task receipts (MAIR-408)
 
 Task creation from a card or the detail verifies a non-empty ID distinct from

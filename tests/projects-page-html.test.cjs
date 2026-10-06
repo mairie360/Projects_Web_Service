@@ -273,6 +273,43 @@ test('switching the view reloads the page with the new view and renders the tabl
   assert.match(view.text(), /Rénovation de l’éclairage public/);
 });
 
+test('Table exposes a named detail button, stops row bubbling and uses only the existing detail GET', async () => {
+  const project = fixtures.projectListItem();
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  await view.act(() => view.props('ViewToggle').onChange('table'));
+  await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
+  const name = `Ouvrir la fiche du projet ${project.title}`;
+  const openers = view.hostElements((props, text, tag) => tag === 'button' && props['aria-label'] === name);
+  assert.equal(openers.length, 1);
+  assert.equal(openers[0].props['aria-haspopup'], 'dialog');
+  assert.match(openers[0].props.className, /focus-visible:outline/);
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
+  let stopped = 0;
+  await view.act(() => openers[0].props.onClick({ stopPropagation() { stopped++; } }));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  assert.equal(stopped, 1);
+  assert.equal(view.props('ProjectDetailModal').project.id, project.id);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+  await view.act(() => view.props('ProjectDetailModal').onClose());
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
+});
+
+test('Table preserves a received view refusal without sending a detail GET from its row', async () => {
+  const project = fixtures.projectListItem();
+  project.permissions = { ...project.permissions, canView: false };
+  await renderLoadedPage(fixtures.projectsPage([project]));
+  await view.act(() => view.props('ViewToggle').onChange('table'));
+  await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
+  const opener = view.hostElements((props, text, tag) => tag === 'button' && props['aria-label'] === `Ouvrir la fiche du projet ${project.title}`)[0];
+  assert.equal(opener.props.disabled, true);
+  const row = view.hostElements((props, text, tag) => tag === 'tr' && !!props.onClick)[0];
+  await view.act(() => row.props.onClick());
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 0);
+  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
+});
+
 test('opening a project loads its details and renders them in the modal', async () => {
   await renderLoadedPage();
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
