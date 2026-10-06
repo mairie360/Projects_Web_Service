@@ -166,7 +166,10 @@ test('dragging a project changes only its status and reloads the Kanban from the
   await view.fire((props) => props['data-project-id'] === project.id, 'onDragStart', { dataTransfer });
   await view.fire((props) => props['data-project-status'] === 'review', 'onDragOver', { dataTransfer });
   await view.fire((props) => props['data-project-status'] === 'review', 'onDrop', { dataTransfer });
-  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review');
+  // The canonical PATCH can update the card before the following GET settles.
+  // A recorded read is not completion of the detached onDrop callback.
+  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review' &&
+    alertText() === `Statut du projet "${project.title}" mis à jour.`);
 
   assert.equal(dataTransfer.effectAllowed, 'move');
   assert.equal(dataTransfer.dropEffect, 'move');
