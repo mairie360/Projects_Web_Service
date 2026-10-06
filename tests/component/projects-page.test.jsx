@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,6 +33,49 @@ beforeEach(() => {
 });
 
 describe("Projects page", () => {
+  it('retains a colliding task-create draft, reads without replay and restores its latest fields after closing the detail', async () => {
+    const user = userEvent.setup(), project = fixtures.projectListItem(), task = fixtures.projectTask();
+    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
+    vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project, [task]));
+    vi.mocked(createProjectTask).mockResolvedValue({ ...task, title: 'Reçu collision interdit' });
+    render(<ProjectsPage />);
+    const opener = await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` });
+    await user.click(opener);
+    const dialog = within(screen.getByRole('dialog')), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
+    await user.type(input, 'Brouillon collision conservé');
+    await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
+    fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
+    await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
+    await dialog.findByText('Création de tâche non vérifiée : Brouillon collision conservé');
+    expect(input.value).toBe('Brouillon collision conservé');
+    expect(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }).disabled).toBe(true);
+    expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
+    expect(dialog.getByText(task.title, { exact: true })).toBeTruthy();
+    expect(screen.queryByText('Reçu collision interdit')).toBeNull();
+    await user.type(input, ' — dernière saisie');
+    fireEvent.submit(input.closest('form'));
+    const inspect = dialog.getByRole('button', { name: 'Inspecter les tâches du projet', exact: true });
+    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Inspection503'));
+    inspect.focus(); await user.keyboard('{Enter}');
+    await dialog.findByText('Inspection503');
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [task]));
+    inspect.focus(); await user.keyboard('{Enter}');
+    await dialog.findByText(/Données du projet relues/);
+    expect(input.value).toBe('Brouillon collision conservé — dernière saisie');
+    expect(createProjectTask).toHaveBeenCalledOnce();
+    expect(getProjectDetails).toHaveBeenCalledTimes(3);
+    await user.click(dialog.getByRole('button', { name: 'Fermer la fiche projet' }));
+    await user.click(opener);
+    const reopened = within(screen.getByRole('dialog'));
+    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
+    expect(reopened.getByLabelText('Priorité', { exact: true }).value).toBe('low');
+    expect(reopened.getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
+    await user.click(reopened.getAllByRole('button', { name: 'Modifier', exact: true }).at(-1));
+    expect(reopened.getByRole('button', { name: 'Enregistrer la tâche', exact: true }).disabled).toBe(false);
+    await user.click(reopened.getByRole('button', { name: 'Annuler', exact: true }));
+    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
+    expect(createProjectTask).toHaveBeenCalledOnce();
+  });
   it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
     const user = userEvent.setup(), first = fixtures.projectListItem();
     const created = fixtures.projectListItem({ id: 'new-distinct-id', title: 'Copie canonique vérifiée' });

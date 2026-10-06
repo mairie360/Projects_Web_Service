@@ -23,6 +23,9 @@ export { PersonAvatar, PriorityLabel, PriorityPill, ProgressMeter, StatusPill } 
 
 function KanbanProjectCard({
   project,
+  taskCreationState,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
   duplicationPending,
   duplicationVerificationRequired,
   memberOptions,
@@ -95,13 +98,16 @@ function KanbanProjectCard({
         </span>
       </div>
 
-      <TaskComposer project={project} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
+      <TaskComposer project={project} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
     </article>
   );
 }
 
 function GridProjectCard({
   project,
+  taskCreationState,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
   duplicationPending,
   duplicationVerificationRequired,
   memberOptions,
@@ -176,7 +182,7 @@ function GridProjectCard({
         </span>
       </div>
 
-      <TaskComposer project={project} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
+      <TaskComposer project={project} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
     </article>
   );
 }

@@ -149,6 +149,9 @@ function EmptyState() {
 
 export function GridView({
   projects,
+  taskCreationStates,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
   memberOptions,
@@ -160,6 +163,9 @@ export function GridView({
   onProjectTaskAdd,
 }: {
   projects: Project[];
+  taskCreationStates?: ReadonlyMap<string, import('./TaskCreationNotice').TaskCreationState>;
+  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
+  onPreserveTaskDraft?: import('../project-card/types').ProjectCardProps['onPreserveTaskDraft'];
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   memberOptions: FilterOption[];
@@ -179,6 +185,9 @@ export function GridView({
           key={project.id}
           project={project}
           variant="grid"
+          taskCreationState={taskCreationStates?.get(project.id)}
+          onInspectTaskCreation={onInspectTaskCreation}
+          onPreserveTaskDraft={onPreserveTaskDraft}
           duplicationPending={duplicatingProjectIds.includes(project.id)}
           duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
           memberOptions={memberOptions}

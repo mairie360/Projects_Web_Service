@@ -1,5 +1,29 @@
 # Projects_Web_Service — Présentation du module
 
+## Reçu incertain de nouvelle tâche (MAIR-408)
+
+La création depuis une carte ou la fiche vérifie un ID non vide distinct des
+IDs de tâches connus dans ce projet avant envoi et des créations déjà confirmées.
+Une carte jamais consultée charge d’abord sa fiche via le GET existant ; lecture
+indisponible, étrangère ou à IDs répétés n’envoie aucun POST et garde le brouillon
+réessayable.
+Un GET intervenant pendant le POST peut montrer le nouvel ID légitime : ce seul
+constat n’est pas une collision. Un reçu accepté incohérent ne remplace aucune
+tâche existante ni ne fabrique de compteurs. Le brouillon, y compris les saisies
+poursuivies après le reçu, est conservé après fermeture/réouverture et changement
+de vue pendant la durée de page. La création est gardée par projet, GET suivant
+compris ; un callback ignoré rejette au lieu de vider un autre formulaire.
+
+Un avertissement accessible persiste et désactive seulement les nouvelles tâches
+de ce projet. Les éditions/statuts/suppressions des tâches existantes et autres
+projets restent indépendants de cette incertitude et respectent les permissions
+reçues. L’inspection gardée utilise le GET détail existant ; refus, fiche étrangère
+ou IDs répétés ne remplacent pas les tâches affichées. Une inspection cohérente
+applique les données reçues, mais ni son succès ni un titre similaire n’identifie
+la création acceptée. Avertissement et garde POST restent : Project0.4.0 n’offre
+aucune corrélation de requête pour un ID de tâche vide/réutilisé. Aucun replay,
+reprise durable après reload, identité inventée ou changement API/BFF/environnement.
+
 ## Reprise en lecture d’un nouveau reçu distinct (MAIR-408)
 
 Une création/copie acceptée avec nouvel ID distinct mais tâches incohérentes

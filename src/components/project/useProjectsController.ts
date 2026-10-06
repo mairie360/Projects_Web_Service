@@ -26,17 +26,20 @@ import {
 import {
   createProjectFormState,
   createSelectOptions,
+  getPersonValue,
   projectToFormState,
   type FilterOption,
   type ProjectFormState,
   type ViewMode,
+  type TaskFormState,
 } from '../../lib/projectPageState';
 import { getActiveFrontHrefs } from '../../lib/navigation';
 import { authSessionFromAccess } from '../../lib/auth-session';
 import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
-import { assertProjectDetailsIdentity, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
+import { assertProjectDetailsIdentity, NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
+import type { TaskCreationState } from './TaskCreationNotice';
 import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
@@ -93,6 +96,12 @@ export function useProjectsController() {
   // Each opening owns a distinct lifetime, even when reopening the same ID.
   const detailSelectionRef = useRef<DetailSelection | null>(null);
   const taskConfirmationsRef = useRef(new Map<string, TaskConfirmations>());
+  const knownTaskIdsRef = useRef(new Map<string, Set<string>>());
+  const confirmedNewTaskIdsRef = useRef(new Map<string, Set<string>>());
+  const taskCreationWritesRef = useRef(new Set<string>());
+  const uncertainTaskCreationsRef = useRef(new Map<string, string>());
+  const taskCreationInspectionsRef = useRef(new Set<string>());
+  const [taskCreationStates, setTaskCreationStates] = useState<ReadonlyMap<string, TaskCreationState>>(() => new Map());
   const [detailRefreshError, setDetailRefreshError] = useState('');
   const [detailRefreshPending, setDetailRefreshPending] = useState(false);
   const detailRetryRef = useRef<symbol | null>(null);
@@ -409,6 +418,9 @@ export function useProjectsController() {
 
   const applyConfirmedProject = (details: ProjectDetailsResponse, insert = false, taskRevision?: number): ConfirmedProject => {
     knownProjectIdsRef.current.add(details.project.id);
+    const knownTasks = knownTaskIdsRef.current.get(details.project.id) ?? new Set<string>();
+    for (const task of details.taskItems) knownTasks.add(task.id);
+    knownTaskIdsRef.current.set(details.project.id, knownTasks);
     if (insert) confirmedNewProjectIdsRef.current.add(details.project.id);
     ++pageRevisionRef.current;
     const confirmations = taskConfirmationsRef.current.get(details.project.id);
@@ -575,6 +587,9 @@ export function useProjectsController() {
         if (projectVerificationsRef.current.get(projectId) !== verification) return null;
         if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
         assertProjectDetailsIdentity(projectId, details);
+        const known = knownTaskIdsRef.current.get(projectId) ?? new Set<string>();
+        for (const task of details.taskItems) known.add(task.id);
+        knownTaskIdsRef.current.set(projectId, known);
         knownProjectIdsRef.current.add(projectId);
         const confirmations = taskConfirmationsRef.current.get(projectId);
         if (confirmations) {
@@ -627,7 +642,7 @@ export function useProjectsController() {
     return () => { active = false; };
   }, [beginDetailSelection, readCurrentProjectDetails]);
 
-  const refreshProjectDetails = async (projectId: string, selection: DetailSelection | null) => {
+  const refreshProjectDetails = async (projectId: string, selection: DetailSelection | null, reportDetailError = true) => {
     const revision = selection && detailSelectionRef.current === selection && selection.projectId === projectId
       ? ++selection.readRevision : null;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
@@ -641,13 +656,16 @@ export function useProjectsController() {
     } catch (error) {
       if (projectVerificationsRef.current.get(projectId) !== verification) return null;
       if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
-      if (selection && detailSelectionRef.current === selection && selection.readRevision === revision) {
+      if (reportDetailError && selection && detailSelectionRef.current === selection && selection.readRevision === revision) {
         setDetailRefreshError(getBffProjectErrorMessage(error));
       }
       throw error;
     }
     if (projectVerificationsRef.current.get(projectId) !== verification) return null;
     if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== taskRevision) return null;
+    const known = knownTaskIdsRef.current.get(projectId) ?? new Set<string>();
+    for (const task of details.taskItems) known.add(task.id);
+    knownTaskIdsRef.current.set(projectId, known);
     const confirmations = taskConfirmationsRef.current.get(projectId);
     if (confirmations) {
       confirmations.latest = reconcileTaskConfirmations(confirmations.latest, details.taskItems);
@@ -673,6 +691,9 @@ export function useProjectsController() {
   };
 
   const applyConfirmedTask = (projectId: string, taskId: string, task: ProjectTask | null, selection: DetailSelection | null) => {
+    const known = knownTaskIdsRef.current.get(projectId) ?? new Set<string>();
+    known.add(taskId);
+    knownTaskIdsRef.current.set(projectId, known);
     const previous = taskConfirmationsRef.current.get(projectId);
     const changes = new Map(previous?.changes);
     changes.set(taskId, task);
@@ -1030,24 +1051,87 @@ export function useProjectsController() {
     const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
     if (!title) return;
-
-    let confirmed: ProjectTask;
+    if (uncertainTaskCreationsRef.current.has(project.id)) throw new NewTaskReceiptVerificationRequiredError();
+    if (taskCreationWritesRef.current.has(project.id)) throw new Error('Une création de tâche est déjà en cours pour ce projet. Le brouillon est conservé.');
+    taskCreationWritesRef.current.add(project.id);
+    setTaskCreationStates(current => new Map(current).set(project.id, { ...current.get(project.id), pending: true }));
     try {
-      confirmed = await createProjectTask(project.id, taskBodyFromDraft(taskDraft));
+      // The page DTO does not supply tasks for a never-opened card. Establish
+      // a coherent baseline before dispatch rather than trusting an unseen ID.
+      if (!knownTaskIdsRef.current.has(project.id)) {
+        const baseline = await getProjectDetails(project.id);
+        assertProjectDetailsIdentity(project.id, baseline);
+        knownTaskIdsRef.current.set(project.id, new Set(baseline.taskItems.map(task => task.id)));
+      }
+      // Capture before dispatch: a GET during the POST can legitimately observe
+      // the new task. Previously confirmed creations stay independently guarded.
+      const knownAtDispatch = new Set(knownTaskIdsRef.current.get(project.id));
+      for (const task of project.taskItems ?? []) knownAtDispatch.add(task.id);
+      if (selectedProjectDetails?.project.id === project.id) for (const task of selectedProjectDetails.taskItems) knownAtDispatch.add(task.id);
+      const confirmed = await createProjectTask(project.id, taskBodyFromDraft(taskDraft));
+      if (!confirmed.id.trim() || knownAtDispatch.has(confirmed.id) || confirmedNewTaskIdsRef.current.get(project.id)?.has(confirmed.id)) {
+        uncertainTaskCreationsRef.current.set(project.id, title);
+        setTaskCreationStates(current => new Map(current).set(project.id, {
+          pending: true, uncertainTitle: title,
+          draft: { title: taskDraft.title, status: taskDraft.status, priority: taskDraft.priority, dueDate: taskDraft.dueDate, labels: [...taskDraft.labels], assignees: taskDraft.assignees.map(getPersonValue) },
+        }));
+        // Invalidate reads begun before this receipt without fabricating a task
+        // confirmation or locking the existing row whose ID was reused.
+        const previous = taskConfirmationsRef.current.get(project.id);
+        taskConfirmationsRef.current.set(project.id, { revision: (previous?.revision ?? 0) + 1, changes: new Map(previous?.changes), latest: new Map(previous?.latest) });
+        ++pageRevisionRef.current;
+        pageReadPendingRef.current = false;
+        setPageLoading(false);
+        throw new NewTaskReceiptVerificationRequiredError();
+      }
+      const created = confirmedNewTaskIdsRef.current.get(project.id) ?? new Set<string>();
+      created.add(confirmed.id);
+      confirmedNewTaskIdsRef.current.set(project.id, created);
+      applyConfirmedTask(project.id, confirmed.id, confirmed, selection);
+      // A confirmed creation followed by a failed GET must not offer the POST again.
+      try {
+        if (!await refreshProjectDetails(project.id, selection)) return;
+        await refreshProjectsPage({ silent: true });
+        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" ajoutée à "${project.title}".` });
+      } catch (error) {
+        showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+      }
     } catch (error) {
-      showError(error);
+      if (error instanceof NewTaskReceiptVerificationRequiredError) showInfo(error.message);
+      else showError(error);
       throw error;
-    }
-    applyConfirmedTask(project.id, confirmed.id, confirmed, selection);
-    // The write is confirmed. A failed refresh must not offer the same POST again.
-    try {
-      if (!await refreshProjectDetails(project.id, selection)) return;
-      await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Tâche "${confirmed.title}" ajoutée à "${project.title}".` });
-    } catch (error) {
-      showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+    } finally {
+      taskCreationWritesRef.current.delete(project.id);
+      setTaskCreationStates(current => new Map(current).set(project.id, { ...current.get(project.id), pending: false }));
     }
   };
+
+  const inspectTaskCreation = async (projectId: string) => {
+    if (!uncertainTaskCreationsRef.current.has(projectId) || taskCreationInspectionsRef.current.has(projectId) || taskCreationWritesRef.current.has(projectId)) return;
+    taskCreationInspectionsRef.current.add(projectId);
+    setTaskCreationStates(current => new Map(current).set(projectId, { ...current.get(projectId), inspectionPending: true, inspectionError: '', inspectionMessage: '' }));
+    try {
+      const details = await refreshProjectDetails(projectId, detailSelectionRef.current, false);
+      if (!details) throw new Error('La fiche a changé pendant la lecture. Inspectez à nouveau les données, sans renvoyer la création.');
+      // This DTO has no creation-request correlation. Never resolve uncertainty
+      // by title matching, a successful GET, or the colliding existing task ID.
+      setTaskCreationStates(current => new Map(current).set(projectId, { ...current.get(projectId), inspectionMessage: 'Données du projet relues. La création acceptée reste non vérifiée ; aucune écriture n’a été répétée.' }));
+    } catch (error) {
+      setTaskCreationStates(current => new Map(current).set(projectId, { ...current.get(projectId), inspectionError: getBffProjectErrorMessage(error) }));
+    } finally {
+      taskCreationInspectionsRef.current.delete(projectId);
+      setTaskCreationStates(current => new Map(current).set(projectId, { ...current.get(projectId), inspectionPending: false }));
+    }
+  };
+
+  const preserveUncertainTaskDraft = useCallback((projectId: string, patch: Partial<TaskFormState>) => {
+    if (!uncertainTaskCreationsRef.current.has(projectId)) return;
+    setTaskCreationStates(current => {
+      const state = current.get(projectId);
+      if (!state?.draft) return current;
+      return new Map(current).set(projectId, { ...state, draft: { ...state.draft, ...patch } });
+    });
+  }, []);
 
   const setTaskWriteError = (projectId: string, taskId: string, message?: string) => {
     setTaskWriteErrorsByProject(current => {
@@ -1242,6 +1326,9 @@ export function useProjectsController() {
     pendingTaskIds,
     taskWriteErrors,
     unverifiedTaskIds,
+    taskCreationStates,
+    inspectTaskCreation,
+    preserveUncertainTaskDraft,
     unverifiedProjectIds,
     projectVerificationPendingIds,
     projectVerificationErrors,

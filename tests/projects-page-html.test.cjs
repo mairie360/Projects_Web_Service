@@ -748,7 +748,10 @@ test('the task composer of a card refuses an empty title, then posts the task an
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 0);
 
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' }) });
-  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem(), [fixtures.projectTask(), fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' })]) });
+  bffProject.on('get', '/projects/{projectId}', () => ({ body: fixtures.projectDetails(fixtures.projectListItem(), [
+    fixtures.projectTask(),
+    ...(bffProject.calls('/projects/{projectId}/tasks', 'post').length ? [fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' })] : []),
+  ]) }));
   await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Commander les mâts' } });
   assert.doesNotMatch(view.text(), /Le titre de la tâche est obligatoire\./);
   await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
@@ -757,7 +760,7 @@ test('the task composer of a card refuses an empty title, then posts the task an
   const [call] = bffProject.calls('/projects/{projectId}/tasks', 'post');
   assert.equal(call.pathParams.projectId, 'project-1');
   assert.equal(call.body.title, 'Commander les mâts');
-  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1, 'the project details are refreshed');
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'an unconsulted card establishes its baseline, then refreshes after confirmation');
   assert.equal(pageCalls().length, 2, 'the page is reloaded silently');
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/, 'the composer closes');
 });
@@ -795,7 +798,9 @@ for (const mode of ['create', 'edit']) {
 test('a confirmed inline task creation is not offered for retry when the following detail refresh fails', async () => {
   await renderLoadedPage();
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-confirmed', title: 'Tâche enregistrée' }) });
-  bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée')));
+  bffProject.on('get', '/projects/{projectId}', () => bffProject.calls('/projects/{projectId}/tasks', 'post').length
+    ? harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée'))
+    : { body: fixtures.projectDetails() });
   await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
   await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Tâche enregistrée' } });
   await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
@@ -803,6 +808,7 @@ test('a confirmed inline task creation is not offered for retry when the followi
   assert.match(view.text(), /Tâche "Tâche enregistrée" enregistrée\. Actualisation impossible : Actualisation refusée/);
   assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'only the post-confirmation read fails, not the pre-dispatch baseline');
   await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
   assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);

@@ -7,6 +7,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { ProjectCard } from './ProjectCard';
 import type { Project, ProjectTaskDraft } from '../types/project';
+import type { TaskCreationState } from './project/TaskCreationNotice';
 
 type SelectOption = {
   label: string;
@@ -17,6 +18,9 @@ type KanbanBoardProps = {
   projects: Project[];
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
+  taskCreationStates?: ReadonlyMap<string, TaskCreationState>;
+  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
+  onPreserveTaskDraft?: import('./project-card/types').ProjectCardProps['onPreserveTaskDraft'];
   columns: Array<{ status: Project['status']; label: string }>;
   memberOptions?: SelectOption[];
   labelOptions?: SelectOption[];
@@ -45,6 +49,9 @@ export function KanbanBoard({
   projects,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
+  taskCreationStates,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
   columns,
   memberOptions,
   labelOptions,
@@ -173,6 +180,9 @@ export function KanbanBoard({
                 >
                   <ProjectCard
                     project={project}
+                    taskCreationState={taskCreationStates?.get(project.id)}
+                    onInspectTaskCreation={onInspectTaskCreation}
+                    onPreserveTaskDraft={onPreserveTaskDraft}
                     duplicationPending={duplicatingProjectIds.includes(project.id)}
                     duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
                     memberOptions={memberOptions}

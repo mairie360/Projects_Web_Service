@@ -1,5 +1,28 @@
 # Projects_Web_Service — Module overview
 
+## Uncertain new-task receipts (MAIR-408)
+
+Task creation from a card or the detail verifies a non-empty ID distinct from
+task IDs observed for that project before dispatch and previously confirmed
+creations. A never-consulted card first reads a coherent detail baseline via the
+existing GET; unavailable, foreign or repeated-ID baseline sends no POST and
+retains the retryable draft. A concurrent detail read may already show the legitimate new ID;
+that alone is not a collision. An accepted incoherent receipt never replaces
+an existing task or invents counters. The task draft is retained, including
+later input edits, across closing/reopening and view remounts for this page's
+lifetime. Pending creation is guarded per project, including its follow-up GET;
+a skipped callback rejects rather than clearing another form's draft.
+
+Persistent accessible feedback disables only new task creation in that project.
+Existing task edits/status/deletion and other projects remain independent of
+that uncertainty and still obey received permissions. A guarded inspection
+uses the existing project detail GET; refused, foreign or repeated-task details
+cannot replace the displayed tasks. Coherent inspection applies received data,
+but neither a successful GET nor a matching title identifies the accepted
+creation. The warning and POST guard remain: Project0.4.0 has no creation-request
+correlation for an empty/reused task ID. There is no automatic mutation replay,
+durable recovery after reload, invented identity or API/BFF/environment change.
+
 ## Read-only recovery of a distinct new receipt (MAIR-408)
 
 When an accepted creation/copy identifies a distinct new project but supplies

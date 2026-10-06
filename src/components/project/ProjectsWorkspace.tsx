@@ -8,6 +8,7 @@ import { ActionButton } from './ProjectFormControls';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ProjectDetailModal } from './ProjectDetailModal';
 import { ProjectPagination } from './ProjectPagination';
+import { TaskCreationNotice } from './TaskCreationNotice';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
 import { navigateToPage } from '../../lib/navigation';
 import { logoutAndReload } from '../../lib/auth-session';
@@ -23,6 +24,9 @@ export function ProjectsWorkspace({
   pendingTaskIds,
   taskWriteErrors,
   unverifiedTaskIds,
+  taskCreationStates,
+  inspectTaskCreation,
+  preserveUncertainTaskDraft,
   unverifiedProjectIds,
   projectVerificationPendingIds,
   projectVerificationErrors,
@@ -135,6 +139,9 @@ export function ProjectsWorkspace({
           pendingTaskIds={pendingTaskIds}
           taskWriteErrors={taskWriteErrors}
           unverifiedTaskIds={unverifiedTaskIds}
+          taskCreationState={taskCreationStates.get(selectedProject.id)}
+          onInspectTaskCreation={() => inspectTaskCreation(selectedProject.id)}
+          onPreserveTaskDraft={patch => preserveUncertainTaskDraft(selectedProject.id, patch)}
           onRetry={retryProjectDetails}
           onUpdateProject={updateProjectFromForm}
           onAddTask={addProjectTask}
@@ -181,6 +188,9 @@ export function ProjectsWorkspace({
         className="projects-shell"
       >
             <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+              {[...taskCreationStates].filter(([, state]) => state.uncertainTitle).map(([projectId, state]) => (
+                <TaskCreationNotice key={projectId} state={state} onInspect={() => inspectTaskCreation(projectId)} />
+              ))}
               {[...newProjectReceiptIssues].map(([key, issue]) => (
                 <div key={key} role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
                   <p className="font-semibold">{issue.kind === 'create' ? 'Création' : 'Duplication'} non vérifiée : {issue.title}</p>
@@ -326,6 +336,9 @@ export function ProjectsWorkspace({
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard
                     projects={filteredProjects}
+                    taskCreationStates={taskCreationStates}
+                    onInspectTaskCreation={inspectTaskCreation}
+                    onPreserveTaskDraft={preserveUncertainTaskDraft}
                     unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     columns={projectsPage?.kanban.columns ?? []}
@@ -344,6 +357,9 @@ export function ProjectsWorkspace({
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
                     projects={filteredProjects}
+                    taskCreationStates={taskCreationStates}
+                    onInspectTaskCreation={inspectTaskCreation}
+                    onPreserveTaskDraft={preserveUncertainTaskDraft}
                     unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     memberOptions={memberOptions}

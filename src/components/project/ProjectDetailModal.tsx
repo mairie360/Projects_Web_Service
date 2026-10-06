@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
+import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
+import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
 import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
 import { Button, ToolTip } from '@mairie360/lib-components';
 import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
@@ -35,6 +36,9 @@ export function ProjectDetailModal({
   pendingTaskIds,
   taskWriteErrors,
   unverifiedTaskIds,
+  taskCreationState,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
   onRetry,
   onUpdateProject,
   onAddTask,
@@ -58,6 +62,9 @@ export function ProjectDetailModal({
   pendingTaskIds?: ReadonlySet<string>;
   taskWriteErrors?: ReadonlyMap<string, string>;
   unverifiedTaskIds?: ReadonlySet<string>;
+  taskCreationState?: TaskCreationState;
+  onInspectTaskCreation?: () => void | Promise<void>;
+  onPreserveTaskDraft?: (patch: Partial<TaskFormState>) => void;
   onRetry?: () => void | Promise<void>;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
@@ -74,13 +81,18 @@ export function ProjectDetailModal({
   const projectSavingRef = React.useRef(false);
   const projectEditIdRef = React.useRef(project.id);
   const editingProjectRef = React.useRef(false);
-  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => createTaskFormState(project));
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? createTaskFormState(project));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
   const [taskFormVerificationError, setTaskFormVerificationError] = React.useState(false);
   const [taskSaving, setTaskSaving] = React.useState(false);
   const taskSavingRef = React.useRef(false);
+  const taskCreationNoticeRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (taskCreationState?.uncertainTitle && !taskSaving && !editingTaskId) taskCreationNoticeRef.current?.focus();
+  }, [taskCreationState?.uncertainTitle, taskSaving, editingTaskId]);
   const taskProjectIdRef = React.useRef(project.id);
+  const officialProjectRef = React.useRef<Project | null>(null);
   const [taskSearch, setTaskSearch] = React.useState('');
   const [taskStatusFilter, setTaskStatusFilter] = React.useState('all');
   const [taskPriorityFilter, setTaskPriorityFilter] = React.useState('all');
@@ -171,6 +183,10 @@ export function ProjectDetailModal({
   }, [taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
 
   React.useEffect(() => {
+    // Retained input changes are not a new official project response: do not
+    // reset task searches/filters or unrelated editors on each keystroke.
+    if (officialProjectRef.current === project) return;
+    officialProjectRef.current = project;
     const projectChanged = taskProjectIdRef.current !== project.id;
     // Official refreshes update defaults, never an active same-project draft.
     if (projectEditIdRef.current !== project.id || !editingProjectRef.current) {
@@ -183,7 +199,7 @@ export function ProjectDetailModal({
     // A same-project refresh must not discard an unsaved task or its retry.
     if (projectChanged) {
       taskProjectIdRef.current = project.id;
-      setTaskForm(createTaskFormState(project));
+      setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
       setEditingTaskId(null);
       setTaskFormError('');
       collaborationSelectionRef.current = null;
@@ -199,7 +215,7 @@ export function ProjectDetailModal({
     setTaskPriorityFilter('all');
     setTaskDueFilter('');
     setDeletingTaskId(null);
-  }, [project]);
+  }, [project, taskCreationState?.draft]);
 
   React.useEffect(() => () => {
     collaborationSelectionRef.current = null;
@@ -314,6 +330,7 @@ export function ProjectDetailModal({
 
   const updateTaskForm = (patch: Partial<TaskFormState>) => {
     setTaskForm((current) => ({ ...current, ...patch }));
+    if (!editingTaskId && taskCreationState?.uncertainTitle) onPreserveTaskDraft?.(patch);
     if (taskFormError) setTaskFormError('');
   };
 
@@ -373,6 +390,7 @@ export function ProjectDetailModal({
   const submitTask = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (taskSavingRef.current || projectSavingRef.current) return;
+    if (!editingTaskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return;
     if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
     if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
     setTaskFormVerificationError(false);
@@ -410,7 +428,7 @@ export function ProjectDetailModal({
       setEditingTaskId(null);
     } catch (error) {
       setTaskFormError(getBffProjectErrorMessage(error));
-      setTaskFormVerificationError(error instanceof ProjectTaskVerificationRequiredError);
+      setTaskFormVerificationError(error instanceof ProjectTaskVerificationRequiredError || error instanceof NewTaskReceiptVerificationRequiredError);
     } finally {
       taskSavingRef.current = false;
       setTaskSaving(false);
@@ -426,7 +444,7 @@ export function ProjectDetailModal({
 
   const cancelTaskEdit = () => {
     if (taskSavingRef.current || projectSavingRef.current) return;
-    setTaskForm(createTaskFormState(project));
+    setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
     setEditingTaskId(null);
     setTaskFormError('');
   };
@@ -557,13 +575,16 @@ export function ProjectDetailModal({
                     <Button
                       label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
-                      disabled={!!editingTaskId && (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId))}
+                      disabled={editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle)}
                       primary
-                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
+                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b] disabled:!cursor-not-allowed disabled:!opacity-50"
                     />
                   </div>
                   </fieldset>
                   </form>
+                  <div ref={taskCreationNoticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+                    <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
+                  </div>
                 </div>
               )}
 
