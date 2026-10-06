@@ -1,5 +1,16 @@
 # Projects_Web_Service — Présentation du module
 
+## Brouillons de tâches imbriquées indépendants (MAIR-408)
+
+Le formulaire projet attribue à chaque nouvelle tâche une clé locale distincte
+de toutes les tâches déjà présentes, même si l’horloge se répète ou recule.
+Cocher ou modifier une tâche n’altère pas les autres ; l’édition conserve sa clé
+et sa date de création. Ces clés servent uniquement à la présentation, sans
+revendiquer une identité serveur : le corps projet existant transmet les champs
+des tâches sans ces IDs locaux. Identités reçues, gardes d’écriture, permissions
+et confirmations canoniques restent inchangées. Aucun changement API/BFF/contrat
+n’est requis.
+
 ## Reçu incertain de nouvelle tâche (MAIR-408)
 
 La création depuis une carte ou la fiche vérifie un ID non vide distinct des
