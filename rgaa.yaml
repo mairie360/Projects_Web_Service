@@ -159,7 +159,7 @@ states:
     route: /
     steps:
       - click: { selector: '[data-project-id="project-102"] button:has-text("Ajouter une tâche")' }
-      - wait_for: { role: form, name: Créer une tâche }
+      - wait_for: { selector: '[data-project-id="project-102"] form' }
   # Card menu and the dialogs it opens (the deletion stops at the confirmation).
   - id: card-menu-open
     as: manager
@@ -180,14 +180,14 @@ states:
     steps:
       - click: { role: button, name: Actions pour Plan de mobilité douce }
       - click: { role: menuitem, name: Modifier }
-      - wait_for: { role: dialog, name: Modifier le projet }
+      - wait_for: { role: heading, name: Modifier le projet }
   # New project dialog: empty, submitted empty (browser validation), then without an assignee.
   - id: new-project-dialog
     as: manager
     route: /
     steps:
       - click: { role: button, name: Nouveau projet }
-      - wait_for: { role: dialog, name: Nouveau projet }
+      - wait_for: { role: heading, name: Nouveau projet }
   - id: new-project-empty-submit
     description: Submitted empty (browser validation of the required fields)
     as: manager
@@ -219,8 +219,9 @@ states:
     route: /
     steps:
       - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      - click: { role: button, name: Modifier, exact: true }
-      - wait_for: { role: form, name: Modifier le projet }
+      # The first "Modifier" of the dialog is the one of its header (the next ones edit a task).
+      - click: { selector: '[role="dialog"] button:text-is("Modifier") >> nth=0' }
+      - wait_for: { role: heading, name: Modifier le projet }
   - id: task-delete-confirmation
     description: Inline confirmation of a task deletion (stops there)
     as: manager
@@ -241,7 +242,7 @@ states:
     route: /?project=project-101&task=task-1002
     steps:
       - click: { selector: 'article[aria-current="true"] button:has-text("Suivi")' }
-      - wait_for: { role: textbox, name: Commentaire pour Remplacement des fenêtres }
+      - wait_for: { text: Aucune modification enregistrée. }
   - id: deep-link-invalid
     description: Invalid project link (error alert)
     as: manager
