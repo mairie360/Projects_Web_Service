@@ -94,7 +94,7 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 ## Architecture and request handling
 
-Next.js 16.3.6, React 19 and TypeScript application using the App Router. The browser calls same-origin routes; the Next.js server forwards data to **BFF_Project**.
+Next.js 16.3.8, React 19 and TypeScript application using the App Router. The browser calls same-origin routes; the Next.js server forwards data to **BFF_Project**.
 
 ```mermaid
 flowchart LR
@@ -220,14 +220,15 @@ Every response carries `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff
 
 ## Synchronization and verification
 
-The frontend dependency maintenance tracked in issue #23 raises the existing
-Next-scoped sharp override to `^0.35.5`. The lock changes only sharp and its
-platform binaries; the published Project contract, shared UI and Next pins
-remain unchanged. `tests/image-runtime.test.cjs` checks the locked/loaded
+The frontend dependency maintenance tracked in issue #23 keeps the existing
+Next-scoped sharp override at `^0.35.5`, pins Next and eslint-config-next to
+`16.3.8`, and resolves source-map-js to `1.2.2`. The 8 October follow-up changes
+only fourteen Next/source-map lock entries; the published Project contract
+and shared UI pins remain unchanged. `tests/image-runtime.test.cjs` checks the locked/loaded
 release, its prebuilt librsvg dependency and a harmless SVG-to-PNG conversion.
-Keep the npm release-age policy and full blocking audit unchanged. Removing
-the sharp advisory does not remove the independent braces/source-map-js
-findings, certify deployed images or permit merging a failing CI.
+Keep the npm release-age policy and full blocking audit unchanged. The braces
+finding remains independent. This maintenance does not certify deployed
+images or permit merging a failing CI.
 
 The contract comes from a **published** BFF_Project release. After a release, pin the new version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, never a `0.0.0-dev`/`staging` pre-release), move the `bff-project` image tags in `docker-compose*.yml` to the same version, then run:
 

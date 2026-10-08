@@ -96,7 +96,7 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 ## Architecture et traitement des requêtes
 
-Application Next.js 16.3.6, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
+Application Next.js 16.3.8, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
 
 ```mermaid
 flowchart LR
@@ -222,13 +222,14 @@ Toutes les réponses portent `X-Frame-Options: DENY`, `X-Content-Type-Options: n
 
 ## Synchronisation et vérifications
 
-La maintenance frontend suivie par l’issue #23 relève l’override sharp limité
-à Next vers `^0.35.5`. Le verrou ne change que sharp et ses binaires associés ;
-les versions du contrat Project publié, de la bibliothèque UI et de Next
-restent identiques. `tests/image-runtime.test.cjs` vérifie la version chargée
+La maintenance frontend suivie par l’issue #23 conserve l’override sharp limité
+à Next vers `^0.35.5`, épingle Next et eslint-config-next à `16.3.8` et résout
+source-map-js à `1.2.2`. Le complément du 8 octobre ne change que quatorze
+entrées du verrou liées à Next et source-map ; les versions du contrat Project
+publié et de la bibliothèque UI restent identiques. `tests/image-runtime.test.cjs` vérifie la version chargée
 et verrouillée, librsvg précompilé et une conversion SVG-to-PNG bénigne.
-Conserver le délai npm et l’audit bloquant intégral. La correction sharp ne
-supprime pas les alertes indépendantes braces/source-map-js, ne certifie pas
+Conserver le délai npm et l’audit bloquant intégral. L’alerte braces reste
+indépendante. Cette maintenance ne certifie pas
 une image déployée et n’autorise pas la fusion d’une CI en échec.
 
 Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :

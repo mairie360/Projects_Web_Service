@@ -17,22 +17,28 @@ Les guides décrivent le module implémenté, ses limites actuelles, le démarra
 
 ## Frontend checks / Vérifications du front
 
-### Image runtime maintenance / Maintenance du moteur d’images — issue #23
+### Runtime dependency maintenance / Maintenance des dépendances — issue #23
 
 The Next image runtime uses `sharp >=0.35.5` through the existing scoped
 override and lock, including the corrected prebuilt librsvg dependency.
 `tests/image-runtime.test.cjs` checks the installed/locked runtime and renders
 one harmless SVG to PNG. No business data, BFF contract or workflow changes.
-The seven-day npm policy and blocking security checks remain active. This
-partial correction does not resolve the independent braces/source-map-js
-findings or establish that the full CI is green.
+Next and eslint-config-next are pinned to `16.3.8`, and source-map-js resolves
+to `1.2.2` within its existing parent ranges. Only the corresponding Next and
+source-map lock entries change in this follow-up; the published Project
+contract and shared UI remain pinned to their existing releases. The seven-day
+npm policy and blocking security checks remain active. The independent braces
+finding remains unresolved; this maintenance does not establish green CI.
 
 Le moteur d’images Next utilise `sharp >=0.35.5` via l’override ciblé et le
 verrou existants, avec librsvg corrigé. Les régressions vérifient la version
 réellement chargée et convertissent un SVG bénin en PNG. Aucun contrat BFF,
-workflow ou donnée métier ne change. Le délai npm de sept jours et les
-contrôles bloquants restent actifs ; les alertes indépendantes braces et
-source-map-js ne sont pas résolues par ce seul correctif.
+workflow ou donnée métier ne change. Next et eslint-config-next sont épinglés
+à `16.3.8` ; source-map-js est verrouillé à `1.2.2` dans les plages parentes
+existantes. Ce complément ne change que les entrées Next et source-map du
+verrou, en conservant les versions publiées du contrat Project et de l’UI.
+Le délai npm de sept jours et les contrôles bloquants restent actifs ;
+l’alerte indépendante braces reste ouverte et la CI n’est pas déclarée verte.
 
 ### Protected navigation after a redirect / Navigation protégée après redirection — MAIR-408
 

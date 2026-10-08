@@ -19,7 +19,7 @@
     "@mairie360/bff-project-openapi": "0.4.0",
     "@mairie360/lib-components": "0.6.10",
     "daisyui": "^5.0.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -38,7 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "jest-axe": "11.0.0",
     "jsdom": "30.1.1",
     "tailwindcss": "^4.0.12",
