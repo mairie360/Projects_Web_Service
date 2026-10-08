@@ -34,8 +34,8 @@ test('the exact required legacy status executes both real blocking scanners with
 
 test('the existing reusable frontend workflow keeps its blocking defaults and only declared secrets', () => {
   assert.deepEqual(workflow().jobs.CICD, {
-    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@v4.1.1',
-    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: 'v4.1.1' },
+    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@v4.2.0',
+    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: 'v4.2.0' },
     secrets: {
       CODECOV_TOKEN: '${{ secrets.CODECOV_TOKEN }}',
       N8N_WEBHOOK_SECRET: '${{ secrets.N8N_WEBHOOK_SECRET }}',
