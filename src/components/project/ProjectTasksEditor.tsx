@@ -16,7 +16,6 @@ import {
   createPersonFromOptionValue,
   formatInputDate,
   getPersonValue,
-  getUniqueValues,
   type FilterOption,
   type ProjectFormState,
   type TaskFormState,
@@ -40,30 +39,48 @@ function createTaskSummaryPatch(taskItems: ProjectTask[]): Pick<ProjectFormState
   };
 }
 
-function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskFormState {
+function createDraftTaskId(taskItems: ProjectTask[]): string {
+  const base = `task-${Date.now()}`;
+  const existingIds = new Set(taskItems.map((task) => task.id));
+  let candidate = base;
+  let suffix = 0;
+  while (existingIds.has(candidate)) {
+    candidate = `${base}-${++suffix}`;
+  }
+  return candidate;
+}
+
+// null is private draft state: use the live project default until the date is
+// explicitly chosen or cleared. Existing tasks always own their string date.
+type TaskDraftFormState = Omit<TaskFormState, 'dueDate'> & { dueDate: string | null };
+
+function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskDraftFormState {
   return {
     title: '',
     status: form.status,
     priority: form.priority,
     assignees: [],
     labels: [],
-    dueDate: form.dueDate,
+    dueDate: null,
   };
 }
 
 export function taskToFormState(task: ProjectTask): TaskFormState {
-  const assigneeNames = task.assignees?.length
-    ? task.assignees.map(getPersonValue)
-    : [getPersonValue(task.responsible)];
+  const assigneeNames = [getPersonValue(task.responsible), ...(task.assignees ?? []).map(getPersonValue)];
 
   return {
     title: task.title,
     status: task.status,
     priority: task.priority,
-    assignees: getUniqueValues(assigneeNames),
+    assignees: uniqueAssigneesInOrder(assigneeNames),
     labels: task.labels,
     dueDate: task.dueDate,
   };
+}
+
+export function uniqueAssigneesInOrder(values: string[]): string[] {
+  // The first assignee carries the primary choice; sorting IDs reassigns tasks.
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 export function ProjectTasksEditor({
@@ -81,20 +98,20 @@ export function ProjectTasksEditor({
   priorityOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
 }) {
-  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() =>
+  const [taskForm, setTaskForm] = React.useState<TaskDraftFormState>(() =>
     createTaskFormStateFromProjectForm(form)
   );
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
+  const taskDueDate = taskForm.dueDate ?? form.dueDate;
 
   React.useEffect(() => {
     setTaskForm((current) => ({
       ...current,
       status: current.title ? current.status : form.status,
       priority: current.title ? current.priority : form.priority,
-      dueDate: current.dueDate || form.dueDate,
     }));
-  }, [form.dueDate, form.priority, form.status]);
+  }, [form.priority, form.status]);
 
   const updateTaskForm = (patch: Partial<TaskFormState>) => {
     setTaskForm((current) => ({ ...current, ...patch }));
@@ -112,7 +129,7 @@ export function ProjectTasksEditor({
       return;
     }
 
-    const assigneeValues = getUniqueValues(
+    const assigneeValues = uniqueAssigneesInOrder(
       taskForm.assignees.length > 0 ? taskForm.assignees : [form.responsible]
     );
     if (assigneeValues.length === 0) {
@@ -123,14 +140,14 @@ export function ProjectTasksEditor({
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const responsible = assignees[0];
     const task: ProjectTask = {
-      id: editingTaskId ?? `task-${Date.now()}`,
+      id: editingTaskId ?? createDraftTaskId(form.taskItems),
       title,
       status: taskForm.status,
       responsible,
       assignees,
       priority: taskForm.priority,
       labels: taskForm.labels,
-      dueDate: taskForm.dueDate,
+      dueDate: taskDueDate,
       completed: taskForm.status === 'done',
       createdAt: formatInputDate(new Date()),
     };
@@ -229,7 +246,7 @@ export function ProjectTasksEditor({
               <input
                 id="project-form-task-due-date"
                 type="date"
-                value={taskForm.dueDate}
+                value={taskDueDate}
                 className={fieldClassName}
                 onChange={(event) => updateTaskForm({ dueDate: event.target.value })}
               />

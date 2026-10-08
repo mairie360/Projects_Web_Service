@@ -149,6 +149,11 @@ function EmptyState() {
 
 export function GridView({
   projects,
+  taskCreationStates,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
+  duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   memberOptions,
   labelOptions,
   onProjectOpen,
@@ -158,6 +163,11 @@ export function GridView({
   onProjectTaskAdd,
 }: {
   projects: Project[];
+  taskCreationStates?: ReadonlyMap<string, import('./TaskCreationNotice').TaskCreationState>;
+  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
+  onPreserveTaskDraft?: import('../project-card/types').ProjectCardProps['onPreserveTaskDraft'];
+  duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
@@ -175,6 +185,11 @@ export function GridView({
           key={project.id}
           project={project}
           variant="grid"
+          taskCreationState={taskCreationStates?.get(project.id)}
+          onInspectTaskCreation={onInspectTaskCreation}
+          onPreserveTaskDraft={onPreserveTaskDraft}
+          duplicationPending={duplicatingProjectIds.includes(project.id)}
+          duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
           onOpen={onProjectOpen}
@@ -190,12 +205,16 @@ export function GridView({
 
 export function TableView({
   projects,
+  duplicatingProjectIds = [],
+  unverifiedDuplicationSourceIds,
   onProjectOpen,
   onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
 }: {
   projects: Project[];
+  duplicatingProjectIds?: string[];
+  unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   onProjectOpen: (project: Project) => void;
   onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
@@ -253,6 +272,8 @@ export function TableView({
                 <td className="px-5 py-4">
                   <ProjectActionsMenu
                     project={project}
+                    duplicationPending={duplicatingProjectIds.includes(project.id)}
+                    duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
                     onEdit={onProjectEdit}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}

@@ -1,5 +1,50 @@
 # Projects_Web_Service — Documentation technique
 
+## Assignés de tâches ordonnés — MAIR-408
+
+`uniqueAssigneesInOrder` trimme, filtre et déduplique avec un `Set` ordonné, sans
+utiliser le helper trié de catalogue `getUniqueValues` (inchangé).
+`taskToFormState` place le responsable réellement reçu avant ses autres membres
+et déduplique. Sauvegardes imbriquées et fiche utilisent le même helper ordonné ;
+choix, retraits et fallback restent dans les handlers existants. Aucun nouvel
+effet, appel, champ de contrat, DTO ou backend. Les tests vérifient responsable
+et membres indépendamment des labels optionnels du reçu, puis les corps réels
+POST projet/POST-PATCH tâche et le refus/réessai explicite identique.
+
+## Défaut de date des tâches imbriquées — MAIR-408
+
+`ProjectTasksEditor` conserve une date privée `string | null` : `null` signifie
+non choisie, toute chaîne (y compris `''`) appartient à la tâche. La date rendue
+et enregistrée est `draft.dueDate ?? form.dueDate`, sans copie dans un effet.
+Les dates des tâches existantes restent des chaînes. Le marqueur ne modifie ni
+`TaskFormState`, ni la tâche de présentation, ni le DTO, proxy ou BFF. Les
+régressions composant couvrent années intermédiaires, brouillon titré, choix,
+effacement, édition et annulation ; la régression page/harnais réel vérifie les
+dates parent/tâches du POST unique, l’absence de marqueur/ID et le reçu canonique.
+
+## Redirections opaques du client navigateur — MAIR-408
+
+`requestBff` impose `redirect: 'manual'` puis vérifie l’AbortSignal après réception.
+Le type `opaqueredirect` est traité avant statut, en-têtes et corps :
+`BffProjectNavigationRequiredError` signale la navigation sans supposer un 401
+ni inspecter Location. Un WeakSet indexé par Location limite les réponses
+parallèles à un rechargement du document ; aucune lecture ni mutation n’est
+rejouée. Le middleware inchangé construit Login et le retour au document initial.
+Le cleanup 401 existant reste conservé. Erreurs réseau et vrais 403/503 ne
+rechargent pas la page. Routes, méthodes et payloads contractuels sont inchangés.
+
+## Construction des credentials frontend — MAIR-408
+
+`createRequestHeaders` ajoute seulement Accept et Content-Type JSON par défaut
+et conserve les en-têtes explicitement fournis. Il n’appelle plus les helpers
+de jeton stocké. Le proxy same-origin inchangé dérive Authorization du cookie
+HttpOnly en l’absence d’en-tête explicite ; l’authentification serveur ne change
+pas. Les helpers historiques restent disponibles mais ne sont pas branchés sur
+la construction des requêtes Projects. Le cleanup existant après401 est conservé.
+Les tests client avec contrat couvrent stockage ancien/actuel/historique, priorité
+du cookie, stockage refusé, lectures et duplication ; ils ne certifient pas un
+stockage navigateur ou une session déployée de bout en bout.
+
 ## Pied de page partagé — MAIR-180
 
 L’audit CI inchangé a détecté la dépendance d’outillage transitive
@@ -51,7 +96,7 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 ## Architecture et traitement des requêtes
 
-Application Next.js 16.3.6, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
+Application Next.js 16.3.8, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
 
 ```mermaid
 flowchart LR
@@ -59,7 +104,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestre vues et formulaires. `bffProjectClient.ts` adapte le contrat au modèle de présentation; `projectPageState.ts` centralise la mise à jour de l’état de page. Les composants du dossier `src/components/project` portent les formulaires et détails.
+`src/app/page.tsx` compose le contrôleur stable `useProjectsController` et
+`ProjectsWorkspace`. Le contrôleur conserve état/effets, révisions des lectures
+et gardes synchrones des mutations ; le rendu utilise ses props inférées sans
+lecture supplémentaire ni état métier dupliqué. Les dialogues sont importés
+directement depuis `CreateProjectModal.tsx` et `ProjectDetailModal.tsx`.
+Ordre des hooks, corps des callbacks, focus et protections pendant l'attente
+restent identiques. `bffProjectClient.ts` adapte toujours le contrat et
+`projectPageState.ts` centralise les mises à jour. Les tâches/collaborations du
+détail restent un volet d'audit distinct ; ce découpage ne certifie ni révocation,
+persistance des métadonnées, déploiement ou totalité de MAIR-408.
 
 Le proxy générique lit le contrat OpenAPI versionné pour autoriser chemins et méthodes. Il conserve paramètres de requête, corps binaire, statuts et en-têtes utiles, filtre les en-têtes de transport, désactive le cache et n’effectue pas de suivi automatique des redirections. Son délai est de 15 secondes.
 
@@ -167,6 +221,16 @@ Le proxy générique répond 400 pour un chemin invalide, 404 pour un chemin hor
 Toutes les réponses portent `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` et `Cross-Origin-Resource-Policy`, `Cross-Origin-Embedder-Policy` et `Cross-Origin-Opener-Policy` (`next.config.ts`), et `X-Powered-By` est désactivé. Pour les requêtes authentifiées, [src/middleware.ts](../../src/middleware.ts) ajoute une `Content-Security-Policy` avec un nonce propre à chaque requête, que Next.js applique à ses scripts. Les pages sont donc rendues à la demande (`dynamic = "force-dynamic"` dans le layout). Les feuilles de style sont limitées à l'origine et au nonce ; seuls les attributs `style` rendus par les composants passent par `style-src-attr 'unsafe-inline'`, et `next dev` autorise aussi `'unsafe-eval'`. Toute nouvelle ressource externe (image, police, API appelée depuis le navigateur) doit être ajoutée à la politique dans `src/lib/content-security-policy.ts`.
 
 ## Synchronisation et vérifications
+
+La maintenance frontend suivie par l’issue #23 conserve l’override sharp limité
+à Next vers `^0.35.5`, épingle Next et eslint-config-next à `16.3.8` et résout
+source-map-js à `1.2.2`. Le complément du 8 octobre ne change que quatorze
+entrées du verrou liées à Next et source-map ; les versions du contrat Project
+publié et de la bibliothèque UI restent identiques. `tests/image-runtime.test.cjs` vérifie la version chargée
+et verrouillée, librsvg précompilé et une conversion SVG-to-PNG bénigne.
+Conserver le délai npm et l’audit bloquant intégral. L’alerte braces reste
+indépendante. Cette maintenance ne certifie pas
+une image déployée et n’autorise pas la fusion d’une CI en échec.
 
 Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :
 

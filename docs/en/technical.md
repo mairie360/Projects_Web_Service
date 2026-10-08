@@ -1,5 +1,49 @@
 # Projects_Web_Service — Technical documentation
 
+## Ordered task assignees — MAIR-408
+
+`uniqueAssigneesInOrder` trims, filters and deduplicates using insertion-order
+`Set`; it does not use the sorted catalogue helper `getUniqueValues` (unchanged).
+`taskToFormState` prefixes the actual received responsible before deduplicating
+its supplied members. Both nested and detail saves use the same ordered helper;
+picker choices, removal and fallback stay existing handlers. No new effect,
+request, contract field, DTO or backend change. Regression tests verify primary
+identity/membership independently of optional receipt labels, and actual project
+POST/detail POST/PATCH bodies plus refusal/identical explicit retry.
+
+## Nested-task date default — MAIR-408
+
+`ProjectTasksEditor` keeps a private `string | null` draft date: `null` means
+unchosen, while any string (including `''`) is owned by the task. The rendered
+and saved date is `draft.dueDate ?? form.dueDate`, not a copy in an effect.
+Existing task dates stay strings. The sentinel never changes `TaskFormState`,
+the presentation task, contract DTO, proxy or BFF. Component regressions cover
+intermediate years, a titled draft, chosen/cleared dates, existing-task edits
+and cancellation; the real page/harness regression checks the single project
+POST's parent/nested dates, absence of markers/IDs and canonical receipt.
+
+## Opaque redirects in the browser client — MAIR-408
+
+`requestBff` sets `redirect: 'manual'` and checks the AbortSignal after the
+response arrives. `opaqueredirect` is handled before status, headers or body:
+`BffProjectNavigationRequiredError` signals navigation, without guessing a 401
+or inspecting Location. A WeakSet keyed by the current Location limits parallel
+responses to one document reload; it does not retry reads or mutations. The
+unchanged middleware builds Login and the original document return URL.
+Existing 401 cleanup is preserved. Generic transport errors and real 403/503
+remain errors without reload. Contract paths, methods and payloads are unchanged.
+
+## Frontend credential construction — MAIR-408
+
+`createRequestHeaders` only provides Accept and JSON Content-Type defaults and
+preserves caller-supplied headers. It does not invoke stored-token helpers. The
+unchanged same-origin proxy derives Authorization from the HttpOnly cookie when
+there is no explicit header; server authentication is not changed. Legacy
+helpers remain available but are not used by project request construction.
+Existing401 logout cleanup is preserved. Contract-backed client tests cover
+stale/current and legacy storage, cookie precedence, storage denial, reads and
+duplication; they do not prove browser storage or a deployed session end-to-end.
+
 ## Shared footer — MAIR-180
 
 The unchanged CI audit exposed the transitive tooling dependency
@@ -50,7 +94,7 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 ## Architecture and request handling
 
-Next.js 16.3.6, React 19 and TypeScript application using the App Router. The browser calls same-origin routes; the Next.js server forwards data to **BFF_Project**.
+Next.js 16.3.8, React 19 and TypeScript application using the App Router. The browser calls same-origin routes; the Next.js server forwards data to **BFF_Project**.
 
 ```mermaid
 flowchart LR
@@ -58,7 +102,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestrates views and forms. `bffProjectClient.ts` adapts the contract to the presentation model; `projectPageState.ts` centralizes page-state updates. Components in `src/components/project` implement forms and details.
+`src/app/page.tsx` composes the stable `useProjectsController` and
+`ProjectsWorkspace`. The controller retains the page's state/effects, read
+revisions and synchronous mutation guards; the workspace renders inferred props
+without extra reads or local business state. Creation and detail dialogs are
+directly imported from `CreateProjectModal.tsx` and `ProjectDetailModal.tsx`.
+Their existing hook order, callback bodies, focus and pending behavior are
+preserved. `bffProjectClient.ts` still adapts the contract and `projectPageState.ts`
+centralizes page-state updates. The detail's task/collaboration workflow remains
+a separate audit item; these boundaries do not certify logout revocation,
+metadata persistence, deployment or the whole MAIR-408 audit.
 
 The generic proxy reads the versioned OpenAPI contract to allow paths and methods. It preserves query parameters, binary bodies, statuses and useful headers, filters transport headers, disables caching and does not automatically follow redirects. Its timeout is 15 seconds.
 
@@ -166,6 +219,16 @@ The generic proxy returns 400 for an invalid path, 404 for a path outside the co
 Every response carries `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` and `Cross-Origin-Resource-Policy`, `Cross-Origin-Embedder-Policy` and `Cross-Origin-Opener-Policy` (`next.config.ts`), and `X-Powered-By` is disabled. For authenticated requests, [src/middleware.ts](../../src/middleware.ts) adds a `Content-Security-Policy` with a per-request nonce, which Next.js applies to its scripts. Pages are therefore rendered on demand (`dynamic = "force-dynamic"` in the layout). Stylesheets are limited to the origin and the nonce; only `style` attributes rendered by components are allowed through `style-src-attr 'unsafe-inline'`, and `next dev` also allows `'unsafe-eval'`. Any new external resource (image, font, API called from the browser) must be added to the policy in `src/lib/content-security-policy.ts`.
 
 ## Synchronization and verification
+
+The frontend dependency maintenance tracked in issue #23 keeps the existing
+Next-scoped sharp override at `^0.35.5`, pins Next and eslint-config-next to
+`16.3.8`, and resolves source-map-js to `1.2.2`. The 8 October follow-up changes
+only fourteen Next/source-map lock entries; the published Project contract
+and shared UI pins remain unchanged. `tests/image-runtime.test.cjs` checks the locked/loaded
+release, its prebuilt librsvg dependency and a harmless SVG-to-PNG conversion.
+Keep the npm release-age policy and full blocking audit unchanged. The braces
+finding remains independent. This maintenance does not certify deployed
+images or permit merging a failing CI.
 
 The contract comes from a **published** BFF_Project release. After a release, pin the new version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, never a `0.0.0-dev`/`staging` pre-release), move the `bff-project` image tags in `docker-compose*.yml` to the same version, then run:
 

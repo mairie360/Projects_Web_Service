@@ -67,8 +67,9 @@ describe('lecture des projets', () => {
     assert.equal(page.access.role, 'Responsable');
   });
 
-  test('sans filtre ni cookie, le jeton stocké (y compris la clé historique) sert d’Authorization', async () => {
+  test('sans cookie, aucun jeton de stockage actuel ou historique ne devient une Authorization', async () => {
     harness.cookies.clear();
+    harness.storage.setItem('mairie360.auth.jwt', 'stale-session');
     harness.storage.setItem('mairie360.projects.jwt', ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
@@ -76,18 +77,43 @@ describe('lecture des projets', () => {
 
     const call = onlyCall('/projects-page', 'get');
     assert.equal(call.url.search, '');
-    assert.equal(call.headers.authorization, bearer(fixtures.agents.alice));
-    assert.equal(client.getStoredBffProjectJwtToken(), fixtures.jwt(fixtures.agents.alice.id));
-    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), fixtures.jwt(fixtures.agents.alice.id));
+    assert.equal(call.headers.authorization, undefined);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'stale-session');
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
   });
 
-  test('un en-tête Authorization explicite n’est jamais remplacé par le cookie', async () => {
+  test('un jeton stocké ne remplace jamais la session valide du cookie', async () => {
     client.storeBffProjectJwtToken('Bearer explicit-session');
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
     await client.getProjectsPage({ view: 'kanban' });
 
-    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, 'Bearer explicit-session');
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
+    assert.equal(harness.cookies.has('accessToken'), true);
+  });
+
+  test('la lecture des projets ne lit ni ne migre le stockage hérité', async (t) => {
+    harness.storage.setItem('mairie360.projects.jwt', fixtures.jwt(fixtures.agents.alice.id));
+    const read = t.mock.method(harness.storage, 'getItem', () => { throw new Error('Storage inaccessible'); });
+    const write = t.mock.method(harness.storage, 'setItem', () => { throw new Error('Storage inaccessible'); });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
+
+    await client.getProjectsPage();
+
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(read.mock.callCount(), 0);
+    assert.equal(write.mock.callCount(), 0);
+  });
+
+  test('une mutation ne transmet aucun jeton stocké en remplacement du cookie', async () => {
+    harness.storage.setItem('mairie360.auth.jwt', 'expired-local-token');
+    bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: fixtures.projectDetails() });
+
+    await client.duplicateProject('project-1');
+
+    assert.equal(onlyCall('/projects/{projectId}/duplicate', 'post').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
   });
 
   test('clearStoredBffProjectJwtToken efface le jeton stocké', () => {
@@ -250,6 +276,78 @@ describe('écritures sur les tâches', () => {
 });
 
 describe('erreurs du BFF', () => {
+  test('les redirections opaques des lectures rechargent la page protégée sans inspecter ni suivre leur destination', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return Object.defineProperties({ type: 'opaqueredirect' }, {
+        status: { get() { throw new Error('opaque status must not be read'); } },
+        ok: { get() { throw new Error('opaque status must not be read'); } },
+        headers: { get() { throw new Error('opaque Location must not be read'); } },
+        json: { get() { throw new Error('opaque body must not be read'); } },
+      });
+    });
+
+    const results = await Promise.allSettled([
+      client.getProjectsPage({ q: 'éclairage' }),
+      client.getProjectDetails('project-1'),
+      client.getTaskCollaboration('project-1', 'task-1'),
+    ]);
+
+    assert.ok(results.every(result => result.status === 'rejected' && result.reason.name === 'BffProjectNavigationRequiredError'));
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 3);
+    assert.ok(requests.every(({ init }) => init.redirect === 'manual'));
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('une redirection opaque après mutation ne réémet pas automatiquement cette mutation', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.duplicateProject('project-1'), { name: 'BffProjectNavigationRequiredError' });
+
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].path, '/projects/project-1/duplicate');
+    assert.equal(requests[0].init.method, 'POST');
+    assert.equal(requests[0].init.redirect, 'manual');
+    assert.equal(requests[0].init.body, undefined);
+  });
+
+  test('une réponse opaque annulée ne déclenche aucune navigation', async (t) => {
+    const controller = new AbortController();
+    t.mock.method(global, 'fetch', async () => {
+      controller.abort();
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.getProjectsPage({}, controller.signal), { name: 'AbortError' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('un refus réseau générique ne devient ni une session expirée ni une navigation', async (t) => {
+    t.mock.method(global, 'fetch', async () => { throw new TypeError('Network unavailable'); });
+
+    await assert.rejects(client.getProjectsPage(), { name: 'TypeError', message: 'Network unavailable' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
   test('les erreurs ApiError documentées deviennent des BffProjectError typées', async () => {
     const cases = [
       [400, () => client.createProject(client.createProjectBodyFromForm(projectForm())), 'post', '/projects', fixtures.apiError('BAD_REQUEST', 'Titre requis', [{ path: 'title' }])],

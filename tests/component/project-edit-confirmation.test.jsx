@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectDetailModal } from "@/components/project/ProjectModals";
+import { ProjectDetailModal } from "@/components/project/ProjectDetailModal";
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
