@@ -281,3 +281,5 @@ For a proxy error, compare the path and method with the inventory, then check th
 - [docker-compose.yml](../../docker-compose.yml)
 
 Historical supplements: [BFF.md](../../BFF.md), [BACKEND.md](../../BACKEND.md). Proposed requirements must remain distinct from implemented behavior.
+
+The computed sidebar-shadow check accepts the valid color-first and color-last CSS forms, while retaining all offset/blur/spread/color constraints. This changes only the test parser; application styles and dependencies remain unchanged.

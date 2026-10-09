@@ -307,3 +307,5 @@ En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, 
 - [docker-compose.yml](../../docker-compose.yml)
 
 Compléments historiques: [BFF.md](../../BFF.md), [BACKEND.md](../../BACKEND.md). Les besoins proposés doivent rester distincts du comportement effectivement implémenté.
+
+Le contrôle de l’ombre calculée accepte les formes CSS valides avec la couleur en début ou en fin, tout en conservant les contraintes de décalage, flou, étalement et couleur. Seul le parseur du test change ; styles du produit et dépendances restent inchangés.

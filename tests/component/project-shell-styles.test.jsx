@@ -31,23 +31,22 @@ describe('Projects styles applied to the published shell', () => {
     expect(computed.position).toBe('relative');
     expect(computed.zIndex).toBe('20');
     // This is computed CSS output, not matching a stylesheet source selector.
-    const shadowParts = computed.boxShadow.split(/\s+(?![^()]*\))/);
-    const pixels = (value) => {
-      const number = parseFloat(value);
+    const tokens = computed.boxShadow.trim().split(/\s+(?![^()]*\))/);
+    const lengths = tokens.filter(token => Number.isFinite(Number.parseFloat(token)));
+    const colors = tokens.filter(token => !Number.isFinite(Number.parseFloat(token)));
+    expect([3, 4]).toContain(lengths.length);
+    expect(colors).toHaveLength(1);
+    const pixels = lengths.map(value => {
+      const number = Number.parseFloat(value);
       expect(number === 0 || value.toLowerCase().endsWith('px')).toBe(true);
       return number;
-    };
-    expect(shadowParts.slice(0, 3).map(pixels)).toEqual([8, 0, 24]);
-    const explicitSpread = Number.isFinite(parseFloat(shadowParts[3]));
-    if (explicitSpread) expect(pixels(shadowParts[3])).toBe(0);
+    });
+    if (pixels.length === 3) pixels.push(0);
+    expect(pixels).toEqual([8, 0, 24, 0]);
     const color = document.createElement('span');
-    color.style.color = shadowParts.slice(explicitSpread ? 4 : 3).join(' ');
-    document.body.append(color);
-    try {
-      expect(getComputedStyle(color).color).toBe('rgba(12, 28, 48, 0.28)');
-    } finally {
-      color.remove();
-    }
+    color.style.color = colors[0]; document.body.append(color);
+    try { expect(getComputedStyle(color).color).toBe('rgba(12, 28, 48, 0.28)'); }
+    finally { color.remove(); }
     const navigation = within(sidebar).getByRole('navigation', { name: 'Menu principal' });
     const buttons = within(navigation).getAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual(defaultSidebarItems.map(({ label }) => label));
