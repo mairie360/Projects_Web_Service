@@ -85,7 +85,7 @@ export function navigateToLogin() {
   window.location.assign(login.href);
 }
 
-/** Cookies are expired by Login only after its revocation response is received. */
+/** Explicit logout checks Login's revocation receipt before clearing legacy browser storage. */
 export async function logoutAndReload() {
   if (typeof window === 'undefined') return;
   const location = window.location;
