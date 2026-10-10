@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const { root } = require('./typescript.cjs');
+const { propertyName } = require('./source-policy.cjs');
 
 // Inventaire statique (AST TypeScript) de tout ce qui peut émettre une requête réseau dans `src/` :
 // appels `fetch`, appels du client `requestBff`, appelants de la passerelle serveur `forwardToBff`, et
@@ -63,7 +64,7 @@ function pathOf(node) {
 function methodOf(init) {
   if (!init) return 'GET';
   if (!ts.isObjectLiteralExpression(init)) return undefined;
-  const property = init.properties.find((candidate) => ts.isPropertyAssignment(candidate) && candidate.name.getText() === 'method');
+  const property = init.properties.find((candidate) => ts.isPropertyAssignment(candidate) && propertyName(candidate.name) === 'method');
   if (!property) return 'GET';
   const value = property.initializer;
   return ts.isStringLiteral(value) && HTTP_METHODS.has(value.text.toUpperCase()) ? value.text.toUpperCase() : undefined;
