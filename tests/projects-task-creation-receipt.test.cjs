@@ -119,7 +119,7 @@ test('same-project concurrent creation rejects skipped callbacks and retains the
   harness.bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: f.projectTask({ id: 'new-real-id' }) });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await fetch(...args);
-    if (args[0] === `/projects/${project.id}/tasks` && args[1]?.method === 'POST') { ready.resolve(); await gate.promise; }
+    if (args[0] === `/api/bff/projects/${project.id}/tasks` && args[1]?.method === 'POST') { ready.resolve(); await gate.promise; }
     return response;
   });
   try {
@@ -141,7 +141,7 @@ test('an intervening coherent detail GET may observe a new ID before its valid c
   harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [original, created]) });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await fetch(...args);
-    if (args[0] === `/projects/${project.id}/tasks` && args[1]?.method === 'POST') { ready.resolve(); await gate.promise; }
+    if (args[0] === `/api/bff/projects/${project.id}/tasks` && args[1]?.method === 'POST') { ready.resolve(); await gate.promise; }
     return response;
   });
   try {
@@ -159,7 +159,7 @@ test('inspection is single-flight and cannot reopen a closed or different projec
   const gate = Promise.withResolvers(), ready = Promise.withResolvers(); const fetch = global.fetch; let pending;
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await fetch(...args);
-    if (args[0] === `/projects/${project.id}`) { ready.resolve(); await gate.promise; }
+    if (args[0] === `/api/bff/projects/${project.id}`) { ready.resolve(); await gate.promise; }
     return response;
   });
   const before = harness.bffProject.requests.length;

@@ -136,7 +136,7 @@ test('two catalogue verification dispatches share a pending GET and never clear 
   const ready = new Promise(resolve => { received = resolve; });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await originalFetch(...args);
-    if (String(args[0]).startsWith('/projects-page')) { received(); await gate; }
+    if (String(args[0]).startsWith('/api/bff/projects-page')) { received(); await gate; }
     return response;
   });
   const reads = harness.bffProject.requests.length;
@@ -166,7 +166,7 @@ test('a late duplicate cannot reuse the ID already confirmed by a different new-
   const ready = new Promise(resolve => { received = resolve; });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await originalFetch(...args);
-    if (args[0] === `/projects/${first.id}/duplicate` && args[1]?.method === 'POST') {
+    if (args[0] === `/api/bff/projects/${first.id}/duplicate` && args[1]?.method === 'POST') {
       received(); await gate;
     }
     return response;
@@ -274,7 +274,7 @@ test('two distinct-receipt verification dispatches share GET and retain a contin
   const ready = new Promise(resolve => { received = resolve; });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await originalFetch(...args);
-    if (args[0] === `/projects/${created.id}`) { received(); await gate; }
+    if (args[0] === `/api/bff/projects/${created.id}`) { received(); await gate; }
     return response;
   });
   const reads = harness.bffProject.requests.length;
@@ -322,7 +322,7 @@ test('an abandoned consultation cannot resolve a distinct receipt or reopen anot
   const ready = new Promise(resolve => { received = resolve; });
   t.mock.method(global, 'fetch', async (...args) => {
     const response = await originalFetch(...args);
-    if (args[0] === `/projects/${created.id}`) { received(); await gate; }
+    if (args[0] === `/api/bff/projects/${created.id}`) { received(); await gate; }
     return response;
   });
   try {

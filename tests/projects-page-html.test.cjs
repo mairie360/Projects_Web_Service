@@ -1049,7 +1049,7 @@ test('task follow-up ignores a late response from a previously selected task', a
   const originalFetch = global.fetch;
   t.mock.method(global, 'fetch', async (target, init) => {
     const response = await originalFetch(target, init);
-    if (typeof target === 'string' && target === '/projects/project-1/tasks/task-1/collaboration') await gate;
+    if (typeof target === 'string' && target === '/api/bff/projects/project-1/tasks/task-1/collaboration') await gate;
     return response;
   });
   bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: {
@@ -1340,4 +1340,19 @@ test('the detail modal edits the project inline, adds a task from its form and c
 
   await view.click((props) => props['aria-label'] === 'Fermer la fiche projet');
   assert.equal(view.find('ProjectDetailModal').length, 0);
+});
+
+test('an unavailable logout stays visible in the existing alert and an explicit retry can close the session', async () => {
+  await renderLoadedPage();
+  harness.replyFromOwner(() => Response.json({ message: 'Unavailable' }, { status: 503 }));
+  await view.act(() => view.props('ProjectsWorkspace').logout());
+  assert.match(view.text(), /La déconnexion n’a pas abouti\. Veuillez réessayer\./);
+  assert.deepEqual(harness.location.assigned, []);
+  assert.equal(harness.cookies.has('accessToken'), true);
+  harness.replyFromOwner(undefined);
+  harness.bffUser.on('post', '/auth/logout', { body: { message: 'Logged out successfully', session_revoked: true } });
+  await view.act(() => view.props('ProjectsWorkspace').logout());
+  assert.equal(harness.cookies.has('accessToken'), false);
+  assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/']);
+  assert.equal(harness.ownerCalls.length, 2);
 });

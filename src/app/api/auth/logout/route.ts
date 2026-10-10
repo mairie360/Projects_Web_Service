@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server';
-import { clearAccessTokenCookie } from '@/lib/access-token-cookie';
+import { createSessionLogoutProxy } from '@mairie360/lib-components/next';
 
-// Déconnexion locale : le contrat de BFF_Project n'expose pas de route de déconnexion, et le front ne
-// contacte aucun autre BFF. Le cookie de session est effacé ; le middleware renvoie ensuite vers Login.
-export function POST() {
-  return clearAccessTokenCookie(new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'no-store' } }));
-}
+/** Explicit logout uses the same Login owner as session renewal. */
+export const POST = createSessionLogoutProxy({
+  loginUrl: () => process.env.LOGIN_FRONT_URL?.trim() ?? '',
+  frontUrl: () => process.env.PROJECT_FRONT_URL?.trim() ?? '',
+});

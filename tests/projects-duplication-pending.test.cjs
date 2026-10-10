@@ -73,7 +73,7 @@ for (const mode of ['kanban', 'grid', 'table']) {
 test('guard remains active during the follow-up GET and across a view change', async () => {
   await open();
   harness.bffProject.on('post', duplicatePath, { status: 201, body: copy });
-  const pendingRead = pause('GET', (path) => path.startsWith('/projects-page'));
+  const pendingRead = pause('GET', (path) => path.startsWith('/api/bff/projects-page'));
   const writes = [];
   try {
     const project = props().projects[0];
@@ -98,7 +98,7 @@ test('pending duplicate and refused refresh compose across views without losing 
   const project = props().projects[0];
   harness.bffProject.on('post', duplicatePath, { status: 201, body: copy });
   harness.bffProject.on('get', '/projects-page', harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Relecture refusée')));
-  const pendingRead = pause('GET', path => path.startsWith('/projects-page'));
+  const pendingRead = pause('GET', path => path.startsWith('/api/bff/projects-page'));
   const writes = [];
   try {
     const originalCallbacks = props();

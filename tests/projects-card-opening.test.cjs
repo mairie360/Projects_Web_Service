@@ -28,7 +28,7 @@ function holdFirstDetail(t, projectId) {
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === `/projects/${projectId}` && (!init?.method || init.method === 'GET') && held === 0) { ++held; await gate; }
+    if (input === `/api/bff/projects/${projectId}` && (!init?.method || init.method === 'GET') && held === 0) { ++held; await gate; }
     return response;
   });
   return { release: () => release(), started: () => held > 0 };

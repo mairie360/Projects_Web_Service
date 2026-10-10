@@ -51,7 +51,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
         const fetch = global.fetch;
         t.mock.method(global, 'fetch', async (input, init) => {
           const response = await fetch(input, init);
-          if (input === `/projects/project-1${['done', 'review'].includes(projectOperation) ? '/close' : ''}` && init?.method === method.toUpperCase()) { ++held; await gate; }
+          if (input === `/api/bff/projects/project-1${['done', 'review'].includes(projectOperation) ? '/close' : ''}` && init?.method === method.toUpperCase()) { ++held; await gate; }
           return response;
         });
         // A card opens by GET before its write; let that opening complete normally.
@@ -147,7 +147,7 @@ for (const operation of ['create', 'duplicate']) {
   test(`a ${operation} project does not inherit confirmations from its source's task IDs`, async t => {
     await loaded();
     const copy = f.projectListItem({ id: 'project-copy', title: 'Projet distinct confirmé' });
-    const path = operation === 'create' ? '/projects' : '/projects/project-1/duplicate';
+    const path = operation === 'create' ? '/api/bff/projects' : '/api/bff/projects/project-1/duplicate';
     harness.bffProject.on('post', operation === 'create' ? '/projects' : '/projects/{projectId}/duplicate', { status: 201, body: f.projectDetails(copy, [task, other]) });
     if (operation === 'create') {
       await view.act(() => view.props('ProjectsWorkspace').openCreateProject());
@@ -187,7 +187,7 @@ for (const reopen of [false, true]) {
     const fetch = global.fetch;
     t.mock.method(global, 'fetch', async (input, init) => {
       const response = await fetch(input, init);
-      if (input === '/projects/project-1/close' && init?.method === 'PATCH') { ++held; await gate; }
+      if (input === '/api/bff/projects/project-1/close' && init?.method === 'PATCH') { ++held; await gate; }
       return response;
     });
     try {

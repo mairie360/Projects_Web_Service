@@ -110,7 +110,7 @@ test('a detail GET started before an uncertain confirmation cannot unlock that t
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1' && !held) { ++held; await gate; }
+    if (input === '/api/bff/projects/project-1' && !held) { ++held; await gate; }
     return response;
   });
   let pending;

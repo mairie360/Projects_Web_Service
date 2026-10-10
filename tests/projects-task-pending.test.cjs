@@ -42,8 +42,8 @@ for (const operation of ['status', 'delete', 'edit']) {
       const fetch = global.fetch;
       t.mock.method(global, 'fetch', async (input, init) => {
         const response = await fetch(input, init);
-        const write = input === (operation === 'status' ? '/projects/project-1/tasks/task-1/status' : '/projects/project-1/tasks/task-1') && init?.method === method(operation).toUpperCase();
-        if ((phase === 'write' && write) || (phase === 'read' && input === '/projects/project-1' && (init?.method ?? 'GET') === 'GET')) {
+        const write = input === (operation === 'status' ? '/api/bff/projects/project-1/tasks/task-1/status' : '/api/bff/projects/project-1/tasks/task-1') && init?.method === method(operation).toUpperCase();
+        if ((phase === 'write' && write) || (phase === 'read' && input === '/api/bff/projects/project-1' && (init?.method ?? 'GET') === 'GET')) {
           ++held; await gate;
         }
         return response;
@@ -79,7 +79,7 @@ for (const operation of ['status', 'delete', 'edit']) {
     let held = 0;
     t.mock.method(global, 'fetch', async (input, init) => {
       const response = await fetch(input, init);
-      const browserPath = operation === 'status' ? '/projects/project-1/tasks/task-1/status' : '/projects/project-1/tasks/task-1';
+      const browserPath = operation === 'status' ? '/api/bff/projects/project-1/tasks/task-1/status' : '/api/bff/projects/project-1/tasks/task-1';
       if (input === browserPath && init?.method === method(operation).toUpperCase()) { ++held; await gate; }
       return response;
     });
@@ -116,7 +116,7 @@ test('different tasks remain independent while the first status confirmation is 
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
+    if (input === '/api/bff/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
     return response;
   });
   let first;
@@ -138,7 +138,7 @@ test('closing and reopening a consultation retains the page-owned pending task g
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
+    if (input === '/api/bff/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
     return response;
   });
   let pending;
@@ -165,7 +165,7 @@ test('the same task ID in another project does not share a pending guard', async
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
+    if (input === '/api/bff/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
     return response;
   });
   let first;
@@ -194,7 +194,7 @@ test('a deliberate retry clears only its task refusal and preserves the other ro
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
+    if (input === '/api/bff/projects/project-1/tasks/task-1/status' && init?.method === 'PATCH') { ++held; await gate; }
     return response;
   });
   harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ title: 'Retry confirmé' }) });

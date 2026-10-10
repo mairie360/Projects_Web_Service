@@ -9,23 +9,20 @@ const { analyseNetworkCalls, sourceFiles, parse, visit } = require('./support/ne
 const { discoverRoutes, matchRoute } = require('./support/front-harness.cjs');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 
-// Garde statique : le front ne joint qu'un seul service, BFF_Project, et uniquement à travers son contrat
-// publié, dont contracts/openapi.json est la reconstruction exacte (package-contract.test.cjs). C'est
-// BFF_Project qui résout la session auprès de BFF User pour le front.
-// - Navigateur → même origine uniquement : `requestBff` (opérations du contrat, servies par la route
-//   catch-all) et la déconnexion locale `/api/auth/logout`, qui n'appelle aucun service.
-// - Next.js → réseau uniquement via `forwardToBff`, appelé par la seule route catch-all filtrée sur ce contrat.
+// Browser business calls stay same-origin under /api/bff, which forwards only the
+// published Project contract. Renewal and explicit revocation delegate to Login;
+// no frontend calls User directly. Dynamic tests exercise the real shared handlers.
 
 const publishedContract = OpenApiContract.load(path.join(root, 'contracts', 'openapi.json'));
 const network = analyseNetworkCalls();
 const routes = discoverRoutes();
-const CATCH_ALL = 'src/app/[...path]/route.ts';
+const CATCH_ALL = 'src/app/api/bff/[...path]/route.ts';
+const LEGACY_CATCH_ALL = 'src/app/[...path]/route.ts';
 const LOCAL_ROUTES = { 'src/app/api/auth/logout/route.ts': ['POST'] };
 
 /** Modules autorisés à appeler `fetch`, et la seule forme d'appel acceptée dans chacun. */
 const FETCH_GATEWAYS = {
-  'src/lib/bff-proxy.ts': { function: 'forwardToBff', target: 'target' },
-  'src/lib/bffProjectClient.ts': { function: 'requestBff', target: 'path' },
+  'src/lib/bffProjectClient.ts': { function: 'requestBff', path: '/api/bff{path}', method: 'GET' },
   'src/lib/auth-token.ts': { function: 'logoutAndReload', path: '/api/auth/logout', method: 'POST' },
 };
 
@@ -49,20 +46,23 @@ describe('inventaire des appels réseau de src/', () => {
     }
   });
 
-  test('forwardToBff (seule sortie serveur) n’est appelé que par la route catch-all contractuelle', () => {
-    assert.deepEqual(network.forwardCalls.map((call) => `${call.file}#${call.function}`), ['src/lib/bff-proxy.ts#proxyBffRequest']);
-    assert.equal(requireTs(CATCH_ALL).GET, requireTs('src/lib/bff-proxy.ts').proxyBffRequest);
-  });
-
-  test('seules la route catch-all et les routes locales existent, et les routes locales n’appellent aucun service', () => {
-    assert.deepEqual(routes.map((route) => route.file).sort(), [CATCH_ALL, ...Object.keys(LOCAL_ROUTES)].sort());
-    for (const [file, methods] of Object.entries(LOCAL_ROUTES)) {
-      const imports = [];
-      visit(parse(file), (node) => { if (ts.isImportDeclaration(node)) imports.push(node.moduleSpecifier.text); });
-      assert.ok(!imports.some((specifier) => /bff-proxy/.test(specifier)), `${file} ne doit pas utiliser le proxy`);
-      assert.ok(!network.fetchCalls.some((call) => call.file === file), `${file} ne doit pas appeler fetch`);
-      assert.deepEqual(Object.keys(requireTs(file)).filter((name) => /^[A-Z]+$/.test(name)), methods);
+  test('server routes delegate only to the published shared gateway and Login owner', () => {
+    assert.deepEqual(network.forwardCalls, []);
+    for (const file of [CATCH_ALL, LEGACY_CATCH_ALL]) {
+      assert.equal(requireTs(file).GET, requireTs('src/lib/bff-proxy.ts').proxyBffRequest);
     }
+    const calls = [];
+    const imports = [];
+    for (const file of ['src/lib/bff-proxy.ts', ...Object.keys(LOCAL_ROUTES)]) {
+      visit(parse(file), node => {
+        if (ts.isImportDeclaration(node)) imports.push([file, node.moduleSpecifier.text]);
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && /^(proxyPublishedBffRequest|createSessionLogoutProxy)$/.test(node.expression.text)) calls.push([file, node.expression.text]);
+      });
+    }
+    assert.deepEqual(calls, [['src/lib/bff-proxy.ts', 'proxyPublishedBffRequest'], ['src/app/api/auth/logout/route.ts', 'createSessionLogoutProxy']]);
+    assert.equal(imports.filter(([, specifier]) => specifier === '@mairie360/lib-components/next').length, 2);
+    assert.deepEqual(routes.map(route => route.file).sort(), [CATCH_ALL, LEGACY_CATCH_ALL, ...Object.keys(LOCAL_ROUTES)].sort());
+    for (const [file, methods] of Object.entries(LOCAL_ROUTES)) assert.deepEqual(Object.keys(requireTs(file)).filter(name => /^[A-Z]+$/.test(name)), methods);
   });
 
   test('chaque appel requestBff correspond à une opération du contrat publié servie par la route catch-all', () => {
@@ -72,7 +72,7 @@ describe('inventaire des appels réseau de src/', () => {
       assert.ok(call.target && call.method, `${call.location} : chemin ou méthode non analysable statiquement`);
       const match = publishedContract.match(call.method, call.target.path);
       assert.ok(match, `${call.location} : ${call.method} ${call.target.path} absent du contrat publié`);
-      assert.equal(matchRoute(routes, call.target.path)?.file, CATCH_ALL, `${call.location} doit passer par la route catch-all`);
+      assert.equal(matchRoute(routes, '/api/bff' + call.target.path)?.file, CATCH_ALL, `${call.location} doit passer par la route catch-all`);
       assert.equal(typeof catchAll[call.method], 'function', `${call.location} : la route catch-all n'exporte pas ${call.method}`);
       if (call.target.query) assert.ok((match.operation.parameters ?? []).some((parameter) => parameter.in === 'query'), `${call.location} : query sur une opération sans paramètre de query`);
     }

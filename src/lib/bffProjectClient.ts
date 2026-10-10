@@ -18,7 +18,7 @@ import type {
 import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
-  logoutAndReload,
+  navigateToLogin,
   storeAuthJwtToken,
 } from './auth-token';
 import { getPersonValue, type ProjectFormState, type ViewMode } from './projectPageState';
@@ -185,7 +185,7 @@ async function parseResponseError(response: Response) {
 }
 
 async function requestBff<T>(path: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`/api/bff${path}`, {
     ...init,
     headers: createRequestHeaders(init),
     redirect: 'manual',
@@ -206,7 +206,7 @@ async function requestBff<T>(path: string, init: RequestInit = {}) {
   }
 
   if (response.status === 401) {
-    await logoutAndReload();
+    navigateToLogin();
     throw new BffProjectError('Votre session a expiré.', 401, 'UNAUTHORIZED');
   }
 
