@@ -1356,3 +1356,14 @@ test('an unavailable logout stays visible in the existing alert and an explicit 
   assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/']);
   assert.equal(harness.ownerCalls.length, 2);
 });
+
+
+test('the logout control explains an offline transport in the existing alert without claiming closure', async t => {
+  await renderLoadedPage();
+  t.mock.method(global, 'fetch', async () => { throw new TypeError('Failed to fetch'); });
+  await view.act(() => view.props('ProjectsWorkspace').logout());
+  assert.match(view.text(), /La déconnexion n’a pas abouti\. Vérifiez votre connexion et réessayez\./);
+  assert.doesNotMatch(view.text(), /Failed to fetch/);
+  assert.equal(harness.cookies.has('accessToken'), true);
+  assert.deepEqual(harness.location.assigned, []);
+});
