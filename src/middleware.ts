@@ -5,7 +5,7 @@ import {
   createNonce,
   NONCE_REQUEST_HEADER,
 } from "./lib/content-security-policy";
-import { ACCESS_TOKEN_COOKIE, clearAccessTokenCookie } from "./lib/access-token-cookie";
+import { ACCESS_TOKEN_COOKIE } from "./lib/access-token-cookie";
 import { readFrontUrlsFromEnv } from "./lib/front-urls";
 import { settingsProfileUrl } from "./lib/settings-profile";
 
@@ -45,6 +45,7 @@ function redirectToLogin(request: NextRequest) {
       requestedPage.pathname = request.nextUrl.pathname;
       requestedPage.search = request.nextUrl.search;
       destination.searchParams.set("redirect", requestedPage.href);
+      destination.searchParams.set("resumeSession", "1");
     } catch {
       // A missing or invalid public URL leaves Login's default destination in place.
     }
@@ -60,7 +61,8 @@ function redirectToLogin(request: NextRequest) {
       },
     },
   );
-  return clearAccessTokenCookie(response);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }
 
 export function middleware(request: NextRequest) {
