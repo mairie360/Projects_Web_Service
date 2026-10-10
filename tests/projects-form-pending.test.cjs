@@ -37,7 +37,7 @@ function delayWrite(method) {
   const gate = new Promise((resolve) => { release = resolve; });
   let started = 0;
   global.fetch = async (input, init) => {
-    if (init?.method === method && (input === '/projects' || input === '/projects/project-1')) {
+    if (init?.method === method && (input === '/api/bff/projects' || input === '/api/bff/projects/project-1')) {
       started += 1;
       await gate;
     }

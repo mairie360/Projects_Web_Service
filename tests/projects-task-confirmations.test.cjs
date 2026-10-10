@@ -78,7 +78,7 @@ test('an older task refresh cannot erase a newer independent-task confirmation o
   let held = false;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (!held && input === '/projects/project-1' && (init?.method ?? 'GET') === 'GET') { held = true; await gate; }
+    if (!held && input === '/api/bff/projects/project-1' && (init?.method ?? 'GET') === 'GET') { held = true; await gate; }
     return response;
   });
   const first = f.projectTask({ title: 'Première confirmation', status: 'done' });
@@ -111,7 +111,7 @@ test('detail recovery is guarded while pending and a late retry cannot reopen a 
   const fetch = global.fetch;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (input === '/projects/project-1' && (init?.method ?? 'GET') === 'GET') await gate;
+    if (input === '/api/bff/projects/project-1' && (init?.method ?? 'GET') === 'GET') await gate;
     return response;
   });
   bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [task, other, confirmed]) });
@@ -170,8 +170,8 @@ for (const oldStatus of [200, 503, 401, 403]) {
     let heldRead = false;
     t.mock.method(global, 'fetch', async (input, init) => {
       const response = await fetch(input, init);
-      if (input === '/projects/project-1/tasks' && init?.method === 'POST') await writeGate;
-      if (!heldRead && input === '/projects/project-1' && (init?.method ?? 'GET') === 'GET') { heldRead = true; await readGate; }
+      if (input === '/api/bff/projects/project-1/tasks' && init?.method === 'POST') await writeGate;
+      if (!heldRead && input === '/api/bff/projects/project-1' && (init?.method ?? 'GET') === 'GET') { heldRead = true; await readGate; }
       return response;
     });
     let creating, opening;
@@ -186,8 +186,9 @@ for (const oldStatus of [200, 503, 401, 403]) {
     if (oldStatus === 401 || oldStatus === 403) {
       assert.equal(view.find('ProjectDetailModal').length, 0);
       assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 3, 'session/permission decisions must not cause an automatic replacement read');
-      assert.equal(harness.location.reloads, oldStatus === 401 ? 1 : 0);
-      assert.equal(harness.browserCalls.filter(value => value.path === '/api/auth/logout').length, oldStatus === 401 ? 1 : 0);
+      assert.equal(harness.location.reloads, 0);
+      assert.equal(harness.location.assigned.length, oldStatus === 401 ? 1 : 0);
+      assert.equal(harness.browserCalls.filter(value => value.path === '/api/auth/logout').length, 0);
     } else {
       assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === confirmed.id).title, confirmed.title);
       assert.doesNotMatch(view.text(), /Ancienne fiche refusée/);

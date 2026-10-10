@@ -36,7 +36,7 @@ for (const [operation, refusedRefresh] of [
     const fetch = global.fetch;
     t.mock.method(global, 'fetch', async (input, init) => {
       const response = await fetch(input, init);
-      if (input === (operation === 'duplicate' ? '/projects/project-1/duplicate' : '/projects/project-1') && init?.method === method.toUpperCase()) await gate;
+      if (input === (operation === 'duplicate' ? '/api/bff/projects/project-1/duplicate' : '/api/bff/projects/project-1') && init?.method === method.toUpperCase()) await gate;
       return response;
     });
     let pending;

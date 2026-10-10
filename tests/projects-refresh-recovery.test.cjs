@@ -145,7 +145,7 @@ for (const operation of ['edit-card', 'delete']) {
       const originalFetch = global.fetch;
       t.mock.method(global, 'fetch', async (target, init) => {
         const response = await originalFetch(target, init);
-        if (typeof target === 'string' && target.startsWith('/projects-page') && ++readCount === 1) {
+        if (typeof target === 'string' && target.startsWith('/api/bff/projects-page') && ++readCount === 1) {
           await gate;
           heldReadFinished = true;
         }
@@ -280,7 +280,7 @@ test('synchronous repeated activation sends one read, stays disabled while pendi
   const originalFetch = global.fetch;
   t.mock.method(global, 'fetch', async (target, init) => {
     const response = await originalFetch(target, init);
-    if (typeof target === 'string' && target.startsWith('/projects-page')) await gate;
+    if (typeof target === 'string' && target.startsWith('/api/bff/projects-page')) await gate;
     return response;
   });
   const button = () => view.hostElements((props, text, tag) => tag === 'button' && text === 'Réessayer')[0];

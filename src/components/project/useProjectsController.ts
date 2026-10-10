@@ -34,7 +34,7 @@ import {
   type TaskFormState,
 } from '../../lib/projectPageState';
 import { getActiveFrontHrefs } from '../../lib/navigation';
-import { authSessionFromAccess } from '../../lib/auth-session';
+import { authSessionFromAccess, logoutAndReload } from '../../lib/auth-session';
 import { parseProjectDeepLink } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
@@ -1306,6 +1306,12 @@ export function useProjectsController() {
     }
   };
 
+  const logout = async () => {
+    try { await logoutAndReload(); } catch (error) {
+      setAlert({ type: 'error', message: error instanceof Error ? error.message : 'La déconnexion n’a pas abouti. Veuillez réessayer.' });
+    }
+  };
+
   const selectedProject = selectedProjectDetails?.project ?? null;
   const selectedProjectTasks = selectedProjectDetails?.taskItems ?? [];
   const pendingTaskIds = pendingTasksByProject.get(selectedProject?.id ?? '') ?? new Set<string>();
@@ -1401,6 +1407,7 @@ export function useProjectsController() {
     pageTitle,
     pageSubtitle,
     frontHrefs,
+    logout,
   };
 }
 

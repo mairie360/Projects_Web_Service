@@ -2,19 +2,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./typescript.cjs');
+const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession } = require('@mairie360/lib-components/next');
 const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 
-// Harnais « navigateur → Next.js → BFF_Project » sans DOM ni serveur Next :
-// - le `fetch` du navigateur (chemins same-origin) est routé vers les vrais fichiers `src/app/**/route.ts`,
-//   découverts comme le fait l'App Router (segments statiques avant la route catch-all) ;
-// - le `fetch` serveur du proxy n'a le droit de joindre qu'un seul service : le mock de BFF_Project, piloté
-//   par contracts/openapi.json, reconstruction exacte du paquet publié @mairie360/bff-project-openapi
-//   (version X.Y.Z de package.json, vérifiée par package-contract.test.cjs) ;
-// - tout autre appel réseau est refusé et relevé comme violation, tout comme les écarts de contrat
-//   détectés par le mock, les paramètres de query non déclarés et le cookie transmis au BFF.
+// Browser fetch routes to the actual App Router handlers, including the more
+// specific /api/bff catch-all. Business traffic reaches only the published Project
+// mock. The configured Login origin runs the actual published owner handlers;
+// their User transport uses an exact selected published session contract. All
+// other origins, routes and contract mismatches remain violations.
 
-const ORIGIN = 'http://projects.test';
+const ORIGIN = 'https://projects.mairie.test';
 const APP_DIR = path.join(root, 'src', 'app');
 
 function discoverRoutes(dir = APP_DIR, segments = []) {
@@ -25,7 +23,7 @@ function discoverRoutes(dir = APP_DIR, segments = []) {
       return discoverRoutes(full, nested);
     }
     return entry.name === 'route.ts' ? [{ file: path.relative(root, full), segments }] : [];
-  }).sort((a, b) => rank(a) - rank(b));
+  }).sort((a, b) => rank(a) - rank(b) || b.segments.length - a.segments.length);
 }
 const rank = (route) => route.segments.filter((segment) => segment.startsWith('[')).length * 10 + (route.segments.some((segment) => segment.startsWith('[...')) ? 100 : 0);
 
@@ -67,7 +65,14 @@ function abortable(promise, signal) {
 
 function createFrontHarness() {
   const bffProject = new ContractMockServer('BFF_PROJECT', OpenApiContract.load(path.join(root, 'contracts', 'openapi.json')));
-  const mocks = [bffProject];
+  const bffUser = new ContractMockServer('BFF_USER_SESSION', OpenApiContract.load(path.join(root, 'tests/fixtures/user-session-openapi.json')));
+  const mocks = [bffProject, bffUser];
+  const LOGIN_ORIGIN = 'https://login.mairie.test';
+  const ownerConfig = { userBffUrl: () => bffUser.url, cookieOptions: () => ({ secure: true, domain: '.mairie.test' }), allowedOrigins: () => [ORIGIN, LOGIN_ORIGIN] };
+  const ownerRoutes = { '/api/auth/refresh': createSessionRefreshHandler(ownerConfig), '/api/auth/logout': createSessionLogoutHandler(ownerConfig) };
+  const ownerCalls = [];
+  let ownerOverride;
+
   const routes = discoverRoutes();
   const originalFetch = global.fetch;
   const upstreams = new Set();
@@ -76,7 +81,7 @@ function createFrontHarness() {
   const browserCalls = [];
   const forbidden = [];
   const storage = memoryStorage();
-  const location = { reloads: 0, assigned: [], reload() { this.reloads += 1; }, assign(href) { this.assigned.push(href); } };
+  let location = { href: ORIGIN + '/?view=table&q=voirie', reloads: 0, assigned: [], reload() { this.reloads += 1; }, assign(href) { this.assigned.push(href); } };
 
   function applySetCookie(response) {
     for (const header of response.headers.getSetCookie()) {
@@ -94,6 +99,8 @@ function createFrontHarness() {
     const method = (init.method ?? 'GET').toUpperCase();
     const url = new URL(target, ORIGIN);
     const headers = new Headers(init.headers);
+    headers.set('Origin', ORIGIN);
+    headers.set('Sec-Fetch-Site', 'same-origin');
     if (cookies.size) headers.set('cookie', [...cookies].map(([name, value]) => `${name}=${value}`).join('; '));
     browserCalls.push({ method, path: url.pathname, search: url.search });
 
@@ -112,6 +119,15 @@ function createFrontHarness() {
   async function harnessFetch(input, init = {}) {
     if (typeof input === 'string' && input.startsWith('/') && !input.startsWith('//')) return browserFetch(input, init);
     const url = new URL(input instanceof Request ? input.url : String(input), ORIGIN);
+    if (url.origin === LOGIN_ORIGIN) {
+      const handler = ownerRoutes[url.pathname];
+      if (!handler || init.method !== 'POST') {
+        forbidden.push(`appel Login hors protocole : ${init.method} ${url.pathname}`);
+        throw new TypeError('Opération Login refusée');
+      }
+      ownerCalls.push({ url, init });
+      return ownerOverride ? ownerOverride(url, init) : handler(new NextRequest(url, init));
+    }
     if (upstreams.has(url.origin)) return originalFetch(input, init);
     forbidden.push(`appel réseau hors contrat : ${(init.method ?? 'GET').toUpperCase()} ${url.href}`);
     throw new TypeError(`Appel réseau refusé par le harnais de test : ${url.href}`);
@@ -123,10 +139,13 @@ function createFrontHarness() {
 
   return {
     bffProject,
+    bffUser,
+    ownerCalls,
+    replyFromOwner(handler) { ownerOverride = handler; },
     browserCalls,
     cookies,
     storage,
-    location,
+    get location() { return location; },
     async start() {
       await Promise.all(mocks.map((mock) => mock.start()));
       mocks.forEach((mock) => upstreams.add(new URL(mock.url).origin));
@@ -142,15 +161,25 @@ function createFrontHarness() {
     reset() {
       recordExercised();
       mocks.forEach((mock) => mock.reset());
+      for (const call of ownerCalls) {
+        const value = new NextRequest(call.url, call.init).cookies.get('refreshToken')?.value;
+        if (value) forgetUserSession(bffUser.url, value);
+      }
+      ownerCalls.length = 0;
+      ownerOverride = undefined;
       cookies.clear();
       storage.clear();
       browserCalls.length = 0;
       forbidden.length = 0;
-      location.reloads = 0;
+      location = { ...location, href: ORIGIN + '/?view=table&q=voirie', reloads: 0, assigned: [] };
+      if (global.window) global.window.location = location;
       location.assigned.length = 0;
       // Le proxy relit son URL à chaque requête : les variables de repli sont neutralisées.
       for (const name of ['PROJECT_BFF_URL', 'NEXT_PUBLIC_BFF_PROJECT_BASE_URL']) delete process.env[name];
       process.env.BFF_PROJECT_BASE_URL = bffProject.url;
+      process.env.LOGIN_FRONT_URL = LOGIN_ORIGIN;
+      process.env.PROJECT_FRONT_URL = ORIGIN;
+      requireTs('src/lib/front-urls.ts').setBrowserFrontUrls({ LOGIN_FRONT_URL: LOGIN_ORIGIN, PROJECT_FRONT_URL: ORIGIN });
     },
     /** Autorise le proxy à joindre une URL supplémentaire (ex. port fermé pour simuler un BFF injoignable). */
     allowUpstream(url) { upstreams.add(new URL(url).origin); },

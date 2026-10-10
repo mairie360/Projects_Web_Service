@@ -11,7 +11,6 @@ import { ProjectPagination } from './ProjectPagination';
 import { TaskCreationNotice } from './TaskCreationNotice';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
 import { navigateToPage } from '../../lib/navigation';
-import { logoutAndReload } from '../../lib/auth-session';
 import type { ProjectsController } from './useProjectsController';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
@@ -98,6 +97,7 @@ export function ProjectsWorkspace({
   pageTitle,
   pageSubtitle,
   frontHrefs,
+  logout,
 }: ProjectsController) {
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
@@ -183,7 +183,7 @@ export function ProjectsWorkspace({
         activeItem="projects"
         isAdmin={session.isAdmin}
         user={session.user}
-        onLogout={() => void logoutAndReload()}
+        onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
         className="projects-shell"
       >

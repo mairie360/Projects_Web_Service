@@ -106,7 +106,7 @@ test('a project detail read begun before the uncertain receipt cannot unlock or 
   await loaded(); await view.act(()=>view.props('ProjectsWorkspace').openProjectDetails(first));
   let release,held=0,pending;
   const gate=new Promise(resolve=>{release=resolve;});const fetch=global.fetch;
-  t.mock.method(global,'fetch',async(input,init)=>{const response=await fetch(input,init);if(input===`/projects/${first.id}`&&!held){++held;await gate;}return response;});
+  t.mock.method(global,'fetch',async(input,init)=>{const response=await fetch(input,init);if(input===`/api/bff/projects/${first.id}`&&!held){++held;await gate;}return response;});
   try{
     await view.act(()=>{pending=view.props('ProjectDetailModal').onRetry();});await view.waitFor(()=>held>0);
     rejectReceipt('move');await view.act(()=>perform('move'));
@@ -141,7 +141,7 @@ test('a double verification is one GET; changing detail selection cannot reopen 
   rejectReceipt('close');await view.act(()=>perform('close'));
   let release,held=0,pending;
   const gate=new Promise(resolve=>{release=resolve;});const fetch=global.fetch;
-  t.mock.method(global,'fetch',async(input,init)=>{const response=await fetch(input,init);if(input===`/projects/${first.id}`&&!held){++held;await gate;}return response;});
+  t.mock.method(global,'fetch',async(input,init)=>{const response=await fetch(input,init);if(input===`/api/bff/projects/${first.id}`&&!held){++held;await gate;}return response;});
   const before=harness.bffProject.calls('/projects/{projectId}','get').length;
   try{
     await view.act(()=>{pending=view.props('ProjectsWorkspace').verifyProjectReceipt(first.id);});await view.waitFor(()=>held>0);

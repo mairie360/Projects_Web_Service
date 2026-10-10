@@ -54,6 +54,7 @@ function pathOf(node) {
     const name = ts.isCallExpression(expression) ? calleeName(expression) : undefined;
     if (name === 'encodeURIComponent' && !query) result += `{${expression.arguments[0].getText()}}`;
     else if (name === 'createQueryString' && index === node.templateSpans.length - 1 && span.literal.text === '') query = true;
+    else if (node.head.text === '/api/bff' && node.templateSpans.length === 1 && ts.isIdentifier(expression) && expression.text === 'path' && span.literal.text === '') result += '{path}';
     else return undefined;
     result += span.literal.text;
   }

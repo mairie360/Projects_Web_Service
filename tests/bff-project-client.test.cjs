@@ -320,7 +320,7 @@ describe('erreurs du BFF', () => {
 
     assert.equal(location.reloads, 1);
     assert.equal(requests.length, 1);
-    assert.equal(requests[0].path, '/projects/project-1/duplicate');
+    assert.equal(requests[0].path, '/api/bff/projects/project-1/duplicate');
     assert.equal(requests[0].init.method, 'POST');
     assert.equal(requests[0].init.redirect, 'manual');
     assert.equal(requests[0].init.body, undefined);
@@ -390,7 +390,7 @@ describe('erreurs du BFF', () => {
     assert.deepEqual(bffProject.requests, []);
   });
 
-  test('un 401 déconnecte localement sans autre BFF, vide le stockage et recharge la page', async () => {
+  test('un 401 renvoie vers Login avec le retour validé sans révoquer la session', async () => {
     client.storeBffProjectJwtToken('stale-session');
     bffProject.on('get', '/projects-page', harness.errorReply(401, fixtures.apiError('UNAUTHORIZED', 'Session expirée')));
 
@@ -398,9 +398,11 @@ describe('erreurs du BFF', () => {
 
     assert.equal(bffProject.requests.length, 1);
     assert.equal(harness.storage.length, 0);
-    assert.equal(harness.cookies.has('accessToken'), false);
-    assert.equal(harness.location.reloads, 1);
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page', 'POST /api/auth/logout']);
+    assert.equal(harness.cookies.has('accessToken'), true);
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?returnUrl=' + encodeURIComponent(harness.location.href)]);
+    assert.deepEqual(harness.ownerCalls, []);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /api/bff/projects-page']);
   });
 
   test('une requête annulée rejette avec AbortError', async () => {

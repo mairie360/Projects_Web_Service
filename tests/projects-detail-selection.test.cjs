@@ -34,7 +34,7 @@ function gateNextDetail(t, projectId) {
   let held = false;
   t.mock.method(global, 'fetch', async (input, init) => {
     const response = await fetch(input, init);
-    if (!held && input === `/projects/${projectId}` && (init?.method ?? 'GET') === 'GET') {
+    if (!held && input === `/api/bff/projects/${projectId}` && (init?.method ?? 'GET') === 'GET') {
       held = true; await gate;
     }
     return response;
@@ -115,7 +115,7 @@ for (const nextSelection of ['closed', 'other', 'same-reopened', 'unchanged']) {
     const fetch = global.fetch;
     t.mock.method(global, 'fetch', async (input, init) => {
       const response = await fetch(input, init);
-      if (input === `/projects/${first.id}/close`) await gate;
+      if (input === `/api/bff/projects/${first.id}/close`) await gate;
       return response;
     });
     let pending;
