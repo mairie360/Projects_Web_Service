@@ -40,7 +40,8 @@ test('missing or expired sessions are redirected to Login without a CSP', () => 
     const response = middleware(pageRequest(token));
     assert.equal(response.status, 307);
     assert.equal(response.headers.get('content-security-policy'), null);
-    assert.match(response.headers.get('set-cookie'), /accessToken=;/);
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
   }
 });
 
@@ -63,13 +64,14 @@ test('JWT sans exp, opaque ou illisible : seul un payload illisible est traité 
   assert.equal(middleware(pageRequest('a.%%%.c')).status, 307);
 });
 
-test('la redirection suit LOGIN_FRONT_URL et efface le cookie sur COOKIE_DOMAIN', () => {
+test('la redirection suit LOGIN_FRONT_URL sans modifier le cookie partagé sur COOKIE_DOMAIN', () => {
   process.env.LOGIN_FRONT_URL = 'https://login.example/';
   process.env.COOKIE_DOMAIN = ' .mairie360.test ';
   try {
     const response = middleware(pageRequest());
     assert.equal(response.headers.get('location'), 'https://login.example/');
-    assert.match(response.headers.get('set-cookie'), /Domain=\.mairie360\.test/i);
+    assert.equal(response.headers.get('set-cookie'), null);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
   } finally {
     delete process.env.LOGIN_FRONT_URL;
     delete process.env.COOKIE_DOMAIN;
