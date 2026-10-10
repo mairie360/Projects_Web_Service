@@ -166,8 +166,10 @@ describe('déconnexion partagée explicite', () => {
 
   test('an unconfirmed server closure is visible and never becomes a successful navigation', async () => {
     const { logoutAndReload } = requireTs('src/lib/auth-token.ts');
+    harness.storage.setItem('mairie360.auth.jwt', 'legacy-auth-fixture');
     harness.bffUser.on('post', '/auth/logout', { body: { message: 'Local session closed', session_revoked: false } });
-    await assert.rejects(logoutAndReload(), /fermeture de la session serveur n’a pas pu être confirmée/);
+    await assert.rejects(logoutAndReload(), /La déconnexion n’a pas pu être confirmée/);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'legacy-auth-fixture');
     assert.equal(harness.cookies.has('accessToken'), false);
     assert.deepEqual(harness.location.assigned, []);
   });

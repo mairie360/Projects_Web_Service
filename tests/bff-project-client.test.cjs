@@ -397,10 +397,10 @@ describe('erreurs du BFF', () => {
     await assert.rejects(client.getProjectsPage(), { status: 401, code: 'UNAUTHORIZED', message: 'Votre session a expiré.' });
 
     assert.equal(bffProject.requests.length, 1);
-    assert.equal(harness.storage.length, 0);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'stale-session');
     assert.equal(harness.cookies.has('accessToken'), true);
     assert.equal(harness.location.reloads, 0);
-    assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?returnUrl=' + encodeURIComponent(harness.location.href)]);
+    assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
     assert.deepEqual(harness.ownerCalls, []);
     assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /api/bff/projects-page']);
   });

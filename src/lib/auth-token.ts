@@ -80,13 +80,12 @@ export function navigateToLogin() {
   if (!login) return;
   const own = parseFrontUrl(frontUrl('PROJECT_FRONT_URL'));
   const current = parseFrontUrl(window.location.href);
-  if (own && current?.origin === own.origin) login.searchParams.set('returnUrl', current.href);
+  if (own && current?.origin === own.origin) login.searchParams.set('redirect', current.href);
   navigatingLocations.add(window.location);
-  clearStoredAuthJwtToken();
   window.location.assign(login.href);
 }
 
-/** Cookies are expired by Login only after its revocation response is received. */
+/** Explicit logout checks Login's revocation receipt before clearing legacy browser storage. */
 export async function logoutAndReload() {
   if (typeof window === 'undefined') return;
   const location = window.location;
@@ -111,8 +110,7 @@ export async function logoutAndReload() {
       throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
     }
     if (!receipt.session_revoked) {
-      clearStoredAuthJwtToken();
-      throw new Error('La session locale est fermée. La fermeture de la session serveur n’a pas pu être confirmée.');
+      throw new Error('La déconnexion n’a pas pu être confirmée. Votre session reste à vérifier.');
     }
     let destination = parseFrontUrl(frontUrl('LOGIN_FRONT_URL'));
     if ('logout_url' in receipt) {
