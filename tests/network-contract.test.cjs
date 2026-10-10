@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { describe, test, afterEach } = require('node:test');
 const ts = require('typescript');
+const policy = require('./support/source-policy.cjs');
 const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./support/typescript.cjs');
 const { analyseNetworkCalls, sourceFiles, parse, visit } = require('./support/network-calls.cjs');
@@ -80,7 +81,7 @@ describe('inventaire des appels réseau de src/', () => {
   test('les filtres de ProjectsPageQuery sont exactement les paramètres publiés de GET /projects-page', () => {
     let members;
     visit(parse('src/lib/bffProjectClient.ts'), (node) => {
-      if (ts.isTypeAliasDeclaration(node) && node.name.text === 'ProjectsPageQuery') members = node.type.members.map((member) => member.name.getText());
+      if (ts.isTypeAliasDeclaration(node) && node.name.text === 'ProjectsPageQuery') members = node.type.members.map((member) => policy.propertyName(member.name));
     });
     const declared = publishedContract.match('GET', '/projects-page').operation.parameters.filter((parameter) => parameter.in === 'query').map((parameter) => parameter.name);
     assert.deepEqual([...members].sort(), [...declared].sort());
@@ -90,7 +91,7 @@ describe('inventaire des appels réseau de src/', () => {
     const offenders = [];
     for (const file of sourceFiles().filter((candidate) => candidate !== 'src/lib/bff-proxy.ts')) {
       visit(parse(file), (node) => {
-        if (ts.isPropertyAccessExpression(node) && /BFF|_API_/.test(node.name.text) && node.expression.getText() === 'process.env') offenders.push(`${file}: ${node.getText()}`);
+        if (ts.isPropertyAccessExpression(node) && /BFF|_API_/.test(node.name.text) && ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'process' && node.expression.name.text === 'env') offenders.push(`${file}: ${node.getText()}`);
       });
     }
     assert.deepEqual(offenders, []);

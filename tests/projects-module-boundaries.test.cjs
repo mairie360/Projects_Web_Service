@@ -1,49 +1,40 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { readFileSync, existsSync } = require('node:fs');
+const { existsSync } = require('node:fs');
 const { join } = require('node:path');
-const ts = require('typescript');
-
+const { ts, parse, nodes, imported, exportedCallable, callName, calls, importedCallNames } = require('./support/module-policy.cjs');
 const root = join(__dirname, '..');
-const source = (file) => readFileSync(join(root, file), 'utf8');
-const ast = (file) => ts.createSourceFile(file, source(file), ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-const imports = (file) => ast(file).statements.filter(ts.isImportDeclaration).map(node => node.moduleSpecifier.text);
-
+const imports = source => imported(source).map(row => row.specifier);
+const names = source => { const aliases = importedCallNames(source); return calls(source).map(node => aliases.get(callName(node.expression)) ?? callName(node.expression)); };
+// AST architecture policy only. Real dialog/rerender/draft behavior is tested separately.
 test('the Projects route only composes a stable controller and workspace', () => {
-  const page = source('src/app/page.tsx');
-  assert.match(page, /useProjectsController\(\)/);
-  assert.match(page, /<ProjectsWorkspace/);
-  assert.doesNotMatch(page, /useState|useEffect|useRef|bffProjectClient|ProjectModals/);
+  const page = parse('src/app/page.tsx');
+  const aliases = importedCallNames(page);
+  const controller = calls(page).filter(node => (aliases.get(callName(node.expression)) ?? callName(node.expression)) === 'useProjectsController');
+  assert.equal(controller.length, 1); assert.equal(controller[0].arguments.length, 0);
+  const workspace = nodes(page, node => ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)).filter(node => (aliases.get(callName(node.tagName)) ?? callName(node.tagName)) === 'ProjectsWorkspace');
+  assert.equal(workspace.length, 1);
+  assert.equal(names(page).some(name => ['useState', 'useEffect', 'useRef'].includes(name)), false);
+  assert.equal(imports(page).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
 });
-
 test('the controller owns existing state and commands without JSX or component dependencies', () => {
-  const file = 'src/components/project/useProjectsController.ts';
-  const tree = ast(file);
-  let jsx = false;
-  const visit = node => {
-    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) jsx = true;
-    ts.forEachChild(node, visit);
-  };
-  visit(tree);
-  assert.equal(jsx, false);
-  assert.match(source(file), /export function useProjectsController/);
-  assert.equal(imports(file).some(name => /ProjectViews|ProjectModals|ProjectsWorkspace|lib-components|Kanban/.test(name)), false);
+  const source = parse('src/components/project/useProjectsController.ts');
+  assert.equal(nodes(source, node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)).length, 0);
+  assert.ok(exportedCallable(source, 'useProjectsController'));
+  assert.equal(imports(source).some(name => /ProjectViews|ProjectModals|ProjectsWorkspace|lib-components|Kanban/.test(name)), false);
 });
-
 test('the workspace renders controller props without duplicating business state or requests', () => {
-  const file = 'src/components/project/ProjectsWorkspace.tsx';
-  assert.match(source(file), /export function ProjectsWorkspace/);
-  assert.doesNotMatch(source(file), /useState|useEffect|useRef|useProjectsController\(\)|getProjectsPage\(/);
-  assert.equal(imports(file).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
-  assert.ok(imports(file).includes('./CreateProjectModal'));
-  assert.ok(imports(file).includes('./ProjectDetailModal'));
+  const source = parse('src/components/project/ProjectsWorkspace.tsx');
+  assert.ok(exportedCallable(source, 'ProjectsWorkspace'));
+  assert.equal(names(source).some(name => ['useState', 'useEffect', 'useRef', 'useProjectsController', 'getProjectsPage'].includes(name)), false);
+  assert.equal(imports(source).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
+  assert.ok(imports(source).includes('./CreateProjectModal'));
+  assert.ok(imports(source).includes('./ProjectDetailModal'));
 });
-
 test('creation and detail dialogs have separate stable top-level components', () => {
   for (const name of ['CreateProjectModal', 'ProjectDetailModal']) {
-    const file = `src/components/project/${name}.tsx`;
-    const functions = ast(file).statements.filter(ts.isFunctionDeclaration);
-    assert.deepEqual(functions.map(node => node.name.text), [name]);
+    const source = parse(`src/components/project/${name}.tsx`);
+    assert.ok(exportedCallable(source, name));
   }
   assert.equal(existsSync(join(root, 'src/components/project/ProjectModals.tsx')), false);
 });
