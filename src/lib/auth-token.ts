@@ -93,12 +93,20 @@ export async function logoutAndReload() {
   const running = logoutFlights.get(location);
   if (running) return running;
   const pending = (async () => {
-    const response = await fetch('/api/auth/logout', {
-      method: 'POST', credentials: 'same-origin', cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' }, body: '{}',
-    });
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/logout', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+    } catch {
+      throw new Error('La déconnexion n’a pas abouti. Vérifiez votre connexion et réessayez.');
+    }
     if (!response.ok) throw new Error('La déconnexion n’a pas abouti. Veuillez réessayer.');
-    const receipt: unknown = await response.json();
+    let receipt: unknown;
+    try { receipt = await response.json(); } catch {
+      throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
+    }
     if (typeof receipt !== 'object' || receipt === null || !('session_revoked' in receipt) || typeof receipt.session_revoked !== 'boolean') {
       throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
     }

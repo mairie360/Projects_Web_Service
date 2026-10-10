@@ -194,4 +194,20 @@ describe('déconnexion partagée explicite', () => {
     assert.deepEqual(harness.location.assigned, []);
   });
 
+  test('a transport refusal explains retry in French and preserves session and auth storage', async t => {
+    harness.storage.setItem('mairie360.auth.jwt', 'local-session');
+    t.mock.method(global, 'fetch', async () => { throw new TypeError('Failed to fetch'); });
+    await assert.rejects(requireTs('src/lib/auth-token.ts').logoutAndReload(), { message: 'La déconnexion n’a pas abouti. Vérifiez votre connexion et réessayez.' });
+    assert.equal(harness.cookies.has('accessToken'), true);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'local-session');
+    assert.deepEqual(harness.location.assigned, []);
+  });
+
+  test('an unreadable successful receipt explains uncertainty without navigation', async () => {
+    harness.replyFromOwner(() => new Response('<html>Unavailable</html>', { headers: { 'Content-Type': 'text/html' } }));
+    await assert.rejects(requireTs('src/lib/auth-token.ts').logoutAndReload(), { message: 'La déconnexion n’a pas pu être confirmée. Veuillez réessayer.' });
+    assert.equal(harness.cookies.has('accessToken'), true);
+    assert.deepEqual(harness.location.assigned, []);
+  });
+
 });
