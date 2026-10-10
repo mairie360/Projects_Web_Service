@@ -59,11 +59,17 @@ test('a published write retries once with the exact same body after a rejected a
 
 test('a rejected refresh navigates once with the current validated return and never invokes logout', async () => {
   business();
+  h.storage.setItem('mairie360.auth.jwt', 'legacy-auth-fixture');
+  h.storage.setItem('unrelated.preference', 'keep');
   h.replyFromOwner(() => Response.json({ message: 'Session expirée' }, { status: 401 }));
   const result = await Promise.allSettled([client.getProjectsPage(), client.getProjectsPage()]);
   assert.ok(result.every(x => x.status === 'rejected' && x.reason.status === 401));
   assert.equal(h.location.assigned.length, 1);
-  assert.equal(new URL(h.location.assigned[0]).searchParams.get('returnUrl'), h.location.href);
+  const loginTarget = new URL(h.location.assigned[0]);
+  assert.equal(loginTarget.searchParams.get('redirect'), h.location.href);
+  assert.equal(loginTarget.searchParams.has('returnUrl'), false);
+  assert.equal(h.storage.getItem('mairie360.auth.jwt'), 'legacy-auth-fixture');
+  assert.equal(h.storage.getItem('unrelated.preference'), 'keep');
   assert.ok(h.ownerCalls.every(x => x.url.pathname === '/api/auth/refresh'));
   assert.equal(h.cookies.get('refreshToken'), 'initial-refresh');
 });
