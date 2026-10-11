@@ -83,6 +83,7 @@ export function navigateToLogin() {
   const current = parseFrontUrl(window.location.href);
   if (own && current?.origin === own.origin) login.searchParams.set('redirect', current.href);
   navigatingLocations.add(window.location);
+  clearStoredAuthJwtToken();
   window.location.assign(login.href);
 }
 

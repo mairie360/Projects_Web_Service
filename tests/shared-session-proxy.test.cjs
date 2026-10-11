@@ -68,7 +68,7 @@ test('a rejected refresh navigates once with the current validated return and ne
   const loginTarget = new URL(h.location.assigned[0]);
   assert.equal(loginTarget.searchParams.get('redirect'), h.location.href);
   assert.equal(loginTarget.searchParams.has('returnUrl'), false);
-  assert.equal(h.storage.getItem('mairie360.auth.jwt'), 'legacy-auth-fixture');
+  assert.equal(h.storage.getItem('mairie360.auth.jwt'), null);
   assert.equal(h.storage.getItem('unrelated.preference'), 'keep');
   assert.ok(h.ownerCalls.every(x => x.url.pathname === '/api/auth/refresh'));
   assert.equal(h.cookies.get('refreshToken'), 'initial-refresh');
