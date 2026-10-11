@@ -392,12 +392,18 @@ describe('erreurs du BFF', () => {
 
   test('un 401 renvoie vers Login avec le retour validé sans révoquer la session', async () => {
     client.storeBffProjectJwtToken('stale-session');
+    harness.storage.setItem('mairie360.projects.jwt', 'old-project-session');
+    harness.storage.setItem('projects.draft', 'unsaved project');
+    harness.storage.setItem('ui.theme', 'dark');
     bffProject.on('get', '/projects-page', harness.errorReply(401, fixtures.apiError('UNAUTHORIZED', 'Session expirée')));
 
     await assert.rejects(client.getProjectsPage(), { status: 401, code: 'UNAUTHORIZED', message: 'Votre session a expiré.' });
 
     assert.equal(bffProject.requests.length, 1);
-    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'stale-session');
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), null);
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), null);
+    assert.equal(harness.storage.getItem('projects.draft'), 'unsaved project');
+    assert.equal(harness.storage.getItem('ui.theme'), 'dark');
     assert.equal(harness.cookies.has('accessToken'), true);
     assert.equal(harness.location.reloads, 0);
     assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
