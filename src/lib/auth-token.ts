@@ -71,11 +71,12 @@ export function getStoredAuthorizationHeader() {
 }
 
 const navigatingLocations = new WeakSet<Location>();
+const recoveryLocations = new WeakSet<Location>();
 const logoutFlights = new WeakMap<Location, Promise<void>>();
 
 /** A rejected renewal returns to Login without revoking or replaying a write. */
 export function navigateToLogin() {
-  if (typeof window === 'undefined' || navigatingLocations.has(window.location)) return;
+  if (typeof window === 'undefined' || navigatingLocations.has(window.location) || recoveryLocations.has(window.location)) return;
   const login = parseFrontUrl(frontUrl('LOGIN_FRONT_URL'));
   if (!login) return;
   const own = parseFrontUrl(frontUrl('PROJECT_FRONT_URL'));
@@ -85,12 +86,21 @@ export function navigateToLogin() {
   window.location.assign(login.href);
 }
 
+/** Return only on an explicit choice after an unconfirmed logout. */
+export function returnToLogin() {
+  if (typeof window === 'undefined') return;
+  recoveryLocations.delete(window.location);
+  navigatingLocations.delete(window.location);
+  navigateToLogin();
+}
+
 /** Explicit logout checks Login's revocation receipt before clearing legacy browser storage. */
 export async function logoutAndReload() {
   if (typeof window === 'undefined') return;
   const location = window.location;
   const running = logoutFlights.get(location);
   if (running) return running;
+  recoveryLocations.add(location);
   const pending = (async () => {
     let response: Response;
     try {
@@ -106,7 +116,7 @@ export async function logoutAndReload() {
     try { receipt = await response.json(); } catch {
       throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
     }
-    if (typeof receipt !== 'object' || receipt === null || !('session_revoked' in receipt) || typeof receipt.session_revoked !== 'boolean') {
+    if (typeof receipt !== 'object' || receipt === null || !('message' in receipt) || typeof receipt.message !== 'string' || !('session_revoked' in receipt) || typeof receipt.session_revoked !== 'boolean') {
       throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
     }
     if (!receipt.session_revoked) {

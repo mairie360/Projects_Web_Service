@@ -176,7 +176,7 @@ describe('déconnexion partagée explicite', () => {
 
   for (const receipt of [{}, { session_revoked: 'yes' }, { session_revoked: true, logout_url: 7 }, { session_revoked: true, logout_url: 'javascript:alert(1)' }, { session_revoked: true, logout_url: 'https://auth.mairie.test/not-logout' }, { session_revoked: true, logout_url: 'http://auth.mairie.test/realms/mairie/protocol/openid-connect/logout' }]) {
     test('a malformed logout receipt cannot report success: ' + JSON.stringify(receipt), async () => {
-      harness.replyFromOwner(() => Response.json(receipt));
+      harness.replyFromOwner(() => Response.json({ message: 'Logged out successfully', ...receipt }));
       await assert.rejects(requireTs('src/lib/auth-token.ts').logoutAndReload());
       assert.deepEqual(harness.location.assigned, []);
     });
@@ -191,7 +191,7 @@ describe('déconnexion partagée explicite', () => {
 
   test('a confirmed receipt with missing Login configuration remains visible instead of reloading', async () => {
     requireTs('src/lib/front-urls.ts').setBrowserFrontUrls({});
-    harness.replyFromOwner(() => Response.json({ session_revoked: true }));
+    harness.replyFromOwner(() => Response.json({ message: 'Logged out successfully', session_revoked: true }));
     await assert.rejects(requireTs('src/lib/auth-token.ts').logoutAndReload(), /connexion partagée n’est pas configurée/);
     assert.deepEqual(harness.location.assigned, []);
   });

@@ -140,6 +140,8 @@ export function useProjectsController() {
   const [searchTerm, setSearchTerm] = useState('');
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const logoutPendingRef = useRef(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const retryPendingRef = useRef(false);
@@ -1307,8 +1309,13 @@ export function useProjectsController() {
   };
 
   const logout = async () => {
+    if (logoutPendingRef.current) return;
+    logoutPendingRef.current = true;
+    setLogoutError(null);
     try { await logoutAndReload(); } catch (error) {
-      setAlert({ type: 'error', message: error instanceof Error ? error.message : 'La déconnexion n’a pas abouti. Veuillez réessayer.' });
+      setLogoutError(error instanceof Error ? error.message : 'La déconnexion n’a pas abouti. Veuillez réessayer.');
+    } finally {
+      logoutPendingRef.current = false;
     }
   };
 
@@ -1363,6 +1370,7 @@ export function useProjectsController() {
     openFilter,
     setOpenFilter,
     alert,
+    logoutError,
     setAlert,
     pageLoading,
     pageError,
