@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
 import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
@@ -9,7 +10,7 @@ import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSqua
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import { createPersonFromOptionValue, createTaskFormState, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
@@ -22,6 +23,7 @@ type TaskFollowUpSelection = {
 
 export function ProjectDetailModal({
   project,
+  defaultTaskAssigneeId,
   tasks,
   highlightTaskId,
   memberOptions,
@@ -48,6 +50,7 @@ export function ProjectDetailModal({
   onCloseProject,
 }: {
   project: Project;
+  defaultTaskAssigneeId?: string | null;
   tasks: ProjectTask[];
   highlightTaskId?: string | null;
   memberOptions: FilterOption[];
@@ -81,7 +84,7 @@ export function ProjectDetailModal({
   const projectSavingRef = React.useRef(false);
   const projectEditIdRef = React.useRef(project.id);
   const editingProjectRef = React.useRef(false);
-  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? createTaskFormState(project));
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
   const [taskFormVerificationError, setTaskFormVerificationError] = React.useState(false);
@@ -199,7 +202,7 @@ export function ProjectDetailModal({
     // A same-project refresh must not discard an unsaved task or its retry.
     if (projectChanged) {
       taskProjectIdRef.current = project.id;
-      setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
+      setTaskForm(taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
       setEditingTaskId(null);
       setTaskFormError('');
       collaborationSelectionRef.current = null;
@@ -401,14 +404,16 @@ export function ProjectDetailModal({
       return;
     }
 
-    const assigneeValues = uniqueAssigneesInOrder(
-      taskForm.assignees.length > 0 ? taskForm.assignees : [getPersonValue(project.responsible)]
-    );
+    if (!taskForm.assignees.length) {
+      setTaskFormError('Choisissez au moins un agent assigné à cette tâche.');
+      return;
+    }
+    const assigneeValues = uniqueAssigneesInOrder(taskForm.assignees);
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
       status: taskForm.status,
-      responsible: assignees[0] ?? project.responsible,
+      responsible: assignees[0],
       assignees,
       priority: taskForm.priority,
       labels: taskForm.labels,
@@ -424,7 +429,7 @@ export function ProjectDetailModal({
       } else {
         await onAddTask(project, taskDraft);
       }
-      setTaskForm(createTaskFormState(project));
+      setTaskForm(createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
       setEditingTaskId(null);
     } catch (error) {
       setTaskFormError(getBffProjectErrorMessage(error));
@@ -444,7 +449,7 @@ export function ProjectDetailModal({
 
   const cancelTaskEdit = () => {
     if (taskSavingRef.current || projectSavingRef.current) return;
-    setTaskForm(taskCreationState?.draft ?? createTaskFormState(project));
+    setTaskForm(taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
     setEditingTaskId(null);
     setTaskFormError('');
   };
