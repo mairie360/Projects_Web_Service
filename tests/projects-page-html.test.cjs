@@ -901,6 +901,7 @@ for (const mode of ['create', 'edit']) {
     await view.fire((props) => props.id === 'detail-task-status', 'onChange', { target: { value: 'review' } });
     await view.fire((props) => props.id === 'detail-task-priority', 'onChange', { target: { value: 'low' } });
     await view.fire((props) => props.id === 'detail-task-due-date', 'onChange', { target: { value: '2026-11-17' } });
+    if (mode === 'create') await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['3']));
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
     assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value="Saisie à conserver"/);
     const dialog = view.html.match(/<section[^>]*role="dialog"[^]*?<\/main>/)?.[0];
@@ -1326,6 +1327,7 @@ test('the detail modal edits the project inline, adds a task from its form and c
 
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await view.fire((props, text, tag) => tag === 'input' && props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Poser les lanternes' } });
+  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['3']));
   await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
   await view.waitFor(() => alertText() === 'Tâche "Poser les lanternes" ajoutée à "Éclairage LED".');
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post')[0].body.title, 'Poser les lanternes');

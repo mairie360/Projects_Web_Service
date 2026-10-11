@@ -1,5 +1,6 @@
 'use client';
 
+import type { CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BffProjectError,
@@ -88,7 +89,17 @@ function validateProjectForm(form: ProjectFormState) {
   );
 }
 
-export function useProjectsController() {
+export function useProjectsController({ currentAgentSource }: { currentAgentSource?: CurrentAgentSource } = {}) {
+  const [agentReceipt, setAgentReceipt] = useState<{ source: CurrentAgentSource; id: string | null } | null>(null);
+  const defaultTaskAssigneeId = agentReceipt?.source === currentAgentSource ? agentReceipt?.id ?? null : null;
+  useEffect(() => {
+    if (!currentAgentSource) return;
+    const controller = new AbortController();
+    void currentAgentSource.read(controller.signal).then(agent => {
+      if (!controller.signal.aborted) setAgentReceipt({ source:currentAgentSource, id:typeof agent?.id === 'string' && agent.id.trim() ? agent.id : null });
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [currentAgentSource]);
   const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<SelectedProjectDetails | null>(null);
@@ -1331,6 +1342,7 @@ export function useProjectsController() {
   const frontHrefs = getActiveFrontHrefs();
 
   return {
+    defaultTaskAssigneeId,
     projectsPage,
     projects,
     closeProjectDetails,

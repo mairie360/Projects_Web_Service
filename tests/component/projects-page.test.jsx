@@ -21,8 +21,8 @@ vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
 
 beforeEach(() => {
   window.history.replaceState({}, "", "/");
-  vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([]));
-  vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails());
+  vi.mocked(getProjectsPage).mockReset().mockResolvedValue(fixtures.projectsPage([]));
+  vi.mocked(getProjectDetails).mockReset().mockResolvedValue(fixtures.projectDetails());
   vi.mocked(duplicateProject).mockReset();
   vi.mocked(createProjectTask).mockReset();
   vi.mocked(deleteProjectTask).mockReset();
@@ -43,6 +43,7 @@ describe("Projects page", () => {
     await user.click(opener);
     const dialog = within(screen.getByRole('dialog')), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
     await user.type(input, 'Brouillon collision conservé');
+    await user.click(dialog.getByLabelText('Assignés',{exact:true})); await user.click(dialog.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(input);
     await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
     fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
@@ -478,6 +479,7 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
+    await user.click(screen.getByLabelText('Assignés',{exact:true})); await user.click(screen.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();

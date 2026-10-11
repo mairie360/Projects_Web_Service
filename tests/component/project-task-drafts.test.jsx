@@ -12,6 +12,7 @@ function props() {
     project: { ...fixtures.projectListItem(), dueDate: "2026-12-15" },
     tasks: [{ ...fixtures.projectTask(), dueDate: "2026-10-01" }],
     memberOptions: page.options.members,
+    defaultTaskAssigneeId: "3",
     labelOptions: page.options.labels,
     statusOptions: page.filters.statuses,
     priorityOptions: page.filters.priorities,
@@ -162,4 +163,18 @@ describe("Project task save confirmation", () => {
     expect(screen.getByPlaceholderText("Ajouter une tâche...").value).toBe("");
     expect(screen.getAllByRole("combobox").map(x => x.value)).toEqual(["done", "high"]);
   });
+});
+
+it('requires an explicit assignee when the authenticated agent is unavailable, without substituting the project owner', async () => {
+  const user=userEvent.setup();const values={ ...props(),defaultTaskAssigneeId:null };
+  render(<ProjectDetailModal {...values} />);
+  const scope=within(screen.getByRole('dialog'));const title=scope.getByPlaceholderText('Ajouter une tâche...');
+  await user.type(title,'Tâche sans identité supposée');
+  fireEvent.submit(title.closest('form'));
+  expect(await scope.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
+  expect(values.onAddTask).not.toHaveBeenCalled();
+  await user.click(scope.getByLabelText('Assignés',{exact:true}));await user.click(scope.getByRole('option',{name:'Admin Mairie'}));await user.click(title);
+  fireEvent.submit(title.closest('form'));
+  await waitFor(()=>expect(values.onAddTask).toHaveBeenCalledOnce());
+  expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('1');
 });
