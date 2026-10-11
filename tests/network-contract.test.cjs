@@ -18,12 +18,14 @@ const network = analyseNetworkCalls();
 const routes = discoverRoutes();
 const CATCH_ALL = 'src/app/api/bff/[...path]/route.ts';
 const LEGACY_CATCH_ALL = 'src/app/[...path]/route.ts';
-const LOCAL_ROUTES = { 'src/app/api/auth/logout/route.ts': ['POST'] };
+const LOCAL_ROUTES = { 'src/app/api/auth/logout/route.ts': ['POST'], 'src/app/api/auth/current-user/route.ts': ['GET'] };
 
 /** Modules autorisés à appeler `fetch`, et la seule forme d'appel acceptée dans chacun. */
 const FETCH_GATEWAYS = {
   'src/lib/bffProjectClient.ts': { function: 'requestBff', path: '/api/bff{path}', method: 'GET' },
   'src/lib/auth-token.ts': { function: 'logoutAndReload', path: '/api/auth/logout', method: 'POST' },
+  'src/lib/current-agent.ts': { function: undefined, path: '/api/auth/current-user', method: 'GET' },
+  'src/lib/current-user-proxy.ts': { function: 'currentUser', target: 'target' },
 };
 
 const originalFetch = global.fetch;

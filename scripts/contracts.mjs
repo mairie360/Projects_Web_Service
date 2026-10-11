@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PACKAGE_NAME, buildOrvalOpenApi, resolveOrvalPackage } from './orval-contract.mjs';
 
-// Le seul contrat utilisé par ce front est celui de BFF_Project publié dans @mairie360/bff-project-openapi,
+// Le seul contrat routé par le proxy de ce front est celui de BFF_Project publié dans @mairie360/bff-project-openapi,
 // épinglé à une version exacte X.Y.Z. contracts/openapi.json en est la reconstruction versionnée
 // (lue par le proxy au build et par les tests) ; il n'est jamais copié depuis un checkout du BFF.
 //   --sync   (alias --generate) : régénère contracts/openapi.json depuis le paquet installé
@@ -21,7 +21,15 @@ function checkPinnedPackage() {
   if (!pinned) throw new Error(`${PACKAGE_NAME} doit être une dépendance de package.json.`);
   if (!EXACT_VERSION.test(pinned)) throw new Error(`${PACKAGE_NAME} doit être épinglé à une version publiée exacte X.Y.Z (trouvé « ${pinned} »).`);
   const bffPackages = Object.keys({ ...dependencies, ...devDependencies }).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name));
-  if (bffPackages.length !== 1) throw new Error(`Un seul contrat de BFF est autorisé (trouvé : ${bffPackages.join(', ')}).`);
+  // User supplies types for Login's existing /me relay, never an additional
+  // operation in Project's generated contract or business proxy allowlist.
+  const sessionTypes = '@mairie360/bff-user-openapi';
+  if (dependencies[sessionTypes] || devDependencies[sessionTypes] !== '0.5.0' ||
+    JSON.parse(readFileSync(resolve('node_modules', sessionTypes, 'package.json'), 'utf8')).version !== '0.5.0') {
+    throw new Error('Les types de session User doivent rester épinglés en devDependency à la version publiée 0.5.0.');
+  }
+  const businessPackages = bffPackages.filter(name => name !== sessionTypes);
+  if (businessPackages.length !== 1) throw new Error(`Un seul contrat métier de BFF est autorisé (trouvé : ${businessPackages.join(', ')}).`);
   const installed = resolveOrvalPackage().version;
   if (installed !== pinned) throw new Error(`${PACKAGE_NAME}@${installed} est installé mais package.json épingle ${pinned} : lancer npm ci.`);
   return pinned;

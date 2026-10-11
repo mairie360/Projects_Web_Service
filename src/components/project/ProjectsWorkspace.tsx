@@ -16,7 +16,7 @@ import type { ProjectsController } from './useProjectsController';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function ProjectsWorkspace({
-  defaultTaskAssigneeId,
+  readCurrentTaskAssignee,
   projectsPage,
   projects,
   closeProjectDetails,
@@ -128,7 +128,7 @@ export function ProjectsWorkspace({
       {selectedProject && (
         <ProjectDetailModal
           project={selectedProject}
-          defaultTaskAssigneeId={defaultTaskAssigneeId}
+          readCurrentTaskAssignee={readCurrentTaskAssignee}
           tasks={selectedProjectTasks}
           highlightTaskId={linkedTaskId}
           memberOptions={memberOptions}

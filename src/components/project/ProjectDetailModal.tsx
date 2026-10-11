@@ -24,6 +24,7 @@ type TaskFollowUpSelection = {
 export function ProjectDetailModal({
   project,
   defaultTaskAssigneeId,
+  readCurrentTaskAssignee,
   tasks,
   highlightTaskId,
   memberOptions,
@@ -51,6 +52,7 @@ export function ProjectDetailModal({
 }: {
   project: Project;
   defaultTaskAssigneeId?: string | null;
+  readCurrentTaskAssignee?: (signal: AbortSignal) => Promise<string | null>;
   tasks: ProjectTask[];
   highlightTaskId?: string | null;
   memberOptions: FilterOption[];
@@ -84,12 +86,28 @@ export function ProjectDetailModal({
   const projectSavingRef = React.useRef(false);
   const projectEditIdRef = React.useRef(project.id);
   const editingProjectRef = React.useRef(false);
-  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
+  const newTaskForm = () => createDetailTaskFormState(project, readCurrentTaskAssignee ? null : defaultTaskAssigneeId, memberOptions);
+  const [taskForm, setTaskForm] = React.useState<TaskFormState>(() => taskCreationState?.draft ?? newTaskForm());
+  const taskDraftTouchedRef = React.useRef(!!taskCreationState?.draft);
+  const agentReadRef = React.useRef<AbortController | null>(null);
+  const [taskResetRevision, setTaskResetRevision] = React.useState(0);
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [taskFormError, setTaskFormError] = React.useState('');
   const [taskFormVerificationError, setTaskFormVerificationError] = React.useState(false);
   const [taskSaving, setTaskSaving] = React.useState(false);
   const taskSavingRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!readCurrentTaskAssignee || editingTaskId || taskDraftTouchedRef.current || project.permissions?.canCreateTask === false) return;
+    const controller = new AbortController();
+    agentReadRef.current = controller;
+    setTaskForm(current => ({ ...current, assignees: [] }));
+    void readCurrentTaskAssignee(controller.signal).then(id => {
+      if (controller.signal.aborted || taskDraftTouchedRef.current || agentReadRef.current !== controller) return;
+      const selectable = id && memberOptions.filter(member => String(member.value) === id).length === 1;
+      setTaskForm(current => ({ ...current, assignees: selectable ? [id] : [] }));
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [readCurrentTaskAssignee, memberOptions, project.id, project.permissions?.canCreateTask, editingTaskId, taskResetRevision]);
   const taskCreationNoticeRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (taskCreationState?.uncertainTitle && !taskSaving && !editingTaskId) taskCreationNoticeRef.current?.focus();
@@ -201,8 +219,11 @@ export function ProjectDetailModal({
     }
     // A same-project refresh must not discard an unsaved task or its retry.
     if (projectChanged) {
+      agentReadRef.current?.abort();
+      taskDraftTouchedRef.current = !!taskCreationState?.draft;
+      setTaskResetRevision(current => current + 1);
       taskProjectIdRef.current = project.id;
-      setTaskForm(taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
+      setTaskForm(taskCreationState?.draft ?? newTaskForm());
       setEditingTaskId(null);
       setTaskFormError('');
       collaborationSelectionRef.current = null;
@@ -332,6 +353,8 @@ export function ProjectDetailModal({
   };
 
   const updateTaskForm = (patch: Partial<TaskFormState>) => {
+    taskDraftTouchedRef.current = true;
+    agentReadRef.current?.abort();
     setTaskForm((current) => ({ ...current, ...patch }));
     if (!editingTaskId && taskCreationState?.uncertainTitle) onPreserveTaskDraft?.(patch);
     if (taskFormError) setTaskFormError('');
@@ -396,6 +419,8 @@ export function ProjectDetailModal({
     if (!editingTaskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return;
     if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
     if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
+    taskDraftTouchedRef.current = true;
+    agentReadRef.current?.abort();
     setTaskFormVerificationError(false);
 
     const title = taskForm.title.trim();
@@ -429,7 +454,9 @@ export function ProjectDetailModal({
       } else {
         await onAddTask(project, taskDraft);
       }
-      setTaskForm(createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
+      setTaskForm(newTaskForm());
+      taskDraftTouchedRef.current = false;
+      setTaskResetRevision(current => current + 1);
       setEditingTaskId(null);
     } catch (error) {
       setTaskFormError(getBffProjectErrorMessage(error));
@@ -442,6 +469,8 @@ export function ProjectDetailModal({
 
   const editTask = (task: ProjectTask) => {
     if (taskSavingRef.current || projectSavingRef.current || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
+    taskDraftTouchedRef.current = true;
+    agentReadRef.current?.abort();
     setTaskForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setTaskFormError('');
@@ -449,7 +478,10 @@ export function ProjectDetailModal({
 
   const cancelTaskEdit = () => {
     if (taskSavingRef.current || projectSavingRef.current) return;
-    setTaskForm(taskCreationState?.draft ?? createDetailTaskFormState(project,defaultTaskAssigneeId,memberOptions));
+    agentReadRef.current?.abort();
+    taskDraftTouchedRef.current = !!taskCreationState?.draft;
+    setTaskForm(taskCreationState?.draft ?? newTaskForm());
+    setTaskResetRevision(current => current + 1);
     setEditingTaskId(null);
     setTaskFormError('');
   };

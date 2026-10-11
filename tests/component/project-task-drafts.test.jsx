@@ -178,3 +178,62 @@ it('requires an explicit assignee when the authenticated agent is unavailable, w
   await waitFor(()=>expect(values.onAddTask).toHaveBeenCalledOnce());
   expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('1');
 });
+
+it('prefills the fresh selectable identity, rereads after a save and does not overwrite a touched draft', async () => {
+  const user = userEvent.setup(), values = props(), first = deferred(), second = deferred();
+  const read = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  const dialog = within(screen.getByRole('dialog')), title = dialog.getByLabelText('Titre de la tâche', { exact:true });
+  const assignees = dialog.getByLabelText('Assignés', {exact:true});
+  expect(assignees.textContent).toContain('Choisir un ou plusieurs assignés');
+  await act(async () => first.resolve('1'));
+  expect(dialog.getByRole('button',{name:'Retirer Admin Mairie'})).toBeTruthy();
+  await user.type(title, 'Tâche confirmée');
+  await user.click(dialog.getByRole('button', {name:'Ajouter la tâche',exact:true}));
+  await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+  expect(values.onAddTask.mock.calls[0][1].responsible.id).toBe('1');
+  await user.type(title, 'Brouillon saisi avant la réponse');
+  await user.click(assignees); await user.click(dialog.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(title);
+  await act(async () => second.resolve('1'));
+  expect(read.mock.calls[1][0].aborted).toBe(true);
+  expect(dialog.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
+  expect(dialog.queryByRole('button',{name:'Retirer Admin Mairie'})).toBeNull();
+  expect(title.value).toBe('Brouillon saisi avant la réponse');
+});
+
+it('aborts a closed detail and reads the account again on reopening', async () => {
+  const values=props(), old=deferred(), fresh=deferred();
+  const read=vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+  const view=render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  view.unmount(); expect(read.mock.calls[0][0].aborted).toBe(true);
+  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  await act(async()=>old.resolve('1'));
+  expect(screen.getByLabelText('Assignés',{exact:true}).textContent).toContain('Choisir un ou plusieurs assignés');
+  await act(async()=>fresh.resolve('3'));
+  expect(screen.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
+});
+
+it('preserves a restored uncertain creation and existing task editing while reading new defaults', async () => {
+  const user=userEvent.setup(), values=props(), read=vi.fn().mockResolvedValue('1');
+  const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'review',priority:'low',assignees:['3'],labels:[],dueDate:'2026-11-17'}};
+  render(<ProjectDetailModal {...values} taskCreationState={state} readCurrentTaskAssignee={read} />);
+  expect(read).not.toHaveBeenCalled();
+  const scope=within(screen.getByRole('dialog'));
+  await user.click(scope.getAllByRole('button',{name:'Modifier',exact:true}).at(-1));
+  expect(scope.getByLabelText('Titre de la tâche',{exact:true}).value).toBe(values.tasks[0].title);
+  expect(read).not.toHaveBeenCalled();
+  await user.click(scope.getByRole('button',{name:'Annuler',exact:true}));
+  expect(scope.getByLabelText('Titre de la tâche',{exact:true}).value).toBe('Brouillon conservé');
+  expect(scope.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
+  expect(read).not.toHaveBeenCalled();
+});
+
+it.each([null, 'refused'])('keeps an unavailable identity manual (%s)', async result => {
+  const user=userEvent.setup(), values=props();
+  const read=result==='refused'?vi.fn().mockRejectedValue(new Error('Unavailable')):vi.fn().mockResolvedValue(null);
+  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  const title=screen.getByLabelText('Titre de la tâche',{exact:true});
+  await user.type(title,'Affectation explicite requise');fireEvent.submit(title.closest('form'));
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
+  expect(values.onAddTask).not.toHaveBeenCalled();
+});

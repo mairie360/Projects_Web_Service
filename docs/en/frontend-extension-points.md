@@ -1,6 +1,6 @@
 # Frontend extension points while backend work is pending
 
-The 11 October 2026 request authorizes preparing the remaining local-demo features on the frontend before the backend is implemented. Published SDKs, BFF/API sources, environment variables and RGAA configuration remain unchanged. These view ports are frontend interfaces, not new HTTP contracts. They have no production transport until a published operation is mapped to them.
+The 11 October 2026 request authorizes preparing the remaining local-demo features on the frontend before the backend is implemented. BFF/API sources, environment variables and RGAA configuration remain unchanged. Projects also consumes the published User 0.5.0 types for the existing session read. These view ports are frontend interfaces, not new HTTP contracts. Ports without a mapped published operation have no production transport. The current-agent read below uses an existing operation.
 
 ## Expected integration
 
@@ -14,4 +14,4 @@ Unit/component tests inject view ports solely to exercise the frontend confirmat
 
 ## Module
 
-`CurrentAgentSource` prepares the received current identity. The detail-task form preselects only a real agent present in its selectable members. In its absence, it does not substitute the project owner or first member. Explicit drafts stay intact when a late identity arrives; future resets use the current verified default. The new-project and Kanban rules remain separate.
+`CurrentAgentSource` reads the current identity afresh when a detail-task form opens or resets. The production source uses the frontend `/api/auth/current-user` adapter, which reads the existing Login `/api/bff/me` relay with shared cookies. The actual User 0.5.0 SDK makes `user.id` optional; it is mapped to Project’s published `user-{id}` namespace only when exactly one such value is present in the received page member options. Missing, malformed, refused or unselectable identities keep assignment manual. Only the ID is exposed, with no cache; account names and project ownership are never identity substitutes. The detail-task form preselects only a real agent present in its selectable members. In its absence, it does not substitute the project owner or first member. Explicit drafts stay intact when a late identity arrives; new forms read the session again; cancellation, editing an existing task and manual input invalidate pending identity reads. The new-project and Kanban rules remain separate.

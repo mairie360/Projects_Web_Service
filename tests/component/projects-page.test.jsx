@@ -756,3 +756,20 @@ describe("Projects page", () => {
     expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   });
 });
+
+it('wires the existing Login identity to a received Project member only when the detail is opened', async () => {
+  const user=userEvent.setup(), project=fixtures.projectListItem();
+  const page=fixtures.projectsPage([project]);
+  page.options.members=page.options.members.map(member=>({...member,value:`user-${member.value}`}));
+  vi.mocked(getProjectsPage).mockResolvedValue(page);
+  vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project,[]));
+  const fetch=vi.fn().mockResolvedValue(Response.json({id:'1'}));vi.stubGlobal('fetch',fetch);
+  try {
+    render(<ProjectsPage />);
+    const opener=await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`});
+    expect(fetch).not.toHaveBeenCalled();await user.click(opener);
+    await screen.findByRole('button',{name:'Retirer Admin Mairie'});
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0][0]).toBe('/api/auth/current-user');
+  } finally {vi.unstubAllGlobals();}
+});
