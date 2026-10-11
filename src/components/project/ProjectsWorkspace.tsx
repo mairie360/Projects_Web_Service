@@ -11,6 +11,7 @@ import { ProjectPagination } from './ProjectPagination';
 import { TaskCreationNotice } from './TaskCreationNotice';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
 import { navigateToPage } from '../../lib/navigation';
+import { returnToLogin } from '../../lib/auth-token';
 import type { ProjectsController } from './useProjectsController';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
@@ -53,6 +54,7 @@ export function ProjectsWorkspace({
   openFilter,
   setOpenFilter,
   alert,
+  logoutError,
   setAlert,
   pageLoading,
   pageError,
@@ -188,6 +190,14 @@ export function ProjectsWorkspace({
         className="projects-shell"
       >
             <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+              {logoutError && (
+                <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
+                  <p>{logoutError}</p>
+                  <button type="button" onClick={returnToLogin} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f]">
+                    Retour à la connexion
+                  </button>
+                </div>
+              )}
               {[...taskCreationStates].filter(([, state]) => state.uncertainTitle).map(([projectId, state]) => (
                 <TaskCreationNotice key={projectId} state={state} onInspect={() => inspectTaskCreation(projectId)} />
               ))}
