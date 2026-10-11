@@ -22,9 +22,16 @@ test('le paquet de contrat BFF_Project est épinglé à une version publiée X.Y
   assert.equal(readJson('package-lock.json').packages[`node_modules/${PACKAGE_NAME}`].version, pinned);
 });
 
-test('un seul paquet de contrat de BFF est utilisé', () => {
+test('seul le contrat métier Project est routé ; les types de session publiés restent une dépendance de développement exacte', () => {
   const all = { ...manifest.dependencies, ...manifest.devDependencies };
-  assert.deepEqual(Object.keys(all).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name)), [PACKAGE_NAME]);
+  const sessionTypes = '@mairie360/bff-user-openapi';
+  assert.deepEqual(Object.keys(all).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name) && name !== sessionTypes), [PACKAGE_NAME]);
+  assert.equal(manifest.dependencies[sessionTypes], undefined);
+  assert.equal(manifest.devDependencies[sessionTypes], '0.5.0');
+  assert.equal(readJson(`node_modules/${sessionTypes}/package.json`).version, '0.5.0');
+  const locked = readJson('package-lock.json').packages[`node_modules/${sessionTypes}`];
+  assert.equal(locked.version, '0.5.0');
+  assert.equal(locked.dev, true);
 });
 
 test('contracts/openapi.json est exactement le contrat reconstruit depuis le paquet installé', async () => {

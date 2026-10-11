@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./typescript.cjs');
-const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession } = require('@mairie360/lib-components/next');
+const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession, proxyPublishedBffRequest } = require('@mairie360/lib-components/next');
 const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 
@@ -71,6 +71,7 @@ function createFrontHarness() {
   const ownerConfig = { userBffUrl: () => bffUser.url, cookieOptions: () => ({ secure: true, domain: '.mairie.test' }), allowedOrigins: () => [ORIGIN, LOGIN_ORIGIN] };
   const ownerRoutes = { '/api/auth/refresh': createSessionRefreshHandler(ownerConfig), '/api/auth/logout': createSessionLogoutHandler(ownerConfig) };
   const ownerCalls = [];
+  const sessionReadCalls = [];
   let ownerOverride;
 
   const routes = discoverRoutes();
@@ -120,6 +121,13 @@ function createFrontHarness() {
     if (typeof input === 'string' && input.startsWith('/') && !input.startsWith('//')) return browserFetch(input, init);
     const url = new URL(input instanceof Request ? input.url : String(input), ORIGIN);
     if (url.origin === LOGIN_ORIGIN) {
+      if (url.pathname === '/api/bff/me' && (init.method ?? 'GET') === 'GET') {
+        sessionReadCalls.push({ url, init });
+        return proxyPublishedBffRequest(new NextRequest(url, init), ['me'], {
+          baseUrl:()=>bffUser.url, paths:bffUser.contract.document.paths,
+          loginUrl:()=>LOGIN_ORIGIN, frontUrl:()=>LOGIN_ORIGIN,
+        });
+      }
       const handler = ownerRoutes[url.pathname];
       if (!handler || init.method !== 'POST') {
         forbidden.push(`appel Login hors protocole : ${init.method} ${url.pathname}`);
@@ -141,6 +149,7 @@ function createFrontHarness() {
     bffProject,
     bffUser,
     ownerCalls,
+    sessionReadCalls,
     replyFromOwner(handler) { ownerOverride = handler; },
     browserCalls,
     cookies,
@@ -166,6 +175,7 @@ function createFrontHarness() {
         if (value) forgetUserSession(bffUser.url, value);
       }
       ownerCalls.length = 0;
+      sessionReadCalls.length = 0;
       ownerOverride = undefined;
       cookies.clear();
       storage.clear();
@@ -179,6 +189,9 @@ function createFrontHarness() {
       process.env.BFF_PROJECT_BASE_URL = bffProject.url;
       process.env.LOGIN_FRONT_URL = LOGIN_ORIGIN;
       process.env.PROJECT_FRONT_URL = ORIGIN;
+      // The published ID is optional. Baseline business cases exercise its
+      // absence; identity-specific tests explicitly configure a received ID.
+      bffUser.on('get', '/me', {body:{user:{first_name:'Agent',last_name:'Municipal',email:'agent@example.test',status:'ACTIVE'},groups:[],roles:[]}});
       requireTs('src/lib/front-urls.ts').setBrowserFrontUrls({ LOGIN_FRONT_URL: LOGIN_ORIGIN, PROJECT_FRONT_URL: ORIGIN });
     },
     /** Autorise le proxy à joindre une URL supplémentaire (ex. port fermé pour simuler un BFF injoignable). */
