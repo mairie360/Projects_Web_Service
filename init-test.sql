@@ -7,6 +7,9 @@ VALUES (2, 'Perf', 'Tester', 'perf-tester@mairie360.fr', '$argon2id$v=19$m=19456
 ON CONFLICT (id) DO NOTHING;
 -- Core API >= 1.1.1 exige au moins un rôle sur l'utilisateur pour GET /user/me
 -- (sinon 502 côté BFF User, que BFF_Project appelle, donc sur /projects-page et sur le shell du front).
+-- The "User" role alone cannot create projects: BFF Project answers 403 ("The Responsable, Maire
+-- or Admin role is required"). Since MAIR-516 the test user also carries the "Admin" role, so the
+-- k6 write scenario (project creation and deletion) and the scan reach those routes.
 INSERT INTO user_roles (user_id, role_id)
-SELECT 2, r.id FROM roles r WHERE lower(r.name) = 'user'
+SELECT 2, r.id FROM roles r WHERE lower(r.name) IN ('user', 'admin')
 ON CONFLICT DO NOTHING;
