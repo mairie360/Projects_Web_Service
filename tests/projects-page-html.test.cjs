@@ -503,10 +503,10 @@ test('nested task primary assignee order survives an unrelated edit in the proje
   await renderLoadedPage();
   await view.click('Nouveau projet');
   await view.act(() => view.props('CreateProjectModal').onChange({
-    title: 'Projet assignés propres', description: 'Garder le responsable choisi', responsible: '1', dueDate: '2026-11-18',
+    title: 'Projet assignés propres', description: 'Garder le responsable choisi', responsible: 'user-1', dueDate: '2026-11-18',
   }));
   await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Marie puis Alice' } });
-  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'project-form-task-assignees').props.onChange(['3', '2']));
+  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'project-form-task-assignees').props.onChange(['user-3', 'user-2']));
   await view.click('Ajouter la tâche');
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
   await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Titre modifié uniquement' } });
@@ -522,8 +522,8 @@ test('nested task primary assignee order survives an unrelated edit in the proje
   await view.waitFor(() => view.find('CreateProjectModal').length === 0);
   const writes = bffProject.calls('/projects', 'post');
   assert.equal(writes.length, 1);
-  assert.equal(writes[0].body.responsibleId, '1');
-  assert.deepEqual(writes[0].body.taskItems[0].assigneeIds, ['3', '2']);
+  assert.equal(writes[0].body.responsibleId, 'user-1');
+  assert.deepEqual(writes[0].body.taskItems[0].assigneeIds, ['user-3', 'user-2']);
   assert.equal(writes[0].body.taskItems[0].title, 'Titre modifié uniquement');
   assert.equal(Object.hasOwn(writes[0].body.taskItems[0], 'id'), false);
   assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 1);
@@ -901,7 +901,7 @@ for (const mode of ['create', 'edit']) {
     await view.fire((props) => props.id === 'detail-task-status', 'onChange', { target: { value: 'review' } });
     await view.fire((props) => props.id === 'detail-task-priority', 'onChange', { target: { value: 'low' } });
     await view.fire((props) => props.id === 'detail-task-due-date', 'onChange', { target: { value: '2026-11-17' } });
-    if (mode === 'create') await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['3']));
+    if (mode === 'create') await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
     assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value="Saisie à conserver"/);
     const dialog = view.html.match(/<section[^>]*role="dialog"[^]*?<\/main>/)?.[0];
@@ -925,17 +925,17 @@ for (const mode of ['create', 'edit']) {
     if (mode === 'edit') await view.act(() => view.props('TaskEditButton').onClick());
     await view.fire(props => props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Responsable conservé' } });
     await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(
-      mode === 'edit' ? ['3', '2', '1'] : ['3', '1']
+      mode === 'edit' ? ['user-3', 'user-2', 'user-1'] : ['user-3', 'user-1']
     ));
     const method = mode === 'edit' ? 'patch' : 'post';
     const route = mode === 'edit' ? '/projects/{projectId}/tasks/{taskId}' : '/projects/{projectId}/tasks';
     bffProject.on(method, route, harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Assignation refusée')));
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
-    const expected = mode === 'edit' ? ['3', '2', '1'] : ['3', '1'];
+    const expected = mode === 'edit' ? ['user-3', 'user-2', 'user-1'] : ['user-3', 'user-1'];
     const first = bffProject.calls(route, method)[0];
     assert.equal(first.pathParams.projectId, 'project-1');
     if (mode === 'edit') assert.equal(first.pathParams.taskId, 'task-1');
-    assert.equal(first.body.responsibleId, '3');
+    assert.equal(first.body.responsibleId, 'user-3');
     assert.deepEqual(first.body.assigneeIds, expected);
     assert.match(view.text(), /Assignation refusée/);
     const official = fixtures.projectTask({
@@ -949,7 +949,7 @@ for (const mode of ['create', 'edit']) {
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
     assert.equal(bffProject.calls(route, method).length, 2);
     assert.deepEqual(bffProject.calls(route, method)[1].body, first.body);
-    assert.equal(view.props('ProjectDetailModal').tasks.find(task => task.id === official.id).responsible.id, '3');
+    assert.equal(view.props('ProjectDetailModal').tasks.find(task => task.id === official.id).responsible.id, 'user-3');
     assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 2);
   });
 }
@@ -1053,7 +1053,7 @@ test('task follow-up ignores a late response from a previously selected task', a
     if (typeof target === 'string' && target === '/api/bff/projects/project-1/tasks/task-1/collaboration') await gate;
     return response;
   });
-  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: {
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: { ...fixtures.taskCollaboration(),
     comments: [fixtures.taskComment({ message: `Suivi ${pathParams.taskId}` })], history: [],
   } }));
   const follow = () => view.hostElements((props, text, tag) => tag === 'button' && text.includes('Suivi'));
@@ -1088,7 +1088,7 @@ test('task follow-up guards synchronous repeated comment submission and preserve
   assert.match(view.html, /role="alert"[^>]*>Commentaire refusé/);
   const confirmed = fixtures.taskComment({ id: 'comment-retry', message: 'Brouillon à conserver' });
   bffProject.on('post', '/projects/{projectId}/tasks/{taskId}/comments', { status: 201, body: confirmed });
-  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { comments: [confirmed], history: [] } });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { ...fixtures.taskCollaboration(), comments: [confirmed], history: [] } });
   await view.fire((props, text, tag) => tag === 'form' && text.includes('Envoyer'), 'onSubmit');
   await view.waitFor(html => html.includes('Brouillon à conserver') && !html.includes('Envoi du commentaire'));
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 2);
@@ -1110,7 +1110,7 @@ test('task follow-up retains a confirmed comment when its reload fails and retri
   await view.waitFor(html => html.includes('Suivi indisponible'));
   assert.match(view.text(), /Commentaire confirmé/);
   assert.match(view.text(), /Commentaire enregistré\. Actualisation impossible/);
-  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { comments: [fixtures.taskComment(), comment], history: [] } });
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: { ...fixtures.taskCollaboration(), comments: [fixtures.taskComment(), comment], history: [] } });
   await view.click((props, text, tag) => tag === 'button' && text === 'Actualiser le suivi');
   await view.waitFor(html => !html.includes('Suivi indisponible') && !html.includes('Chargement du suivi'));
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 1);
@@ -1163,7 +1163,7 @@ test('task follow-up ignores a late failure after the panel has been closed and 
 test('task follow-up never applies a late comment confirmation to another task', async (t) => {
   await renderLoadedPage();
   await openDetails();
-  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: {
+  bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: { ...fixtures.taskCollaboration(),
     comments: [fixtures.taskComment({ message: `Suivi ${pathParams.taskId}` })], history: [],
   } }));
   await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
@@ -1327,7 +1327,7 @@ test('the detail modal edits the project inline, adds a task from its form and c
 
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await view.fire((props, text, tag) => tag === 'input' && props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Poser les lanternes' } });
-  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['3']));
+  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
   await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
   await view.waitFor(() => alertText() === 'Tâche "Poser les lanternes" ajoutée à "Éclairage LED".');
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post')[0].body.title, 'Poser les lanternes');

@@ -1,55 +1,269 @@
 {
   "components": {
     "schemas": {
-      "ApiError": {
+      "ArchivedTasksQuery": {
         "properties": {
-          "error": {
-            "$ref": "#/components/schemas/ApiErrorError"
+          "limit": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "number"
+          },
+          "page": {
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "ArchivedTasksResponse": {
+        "properties": {
+          "pagination": {
+            "$ref": "#/components/schemas/ArchivedTasksResponsePagination"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedTasksResponseTasksItem"
+            },
+            "type": "array"
           }
         },
         "required": [
-          "error"
+          "tasks",
+          "pagination"
         ],
         "type": "object"
       },
-      "ApiErrorError": {
+      "ArchivedTasksResponsePagination": {
         "properties": {
-          "code": {
-            "type": "string"
+          "hasNextPage": {
+            "type": "boolean"
           },
-          "details": {
-            "items": {},
+          "limit": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "hasNextPage"
+        ],
+        "type": "object"
+      },
+      "ArchivedTasksResponseTasksItem": {
+        "properties": {
+          "assignees": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemAssigneesItem"
+            },
             "type": "array"
           },
-          "message": {
+          "completed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemPermissions"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemPriority"
+          },
+          "priorityLabel": {
+            "type": "string"
+          },
+          "responsible": {
+            "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemResponsible"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemStatus"
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
             "type": "string"
           }
         },
         "required": [
-          "code",
-          "message",
-          "details"
+          "id",
+          "title",
+          "status",
+          "statusLabel",
+          "responsible",
+          "assignees",
+          "priority",
+          "priorityLabel",
+          "labels",
+          "dueDate",
+          "completed",
+          "createdAt",
+          "permissions"
         ],
         "type": "object"
       },
-      "CheckApiResponse": {
+      "ArchivedTasksResponseTasksItemAssigneesItem": {
+        "properties": {
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "type": "object"
+      },
+      "ArchivedTasksResponseTasksItemPermissions": {
+        "properties": {
+          "canComment": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canUpdateStatus": {
+            "type": "boolean"
+          },
+          "canView": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canView",
+          "canEdit",
+          "canDelete",
+          "canUpdateStatus",
+          "canComment"
+        ],
+        "type": "object"
+      },
+      "ArchivedTasksResponseTasksItemPriority": {
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "type": "string"
+      },
+      "ArchivedTasksResponseTasksItemResponsible": {
+        "properties": {
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "type": "object"
+      },
+      "ArchivedTasksResponseTasksItemStatus": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "review",
+          "done"
+        ],
+        "type": "string"
+      },
+      "CheckApisResponse": {
         "properties": {
           "core_api": {
-            "type": "string"
+            "$ref": "#/components/schemas/CheckApisResponseCoreApi"
           },
           "project_api": {
-            "type": "string"
+            "$ref": "#/components/schemas/CheckApisResponseProjectApi"
           },
           "status": {
-            "type": "string"
+            "$ref": "#/components/schemas/CheckApisResponseStatus"
+          },
+          "user_bff": {
+            "$ref": "#/components/schemas/CheckApisResponseUserBff"
           }
         },
         "required": [
           "status",
           "core_api",
-          "project_api"
+          "project_api",
+          "user_bff"
         ],
         "type": "object"
+      },
+      "CheckApisResponseCoreApi": {
+        "enum": [
+          "Connected",
+          "Unreachable"
+        ],
+        "type": "string"
+      },
+      "CheckApisResponseProjectApi": {
+        "enum": [
+          "Connected",
+          "Unreachable"
+        ],
+        "type": "string"
+      },
+      "CheckApisResponseStatus": {
+        "enum": [
+          "OK",
+          "Error"
+        ],
+        "type": "string"
+      },
+      "CheckApisResponseUserBff": {
+        "enum": [
+          "Connected",
+          "Unreachable"
+        ],
+        "type": "string"
       },
       "CloseProjectBody": {
         "properties": {
@@ -71,11 +285,13 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
           },
           "description": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           },
           "dueDate": {
@@ -83,6 +299,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -91,6 +308,7 @@
             "$ref": "#/components/schemas/CreateProjectBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
@@ -103,6 +321,7 @@
             "type": "array"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -139,6 +358,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -148,6 +368,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -159,6 +380,7 @@
             "$ref": "#/components/schemas/CreateProjectBodyTaskItemsItemStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -193,6 +415,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -202,6 +425,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -210,12 +434,14 @@
             "$ref": "#/components/schemas/CreateTaskBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/CreateTaskBodyStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -246,6 +472,70 @@
           "done"
         ],
         "type": "string"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponseError"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "ErrorResponseError": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorResponseErrorCode"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorResponseErrorDetailsItem"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details"
+        ],
+        "type": "object"
+      },
+      "ErrorResponseErrorCode": {
+        "enum": [
+          "BAD_REQUEST",
+          "UNAUTHORIZED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "CONFLICT",
+          "PAYLOAD_TOO_LARGE",
+          "UNPROCESSABLE_ENTITY",
+          "TOO_MANY_REQUESTS",
+          "INTERNAL_ERROR",
+          "BAD_GATEWAY",
+          "SERVICE_UNAVAILABLE",
+          "GATEWAY_TIMEOUT"
+        ],
+        "type": "string"
+      },
+      "ErrorResponseErrorDetailsItem": {
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
       },
       "GetProjectsPage200": {
         "properties": {
@@ -838,6 +1128,7 @@
             "$ref": "#/components/schemas/GetProjectsPagePriority"
           },
           "q": {
+            "maxLength": 255,
             "type": "string"
           },
           "status": {
@@ -1237,6 +1528,22 @@
         ],
         "type": "string"
       },
+      "GetProjectsProjectIdArchivedTasksParams": {
+        "properties": {
+          "limit": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "number"
+          },
+          "page": {
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
       "GetProjectsProjectIdTasksTaskIdCollaboration200": {
         "properties": {
           "comments": {
@@ -1250,11 +1557,15 @@
               "$ref": "#/components/schemas/GetProjectsProjectIdTasksTaskIdCollaboration200HistoryItem"
             },
             "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/GetProjectsProjectIdTasksTaskIdCollaboration200Pagination"
           }
         },
         "required": [
           "comments",
-          "history"
+          "history",
+          "pagination"
         ],
         "type": "object"
       },
@@ -1343,6 +1654,49 @@
       },
       "GetProjectsProjectIdTasksTaskIdCollaboration200HistoryItemChanges": {
         "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "GetProjectsProjectIdTasksTaskIdCollaboration200Pagination": {
+        "properties": {
+          "commentsTotal": {
+            "type": "number"
+          },
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "historyTotal": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "commentsTotal",
+          "historyTotal",
+          "hasNextPage"
+        ],
+        "type": "object"
+      },
+      "GetProjectsProjectIdTasksTaskIdCollaborationParams": {
+        "properties": {
+          "limit": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "number"
+          },
+          "page": {
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
         "required": [],
         "type": "object"
       },
@@ -1710,11 +2064,13 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
           },
           "description": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           },
           "dueDate": {
@@ -1722,6 +2078,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -1730,6 +2087,7 @@
             "$ref": "#/components/schemas/PatchProjectsProjectIdBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
@@ -1742,6 +2100,7 @@
             "type": "array"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -1769,6 +2128,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -1778,6 +2138,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -1789,6 +2150,7 @@
             "$ref": "#/components/schemas/PatchProjectsProjectIdBodyTaskItemsItemStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -2355,6 +2717,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -2364,6 +2727,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -2372,12 +2736,14 @@
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskIdBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskIdBodyStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -2963,11 +3329,13 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
           },
           "description": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           },
           "dueDate": {
@@ -2975,6 +3343,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -2983,6 +3352,7 @@
             "$ref": "#/components/schemas/PostProjectsBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
@@ -2995,6 +3365,7 @@
             "type": "array"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -3031,6 +3402,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -3040,6 +3412,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -3051,6 +3424,7 @@
             "$ref": "#/components/schemas/PostProjectsBodyTaskItemsItemStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -3601,6 +3975,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -3610,6 +3985,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -3618,12 +3994,14 @@
             "$ref": "#/components/schemas/PostProjectsProjectIdTasksBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/PostProjectsProjectIdTasksBodyStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -3698,6 +4076,7 @@
           "message": {
             "maxLength": 2000,
             "minLength": 1,
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -4475,6 +4854,7 @@
             "$ref": "#/components/schemas/ProjectsPageQueryPriority"
           },
           "q": {
+            "maxLength": 255,
             "type": "string"
           },
           "status": {
@@ -5094,11 +5474,15 @@
               "$ref": "#/components/schemas/TaskCollaborationResponseHistoryItem"
             },
             "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/TaskCollaborationResponsePagination"
           }
         },
         "required": [
           "comments",
-          "history"
+          "history",
+          "pagination"
         ],
         "type": "object"
       },
@@ -5190,6 +5574,33 @@
         "required": [],
         "type": "object"
       },
+      "TaskCollaborationResponsePagination": {
+        "properties": {
+          "commentsTotal": {
+            "type": "number"
+          },
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "historyTotal": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "commentsTotal",
+          "historyTotal",
+          "hasNextPage"
+        ],
+        "type": "object"
+      },
       "TaskComment": {
         "properties": {
           "author": {
@@ -5233,6 +5644,7 @@
           "message": {
             "maxLength": 2000,
             "minLength": 1,
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -5295,11 +5707,13 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
           },
           "description": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           },
           "dueDate": {
@@ -5307,6 +5721,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -5315,6 +5730,7 @@
             "$ref": "#/components/schemas/UpdateProjectBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
@@ -5327,6 +5743,7 @@
             "type": "array"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -5354,6 +5771,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -5363,6 +5781,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -5374,6 +5793,7 @@
             "$ref": "#/components/schemas/UpdateProjectBodyTaskItemsItemStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -5408,6 +5828,7 @@
         "properties": {
           "assigneeIds": {
             "items": {
+              "pattern": "^user-\\d+$",
               "type": "string"
             },
             "type": "array"
@@ -5417,6 +5838,7 @@
           },
           "labels": {
             "items": {
+              "pattern": "^[^<>]*$",
               "type": "string"
             },
             "type": "array"
@@ -5425,12 +5847,14 @@
             "$ref": "#/components/schemas/UpdateTaskBodyPriority"
           },
           "responsibleId": {
+            "pattern": "^(?:user-\\d+)?$",
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/UpdateTaskBodyStatus"
           },
           "title": {
+            "pattern": "^[^<>]*$",
             "type": "string"
           }
         },
@@ -5487,7 +5911,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.4.0"
+    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.68d15b9b3719a593289d8833da176bb555a2c991"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5500,7 +5924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CheckApiResponse"
+                  "$ref": "#/components/schemas/CheckApisResponse"
                 }
               }
             },
@@ -5557,6 +5981,7 @@
             "name": "q",
             "required": false,
             "schema": {
+              "maxLength": 255,
               "type": "string"
             }
           },
@@ -5709,6 +6134,53 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PatchProjectsProjectId200"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/archived-tasks": {
+      "get": {
+        "operationId": "getProjectsProjectIdArchivedTasks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivedTasksResponse"
                 }
               }
             },
@@ -5907,6 +6379,26 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
             }
           }
         ],

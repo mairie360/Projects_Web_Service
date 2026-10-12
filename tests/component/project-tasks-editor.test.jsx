@@ -8,9 +8,9 @@ import { createProjectFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
 
 const memberOptions = [
-  { label: 'Admin Mairie', name: 'Admin Mairie', value: '1' },
-  { label: 'Alice Martin', name: 'Alice Martin', value: '2' },
-  { label: 'Marie Durand', name: 'Marie Durand', value: '3' },
+  { label: 'Admin Mairie', name: 'Admin Mairie', value: 'user-1' },
+  { label: 'Alice Martin', name: 'Alice Martin', value: 'user-2' },
+  { label: 'Marie Durand', name: 'Marie Durand', value: 'user-3' },
 ];
 
 function Editor({ responsible = '', taskItems = [], dueDate = '' }) {
@@ -18,7 +18,7 @@ function Editor({ responsible = '', taskItems = [], dueDate = '' }) {
 
   return (
     <>
-      <button type="button" onClick={() => setForm((current) => ({ ...current, responsible: '3' }))}>
+      <button type="button" onClick={() => setForm((current) => ({ ...current, responsible: 'user-3' }))}>
         Choisir Marie pour le projet
       </button>
       <input
@@ -45,7 +45,7 @@ describe('ProjectTasksEditor task assignees', () => {
   it('stacks a long task heading above its mobile edit action and preserves the full title on edit', async () => {
     const user = userEvent.setup();
     const title = 'ValiderLePlanDesNouveauxEspaces'.repeat(3);
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), title);
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
 
@@ -80,14 +80,14 @@ describe('ProjectTasksEditor task assignees', () => {
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
 
     const [task] = JSON.parse(screen.getByTestId('tasks').textContent);
-    expect(task.responsible).toMatchObject({ id: '3', name: 'Marie Durand' });
-    expect(task.assignees).toEqual([expect.objectContaining({ id: '3' })]);
+    expect(task.responsible).toMatchObject({ id: 'user-3', name: 'Marie Durand' });
+    expect(task.assignees).toEqual([expect.objectContaining({ id: 'user-3' })]);
     expect(task.title).toBe('Préparer le dossier');
   });
 
   it('preserves an explicit task assignee even when the project has another responsible', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
 
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Vérifier le dossier');
     await user.click(screen.getByRole('button', { name: 'Assignés' }));
@@ -95,8 +95,8 @@ describe('ProjectTasksEditor task assignees', () => {
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
 
     const [task] = JSON.parse(screen.getByTestId('tasks').textContent);
-    expect(task.responsible).toMatchObject({ id: '2', name: 'Alice Martin' });
-    expect(task.assignees).toEqual([expect.objectContaining({ id: '2' })]);
+    expect(task.responsible).toMatchObject({ id: 'user-2', name: 'Alice Martin' });
+    expect(task.assignees).toEqual([expect.objectContaining({ id: 'user-2' })]);
     expect(screen.getByPlaceholderText('Ajouter une tâche...').value).toBe('');
     expect(screen.queryByText('1 sélectionné(s)')).toBeNull();
   });
@@ -120,12 +120,12 @@ describe('ProjectTasksEditor primary assignee ownership', () => {
   it('editing only a title keeps the existing primary and all selected assignees', async () => {
     const user = userEvent.setup();
     const existing = existingTask();
-    render(<Editor responsible="1" taskItems={[existing]} />);
+    render(<Editor responsible="user-1" taskItems={[existing]} />);
     await edit(user);
     await user.clear(screen.getByPlaceholderText('Ajouter une tâche...'));
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Titre corrigé seulement');
     await save(user);
-    expectMembers(tasks()[0], ['3', '2']);
+    expectMembers(tasks()[0], ['user-3', 'user-2']);
     expect(tasks()[0]).toMatchObject({
       id: existing.id, title: 'Titre corrigé seulement', dueDate: existing.dueDate,
       createdAt: existing.createdAt, labels: existing.labels, status: existing.status,
@@ -135,51 +135,51 @@ describe('ProjectTasksEditor primary assignee ownership', () => {
   for (const assignees of [[fixtures.people.alice, fixtures.people.marie], [fixtures.people.alice]]) {
     it(`keeps the received primary even when the ${assignees.length === 1 ? 'selection omits it' : 'list places it second'}`, async () => {
       const user = userEvent.setup();
-      render(<Editor responsible="1" taskItems={[existingTask({ assignees })]} />);
+      render(<Editor responsible="user-1" taskItems={[existingTask({ assignees })]} />);
       await edit(user);
       await save(user);
-      expectMembers(tasks()[0], ['3', '2']);
+      expectMembers(tasks()[0], ['user-3', 'user-2']);
     });
   }
 
   it('new selection order is not replaced by lexicographic member sorting', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="1" />);
+    render(<Editor responsible="user-1" />);
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Marie puis Alice');
     await user.click(screen.getByRole('button', { name: 'Assignés' }));
     await user.click(screen.getByRole('option', { name: 'Marie Durand' }));
     await user.click(screen.getByRole('option', { name: 'Alice Martin' }));
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
-    expectMembers(tasks()[0], ['3', '2']);
+    expectMembers(tasks()[0], ['user-3', 'user-2']);
   });
 
   it('adding another member during edit does not promote that member to primary', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    render(<Editor responsible="user-1" taskItems={[existingTask()]} />);
     await edit(user);
     await user.click(screen.getByRole('button', { name: 'Assignés' }));
     await user.click(screen.getByRole('option', { name: 'Admin Mairie' }));
     await save(user);
-    expectMembers(tasks()[0], ['3', '2', '1']);
+    expectMembers(tasks()[0], ['user-3', 'user-2', 'user-1']);
   });
 
   it('explicit removal of the existing primary uses the next selected member', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    render(<Editor responsible="user-1" taskItems={[existingTask()]} />);
     await edit(user);
     await user.click(screen.getByRole('button', { name: 'Retirer Marie Durand' }));
     await save(user);
-    expectMembers(tasks()[0], ['2']);
+    expectMembers(tasks()[0], ['user-2']);
   });
 
   it('clearing every assignee retains the existing project-responsible fallback rule', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="1" taskItems={[existingTask()]} />);
+    render(<Editor responsible="user-1" taskItems={[existingTask()]} />);
     await edit(user);
     await user.click(screen.getByRole('button', { name: 'Retirer Marie Durand' }));
     await user.click(screen.getByRole('button', { name: 'Retirer Alice Martin' }));
     await save(user);
-    expectMembers(tasks()[0], ['1']);
+    expectMembers(tasks()[0], ['user-1']);
   });
 });
 
@@ -195,7 +195,7 @@ describe('ProjectTasksEditor local task identities', () => {
   it('keeps same-tick drafts independently toggleable and editable with stable identities and dates', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1791290000000);
     const user = userEvent.setup();
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
     await addTask(user, 'Première tâche');
     await addTask(user, 'Deuxième tâche');
     const original = tasks();
@@ -216,7 +216,7 @@ describe('ProjectTasksEditor local task identities', () => {
 
   it('avoids matching existing identities and previously allocated suffixes without rewriting those tasks', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
     vi.spyOn(Date, 'now').mockReturnValue(1791290000000);
     await addTask(user, 'Première tâche');
     await addTask(user, 'Deuxième tâche');
@@ -231,7 +231,7 @@ describe('ProjectTasksEditor local task identities', () => {
   it('stays unique when the clock moves backwards and later returns to an occupied timestamp', async () => {
     const user = userEvent.setup();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1791290000100);
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
     await addTask(user, 'Avant recul');
     clock.mockReturnValue(1791290000000);
     await addTask(user, 'Après recul');
@@ -249,7 +249,7 @@ describe('ProjectTasksEditor local task identities', () => {
       fixtures.projectTask({ id: 'task-1791290000000-1', title: 'Autre tâche existante' }),
     ];
     const user = userEvent.setup();
-    render(<Editor responsible="3" taskItems={existing} />);
+    render(<Editor responsible="user-3" taskItems={existing} />);
     await addTask(user, 'Tâche ajoutée');
     expect(new Set(tasks().map(task => task.id)).size).toBe(3);
     expect(tasks().slice(0, 2)).toEqual(existing);
@@ -270,7 +270,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
 
   it('follows the final project date instead of retaining an intermediate native year', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" />);
+    render(<Editor responsible="user-3" />);
     for (const value of ['0002-11-18', '0020-11-18', '0202-11-18', '2026-11-18']) changeProjectDate(value);
     expect(taskDate().value).toBe('2026-11-18');
     await addTask(user);
@@ -279,7 +279,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
 
   it('keeps a new deadline unchosen even when another draft field already contains text', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    render(<Editor responsible="user-3" dueDate="2026-11-18" />);
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Texte conservé');
     changeProjectDate('2026-12-31');
     expect(screen.getByPlaceholderText('Ajouter une tâche...').value).toBe('Texte conservé');
@@ -290,7 +290,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
 
   it('preserves an explicitly chosen task date when the project date changes', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    render(<Editor responsible="user-3" dueDate="2026-11-18" />);
     fireEvent.change(taskDate(), { target: { value: '2026-10-21' } });
     changeProjectDate('2026-12-31');
     expect(taskDate().value).toBe('2026-10-21');
@@ -300,7 +300,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
 
   it('preserves an explicitly cleared task date rather than replacing it with a project default', async () => {
     const user = userEvent.setup();
-    render(<Editor responsible="3" dueDate="2026-11-18" />);
+    render(<Editor responsible="user-3" dueDate="2026-11-18" />);
     fireEvent.change(taskDate(), { target: { value: '' } });
     changeProjectDate('2026-12-31');
     expect(taskDate().value).toBe('');
@@ -312,7 +312,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
     it(`editing an existing task retains its own ${dueDate ? 'chosen' : 'blank'} date and identity`, async () => {
       const user = userEvent.setup();
       const existing = fixtures.projectTask({ id: 'existing-date-task', title: 'Tâche existante', dueDate });
-      render(<Editor responsible="3" dueDate="2026-11-18" taskItems={[existing]} />);
+      render(<Editor responsible="user-3" dueDate="2026-11-18" taskItems={[existing]} />);
       await user.click(within(screen.getByRole('heading', { name: 'Tâche existante' }).closest('article'))
         .getByRole('button', { name: 'Modifier' }));
       changeProjectDate('2026-12-31');
@@ -332,7 +332,7 @@ describe('ProjectTasksEditor deadline ownership', () => {
   it('canceling an existing edit creates a fresh unchosen date without changing the existing task', async () => {
     const user = userEvent.setup();
     const existing = fixtures.projectTask({ id: 'existing-cancel-task', title: 'Tâche conservée', dueDate: '2026-10-21' });
-    render(<Editor responsible="3" dueDate="2026-11-18" taskItems={[existing]} />);
+    render(<Editor responsible="user-3" dueDate="2026-11-18" taskItems={[existing]} />);
     await user.click(within(screen.getByRole('heading', { name: 'Tâche conservée' }).closest('article'))
       .getByRole('button', { name: 'Modifier' }));
     changeProjectDate('2026-12-31');

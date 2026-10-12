@@ -29,7 +29,7 @@ describe("Inline project edit confirmation", () => {
     await user.type(form.getByLabelText(/^Description/), "Description conservée");
     await user.selectOptions(form.getByLabelText("Statut", { exact: true }), "review");
     await user.selectOptions(form.getByLabelText("Priorité", { exact: true }), "low");
-    await user.selectOptions(form.getByLabelText("Assigné principal", { exact: true }), "1");
+    await user.selectOptions(form.getByLabelText("Assigné principal", { exact: true }), "user-1");
     await user.click(form.getByLabelText("Assignés", { exact: true }));
     await user.click(within(form.getByRole("listbox")).getByRole("option", { name: "Admin Mairie" }));
     await user.click(form.getByLabelText("Étiquettes", { exact: true }));
@@ -44,13 +44,13 @@ describe("Inline project edit confirmation", () => {
       expect(form.getByLabelText(/^Description/).value).toBe("Description conservée");
       expect(form.getByLabelText("Statut", { exact: true }).value).toBe("review");
       expect(form.getByLabelText("Priorité", { exact: true }).value).toBe("low");
-      expect(form.getByLabelText("Assigné principal", { exact: true }).value).toBe("1");
+      expect(form.getByLabelText("Assigné principal", { exact: true }).value).toBe("user-1");
       expect(form.getByLabelText("Assignés", { exact: true }).textContent).toBe("3 sélectionné(s)");
       expect(form.getByLabelText("Étiquettes", { exact: true }).textContent).not.toMatch(/voirie/);
       expect(form.getByLabelText(/^Échéance/).value).toBe("2026-11-17");
     };
     assertDraft();
-    expect(draft.assignees).toEqual(["2", "3", "1"]);
+    expect(draft.assignees).toEqual(["user-2", "user-3", "user-1"]);
     expect(draft.labels).toEqual(["énergie"]);
     rerender(<ProjectDetailModal {...values} project={{ ...values.project, title: "Titre officiel rafraîchi" }} />);
     assertDraft();

@@ -26,6 +26,6 @@ Les chemins sont relatifs au BFF. Les proxies web conservent méthode, paramètr
 
 ## Mise à jour et validation
 
-Après une publication de BFF_Project, épingler la version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion dev/staging), aligner les images `bff-project` des `docker-compose*.yml`, puis exécuter `npm run contracts:sync`, `npm run contracts:check` et `npm run test:contracts`. Ces commandes fonctionnent hors ligne ; la CI vérifie l’épinglage et que `contracts/openapi.json` correspond au paquet installé.
+Le paquet est épinglé à une version exacte : une release `X.Y.Z` de BFF_Project, ou, tant qu’aucune release n’est coupée, le paquet `0.0.0-dev.<sha>` publié par la CICD pour le commit courant de son `main` (MAIR-509 ; jamais une préversion `staging`). Après une nouvelle version, épingler (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), aligner les images `bff-project` des `docker-compose*.yml` sur l’image construite depuis le même commit (`X.Y.Z`, ou `dev-<sha7>` pour un paquet dev), puis exécuter `npm run contracts:sync`, `npm run contracts:check` et `npm run test:contracts`. Ces commandes fonctionnent hors ligne ; la CI vérifie l’épinglage et que `contracts/openapi.json` correspond au paquet installé.
 
 Besoins proposés pour BFF_Project, absents du contrat publié : une route d’identité de session (nom, e-mail, groupes) pour l’en-tête et la page profil, et une route de déconnexion qui révoque la session côté serveur.

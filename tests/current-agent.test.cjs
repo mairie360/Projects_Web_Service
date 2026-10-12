@@ -5,10 +5,10 @@ const fixtures = require('./support/bff-fixtures.cjs');
 const { createDetailTaskFormState, selectableCurrentAgent, loginCurrentAgentSource } = requireTs('src/lib/current-agent.ts');
 const { createTaskFormState } = requireTs('src/lib/projectPageState.ts');
 test('detail-task defaults use a verified selectable agent, preserving the separate Kanban defaults', () => {
-  const project = fixtures.projectListItem(); const members = [{ value:'agent-1',label:'Agent' },{ value:'3',label:'Responsable' }];
+  const project = fixtures.projectListItem(); const members = [{ value:'agent-1',label:'Agent' },{ value:'user-3',label:'Responsable' }];
   assert.deepEqual(createDetailTaskFormState(project,'agent-1',members).assignees,['agent-1']);
   for (const id of [null,undefined,'missing']) assert.deepEqual(createDetailTaskFormState(project,id,members).assignees,[]);
-  assert.deepEqual(createTaskFormState(project).assignees,['3']);
+  assert.deepEqual(createTaskFormState(project).assignees,['user-3']);
 });
 
 const originalFetch = global.fetch;

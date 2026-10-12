@@ -36,10 +36,10 @@ The `tests/*.test.cjs` suite uses CommonJS `node:test`; component tests use Vite
 
   The only route files allowed are the catch-all and that local logout route, which must not import the proxy. Every `requestBff` path+method (templates built from `${encodeURIComponent(x)}`) must match the contract, and `ProjectsPageQuery` keys must equal the declared query params. `bff-project-client.test.cjs` then checks that every consumed operation was exercised against the mock. A new client call must be written as `requestBff(literal or template, { method: 'LITERAL' })` or it fails the static analysis.
 - `package-contract.test.cjs` checks that:
-  - the package is pinned to an exact `X.Y.Z`, installed and locked at that version;
+  - the package is pinned to an accepted exact version (`scripts/contract-version.mjs`: a release `X.Y.Z` or a `0.0.0-dev.<sha40>` dev package of BFF_Project `main`, never `staging`), installed and locked at that version; the `@mairie360/bff-user-openapi` session types follow the same policy as a devDependency;
   - it is the only `@mairie360/bff-*-openapi` dependency;
   - `contracts/openapi.json` equals the rebuild from the package;
-  - every `docker-compose*.yml` uses `bff-project:<that version>` (never a `../BFF_Project` build);
+  - every `docker-compose*.yml` uses the `bff-project` and `bff-user` images built from the pinned commits (`X.Y.Z`, or `dev-<sha7>` for a dev package; never a `../BFF_Project` build);
   - the `projects-front` service references no other service than BFF_Project.
 - `projects-page-html.test.cjs` renders the real `src/app/page.tsx` with its components through `tests/support/server-view.cjs` (`react-dom/server` with hook state kept between passes, same file in every front, see `../CLAUDE.md`) on the harness: loading, `/projects-page` with the declared query, search/filters/views, card menu (duplicate, edit, delete with confirmation), task composer, detail modal (task status, deletion, collaboration and comments, inline edit, close) are driven through `view.click` / `view.fire` / component props and asserted on the HTML and the BFF calls.
 - `session.test.cjs` replaces `react` in `require.cache` with a one-render `useState`/`useEffect` stub to test `useAuthSession`.
@@ -54,12 +54,12 @@ The only contract is **BFF_Project's, as published in `@mairie360/bff-project-op
 - Source code imports its types straight from the package (`import type { ProjectsPageResponse } from '@mairie360/bff-project-openapi/model'`). There is no generated `.d.ts`.
 
 ```bash
-npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z   # bump: published releases only, never 0.0.0-dev/staging
+npm install --save-exact @mairie360/bff-project-openapi@<version>   # bump: a release X.Y.Z or a published 0.0.0-dev.<sha40>, never staging
 npm run contracts:sync      # (= contracts:generate) rebuild contracts/openapi.json from the installed package
-npm run contracts:check     # fail if the version isn't exact X.Y.Z, installed != package.json, a second bff-*-openapi exists, or the snapshot is stale
+npm run contracts:check     # fail if the version isn't an accepted exact version, installed != package.json, a second business bff-*-openapi exists, or the snapshot is stale
 ```
 
-These commands run offline. After a bump, also move the `bff-project` image tags in the `docker-compose*.yml` files to the same version (`package-contract.test.cjs` enforces it), then adapt the client.
+These commands run offline. After a bump, also move the `bff-project` (and `bff-user`) image tags in the `docker-compose*.yml` files to the images built from the same commits (`package-contract.test.cjs` enforces it), then adapt the client. The stacks also pin dev images of Core API, Project API and the database: the dev Liquibase needs `-Dallow_template_admin=true`, the database enforces argon2id hashes in `init-test.sql`, the dev APIs need `JWT_ALLOW_WEAK_SECRET` for the shared test secret and `RATE_LIMIT_ENABLED=false`, BFF_Project needs `JWT_SECRET` at startup and BFF User `AUTH_RATE_LIMIT_ENABLED=false` for the ZAP scan. BFF errors use the shared `ErrorResponse` envelope (`{ error: { code, message, details } }`, `code` in a fixed enum).
 
 ## Architecture
 

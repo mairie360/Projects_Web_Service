@@ -760,7 +760,7 @@ describe("Projects page", () => {
 it('wires the existing Login identity to a received Project member only when the detail is opened', async () => {
   const user=userEvent.setup(), project=fixtures.projectListItem();
   const page=fixtures.projectsPage([project]);
-  page.options.members=page.options.members.map(member=>({...member,value:`user-${member.value}`}));
+  // The fixtures already identify members as user-<n>, like the published BFF_Project contract.
   vi.mocked(getProjectsPage).mockResolvedValue(page);
   vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project,[]));
   const fetch=vi.fn().mockResolvedValue(Response.json({id:'1'}));vi.stubGlobal('fetch',fetch);

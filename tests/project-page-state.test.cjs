@@ -45,14 +45,14 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
   assert.equal(state.createProjectFormState('review').status, 'review');
 
   const project = { ...fixtures.projectListItem({ dueDate: '2026-12-15' }), assignees: [fixtures.people.alice, fixtures.people.marie, fixtures.people.alice] };
-  assert.deepEqual(state.createTaskFormState(project), { title: '', status: 'in-progress', priority: 'high', assignees: ['3'], labels: [], dueDate: '2026-12-15' });
+  assert.deepEqual(state.createTaskFormState(project), { title: '', status: 'in-progress', priority: 'high', assignees: ['user-3'], labels: [], dueDate: '2026-12-15' });
   assert.deepEqual(state.createInitialTaskItems(project), []);
 
   const tasks = [fixtures.projectTask()];
   const form = state.projectToFormState({ ...project, taskItems: tasks });
   assert.deepEqual({ ...form, taskItems: form.taskItems.length }, {
-    title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: '3',
-    assignees: ['2', '3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, taskItems: 1,
+    title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: 'user-3',
+    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, taskItems: 1,
   });
 });
 

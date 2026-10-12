@@ -41,13 +41,14 @@ function projectForm(overrides = {}) {
     status: 'todo',
     priority: 'high',
     responsible: '',
-    assignees: ['3', ' 2 ', '3', ''],
+    assignees: ['user-3', ' user-2 ', 'user-3', ''],
     labels: ['voirie', ' voirie', 'énergie'],
     dueDate: '2026-12-15',
     progress: 0,
     totalTasks: 1,
     completedTasks: 0,
-    taskItems: [fixtures.projectTask({ title: ' Relevé ', assignees: [fixtures.people.alice, { name: 'Prestataire' }], labels: ['voirie', 'voirie'] })],
+    // A person without id (free text) cannot be sent any more: assigneeIds must match ^user-\d+$.
+    taskItems: [fixtures.projectTask({ title: ' Relevé ', assignees: [fixtures.people.alice, fixtures.people.alice], labels: ['voirie', 'voirie'] })],
     ...overrides,
   };
 }
@@ -170,11 +171,11 @@ describe('écritures sur les projets', () => {
       description: 'Remplacement des candélabres.',
       status: 'todo',
       priority: 'high',
-      responsibleId: '3',
-      assigneeIds: ['3', '2'],
+      responsibleId: 'user-3',
+      assigneeIds: ['user-3', 'user-2'],
       labels: ['voirie', 'énergie'],
       dueDate: '2026-12-15',
-      taskItems: [{ title: 'Relevé', status: 'todo', priority: 'medium', assigneeIds: ['2', 'Prestataire'], labels: ['voirie'], dueDate: '2026-10-01T00:00:00.000Z' }],
+      taskItems: [{ title: 'Relevé', status: 'todo', priority: 'medium', assigneeIds: ['user-2'], labels: ['voirie'], dueDate: '2026-10-01T00:00:00.000Z' }],
     });
     assert.equal(details.project.dueDate, '2026-12-15');
   });
@@ -182,11 +183,11 @@ describe('écritures sur les projets', () => {
   test('PATCH /projects/{projectId} place le responsable choisi en tête des participants', async () => {
     bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails() });
 
-    await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ responsible: ' 1 ', assignees: ['2'], taskItems: [] })));
+    await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ responsible: ' user-1 ', assignees: ['user-2'], taskItems: [] })));
 
     const { body } = onlyCall('/projects/{projectId}', 'patch');
-    assert.equal(body.responsibleId, '1');
-    assert.deepEqual(body.assigneeIds, ['1', '2']);
+    assert.equal(body.responsibleId, 'user-1');
+    assert.deepEqual(body.assigneeIds, ['user-1', 'user-2']);
     assert.deepEqual(body.taskItems, []);
   });
 
@@ -222,7 +223,7 @@ describe('écritures sur les tâches', () => {
   const draft = {
     title: ' Commander les lampes ',
     status: 'todo',
-    responsible: { name: 'Marie Durand' },
+    responsible: fixtures.people.marie,
     assignees: [fixtures.people.alice, fixtures.people.alice],
     priority: 'low',
     labels: ['achat', ''],
@@ -235,16 +236,16 @@ describe('écritures sur les tâches', () => {
     const task = await client.createProjectTask('project-1', client.taskBodyFromDraft(draft));
 
     assert.deepEqual(onlyCall('/projects/{projectId}/tasks', 'post').body, {
-      title: 'Commander les lampes', status: 'todo', priority: 'low', responsibleId: 'Marie Durand',
-      assigneeIds: ['Marie Durand', '2'], labels: ['achat'], dueDate: '2026-11-01',
+      title: 'Commander les lampes', status: 'todo', priority: 'low', responsibleId: 'user-3',
+      assigneeIds: ['user-3', 'user-2'], labels: ['achat'], dueDate: '2026-11-01',
     });
     assert.equal(task.dueDate, '2026-10-01');
   });
 
   test('un brouillon sans responsable prend le premier participant', () => {
     const body = client.taskBodyFromDraft({ ...draft, responsible: { name: '' } });
-    assert.equal(body.responsibleId, '2');
-    assert.deepEqual(body.assigneeIds, ['2']);
+    assert.equal(body.responsibleId, 'user-2');
+    assert.deepEqual(body.assigneeIds, ['user-2']);
   });
 
   test('PATCH /projects/{projectId}/tasks/{taskId} et /status ciblent la tâche encodée', async () => {

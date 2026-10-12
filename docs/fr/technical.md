@@ -232,7 +232,7 @@ Conserver le délai npm et l’audit bloquant intégral. L’alerte braces reste
 indépendante. Cette maintenance ne certifie pas
 une image déployée et n’autorise pas la fusion d’une CI en échec.
 
-Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :
+Le contrat provient d’un paquet **publié** de BFF_Project : une release `X.Y.Z`, ou, tant qu’aucune release n’est coupée, le paquet `0.0.0-dev.<sha>` publié par la CICD pour le commit courant de son `main` (MAIR-509 ; jamais une préversion `staging`). Après un nouveau paquet, l’épingler (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur l’image construite depuis le même commit (`X.Y.Z`, ou `dev-<sha7>` pour un paquet dev, voir `scripts/contract-version.mjs`), puis exécuter :
 
 ```bash
 npm run contracts:sync
@@ -242,7 +242,7 @@ npm run lint
 npm run build
 ```
 
-`contracts:sync` reconstruit `contracts/openapi.json` depuis le paquet installé (`scripts/orval-contract.mjs`). `contracts:check` échoue si la version n’est pas un `X.Y.Z` exact, si le paquet installé diffère, si un autre paquet `bff-*-openapi` existe ou si le snapshot est périmé. Les deux fonctionnent hors ligne. Les types sont importés de `@mairie360/bff-project-openapi/model`. `test:contracts` exécute les tests Node sans coverage ; `npm test` les exécute avec le seuil de 60 % (lignes, branches, fonctions) sur les modules `src/**/*.ts` chargés, rapportés aux lignes TypeScript grâce aux source maps.
+`contracts:sync` reconstruit `contracts/openapi.json` depuis le paquet installé (`scripts/orval-contract.mjs`). `contracts:check` échoue si la version n’est pas une version exacte acceptée, si le paquet installé diffère, si un autre paquet `bff-*-openapi` existe ou si le snapshot est périmé. Les deux fonctionnent hors ligne. Les types sont importés de `@mairie360/bff-project-openapi/model`. `test:contracts` exécute les tests Node sans coverage ; `npm test` les exécute avec le seuil de 60 % (lignes, branches, fonctions) sur les modules `src/**/*.ts` chargés, rapportés aux lignes TypeScript grâce aux source maps.
 
 Les tests reprennent les mocks pilotés par contrat des BFF : `tests/support/contract-mock-server.ts` et `openapi-contract.ts` sont des copies à l’identique des helpers des BFF. Un seul vrai serveur HTTP local simule BFF_Project, piloté par `contracts/openapi.json` ; il refuse tout chemin, méthode, paramètre ou corps hors contrat et valide les réponses simulées. `tests/support/front-harness.cjs` route le `fetch` same-origin du navigateur vers les vrais handlers `src/app/**/route.ts` et n’autorise le proxy serveur qu’à joindre ce mock. `tests/network-contract.test.cjs` inventorie statiquement chaque appel réseau de `src/` et échoue si l’un d’eux contourne `requestBff` ou le contrat. `tests/package-contract.test.cjs` vérifie l’épinglage exact, l’unicité du paquet de contrat, le snapshot et les tags d’image Docker.
 

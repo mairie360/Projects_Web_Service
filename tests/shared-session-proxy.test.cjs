@@ -47,7 +47,7 @@ test('simultaneous reads share one User refresh and receive the same rotated pai
 
 test('a published write retries once with the exact same body after a rejected access token', async () => {
   rotated();
-  const body = { title: 'Tâche municipale', description: '', responsibleId: '3', assigneeIds: ['3'], labels: [], dueDate: '2026-12-15', priority: 'medium', status: 'todo' };
+  const body = { title: 'Tâche municipale', description: '', responsibleId: 'user-3', assigneeIds: ['user-3'], labels: [], dueDate: '2026-12-15', priority: 'medium', status: 'todo' };
   h.bffProject.on('post', '/projects/{projectId}/tasks', request => request.headers.authorization === 'Bearer renewed-access'
     ? { status: 201, body: f.projectTask({ title: body.title }) }
     : h.errorReply(401, f.apiError('UNAUTHORIZED', 'Session expirée')));
