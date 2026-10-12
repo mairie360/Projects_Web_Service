@@ -1,3 +1,4 @@
+import { describeBffProjectError } from './text-constraints';
 import type {
   CreateProjectBody as ContractCreateProjectBody,
   CreateTaskBody as ContractCreateTaskBody,
@@ -220,10 +221,8 @@ async function requestBff<T>(path: string, init: RequestInit = {}) {
 }
 
 export function getBffProjectErrorMessage(error: unknown) {
-  if (error instanceof BffProjectError) return error.message;
-  if (error instanceof Error) return error.message;
-
-  return 'Une erreur inconnue est survenue.';
+  // A 400 of the BFF lists the refused fields (MAIR-514); other errors keep their message.
+  return describeBffProjectError(error, 'Une erreur inconnue est survenue.');
 }
 
 export async function getProjectsPage(query?: ProjectsPageQuery, signal?: AbortSignal) {

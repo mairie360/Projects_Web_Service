@@ -1,5 +1,6 @@
 'use client';
 
+import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
@@ -546,6 +547,8 @@ export function ProjectDetailModal({
                     value={taskForm.title}
                     placeholder="Ajouter une tâche..."
                     aria-label="Titre de la tâche"
+                    pattern={NO_MARKUP_PATTERN}
+                    title={NO_MARKUP_HINT}
                     className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
                     onChange={(event) => updateTaskForm({ title: event.target.value })}
                   />
@@ -849,7 +852,7 @@ export function ProjectDetailModal({
                                       </div>
                                       {task.permissions?.canComment !== false && (
                                         <form className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row" onSubmit={(event) => void submitComment(event, task.id)}>
-                                          <input value={commentMessage} disabled={commentSaving} aria-label={`Commentaire pour ${task.title}`} placeholder="Ajouter un commentaire..." maxLength={2000} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => {
+                                          <input value={commentMessage} disabled={commentSaving} aria-label={`Commentaire pour ${task.title}`} pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} placeholder="Ajouter un commentaire..." maxLength={COMMENT_MAX_LENGTH} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => {
                                             if (!commentRequestRef.current) setCommentMessage(event.target.value);
                                           }} />
                                           <button type="submit" disabled={commentSaving || collaborationLoading || !commentMessage.trim()} className="min-h-8 shrink-0 rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>

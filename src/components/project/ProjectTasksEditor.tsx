@@ -1,5 +1,6 @@
 'use client';
 
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { Button } from '@mairie360/lib-components';
 import { CalendarDays, CheckSquare2, ListChecks, Square } from 'lucide-react';
@@ -214,6 +215,9 @@ export function ProjectTasksEditor({
           <input
             value={taskForm.title}
             placeholder="Ajouter une tâche..."
+            aria-label="Nouvelle tâche"
+            pattern={NO_MARKUP_PATTERN}
+            title={NO_MARKUP_HINT}
             className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
             onChange={(event) => updateTaskForm({ title: event.target.value })}
             onKeyDown={(event) => {

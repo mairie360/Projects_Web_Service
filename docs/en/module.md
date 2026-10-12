@@ -13,6 +13,15 @@ scanner jobs are retained. Protected integration and exact-main/current-local
 verification remain required; this composition is not a deployment or proof
 of backend authorization, persistence or global accessibility.
 
+## Text constraints from the BFF contract (MAIR-514)
+
+The BFF refuses `<` and `>` in every project, task and comment text, and a comment
+holds at most 2 000 characters. The project title, description, task titles and
+comment inputs now carry those rules, so the browser refuses the value with a
+French hint before any request. When the BFF still answers 400 with field details,
+the alert lists the refused fields ("Titre : ne doit pas contenir les caractères
+< ou >") instead of a generic message; a specific BFF message is kept as is.
+
 ## Task primary-assignee ownership (MAIR-408)
 
 Nested project tasks and the project-detail task form deduplicate assignees
