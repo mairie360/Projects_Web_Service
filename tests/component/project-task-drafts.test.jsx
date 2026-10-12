@@ -12,7 +12,7 @@ function props() {
     project: { ...fixtures.projectListItem(), dueDate: "2026-12-15" },
     tasks: [{ ...fixtures.projectTask(), dueDate: "2026-10-01" }],
     memberOptions: page.options.members,
-    defaultTaskAssigneeId: "3",
+    defaultTaskAssigneeId: "user-3",
     labelOptions: page.options.labels,
     statusOptions: page.filters.statuses,
     priorityOptions: page.filters.priorities,
@@ -38,7 +38,7 @@ describe("Project task save confirmation", () => {
     const input = screen.getByLabelText('Titre de la tâche', { exact: true });
     await user.type(input, 'Brouillon carte accepté');
     await user.click(screen.getByRole('button', { name: 'Ajouter', exact: true }));
-    const state = { uncertainTitle: 'Brouillon carte accepté', draft: { title: 'Brouillon carte accepté', status: 'review', priority: 'low', assignees: ['1'], labels: ['voirie'], dueDate: '2026-11-17' } };
+    const state = { uncertainTitle: 'Brouillon carte accepté', draft: { title: 'Brouillon carte accepté', status: 'review', priority: 'low', assignees: ['user-1'], labels: ['voirie'], dueDate: '2026-11-17' } };
     rerender(<TaskComposer {...values} creationState={state} onInspect={onInspect} onPreserveDraft={onPreserveDraft} />);
     expect(screen.getByRole('button', { name: 'Ajouter', exact: true }).disabled).toBe(true);
     expect(input.value).toBe('Brouillon carte accepté');
@@ -97,9 +97,9 @@ describe("Project task save confirmation", () => {
     expect(save.mock.calls[1]).toEqual(save.mock.calls[0]);
     const draft = save.mock.calls[1].at(-1);
     expect(draft).toMatchObject({ title: before.title, status: "review", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
-    expect(draft.responsible.id).toBe("3");
-    expect(draft.assignees.map(person => person.id)).toEqual(mode === "edit" ? ["3", "2", "1"] : ["3", "1"]);
-    expect(draft.assignees.map(person => person.id)).toContain("1");
+    expect(draft.responsible.id).toBe("user-3");
+    expect(draft.assignees.map(person => person.id)).toEqual(mode === "edit" ? ["user-3", "user-2", "user-1"] : ["user-3", "user-1"]);
+    expect(draft.assignees.map(person => person.id)).toContain("user-1");
     expect(dialog.queryByRole("alert")).toBeNull();
     expect(dialog.getByRole("button", { name: "Ajouter la tâche", exact: true })).toBeTruthy();
   });
@@ -176,7 +176,7 @@ it('requires an explicit assignee when the authenticated agent is unavailable, w
   await user.click(scope.getByLabelText('Assignés',{exact:true}));await user.click(scope.getByRole('option',{name:'Admin Mairie'}));await user.click(title);
   fireEvent.submit(title.closest('form'));
   await waitFor(()=>expect(values.onAddTask).toHaveBeenCalledOnce());
-  expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('1');
+  expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('user-1');
 });
 
 it('prefills the fresh selectable identity, rereads after a save and does not overwrite a touched draft', async () => {
@@ -186,15 +186,15 @@ it('prefills the fresh selectable identity, rereads after a save and does not ov
   const dialog = within(screen.getByRole('dialog')), title = dialog.getByLabelText('Titre de la tâche', { exact:true });
   const assignees = dialog.getByLabelText('Assignés', {exact:true});
   expect(assignees.textContent).toContain('Choisir un ou plusieurs assignés');
-  await act(async () => first.resolve('1'));
+  await act(async () => first.resolve('user-1'));
   expect(dialog.getByRole('button',{name:'Retirer Admin Mairie'})).toBeTruthy();
   await user.type(title, 'Tâche confirmée');
   await user.click(dialog.getByRole('button', {name:'Ajouter la tâche',exact:true}));
   await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
-  expect(values.onAddTask.mock.calls[0][1].responsible.id).toBe('1');
+  expect(values.onAddTask.mock.calls[0][1].responsible.id).toBe('user-1');
   await user.type(title, 'Brouillon saisi avant la réponse');
   await user.click(assignees); await user.click(dialog.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(title);
-  await act(async () => second.resolve('1'));
+  await act(async () => second.resolve('user-1'));
   expect(read.mock.calls[1][0].aborted).toBe(true);
   expect(dialog.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
   expect(dialog.queryByRole('button',{name:'Retirer Admin Mairie'})).toBeNull();
@@ -207,15 +207,15 @@ it('aborts a closed detail and reads the account again on reopening', async () =
   const view=render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
   view.unmount(); expect(read.mock.calls[0][0].aborted).toBe(true);
   render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
-  await act(async()=>old.resolve('1'));
+  await act(async()=>old.resolve('user-1'));
   expect(screen.getByLabelText('Assignés',{exact:true}).textContent).toContain('Choisir un ou plusieurs assignés');
-  await act(async()=>fresh.resolve('3'));
+  await act(async()=>fresh.resolve('user-3'));
   expect(screen.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
 });
 
 it('preserves a restored uncertain creation and existing task editing while reading new defaults', async () => {
-  const user=userEvent.setup(), values=props(), read=vi.fn().mockResolvedValue('1');
-  const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'review',priority:'low',assignees:['3'],labels:[],dueDate:'2026-11-17'}};
+  const user=userEvent.setup(), values=props(), read=vi.fn().mockResolvedValue('user-1');
+  const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'review',priority:'low',assignees:['user-3'],labels:[],dueDate:'2026-11-17'}};
   render(<ProjectDetailModal {...values} taskCreationState={state} readCurrentTaskAssignee={read} />);
   expect(read).not.toHaveBeenCalled();
   const scope=within(screen.getByRole('dialog'));
