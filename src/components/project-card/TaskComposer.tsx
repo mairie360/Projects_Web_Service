@@ -1,5 +1,6 @@
 'use client';
 
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { CheckCircle2, CircleDot, Plus, Tag } from 'lucide-react';
 
@@ -248,6 +249,8 @@ export function TaskComposer({
           autoFocus
           placeholder="Ajouter une tâche..."
           aria-label="Titre de la tâche"
+          pattern={NO_MARKUP_PATTERN}
+          title={NO_MARKUP_HINT}
           className="h-8 min-w-0 flex-1 rounded-md border border-[#d0d7de] bg-white px-2 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
           onChange={(event) => {
             setTitle(event.target.value);

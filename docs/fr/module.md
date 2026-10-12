@@ -14,6 +14,16 @@ Intégration protégée et vérification main/copie locale exacte restent requis
 cette composition ne vaut ni déploiement, ni preuve d'autorisation serveur,
 de persistance ou d'accessibilité globale.
 
+## Contraintes de texte du contrat BFF (MAIR-514)
+
+Le BFF refuse `<` et `>` dans tous les textes de projet, de tâche et de commentaire,
+et un commentaire tient en 2 000 caractères au plus. Le titre et la description du
+projet, les titres de tâches et le champ de commentaire portent désormais ces règles :
+le navigateur refuse la valeur avec une aide en français avant toute requête. Si le
+BFF répond malgré tout 400 avec le détail des champs, l’alerte liste les champs refusés
+(« Titre : ne doit pas contenir les caractères < ou > ») au lieu d’un message générique ;
+un message spécifique du BFF est conservé tel quel.
+
 ## Responsable propre aux tâches (MAIR-408)
 
 Les tâches imbriquées et le formulaire de tâche de la fiche projet dédupliquent
