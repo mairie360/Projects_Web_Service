@@ -4,32 +4,43 @@ import crypto from 'k6/crypto';
 import encoding from 'k6/encoding';
 
 // ---------------------------------------------------------------------------
-// Test de charge k6 pour le front Projects (Projects_Web_Service).
-// Cible les routes réellement servies par le serveur Next.js : les pages (rendu Next.js derrière le middleware d'authentification),
-// /health, puis la lecture /projects-page relayée par le proxy same-origin vers BFF Project, seul BFF du front
-// (la session du shell vient aussi de /projects-page).
-// L'authentification passe par le cookie accessToken, comme dans le navigateur :
-// le proxy le convertit en Authorization: Bearer vers le BFF.
+// k6 load test of the Projects front (Projects_Web_Service).
+// Two scenarios run side by side against the routes the Next.js server really serves:
+//   * `reads`: the page (Next.js render behind the authentication middleware), /health, then the
+//     /api/bff/projects-page read the page fetches, relayed by the same-origin proxy to BFF Project,
+//     the only BFF of this front (the shell session also comes from /projects-page);
+//   * `writes` (MAIR-516): the project creation and deletion a user performs from the page,
+//     POST then DELETE /api/bff/projects (-> BFF Project -> Project API).
+// Authentication goes through the accessToken cookie, like in the browser: the proxy turns it
+// into Authorization: Bearer for the BFF.
 // ---------------------------------------------------------------------------
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:5001';
-// Doit correspondre au JWT_SECRET des services core-api / bff-user / APIs de la stack de test.
+// Must match the JWT_SECRET of the core-api / bff-user / API services of the test stack.
 const JWT_SECRET = __ENV.JWT_SECRET || 'b"secret"';
-// Utilisateur inséré par init-test.sql (sub du token).
+// User inserted by init-test.sql (token `sub`).
 const USER_ID = __ENV.PERF_USER_ID || '2';
 
+const STAGES = [
+  { duration: '30s', target: 20 }, // ramp up
+  { duration: '1m', target: 20 }, // plateau
+  { duration: '10s', target: 0 }, // ramp down
+];
+
 export const options = {
-  stages: [
-    { duration: '30s', target: 20 }, // montée en charge
-    { duration: '1m', target: 20 },  // maintien
-    { duration: '10s', target: 0 },  // descente
-  ],
+  scenarios: {
+    reads: { executor: 'ramping-vus', startVUs: 0, stages: STAGES, exec: 'reads', gracefulRampDown: '5s' },
+    // Few VUs on purpose: every iteration writes twice in the Project API database.
+    writes: { executor: 'constant-vus', vus: 3, duration: '1m40s', exec: 'writes' },
+  },
   thresholds: {
-    http_req_failed: ['rate<0.01'],                        // < 1% d'erreurs
-    checks: ['rate>0.99'],                                 // une redirection (307) n'est pas une erreur HTTP : les checks la détectent
-    'http_req_duration{endpoint:page}': ['p(95)<800'],     // rendu page Next.js
-    'http_req_duration{endpoint:health}': ['p(95)<150'],   // proxy same-origin -> BFF /health
-    'http_req_duration{endpoint:projects}': ['p(95)<700'], // proxy + agrégation BFF + upstream
+    http_req_failed: ['rate<0.01'], // < 1% of HTTP errors
+    checks: ['rate>0.99'], // a redirect (307) is not an HTTP error: the checks catch it
+    'http_req_duration{endpoint:page}': ['p(95)<800'],     // Next.js page render
+    'http_req_duration{endpoint:health}': ['p(95)<150'],   // same-origin proxy -> BFF /health
+    'http_req_duration{endpoint:projects}': ['p(95)<700'], // proxy + BFF aggregation + upstream
+    'http_req_duration{endpoint:project-create}': ['p(95)<1000'], // proxy -> BFF Project -> Project API insert
+    'http_req_duration{endpoint:project-delete}': ['p(95)<1000'], // proxy -> BFF Project -> Project API delete
   },
 };
 
@@ -51,10 +62,10 @@ export function setup() {
   return { token: mintJwt() };
 }
 
-export default function (data) {
+export function reads(data) {
   const cookie = { Cookie: `accessToken=${data.token}` };
-  // redirects: 0 : une redirection (ex. vers le front Login si le cookie est refusé)
-  // doit faire échouer le check au lieu d'être suivie hors de la stack.
+  // redirects: 0 : a redirect (e.g. to the Login front when the cookie is refused)
+  // must fail the check instead of being followed outside the stack.
   const pageParams = { headers: cookie, redirects: 0, tags: { endpoint: 'page' } };
   const dataParams = { headers: { ...cookie, Accept: 'application/json' }, redirects: 0, tags: { endpoint: 'projects' } };
 
@@ -69,8 +80,56 @@ export default function (data) {
   });
 
   group('projects reads', () => {
-    const projectsPage = http.get(`${BASE_URL}/projects-page`, dataParams);
-    check(projectsPage, { '/projects-page 200': (r) => r.status === 200 });
+    // Browser path of the page (src/lib/bffProjectClient.ts prefixes /api/bff), not the root catch-all.
+    const projectsPage = http.get(`${BASE_URL}/api/bff/projects-page`, dataParams);
+    check(projectsPage, { '/api/bff/projects-page 200': (r) => r.status === 200 });
+  });
+
+  sleep(1);
+}
+
+function createdProjectId(response) {
+  try {
+    const body = response.json();
+    const id = body && body.project && body.project.id;
+    return id === undefined || id === null ? null : String(id);
+  } catch {
+    return null;
+  }
+}
+
+export function writes(data) {
+  const headers = { Cookie: `accessToken=${data.token}`, Accept: 'application/json', 'Content-Type': 'application/json' };
+
+  group('project lifecycle', () => {
+    const dueDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const created = http.post(
+      `${BASE_URL}/api/bff/projects`,
+      JSON.stringify({
+        title: `k6 ${__VU}-${__ITER}-${Date.now()}`,
+        description: 'Temporary project of the k6 load test',
+        dueDate,
+        labels: ['k6'],
+        priority: 'medium',
+        responsibleId: `user-${USER_ID}`,
+        assigneeIds: [`user-${USER_ID}`],
+        status: 'todo',
+      }),
+      { headers, redirects: 0, tags: { endpoint: 'project-create' } },
+    );
+    const id = createdProjectId(created);
+    const ok = check(created, {
+      'POST /api/bff/projects 200 or 201': (r) => r.status === 200 || r.status === 201,
+      'POST /api/bff/projects returns the project id': () => id !== null,
+    });
+    if (!ok) return;
+
+    const deleted = http.del(`${BASE_URL}/api/bff/projects/${id}`, null, {
+      headers: { Cookie: headers.Cookie, Accept: 'application/json' },
+      redirects: 0,
+      tags: { endpoint: 'project-delete' },
+    });
+    check(deleted, { 'DELETE /api/bff/projects/{id} 200 or 204': (r) => r.status === 200 || r.status === 204 });
   });
 
   sleep(1);
