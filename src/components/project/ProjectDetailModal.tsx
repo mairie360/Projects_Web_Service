@@ -331,8 +331,8 @@ export function ProjectDetailModal({
       if (collaborationSelectionRef.current !== selection) return;
       selection.confirmedComments = [...selection.confirmedComments.filter((comment) => comment.id !== confirmed.id), confirmed];
       setCollaboration((current) => ({
+        ...(current ?? { history: [], pagination: { page: 1, limit: 50, commentsTotal: 0, historyTotal: 0, hasNextPage: false } }),
         comments: [...(current?.comments ?? []).filter((comment) => comment.id !== confirmed.id), confirmed],
-        history: current?.history ?? [],
       }));
       setCommentMessage('');
       await loadTaskCollaboration(selection);

@@ -4,7 +4,8 @@
 const STATUS_LABELS = { todo: 'À faire', 'in-progress': 'En cours', review: 'En revue', done: 'Terminé' };
 const PRIORITY_LABELS = { high: 'Haute', medium: 'Moyenne', low: 'Basse' };
 
-const person = (id, name) => ({ id: String(id), name, avatarUrl: null });
+// BFF_Project identifie les personnes par `user-<id Core>` (schémas CreateProjectBody.assigneeIds / responsibleId).
+const person = (id, name) => ({ id: `user-${id}`, name, avatarUrl: null });
 
 /** Agents de la mairie ; l'id est celui de la base (test user id 2 = Alice). */
 const agents = {
@@ -103,13 +104,29 @@ function taskComment(overrides = {}) {
 
 function taskCollaboration() {
   return {
+    // TaskCollaborationResponse.pagination (comments and history are read page by page since Project API 1.0).
+    pagination: { page: 1, limit: 50, commentsTotal: 1, historyTotal: 1, hasNextPage: false },
     comments: [taskComment()],
     history: [{ id: 'history-1', action: 'status_changed', label: 'Statut modifié', author: { id: people.marie.id, name: people.marie.name }, createdAt: '2026-09-02T10:00:00.000Z', changes: { status: 'in-progress' } }],
   };
 }
 
-/** Enveloppe d'erreur du BFF (schéma ApiError). */
-const apiError = (code, message, details = []) => ({ error: { code, message, details } });
+/** Codes d'erreur publiés par ErrorResponseErrorCode (enveloppe commune des BFFs, MAIR-234). */
+const ERROR_CODES = new Set(['BAD_REQUEST', 'UNAUTHORIZED', 'FORBIDDEN', 'NOT_FOUND', 'CONFLICT', 'PAYLOAD_TOO_LARGE', 'UNPROCESSABLE_ENTITY', 'TOO_MANY_REQUESTS', 'INTERNAL_ERROR', 'BAD_GATEWAY', 'SERVICE_UNAVAILABLE', 'GATEWAY_TIMEOUT']);
+/** Codes historiques des scénarios de test, ramenés au code publié correspondant. */
+const LEGACY_CODES = { UNAVAILABLE: 'SERVICE_UNAVAILABLE', BFF_UNAVAILABLE: 'SERVICE_UNAVAILABLE', REFUSED: 'FORBIDDEN', NOT_IMPLEMENTED: 'INTERNAL_ERROR' };
+
+/**
+ * Enveloppe d'erreur du BFF (schéma ErrorResponse) : le code appartient à l'enum publié (les codes de scénario
+ * tels que READ/PAGE deviennent BAD_GATEWAY) et chaque détail porte un message.
+ */
+const apiError = (code, message, details = []) => ({
+  error: {
+    code: ERROR_CODES.has(code) ? code : (LEGACY_CODES[code] ?? 'BAD_GATEWAY'),
+    message,
+    details: details.map((detail) => (typeof detail === 'object' && detail !== null && !('message' in detail) ? { ...detail, message } : detail)),
+  },
+});
 
 const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 /**

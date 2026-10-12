@@ -230,7 +230,7 @@ Keep the npm release-age policy and full blocking audit unchanged. The braces
 finding remains independent. This maintenance does not certify deployed
 images or permit merging a failing CI.
 
-The contract comes from a **published** BFF_Project release. After a release, pin the new version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, never a `0.0.0-dev`/`staging` pre-release), move the `bff-project` image tags in `docker-compose*.yml` to the same version, then run:
+The contract comes from a **published** BFF_Project package: a release `X.Y.Z`, or, while no release is cut, the `0.0.0-dev.<sha>` package the CICD publishes for the current commit of its `main` (MAIR-509; never a `staging` pre-release). After a new package, pin it (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), move the `bff-project` image tags in `docker-compose*.yml` to the image built from the same commit (`X.Y.Z`, or `dev-<sha7>` for a dev package, see `scripts/contract-version.mjs`), then run:
 
 ```bash
 npm run contracts:sync
@@ -240,7 +240,7 @@ npm run lint
 npm run build
 ```
 
-`contracts:sync` rebuilds `contracts/openapi.json` from the installed package (`scripts/orval-contract.mjs`). `contracts:check` fails if the version is not an exact `X.Y.Z`, if the installed package differs, if another `bff-*-openapi` package exists or if the snapshot is stale. Both run offline. Types are imported from `@mairie360/bff-project-openapi/model`. `test:contracts` runs the Node tests without coverage; `npm test` runs them with the 60% threshold (lines, branches, functions) on the loaded `src/**/*.ts` modules, source-mapped to the TypeScript lines.
+`contracts:sync` rebuilds `contracts/openapi.json` from the installed package (`scripts/orval-contract.mjs`). `contracts:check` fails if the version is not an accepted exact version, if the installed package differs, if another `bff-*-openapi` package exists or if the snapshot is stale. Both run offline. Types are imported from `@mairie360/bff-project-openapi/model`. `test:contracts` runs the Node tests without coverage; `npm test` runs them with the 60% threshold (lines, branches, functions) on the loaded `src/**/*.ts` modules, source-mapped to the TypeScript lines.
 
 The tests follow the BFFs' contract-driven mocks: `tests/support/contract-mock-server.ts` and `openapi-contract.ts` are verbatim copies of the BFF helpers. A single real local HTTP server stands in for BFF_Project, driven by `contracts/openapi.json`; it rejects any path, method, parameter or body outside the contract and validates mocked responses. `tests/support/front-harness.cjs` routes the browser's same-origin `fetch` to the real `src/app/**/route.ts` handlers and only lets the server-side proxy reach that mock. `tests/network-contract.test.cjs` statically inventories every network call in `src/` and fails if one bypasses `requestBff` or the contract. `tests/package-contract.test.cjs` checks the exact pin, the single contract package, the snapshot and the Docker image tags.
 

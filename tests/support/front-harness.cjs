@@ -199,11 +199,12 @@ function createFrontHarness() {
     signIn(token) { cookies.set('accessToken', token); },
     /**
      * Réponse d'erreur du BFF. Orval ne type que les succès : l'erreur est marquée hors contrat, mais son
-     * corps est validé contre le schéma ApiError publié dans le paquet.
+     * corps est validé contre le schéma ErrorResponse publié dans le paquet (enveloppe commune des BFFs,
+     * { error: { code, message, details } } avec un code dans l'enum ErrorResponseErrorCode).
      */
     errorReply(status, body) {
-      bffProject.contract.validate(bffProject.contract.schema('ApiError'), body, '$error')
-        .forEach((error) => forbidden.push(`[BFF_PROJECT] réponse d'erreur ${status} non conforme à ApiError : ${error}`));
+      bffProject.contract.validate(bffProject.contract.schema('ErrorResponse'), body, '$error')
+        .forEach((error) => forbidden.push(`[BFF_PROJECT] réponse d'erreur ${status} non conforme à ErrorResponse : ${error}`));
       return { status, body, outOfContract: true };
     },
     violations() {
