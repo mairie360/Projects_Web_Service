@@ -65,3 +65,16 @@ textarea,
 select {
   font: inherit;
 }
+
+.projects-shell [role="tablist"][aria-label="Vue des projets"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+}
+
+.projects-shell [role="tablist"][aria-label="Vue des projets"] [role="tab"] {
+  min-height: 44px;
+}

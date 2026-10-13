@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 import { readFrontUrlsFromEnv } from "@/lib/front-urls";
 import { FrontUrlsProvider } from "@/lib/front-urls-provider";
 import "./globals.css";
+import "./municipal-theme.css";
+
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 // Rendu à la demande obligatoire : une page prérendue au build ne porterait pas le
 // nonce CSP propre à chaque requête, et ses scripts seraient bloqués.
@@ -29,8 +33,8 @@ export default function RootLayout({
       <head>
         <meta name="apple-mobile-web-app-title" content="Mairie360" />
       </head>
-      <body>
-        <main><FrontUrlsProvider urls={readFrontUrlsFromEnv()}>{children}</FrontUrlsProvider></main>
+      <body className={`${geistSans.variable} mairie-ui antialiased`}>
+        <FrontUrlsProvider urls={readFrontUrlsFromEnv()}>{children}</FrontUrlsProvider>
       </body>
     </html>
   );
