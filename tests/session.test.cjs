@@ -62,7 +62,7 @@ describe('useAuthSession', () => {
       loading: false,
       error: null,
     });
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /api/bff/projects-page']);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page']);
   });
 
   test('une erreur du BFF signale une session indisponible', async () => {

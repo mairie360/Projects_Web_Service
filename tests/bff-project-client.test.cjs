@@ -321,7 +321,7 @@ describe('erreurs du BFF', () => {
 
     assert.equal(location.reloads, 1);
     assert.equal(requests.length, 1);
-    assert.equal(requests[0].path, '/api/bff/projects/project-1/duplicate');
+    assert.equal(requests[0].path, '/projects/project-1/duplicate');
     assert.equal(requests[0].init.method, 'POST');
     assert.equal(requests[0].init.redirect, 'manual');
     assert.equal(requests[0].init.body, undefined);
@@ -409,7 +409,7 @@ describe('erreurs du BFF', () => {
     assert.equal(harness.location.reloads, 0);
     assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
     assert.deepEqual(harness.ownerCalls, []);
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /api/bff/projects-page']);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page']);
   });
 
   test('une requête annulée rejette avec AbortError', async () => {

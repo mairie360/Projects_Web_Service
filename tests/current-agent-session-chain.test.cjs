@@ -13,7 +13,7 @@ test('the production source traverses the real frontend adapter and existing Log
  assert.deepEqual(agent,{id:'12',namespace:'user'});
  assert.equal(selectableCurrentAgent(agent,[{value:'user-12',label:'Agent reçu'}]),'user-12');
  assert.deepEqual(h.browserCalls.map(call=>call.path),['/api/auth/current-user']);
- assert.deepEqual(h.sessionReadCalls.map(call=>call.url.pathname),['/api/bff/me']);
+ assert.deepEqual(h.sessionReadCalls.map(call=>call.url.pathname),['/me']);
  assert.equal(h.bffUser.calls('/me','get')[0].headers.authorization,'Bearer received-access');
  assert.equal(h.bffProject.requests.length,0);
  assert.deepEqual(h.ownerCalls,[]);

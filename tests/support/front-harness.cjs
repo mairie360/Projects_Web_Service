@@ -7,7 +7,7 @@ const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts'
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 
 // Browser fetch routes to the actual App Router handlers, including the more
-// specific /api/bff catch-all. Business traffic reaches only the published Project
+// root catch-all. Business traffic reaches only the published Project
 // mock. The configured Login origin runs the actual published owner handlers;
 // their User transport uses an exact selected published session contract. All
 // other origins, routes and contract mismatches remain violations.
@@ -121,7 +121,7 @@ function createFrontHarness() {
     if (typeof input === 'string' && input.startsWith('/') && !input.startsWith('//')) return browserFetch(input, init);
     const url = new URL(input instanceof Request ? input.url : String(input), ORIGIN);
     if (url.origin === LOGIN_ORIGIN) {
-      if (url.pathname === '/api/bff/me' && (init.method ?? 'GET') === 'GET') {
+      if (url.pathname === '/me' && (init.method ?? 'GET') === 'GET') {
         sessionReadCalls.push({ url, init });
         return proxyPublishedBffRequest(new NextRequest(url, init), ['me'], {
           baseUrl:()=>bffUser.url, paths:bffUser.contract.document.paths,

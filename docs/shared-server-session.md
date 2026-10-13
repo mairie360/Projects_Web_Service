@@ -1,6 +1,6 @@
 # Shared server session (MAIR-266)
 
-Projects consumes the actual published `@mairie360/lib-components@0.7.1` server entry (`/next`, optional Next peer). Browser business requests use the same-origin `/api/bff` route, allowing the HttpOnly refresh cookie to keep its `/api` scope. Both that entry and the retained root catch-all accept only operations in the unchanged published Project contract; metadata and undeclared operations are refused.
+Projects consumes the actual published `@mairie360/lib-components@0.7.1` server entry (`/next`, optional Next peer). Browser business requests call the contract paths at the root of the front origin (served by the root catch-all) through the generated `bffProject` client. Both that entry and the retained root catch-all accept only operations in the unchanged published Project contract; metadata and undeclared operations are refused.
 
 The shared proxy retries a business request once after a 401, delegating renewal to configured Login. Login coordinates concurrent User refresh requests in one process, rotates both cookies and returns them to the requesting front. A rejected renewal returns to configured Login with the current page as a return URL only when its origin matches configured Projects. Renewal outages remain errors; automatic reconnection never invokes revocation or replays a write after navigation.
 

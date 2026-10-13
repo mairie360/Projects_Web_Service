@@ -19,7 +19,7 @@ const business = () => h.bffProject.on('get', '/projects-page', request => reque
 test('expired access renews through the Login owner and retries the published read with its cookies', async () => {
   rotated(); business();
   await client.getProjectsPage({ view: 'table', q: 'éclairage' });
-  assert.deepEqual(h.browserCalls.map(x => x.path), ['/api/bff/projects-page']);
+  assert.deepEqual(h.browserCalls.map(x => x.path), ['/projects-page']);
   assert.deepEqual(h.ownerCalls.map(x => [x.url.pathname, x.init.method]), [['/api/auth/refresh', 'POST']]);
   const renewal = h.bffUser.calls('/auth/refresh', 'post')[0];
   assert.deepEqual(renewal.body, { refresh_token: 'initial-refresh' });
@@ -102,7 +102,7 @@ test('foreign-origin mutations and undeclared metadata are refused without netwo
   const { NextRequest } = require('next/server');
   const response = await POST(new NextRequest('http://projects.test/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://foreign.test', 'Sec-Fetch-Site': 'cross-site' }, body: '{}' }));
   assert.equal(response.status, 403);
-  for (const path of ['/api/bff/openapi.json', '/api/bff/swagger.json', '/api/bff/auth/refresh']) assert.equal((await fetch(path)).status, 404);
+  for (const path of ['/openapi.json', '/swagger.json', '/auth/refresh']) assert.equal((await fetch(path)).status, 404);
   assert.deepEqual(h.ownerCalls, []); assert.deepEqual(h.bffProject.requests, []);
 });
 

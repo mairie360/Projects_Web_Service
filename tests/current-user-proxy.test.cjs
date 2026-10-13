@@ -12,7 +12,7 @@ test('the frontend adapter reads the existing trusted Login /me and exposes only
  const response=await currentUser(request({origin:'https://projects.mairie.test','sec-fetch-site':'same-origin'}));
  assert.equal(response.status,200);assert.deepEqual(await response.json(),{id:'12'});
  assert.equal(response.headers.get('cache-control'),'no-store');assert.match(response.headers.get('set-cookie'),/accessToken=rotated/);
- assert.equal(calls[0].target.href,'https://login.mairie.test/api/bff/me');
+ assert.equal(calls[0].target.href,'https://login.mairie.test/me');
  assert.deepEqual(calls[0].init.headers,{Accept:'application/json','Sec-Fetch-Site':'same-site',Cookie:'accessToken=access-cookie; refreshToken=refresh-cookie'});
  assert.equal(calls[0].init.redirect,'manual');assert.equal(calls[0].init.cache,'no-store');
 });

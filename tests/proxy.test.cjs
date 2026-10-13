@@ -33,7 +33,7 @@ test('proxy preserves the exact published JSON write body and 204 response', asy
   const body = '{ "title": "Projet municipal", "participants": [], "labels": [] }';
   let init;
   global.fetch = async (_url, options) => { init = options; return new Response(null, { status: 204 }); };
-  const request = new NextRequest('http://localhost/api/bff/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'accessToken=test-session' }, body });
+  const request = new NextRequest('http://localhost/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'accessToken=test-session' }, body });
   const response = await proxyBffRequest(request, { params: Promise.resolve({ path: ['projects'] }) });
   assert.equal(response.status, 204); assert.equal(await response.text(), '');
   assert.equal(Buffer.from(init.body).toString(), body);
@@ -50,7 +50,7 @@ test('contract rejects unknown routes and methods before contacting the BFF', as
 test('BFF errors are preserved and ordinary BFF cookies cannot mutate the shared session', async () => {
   global.fetch = async () => Response.json({ message: 'Denied' }, { status: 403, headers: { 'Set-Cookie': 'accessToken=; Max-Age=0; Path=/; HttpOnly' } });
   process.env.BFF_PROJECT_BASE_URL = 'http://bff.example';
-  const result = await proxyBffRequest(new NextRequest('http://localhost/api/bff/projects-page'), { params: Promise.resolve({ path: ['projects-page'] }) });
+  const result = await proxyBffRequest(new NextRequest('http://localhost/projects-page'), { params: Promise.resolve({ path: ['projects-page'] }) });
   assert.equal(result.status, 403); assert.deepEqual(await result.json(), { message: 'Denied' }); assert.equal(result.headers.get('Set-Cookie'), null);
 });
 test('unavailable BFF produces a controlled error', async () => {

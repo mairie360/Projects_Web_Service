@@ -7,10 +7,10 @@ import encoding from 'k6/encoding';
 // k6 load test of the Projects front (Projects_Web_Service).
 // Two scenarios run side by side against the routes the Next.js server really serves:
 //   * `reads`: the page (Next.js render behind the authentication middleware), /health, then the
-//     /api/bff/projects-page read the page fetches, relayed by the same-origin proxy to BFF Project,
+//     /projects-page read the page fetches, relayed by the same-origin proxy to BFF Project,
 //     the only BFF of this front (the shell session also comes from /projects-page);
 //   * `writes` (MAIR-516): the project creation and deletion a user performs from the page,
-//     POST then DELETE /api/bff/projects (-> BFF Project -> Project API).
+//     POST then DELETE /projects (-> BFF Project -> Project API).
 // Authentication goes through the accessToken cookie, like in the browser: the proxy turns it
 // into Authorization: Bearer for the BFF.
 // ---------------------------------------------------------------------------
@@ -80,9 +80,9 @@ export function reads(data) {
   });
 
   group('projects reads', () => {
-    // Browser path of the page (src/lib/bffProjectClient.ts prefixes /api/bff), not the root catch-all.
-    const projectsPage = http.get(`${BASE_URL}/api/bff/projects-page`, dataParams);
-    check(projectsPage, { '/api/bff/projects-page 200': (r) => r.status === 200 });
+    // Browser path of the page (src/lib/bffProjectClient.ts calls the BFF path as is), not the root catch-all.
+    const projectsPage = http.get(`${BASE_URL}/projects-page`, dataParams);
+    check(projectsPage, { '/projects-page 200': (r) => r.status === 200 });
   });
 
   sleep(1);
@@ -104,7 +104,7 @@ export function writes(data) {
   group('project lifecycle', () => {
     const dueDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
     const created = http.post(
-      `${BASE_URL}/api/bff/projects`,
+      `${BASE_URL}/projects`,
       JSON.stringify({
         title: `k6 ${__VU}-${__ITER}-${Date.now()}`,
         description: 'Temporary project of the k6 load test',
@@ -119,17 +119,17 @@ export function writes(data) {
     );
     const id = createdProjectId(created);
     const ok = check(created, {
-      'POST /api/bff/projects 200 or 201': (r) => r.status === 200 || r.status === 201,
-      'POST /api/bff/projects returns the project id': () => id !== null,
+      'POST /projects 200 or 201': (r) => r.status === 200 || r.status === 201,
+      'POST /projects returns the project id': () => id !== null,
     });
     if (!ok) return;
 
-    const deleted = http.del(`${BASE_URL}/api/bff/projects/${id}`, null, {
+    const deleted = http.del(`${BASE_URL}/projects/${id}`, null, {
       headers: { Cookie: headers.Cookie, Accept: 'application/json' },
       redirects: 0,
       tags: { endpoint: 'project-delete' },
     });
-    check(deleted, { 'DELETE /api/bff/projects/{id} 200 or 204': (r) => r.status === 200 || r.status === 204 });
+    check(deleted, { 'DELETE /projects/{id} 200 or 204': (r) => r.status === 200 || r.status === 204 });
   });
 
   sleep(1);
