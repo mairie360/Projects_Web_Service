@@ -1,7 +1,9 @@
 'use client';
 
+import AccessibleShell from "@/components/accessible-shell";
+
 import React from 'react';
-import { Alert, AppShell } from '@mairie360/lib-components';
+import { Alert } from '@mairie360/lib-components';
 import { Plus, Settings } from 'lucide-react';
 import { KanbanBoard } from '../Kanban';
 import { ActionButton } from './ProjectFormControls';
@@ -183,7 +185,7 @@ export function ProjectsWorkspace({
         />
       )}
 
-      <AppShell
+      <AccessibleShell
         activeItem="projects"
         isAdmin={session.isAdmin}
         user={session.user}
@@ -286,22 +288,15 @@ export function ProjectsWorkspace({
                         onOpenChange={(open) => setOpenFilter(open ? 'priority' : null)}
                         onChange={setPriorityFilter}
                       />
-                      <label className="relative block w-full sm:w-44" title="Filtrer par échéance maximale">
-                        <span className="sr-only">Échéance avant</span>
+                      <label className="block w-full sm:w-44" title="Filtrer par échéance maximale">
+                        <span className="mb-1 block text-sm font-medium">Échéance avant</span>
                         <input
                           type="date"
                           aria-label="Échéance avant"
                           value={dueBeforeFilter}
-                          className={`peer h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm font-normal shadow-sm outline-none transition focus:border-[#4b908d] focus:text-[#2f3438] focus:ring-2 focus:ring-[#4b908d]/15 ${
-                            dueBeforeFilter ? 'text-[#2f3438]' : 'text-transparent'
-                          }`}
+                          className="h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm font-normal text-[#2f3438] shadow-sm outline-none transition focus:border-[#4b908d] focus:ring-2 focus:ring-[#4b908d]/15"
                           onChange={(event) => setDueBeforeFilter(event.target.value)}
                         />
-                        {!dueBeforeFilter && (
-                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#2f3438] peer-focus:hidden">
-                            Échéance avant
-                          </span>
-                        )}
                       </label>
                     </div>
                   </div>
@@ -400,7 +395,7 @@ export function ProjectsWorkspace({
                 )}
               </section>
             </div>
-      </AppShell>
+      </AccessibleShell>
     </>
   );
 }
