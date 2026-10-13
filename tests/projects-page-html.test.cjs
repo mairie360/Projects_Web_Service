@@ -1050,7 +1050,7 @@ test('task follow-up ignores a late response from a previously selected task', a
   const originalFetch = global.fetch;
   t.mock.method(global, 'fetch', async (target, init) => {
     const response = await originalFetch(target, init);
-    if (typeof target === 'string' && target === '/api/bff/projects/project-1/tasks/task-1/collaboration') await gate;
+    if (typeof target === 'string' && target === '/projects/project-1/tasks/task-1/collaboration') await gate;
     return response;
   });
   bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: { ...fixtures.taskCollaboration(),
