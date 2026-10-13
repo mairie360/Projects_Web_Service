@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   devIndicators: false,
   poweredByHeader: false,
+  // The published OpenAPI package ships TypeScript sources: Next must compile them.
+  transpilePackages: ['@mairie360/bff-project-openapi'],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
