@@ -37,7 +37,7 @@ x-service: &service-template
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:dev-99f6127}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:dev-90c22bb}
     restart: always
     container_name: mairie360-db-projects-front #change front name
     environment:
@@ -57,7 +57,7 @@ services:
       retries: 5
 
   liquibase:
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:dev-99f6127}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:dev-90c22bb}
     container_name: mairie360-liquibase-projects-front #change front name
     depends_on:
       postgres:
@@ -95,7 +95,7 @@ services:
 
   core:
     container_name: core-projects-front-developpement
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:dev-2529974}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:dev-95531e2}
     ports:
       - "3000:3000"
     networks:
@@ -114,6 +114,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-password}
       DB_PORT: 5432
       PUBLIC_URL: http://core.development.mairie360.fr
+      # Core refuses to start without its Resend configuration (MAIR-522). No page of this front sends an
+      # e-mail through these stacks, so the key is fake and the URL never called.
+      RESEND_API_KEY: "re_fake_local"
+      RESEND_BASE_URL: "http://fake-resend.invalid"
+      EMAIL_DOMAIN: "mairie360.local"
       # API >= api_lib 3.0 refuses the weak shared test secret unless this flag is set (MAIR-428),
       # and rate-limits each account (MAIR-425): the scan / load test hammer it as one user.
       JWT_ALLOW_WEAK_SECRET: "true"
@@ -128,7 +133,7 @@ services:
 
   project-api:
     container_name: project-api-front-projects-developpement
-    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:dev-f3f0a8a}
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:dev-2b0d884}
     ports:
       - "3001:3001"
     networks:
@@ -163,7 +168,7 @@ services:
 
   bff-user:
     container_name: bff-user-projects-front
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:dev-3f35bd8}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:dev-46a698b}
     networks:
       - backend
     environment:
@@ -194,7 +199,7 @@ services:
   bff-project:
     container_name: bff-project-projects-front
     # Seul BFF de ce front : même version que le contrat @mairie360/bff-project-openapi de package.json.
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:dev-68d15b9}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:dev-0b18e81}
     ports:
       - "4001:4001"
     networks:
