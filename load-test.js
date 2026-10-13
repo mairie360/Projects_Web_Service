@@ -52,7 +52,9 @@ function b64url(value) {
 function mintJwt() {
   const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(JSON.stringify({ sub: USER_ID, role: 'user', exp: now + 3600 }));
+  // BFF Project reads the caller's role from this claim (MAIR-529) and only lets Responsable, Maire or
+  // Admin create projects: sign the Admin role init-test.sql gives the user, or every POST answers 403.
+  const payload = b64url(JSON.stringify({ sub: USER_ID, role: 'Admin', exp: now + 3600 }));
   const signingInput = `${header}.${payload}`;
   const signature = crypto.hmac('sha256', JWT_SECRET, signingInput, 'base64rawurl');
   return `${signingInput}.${signature}`;
