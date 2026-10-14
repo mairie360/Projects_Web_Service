@@ -1,7 +1,11 @@
 'use client';
+import { subscribePageReturn } from '@/lib/page-return';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ProjectStatus as PublishedProjectStatus, ProjectPriority as PublishedProjectPriority } from '@mairie360/bff-project-openapi/model';
+import { usePageUrlState } from '../../lib/use-page-url-state';
+import { urlChoice, urlDate, urlPage, urlText } from '../../lib/page-url-state';
 import {
   BffProjectError,
   BffProjectNavigationRequiredError,
@@ -47,6 +51,15 @@ import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../.
 type AlertState = {
   type: 'success' | 'info' | 'error';
   message: string;
+};
+
+const projectUrlSchema = {
+  q: urlText(200),
+  status: urlChoice(['all', ...Object.values(PublishedProjectStatus)], 'all'),
+  priority: urlChoice(['all', ...Object.values(PublishedProjectPriority)], 'all'),
+  dueBefore: urlDate,
+  view: urlChoice(['kanban', 'grid', 'table'], 'kanban'),
+  page: urlPage,
 };
 
 type RefreshProjectsOptions = {
@@ -144,6 +157,8 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [dueBeforeFilter, setDueBeforeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const pageUrl = usePageUrlState(projectUrlSchema);
+  const urlInitialized = useRef(false);
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -292,6 +307,34 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   );
 
   useEffect(() => {
+    if (!pageUrl.ready) return;
+    const nextQuery = {
+      search: pageUrl.state.q, status: pageUrl.state.status, priority: pageUrl.state.priority,
+      dueBefore: pageUrl.state.dueBefore, view: pageUrl.state.view as ViewMode,
+    };
+    const nextPage = Number(pageUrl.state.page);
+    const filtersChanged = Object.entries(nextQuery).some(([key, value]) => queryRef.current[key as keyof ProjectQueryState] !== value);
+    if (!urlInitialized.current || filtersChanged) {
+      prepareQueryChange(false);
+      queryRef.current = nextQuery;
+      requestedPageRef.current = nextPage;
+      setSearchTerm(nextQuery.search);
+      setStatusFilter(nextQuery.status);
+      setPriorityFilter(nextQuery.priority);
+      setDueBeforeFilter(nextQuery.dueBefore);
+      setViewMode(nextQuery.view);
+    } else if (requestedPageRef.current !== nextPage) {
+      prepareQueryChange(false);
+      requestedPageRef.current = nextPage;
+      const controller = new AbortController();
+      navigationReadRef.current = controller;
+      void refreshProjectsPage({ page: nextPage, signal: controller.signal });
+    }
+    urlInitialized.current = true;
+  }, [pageUrl.ready, pageUrl.state.q, pageUrl.state.status, pageUrl.state.priority, pageUrl.state.dueBefore, pageUrl.state.view, pageUrl.state.page, refreshProjectsPage]);
+
+  useEffect(() => {
+    if (!pageUrl.ready) return;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       void refreshProjectsPage({ signal: controller.signal });
@@ -302,7 +345,17 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
       navigationReadRef.current?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [refreshProjectsPage, dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]);
+  }, [pageUrl.ready, refreshProjectsPage, dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const page = document;
+    const refresh = () => {
+      if (pageUrl.ready && !page.hidden && !pageReadPendingRef.current && !projectFormPendingRef.current && !duplicatingProjects.current.size) void refreshProjectsPage({ silent: true });
+    };
+    const unsubscribe = subscribePageReturn(refresh);
+    return () => unsubscribe();
+  }, [pageUrl.ready, refreshProjectsPage]);
 
   const retryProjectsPage = async () => {
     if (pageLoading || pageReadPendingRef.current || retryPendingRef.current) return;
@@ -321,6 +374,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
     if (direction === 'previous' ? pagination.page <= 1 : !pagination.hasNextPage) return;
     const nextPage = pagination.page + (direction === 'previous' ? -1 : 1);
     requestedPageRef.current = nextPage;
+    pageUrl.update({ page: String(nextPage) });
     setOpenFilter(null);
     const controller = new AbortController();
     navigationReadRef.current = controller;
@@ -341,33 +395,39 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
     prepareQueryChange(true);
     queryRef.current = { ...queryRef.current, search: value };
     setSearchTerm(value);
+    pageUrl.update({ q: value, page: '1' }, 'replace');
   };
   const changeStatusFilter = (value: string) => {
     if (value === queryRef.current.status) return;
     prepareQueryChange(true);
     queryRef.current = { ...queryRef.current, status: value };
     setStatusFilter(value);
+    pageUrl.update({ status: value, page: '1' });
   };
   const changePriorityFilter = (value: string) => {
     if (value === queryRef.current.priority) return;
     prepareQueryChange(true);
     queryRef.current = { ...queryRef.current, priority: value };
     setPriorityFilter(value);
+    pageUrl.update({ priority: value, page: '1' });
   };
   const changeDueBeforeFilter = (value: string) => {
     if (value === queryRef.current.dueBefore) return;
     prepareQueryChange(true);
     queryRef.current = { ...queryRef.current, dueBefore: value };
     setDueBeforeFilter(value);
+    pageUrl.update({ dueBefore: value, page: '1' });
   };
   const changeViewMode = (value: ViewMode) => {
     if (value === queryRef.current.view) return;
     prepareQueryChange(false);
     queryRef.current = { ...queryRef.current, view: value };
     setViewMode(value);
+    pageUrl.update({ view: value });
   };
 
   const resetProjectFilters = () => {
+    pageUrl.update({ q: '', status: 'all', priority: 'all', dueBefore: '', page: '1' });
     requestedPageRef.current = 1;
     queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '' };
     setSearchTerm('');

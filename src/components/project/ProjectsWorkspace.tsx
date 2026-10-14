@@ -193,7 +193,12 @@ export function ProjectsWorkspace({
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
         className="projects-shell"
       >
-            <div className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+            {!projectsPage && !pageError && <section className="projects-initial-loading mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14" aria-busy="true">
+              <h1 className="text-2xl font-bold leading-tight text-[#172033]">Projets</h1>
+              <p role="status" className="mt-4 text-sm text-[#536171]">Chargement du tableau des projets...</p>
+              <div aria-hidden="true" className="mt-8 min-h-80 rounded-xl border border-[#d9d5d0] bg-white" />
+            </section>}
+            <div hidden={!projectsPage && !pageError} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
               {logoutError && (
                 <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
                   <p>{logoutError}</p>

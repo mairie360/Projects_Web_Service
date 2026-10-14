@@ -1,0 +1,277 @@
+{
+  "module": "Projects",
+  "readyText": "Rénovation de l’éclairage public",
+  "routes": {
+    "/projects-page": {
+      "access": {
+        "role": "Responsable",
+        "scope": "team",
+        "canCreateProject": true,
+        "canManageProjects": true,
+        "canManageTasks": true,
+        "canUpdateAssignedTaskStatus": true,
+        "canCommentTasks": true
+      },
+      "page": {
+        "title": "Projets",
+        "subtitle": "Suivi des projets de la mairie",
+        "defaultView": "kanban",
+        "views": [
+          {
+            "value": "kanban",
+            "label": "Kanban"
+          },
+          {
+            "value": "grid",
+            "label": "Grille"
+          },
+          {
+            "value": "table",
+            "label": "Tableau"
+          }
+        ]
+      },
+      "filters": {
+        "search": null,
+        "status": "all",
+        "priority": "all",
+        "statuses": [
+          {
+            "label": "À faire",
+            "value": "todo"
+          },
+          {
+            "label": "En cours",
+            "value": "in-progress"
+          },
+          {
+            "label": "En revue",
+            "value": "review"
+          },
+          {
+            "label": "Terminé",
+            "value": "done"
+          }
+        ],
+        "priorities": [
+          {
+            "label": "Haute",
+            "value": "high"
+          },
+          {
+            "label": "Moyenne",
+            "value": "medium"
+          },
+          {
+            "label": "Basse",
+            "value": "low"
+          }
+        ]
+      },
+      "options": {
+        "members": [
+          {
+            "label": "Admin Mairie",
+            "value": "user-1",
+            "name": "Admin Mairie",
+            "avatarUrl": null
+          },
+          {
+            "label": "Alice Martin",
+            "value": "user-2",
+            "name": "Alice Martin",
+            "avatarUrl": null
+          },
+          {
+            "label": "Marie Durand",
+            "value": "user-3",
+            "name": "Marie Durand",
+            "avatarUrl": null
+          }
+        ],
+        "labels": [
+          {
+            "label": "voirie",
+            "value": "voirie"
+          }
+        ]
+      },
+      "summary": {
+        "totalProjects": 1,
+        "projectsByStatus": {
+          "todo": 0,
+          "in-progress": 1,
+          "review": 0,
+          "done": 0
+        },
+        "projectsByPriority": {
+          "high": 1,
+          "medium": 0,
+          "low": 0
+        }
+      },
+      "kanban": {
+        "columns": [
+          {
+            "status": "todo",
+            "label": "À faire",
+            "projectIds": [],
+            "count": 0
+          },
+          {
+            "status": "in-progress",
+            "label": "En cours",
+            "projectIds": [
+              "project-1"
+            ],
+            "count": 1
+          },
+          {
+            "status": "review",
+            "label": "En revue",
+            "projectIds": [],
+            "count": 0
+          },
+          {
+            "status": "done",
+            "label": "Terminé",
+            "projectIds": [],
+            "count": 0
+          }
+        ]
+      },
+      "projects": [
+        {
+          "id": "project-1",
+          "title": "Rénovation de l’éclairage public",
+          "description": "Remplacement des candélabres du centre-ville.",
+          "status": "in-progress",
+          "statusLabel": "En cours",
+          "priority": "high",
+          "priorityLabel": "Haute",
+          "responsible": {
+            "id": "user-3",
+            "name": "Marie Durand",
+            "avatarUrl": null
+          },
+          "assignees": [
+            {
+              "id": "user-3",
+              "name": "Marie Durand",
+              "avatarUrl": null
+            },
+            {
+              "id": "user-2",
+              "name": "Alice Martin",
+              "avatarUrl": null
+            }
+          ],
+          "labels": [
+            "voirie",
+            "énergie"
+          ],
+          "progress": 50,
+          "dueDate": "2026-12-15T00:00:00.000Z",
+          "createdAt": "2026-09-01T08:30:00.000Z",
+          "tasks": {
+            "total": 2,
+            "completed": 1
+          },
+          "permissions": {
+            "canView": true,
+            "canEdit": true,
+            "canDuplicate": true,
+            "canDelete": true,
+            "canCreateTask": true,
+            "canAssignMembers": true,
+            "canClose": true
+          }
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1,
+        "hasNextPage": false
+      }
+    },
+    "/api/user/me": {
+      "user": {
+        "id": 1,
+        "first_name": "Alice",
+        "last_name": "Recette",
+        "email": "alice@example.invalid",
+        "phone": null,
+        "status": "active"
+      },
+      "groups": [
+        {
+          "id": 1,
+          "name": "Mairie",
+          "owner_id": 1,
+          "description": null
+        }
+      ],
+      "roles": [
+        {
+          "id": 1,
+          "name": "Admin"
+        }
+      ]
+    },
+    "/api/auth/me": {
+      "user": {
+        "id": 1,
+        "first_name": "Alice",
+        "last_name": "Recette",
+        "email": "alice@example.invalid",
+        "phone": null,
+        "status": "active"
+      },
+      "groups": [
+        {
+          "id": 1,
+          "name": "Mairie",
+          "owner_id": 1,
+          "description": null
+        }
+      ],
+      "roles": [
+        {
+          "id": 1,
+          "name": "Admin"
+        }
+      ]
+    },
+    "/api/auth/session": {
+      "user": {
+        "id": 1,
+        "first_name": "Alice",
+        "last_name": "Recette",
+        "email": "alice@example.invalid",
+        "phone": null,
+        "status": "active"
+      },
+      "groups": [
+        {
+          "id": 1,
+          "name": "Mairie",
+          "owner_id": 1,
+          "description": null
+        }
+      ],
+      "roles": [
+        {
+          "id": 1,
+          "name": "Admin"
+        }
+      ]
+    },
+    "/api/auth/role": {
+      "isAdmin": true
+    },
+    "/api/auth/current-user": {
+      "id": "1"
+    }
+  }
+}
