@@ -2,6 +2,7 @@
 
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
+import { civilDateInZone } from '@mairie360/front-kit/shared';
 import { Button } from '@mairie360/lib-components';
 import { CalendarDays, CheckSquare2, ListChecks, Square } from 'lucide-react';
 
@@ -15,7 +16,6 @@ import type { Project, ProjectTask } from '../../types/project';
 import {
   calculateProjectProgress,
   createPersonFromOptionValue,
-  formatInputDate,
   getPersonValue,
   type FilterOption,
   type ProjectFormState,
@@ -151,7 +151,7 @@ export function ProjectTasksEditor({
       labels: taskForm.labels,
       dueDate: taskDueDate,
       completed: taskForm.status === 'done',
-      createdAt: formatInputDate(new Date()),
+      createdAt: civilDateInZone(new Date()),
     };
 
     updateTasks(
