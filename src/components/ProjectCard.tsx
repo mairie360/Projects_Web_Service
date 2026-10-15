@@ -23,6 +23,7 @@ export { PersonAvatar, PriorityLabel, PriorityPill, ProgressMeter, StatusPill } 
 
 function KanbanProjectCard({
   project,
+  workflowPort,
   taskCreationState,
   onInspectTaskCreation,
   onPreserveTaskDraft,
@@ -98,13 +99,14 @@ function KanbanProjectCard({
         </span>
       </div>
 
-      <TaskComposer project={project} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
+      <TaskComposer project={project} workflowPort={workflowPort} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
     </article>
   );
 }
 
 function GridProjectCard({
   project,
+  workflowPort,
   taskCreationState,
   onInspectTaskCreation,
   onPreserveTaskDraft,
@@ -182,7 +184,7 @@ function GridProjectCard({
         </span>
       </div>
 
-      <TaskComposer project={project} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
+      <TaskComposer project={project} workflowPort={workflowPort} creationState={taskCreationState} onInspect={onInspectTaskCreation} onPreserveDraft={onPreserveTaskDraft} memberOptions={memberOptions} labelOptions={labelOptions} onAddTask={onAddTask} />
     </article>
   );
 }

@@ -27,6 +27,7 @@ export type ProjectFormState = {
 export type TaskFormState = {
   title: string;
   status: Project['status'];
+  statusId?: string;
   priority: Project['priority'];
   assignees: string[];
   labels: string[];

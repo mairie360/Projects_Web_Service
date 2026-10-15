@@ -1,4 +1,6 @@
 'use client';
+import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow';
+import type { ProjectTemplate, ProjectWorkflowPort } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '@/lib/page-return';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
@@ -102,7 +104,7 @@ function validateProjectForm(form: ProjectFormState) {
   );
 }
 
-export function useProjectsController({ currentAgentSource }: { currentAgentSource?: CurrentAgentSource } = {}) {
+export function useProjectsController({ currentAgentSource, workflowPort = publishedProjectWorkflowPort }: { currentAgentSource?: CurrentAgentSource; workflowPort?: ProjectWorkflowPort } = {}) {
   const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
   const readCurrentTaskAssignee = useCallback(async (signal: AbortSignal) => {
     const agent = await (currentAgentSource ?? loginCurrentAgentSource).read(signal);
@@ -1011,7 +1013,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
     }
   };
 
-  const saveProject = async (event: React.FormEvent<HTMLFormElement>) => {
+  const saveProject = async (event: React.FormEvent<HTMLFormElement>, template?: ProjectTemplate) => {
     event.preventDefault();
     // The ref also protects two events captured before React renders disabled controls.
     if (projectFormPendingRef.current || (!editingProjectId && (newProjectReceiptIssuesRef.current.has('create') || verifiedCreationRef.current))) return;
@@ -1032,7 +1034,12 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
       if (editingProjectId) requireVerifiedProject(editingProjectId);
       const details = editingProjectId
         ? await updateProject(editingProjectId, updateProjectBodyFromForm(projectForm))
-        : await createProject(createProjectBodyFromForm(projectForm));
+        : template
+          ? await (() => {
+            if (!workflowPort?.createProjectFromTemplate) throw new Error('La création depuis un modèle est indisponible.');
+            return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(projectForm));
+          })()
+          : await createProject(createProjectBodyFromForm(projectForm));
       if (editingProjectId) requireProjectReceipt(editingProjectId, details);
       else requireNewProjectReceipt(details, 'create', { kind: 'create', title: projectForm.title }, knownAtDispatch);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
@@ -1142,7 +1149,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
         uncertainTaskCreationsRef.current.set(project.id, title);
         setTaskCreationStates(current => new Map(current).set(project.id, {
           pending: true, uncertainTitle: title,
-          draft: { title: taskDraft.title, status: taskDraft.status, priority: taskDraft.priority, dueDate: taskDraft.dueDate, labels: [...taskDraft.labels], assignees: taskDraft.assignees.map(getPersonValue) },
+          draft: { title: taskDraft.title, status: taskDraft.status, ...(taskDraft.statusId ? { statusId: taskDraft.statusId } : {}), priority: taskDraft.priority, dueDate: taskDraft.dueDate, labels: [...taskDraft.labels], assignees: taskDraft.assignees.map(getPersonValue) },
         }));
         // Invalidate reads begun before this receipt without fabricating a task
         // confirmation or locking the existing row whose ID was reused.
@@ -1307,18 +1314,19 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   const changeProjectTaskStatus = async (
     projectId: string,
     taskId: string,
-    status: ProjectStatus
+    status: ProjectStatus,
+    statusId?: string
   ) => {
     const selection = detailSelectionRef.current;
     return runTaskWrite(projectId, taskId, async () => {
       let updatedTask: ProjectTask;
       try {
-        updatedTask = await updateProjectTaskStatus(projectId, taskId, status);
+        updatedTask = await updateProjectTaskStatus(projectId, taskId, status, statusId);
       } catch (error) {
         showTaskWriteError(projectId, taskId, error);
         return;
       }
-      if (updatedTask.id !== taskId) {
+      if (updatedTask.id !== taskId || (statusId && updatedTask.statusId !== statusId)) {
         await verifyInconsistentTaskReceipt(projectId, taskId, selection);
         return;
       }
@@ -1398,6 +1406,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   const frontHrefs = getActiveFrontHrefs();
 
   return {
+    workflowPort,
     readCurrentTaskAssignee,
     projectsPage,
     projects,

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ProjectWorkflowPort, TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { CheckCircle2, CircleDot, Plus, Tag } from 'lucide-react';
@@ -111,8 +112,9 @@ function CompactMultiSelect({
   );
 }
 
-export function TaskComposer({
+function TaskComposerForm({
   project,
+  workflowPort,
   creationState,
   onInspect,
   onPreserveDraft,
@@ -121,6 +123,7 @@ export function TaskComposer({
   onAddTask,
 }: {
   project: Project;
+  workflowPort?: ProjectWorkflowPort;
   creationState?: TaskCreationState;
   onInspect?: (projectId: string) => void | Promise<void>;
   onPreserveDraft?: (projectId: string, patch: Partial<TaskFormState>) => void;
@@ -131,6 +134,24 @@ export function TaskComposer({
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState(creationState?.draft?.title ?? '');
   const [status, setStatus] = React.useState<Project['status']>(creationState?.draft?.status ?? project.status);
+  const [dynamicStatuses, setDynamicStatuses] = React.useState<TaskStatusDefinition[] | null>(null);
+  const [statusId, setStatusId] = React.useState(creationState?.draft?.statusId ?? '');
+  const [statusLoading, setStatusLoading] = React.useState(false);
+  const [statusUnavailable, setStatusUnavailable] = React.useState(false);
+  React.useEffect(() => {
+    if (!open || !workflowPort) return;
+    const controller = new AbortController();
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return;
+      setStatusLoading(true); setStatusUnavailable(false);
+      try {
+        const snapshot = await workflowPort.readProject(project.id, controller.signal);
+        if (!controller.signal.aborted && snapshot.projectId === project.id) setDynamicStatuses(snapshot.statuses);
+      } catch { if (!controller.signal.aborted) setStatusUnavailable(true); }
+      finally { if (!controller.signal.aborted) setStatusLoading(false); }
+    });
+    return () => controller.abort();
+  }, [open, workflowPort, project.id]);
   const [priority, setPriority] = React.useState<Project['priority']>(creationState?.draft?.priority ?? project.priority);
   const [assignees, setAssignees] = React.useState<string[]>(creationState?.draft?.assignees ?? [getPersonValue(project.responsible)]);
   const [labels, setLabels] = React.useState<string[]>(creationState?.draft?.labels ?? []);
@@ -176,6 +197,8 @@ export function TaskComposer({
       noticeRef.current?.focus();
       return;
     }
+    if (statusLoading) { setError('Les statuts sont en cours de chargement.'); return; }
+    if (dynamicStatuses && !dynamicStatuses.some(item => item.id === statusId)) { setError('Choisissez un statut du projet.'); return; }
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setError('Le titre de la tâche est obligatoire.');
@@ -194,6 +217,7 @@ export function TaskComposer({
       await onAddTask(project, {
         title: trimmedTitle,
         status,
+        ...(dynamicStatuses ? { statusId } : {}),
         responsible: selectedAssignees[0] ?? project.responsible,
         assignees: selectedAssignees,
         priority,
@@ -272,13 +296,22 @@ export function TaskComposer({
       </div>
       {saving && <p role="status" className="mt-2 text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
+      {statusLoading && <p className="mt-2 text-xs text-[#536171]">Chargement des statuts du projet…</p>}
+      {statusUnavailable && <p className="mt-2 text-xs text-[#536171]">Statuts personnalisés indisponibles ; les catégories standard restent disponibles.</p>}
       <div className="mt-2 grid grid-cols-2 gap-2">
+        {dynamicStatuses ? <select aria-label="Statut" value={statusId} className={compactFieldClassName} onChange={event => {
+          const id = event.target.value;
+          const category = dynamicStatuses.find(item => item.id === id)?.category;
+          const value = category === 'inprogress' ? 'in-progress' : category ?? 'todo';
+          setStatusId(id); setStatus(value); preserveDraft({ statusId: id, status: value });
+        }}><option value="">Choisir un statut du projet</option>{dynamicStatuses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select> : (
         <select aria-label="Statut" value={status} className={compactFieldClassName} onChange={(event) => { const value = event.target.value as Project['status']; setStatus(value); preserveDraft({ status: value }); }}>
           <option value="todo">À faire</option>
           <option value="in-progress">En cours</option>
           <option value="review">En révision</option>
           <option value="done">Terminé</option>
         </select>
+        )}
         <select
           aria-label="Priorité"
           value={priority}
@@ -319,4 +352,8 @@ export function TaskComposer({
       </fieldset>
     </form>
   );
+}
+
+export function TaskComposer(props: React.ComponentProps<typeof TaskComposerForm>) {
+  return <TaskComposerForm key={props.project.id} {...props} />;
 }

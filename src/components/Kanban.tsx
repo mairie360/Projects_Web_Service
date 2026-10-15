@@ -16,6 +16,7 @@ type SelectOption = {
 
 type KanbanBoardProps = {
   projects: Project[];
+  workflowPort?: import('../lib/projectWorkflow').ProjectWorkflowPort;
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   taskCreationStates?: ReadonlyMap<string, TaskCreationState>;
@@ -47,6 +48,7 @@ const columnPresentation: Record<Project['status'], KanbanColumnPresentation> = 
 
 export function KanbanBoard({
   projects,
+  workflowPort,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
   taskCreationStates,
@@ -180,6 +182,7 @@ export function KanbanBoard({
                 >
                   <ProjectCard
                     project={project}
+                    workflowPort={workflowPort}
                     taskCreationState={taskCreationStates?.get(project.id)}
                     onInspectTaskCreation={onInspectTaskCreation}
                     onPreserveTaskDraft={onPreserveTaskDraft}

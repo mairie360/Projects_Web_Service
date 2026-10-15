@@ -310,8 +310,8 @@ export async function updateProjectTask(projectId: string, taskId: string, body:
   return normalizeProjectTask(data as ProjectTask);
 }
 
-export async function updateProjectTaskStatus(projectId: string, taskId: string, status: ProjectStatus) {
-  const { data } = await bffProject.patchProjectsProjectIdTasksTaskIdStatus(encodeURIComponent(projectId), encodeURIComponent(taskId), { status });
+export async function updateProjectTaskStatus(projectId: string, taskId: string, status: ProjectStatus, statusId?: string) {
+  const { data } = await bffProject.patchProjectsProjectIdTasksTaskIdStatus(encodeURIComponent(projectId), encodeURIComponent(taskId), statusId ? { statusId } : { status });
 
   return normalizeProjectTask(data as ProjectTask);
 }
@@ -380,6 +380,7 @@ export function taskBodyFromDraft(task: ProjectTaskDraft): CreateTaskBody {
   return {
     title: task.title.trim(),
     status: task.status,
+    ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,
     responsibleId,
     assigneeIds: uniquePreservingOrder([responsibleId, ...assigneeIds]),

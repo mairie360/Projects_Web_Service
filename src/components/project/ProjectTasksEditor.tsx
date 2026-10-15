@@ -72,6 +72,7 @@ export function taskToFormState(task: ProjectTask): TaskFormState {
   return {
     title: task.title,
     status: task.status,
+    ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,
     assignees: uniqueAssigneesInOrder(assigneeNames),
     labels: task.labels,

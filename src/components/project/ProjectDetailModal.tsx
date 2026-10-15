@@ -1,5 +1,7 @@
 'use client';
 
+import { ProjectWorkflow } from './ProjectWorkflow';
+import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '../../lib/projectWorkflow';
 import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { getInstanceTimeZone } from '@mairie360/front-kit/shared';
@@ -25,6 +27,8 @@ type TaskFollowUpSelection = {
 
 export function ProjectDetailModal({
   project,
+  workflowPort,
+  workflowRole,
   defaultTaskAssigneeId,
   readCurrentTaskAssignee,
   tasks,
@@ -53,6 +57,8 @@ export function ProjectDetailModal({
   onCloseProject,
 }: {
   project: Project;
+  workflowPort?: ProjectWorkflowPort;
+  workflowRole?: string;
   defaultTaskAssigneeId?: string | null;
   readCurrentTaskAssignee?: (signal: AbortSignal) => Promise<string | null>;
   tasks: ProjectTask[];
@@ -76,10 +82,19 @@ export function ProjectDetailModal({
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
-  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus) => void | Promise<void>;
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus, statusId?: string) => void | Promise<void>;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
   onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
 }) {
+  const [workflow, setWorkflow] = React.useState<ProjectWorkflowSnapshot | null>(null);
+  const receiveWorkflow = React.useCallback((snapshot: ProjectWorkflowSnapshot) => setWorkflow(snapshot), []);
+  const dynamicStatuses = workflow?.projectId === project.id ? workflow.statuses : undefined;
+  const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? statusOptions;
+  const [showTaskDetails, setShowTaskDetails] = React.useState(false);
+  const categoryStatus = (id: string): ProjectStatus => {
+    const category = dynamicStatuses?.find(status => status.id === id)?.category;
+    return category === 'inprogress' ? 'in-progress' : category ?? 'todo';
+  };
   const [editingProject, setEditingProject] = React.useState(false);
   const [projectEditForm, setProjectEditForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [projectEditError, setProjectEditError] = React.useState('');
@@ -197,13 +212,13 @@ export function ProjectDetailModal({
     return tasks.filter((task) => {
       const matchesSearch = !search || task.title.toLowerCase().includes(search) ||
         task.labels.some((label) => label.toLowerCase().includes(search));
-      const matchesStatus = taskStatusFilter === 'all' || task.status === taskStatusFilter;
+      const matchesStatus = taskStatusFilter === 'all' || (dynamicStatuses ? task.statusId : task.status) === taskStatusFilter;
       const matchesPriority = taskPriorityFilter === 'all' || task.priority === taskPriorityFilter;
       const matchesDueDate = !taskDueFilter || task.dueDate.slice(0, 10) <= taskDueFilter;
 
       return matchesSearch && matchesStatus && matchesPriority && matchesDueDate;
     });
-  }, [taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
+  }, [dynamicStatuses, taskDueFilter, taskPriorityFilter, taskSearch, taskStatusFilter, tasks]);
 
   React.useEffect(() => {
     // Retained input changes are not a new official project response: do not
@@ -431,6 +446,11 @@ export function ProjectDetailModal({
       return;
     }
 
+    if (dynamicStatuses && !dynamicStatuses.some(status => status.id === taskForm.statusId)) {
+      setTaskFormError('Choisissez un statut du projet pour la tâche.');
+      return;
+    }
+
     if (!taskForm.assignees.length) {
       setTaskFormError('Choisissez au moins un agent assigné à cette tâche.');
       return;
@@ -439,7 +459,8 @@ export function ProjectDetailModal({
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
-      status: taskForm.status,
+      status: dynamicStatuses ? categoryStatus(taskForm.statusId ?? '') : taskForm.status,
+      ...(dynamicStatuses ? { statusId: taskForm.statusId } : {}),
       responsible: assignees[0],
       assignees,
       priority: taskForm.priority,
@@ -535,6 +556,8 @@ export function ProjectDetailModal({
                   </button>
                 </div>
               )}
+              <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} onSnapshot={receiveWorkflow} onMutation={() => void onRetry?.()} />
+              {dynamicStatuses && <button type="button" className="mb-4 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 text-sm" aria-expanded={showTaskDetails} onClick={() => setShowTaskDetails(value => !value)}>Détails des tâches</button>}
               {project.permissions?.canCreateTask !== false && (
                 <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
@@ -563,9 +586,9 @@ export function ProjectDetailModal({
                     <SelectField
                       id="detail-task-status"
                       label="Statut"
-                      value={taskForm.status}
-                      options={statusOptions}
-                      onChange={(status) => updateTaskForm({ status: status as Project['status'] })}
+                      value={dynamicStatuses ? taskForm.statusId ?? '' : taskForm.status}
+                      options={dynamicStatuses ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
+                      onChange={(status) => updateTaskForm(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] })}
                     />
                     <SelectField
                       id="detail-task-priority"
@@ -629,7 +652,7 @@ export function ProjectDetailModal({
                 </div>
               )}
 
-              <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
+              {(!dynamicStatuses || showTaskDetails) && <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
                 <div className="flex items-center justify-between border-b border-[#dedbd6] bg-[#f1eee9] px-4 py-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-[#24292f]">
                     <ListChecks className="h-4 w-4 text-[#57606a]" strokeWidth={1.8} />
@@ -664,7 +687,7 @@ export function ProjectDetailModal({
                       onChange={(event) => setTaskStatusFilter(event.target.value)}
                     >
                       <option value="all">Tous les statuts</option>
-                      {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      {taskStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                     <select
                       aria-label="Filtrer les tâches par priorité"
@@ -712,7 +735,7 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={mutationPending || taskMutationBlocked || !canUpdateStatus}
+                            disabled={!!dynamicStatuses || mutationPending || taskMutationBlocked || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
@@ -761,17 +784,18 @@ export function ProjectDetailModal({
                                   <select
                                     aria-label={`Statut de ${task.title}`}
                                     disabled={mutationPending || taskMutationBlocked}
-                                    value={task.status}
+                                    value={dynamicStatuses ? task.statusId : task.status}
                                     className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
                                     onChange={(event) =>
                                       onUpdateTaskStatus(
                                         project.id,
                                         task.id,
-                                        event.target.value as ProjectStatus
+                                        dynamicStatuses ? categoryStatus(event.target.value) : event.target.value as ProjectStatus,
+                                        dynamicStatuses ? event.target.value : undefined
                                       )
                                     }
                                   >
-                                    {statusOptions.map((option) => (
+                                    {taskStatusOptions.map((option) => (
                                       <option key={option.value} value={option.value}>
                                         {option.label}
                                       </option>
@@ -882,7 +906,7 @@ export function ProjectDetailModal({
                     })}
                   </div>
                 )}
-              </section>
+              </section>}
             </main>
 
             <aside className="bg-[#fbfaf8] p-5">
