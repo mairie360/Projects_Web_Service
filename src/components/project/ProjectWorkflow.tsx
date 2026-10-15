@@ -110,7 +110,7 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
     }
   };
   const canManage = canManageWorkflow(role);
-  return <section aria-label="Statuts et tâches du projet" className="mb-5 min-w-0 space-y-4 rounded-md border border-[#d9d5d0] bg-white p-4">
+  return <section aria-label="Statuts et tâches du projet" className="mairie-workflow-panel mb-5 min-w-0 space-y-4 rounded-md border border-[#d9d5d0] bg-white p-4">
     <h2 className="font-semibold text-[#172033]">Statuts des tâches du projet</h2>
     {loading && <p role="status">Chargement des statuts…</p>}
     {error && <p role="alert" className="text-sm text-[#a40e26] [overflow-wrap:anywhere]">{error}</p>}
