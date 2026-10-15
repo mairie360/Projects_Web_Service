@@ -8,10 +8,13 @@ import type { Project } from '../../types/project';
 import { type FilterOption, type ProjectFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { ProjectTasksEditor } from './ProjectTasksEditor';
+import { ProjectTemplatePicker } from './ProjectWorkflow';
+import type { ProjectTemplate, ProjectWorkflowPort } from '../../lib/projectWorkflow';
 import { PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function CreateProjectModal({
   mode,
+  workflowPort,
   form,
   error,
   pending = false,
@@ -34,6 +37,7 @@ export function CreateProjectModal({
   onSubmit,
 }: {
   mode: 'create' | 'edit';
+  workflowPort?: ProjectWorkflowPort;
   form: ProjectFormState;
   error: string;
   pending?: boolean;
@@ -53,8 +57,9 @@ export function CreateProjectModal({
   onChange: (patch: Partial<ProjectFormState>) => void;
   onClose: () => void;
   onInteract?: () => void;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>, template?: ProjectTemplate) => void;
 }) {
+  const [template, setTemplate] = React.useState<ProjectTemplate | undefined>();
   const isEditMode = mode === 'edit';
   const creationConfirmed = !isEditMode && confirmedCreationTitle !== undefined;
   const submitBlocked = pending || verificationRequired || verificationPending || creationConfirmed || !canSave;
@@ -134,7 +139,7 @@ export function CreateProjectModal({
         onPointerDownCapture={onInteract}
         onChangeCapture={onInteract}
         className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
-        onSubmit={onSubmit}
+        onSubmit={event => onSubmit(event, template)}
       >
         <div className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#2b2b2b] px-5 py-3">
           <h2 id={titleId} className="truncate text-base font-semibold text-white">
@@ -218,6 +223,7 @@ export function CreateProjectModal({
             </section>
 
             <aside className="space-y-4 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
+              {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
               <div>
                 <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
                 <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>

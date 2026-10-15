@@ -9,6 +9,7 @@ import { KanbanBoard } from '../Kanban';
 import { ActionButton } from './ProjectFormControls';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ProjectDetailModal } from './ProjectDetailModal';
+import { ProjectTemplateManager } from './ProjectWorkflow';
 import { ProjectPagination } from './ProjectPagination';
 import { TaskCreationNotice } from './TaskCreationNotice';
 import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
@@ -18,6 +19,7 @@ import type { ProjectsController } from './useProjectsController';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function ProjectsWorkspace({
+  workflowPort,
   readCurrentTaskAssignee,
   projectsPage,
   projects,
@@ -130,6 +132,8 @@ export function ProjectsWorkspace({
       {selectedProject && (
         <ProjectDetailModal
           project={selectedProject}
+          workflowPort={workflowPort}
+          workflowRole={projectsPage?.access.role}
           readCurrentTaskAssignee={readCurrentTaskAssignee}
           tasks={selectedProjectTasks}
           highlightTaskId={linkedTaskId}
@@ -162,6 +166,7 @@ export function ProjectsWorkspace({
         <CreateProjectModal
           key={editingProjectId ?? 'create'}
           mode={editingProjectId ? 'edit' : 'create'}
+          workflowPort={workflowPort}
           form={projectForm}
           error={projectFormError}
           pending={projectFormPending}
@@ -269,6 +274,8 @@ export function ProjectsWorkspace({
                 </div>
               </section>
 
+              <ProjectTemplateManager role={projectsPage?.access.role} port={workflowPort} />
+
               <section className="border-b border-[#e3e0dc] py-7">
                 <div className="flex flex-col items-start gap-4 2xl:flex-row 2xl:flex-wrap 2xl:items-center 2xl:justify-between">
                   <div className="flex w-full min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-center 2xl:basis-[50rem]">
@@ -347,6 +354,7 @@ export function ProjectsWorkspace({
 
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard
+                    workflowPort={workflowPort}
                     projects={filteredProjects}
                     taskCreationStates={taskCreationStates}
                     onInspectTaskCreation={inspectTaskCreation}
@@ -368,6 +376,7 @@ export function ProjectsWorkspace({
 
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
+                    workflowPort={workflowPort}
                     projects={filteredProjects}
                     taskCreationStates={taskCreationStates}
                     onInspectTaskCreation={inspectTaskCreation}

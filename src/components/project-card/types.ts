@@ -11,6 +11,7 @@ export type SelectOption = {
 
 export type ProjectCardProps = {
   project: Project;
+  workflowPort?: import('../../lib/projectWorkflow').ProjectWorkflowPort;
   variant?: ProjectCardVariant;
   duplicationPending?: boolean;
   duplicationVerificationRequired?: boolean;
