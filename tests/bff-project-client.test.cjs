@@ -409,7 +409,7 @@ describe('erreurs du BFF', () => {
     assert.equal(harness.location.reloads, 0);
     assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
     assert.deepEqual(harness.ownerCalls, []);
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page']);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page', 'POST /api/auth/refresh']);
   });
 
   test('une requête annulée rejette avec AbortError', async () => {

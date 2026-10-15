@@ -5,6 +5,7 @@ FROM node:${NODE_VERSION}-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY vendor/ ./vendor/
 # The existing credential and tracked npm policy are available only during install.
 RUN --mount=type=secret,id=node_auth_token,env=NODE_AUTH_TOKEN,required=true \
     --mount=type=bind,source=.npmrc,target=/app/.npmrc \

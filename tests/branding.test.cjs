@@ -23,7 +23,7 @@ test('browser and app icons use the same Mairie360 mark', () => {
   assert.equal(existsSync(path.join(root, 'src/app/icon1.png')), false);
 });
 
-test('manifest and page metadata expose the branded assets', () => {
+test('manifest and page metadata expose the branded assets', async () => {
   const manifest = JSON.parse(read('src/app/manifest.json').toString('utf8'));
   const { metadata, default: RootLayout } = loadRootLayout(() => require('./support/typescript.cjs').requireTs('src/app/layout.tsx'));
   const React = require('react');
@@ -39,6 +39,6 @@ test('manifest and page metadata expose the branded assets', () => {
   const appleIcon = metadata.icons.apple.find(item => new URL(item.url, 'https://frontend.test').pathname === '/mairie360-logo.png');
   assert.ok(appleIcon, 'metadata contains the public app icon');
   assert.ok(new URL(appleIcon.url, 'https://frontend.test').searchParams.get('v'), 'the app icon keeps its cache key');
-  const html = renderToStaticMarkup(React.createElement(RootLayout, null, React.createElement('span', { id: 'branding-child' }, 'Preserved child')));
+  const html = renderToStaticMarkup(await RootLayout({children:React.createElement('span', { id: 'branding-child' }, 'Preserved child')}));
   assert.match(html, /<span id="branding-child">Preserved child<\/span>/);
 });

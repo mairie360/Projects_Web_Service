@@ -1,4 +1,4 @@
-import { createSessionLogoutProxy } from '@mairie360/lib-components/next';
+import { createSessionLogoutProxy } from '@mairie360/front-kit/next';
 
 /** Explicit logout uses the same Login owner as session renewal. */
 export const POST = createSessionLogoutProxy({

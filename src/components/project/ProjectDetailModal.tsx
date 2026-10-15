@@ -2,6 +2,7 @@
 
 import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
+import { getInstanceTimeZone } from '@mairie360/front-kit/shared';
 import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
@@ -845,7 +846,7 @@ export function ProjectDetailModal({
                                         {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
                                         {collaboration.comments.map((comment) => (
                                           <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
-                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR')}</time></div>
+                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</time></div>
                                             <p className="mt-1 whitespace-pre-wrap text-[#57606a] [overflow-wrap:anywhere]">{comment.message}</p>
                                           </div>
                                         ))}
@@ -866,7 +867,7 @@ export function ProjectDetailModal({
                                         {collaboration.history.map((entry) => (
                                           <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs [overflow-wrap:anywhere]">
                                             <p className="font-medium text-[#24292f]">{entry.label}</p>
-                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR')}</p>
+                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</p>
                                           </div>
                                         ))}
                                       </div>
