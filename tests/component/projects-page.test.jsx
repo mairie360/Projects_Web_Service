@@ -1,8 +1,9 @@
+import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ProjectsPage from "@/app/page";
+import ProjectsPage from "@/app/projects-client";
 import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProject, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
 import fixtures from "../support/bff-fixtures.cjs";
 
@@ -772,4 +773,23 @@ it('wires the existing Login identity to a received Project member only when the
     expect(fetch).toHaveBeenCalledOnce();
     expect(fetch.mock.calls[0][0]).toBe('/api/auth/current-user');
   } finally {vi.unstubAllGlobals();}
+});
+
+it('hydrates a confirmed server page under StrictMode and reads the next page exactly once', async () => {
+  window.history.replaceState({}, '', '/?view=table');
+  const project = fixtures.projectListItem();
+  const data = fixtures.projectsPage([project], { pagination: { page: 1, limit: 50, total: 85, hasNextPage: true } });
+  const initial = { status: 'confirmed', data, query: { q: '', status: 'all', priority: 'all', dueBefore: '', view: 'table', page: '1' } };
+  const next = { ...project, id: 'project-2', title: 'Confirmed second server project page' };
+  vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([next], { pagination: { page: 2, limit: 50, total: 85, hasNextPage: false } }));
+  const user = userEvent.setup();
+  render(<StrictMode><ProjectsPage initial={initial} /></StrictMode>);
+  expect(screen.getByText(project.title, { exact: true })).toBeTruthy();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)); });
+  expect(getProjectsPage).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Page suivante' }));
+  await screen.findByText(next.title, { exact: true });
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)); });
+  expect(getProjectsPage).toHaveBeenCalledOnce();
+  expect(vi.mocked(getProjectsPage).mock.calls[0][0].page).toBe(2);
 });

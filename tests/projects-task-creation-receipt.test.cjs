@@ -6,7 +6,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
-const Page = requireTs('src/app/page.tsx').default;
+const Page = requireTs('src/app/projects-client.tsx').default;
 const harness = createFrontHarness();
 const project = f.projectListItem(), other = f.projectListItem({ id: 'project-2', title: 'Autre projet' });
 const original = f.projectTask(), draft = { ...original, title: 'Nouvelle tâche à conserver' };

@@ -77,24 +77,25 @@ async function sourceCoverage({ root = process.cwd(), rawDirectory, reportDirect
   await report.run();
   const map = await report.getCoverageMapFromAllCoverageFiles();
   const scope = require('./coverage-scope.cjs');
+  const ownsNodeSource = relative => relative.endsWith('.ts') && !scope.reactSources.includes(relative) || scope.serverTsxSources.includes(relative);
   const typeScriptMap = new map.constructor();
   for (const filename of map.files()) {
     const relative = path.relative(root, filename).split(path.sep).join('/');
-    if (filename.endsWith('.ts') && !scope.reactSources.includes(relative)) typeScriptMap.addFileCoverage(map.fileCoverageFor(filename));
+    if (ownsNodeSource(relative)) typeScriptMap.addFileCoverage(map.fileCoverageFor(filename));
   }
   const total = typeScriptMap.getCoverageSummary().toJSON();
   const files = {};
   for (const filename of map.files()) files[path.relative(root, filename).split(path.sep).join('/')] = map.fileCoverageFor(filename).toSummary().toJSON();
   const failures = [];
-  for (const metric of ['lines', 'branches', 'functions']) if (total[metric].pct < 60) failures.push({ file: 'all TypeScript source', metric, actual: total[metric].pct, required: 60 });
+  for (const metric of ['lines', 'branches', 'functions']) if (total[metric].pct < 60) failures.push({ file: 'all Node-owned source', metric, actual: total[metric].pct, required: 60 });
   for (const filename of sourcePaths) {
     const relative = path.relative(root, filename).split(path.sep).join('/');
     if (!files[relative]) failures.push({ file: relative, metric: 'presence', actual: 'missing', required: 'reported' });
-    else if (relative.endsWith('.ts') && !scope.reactSources.includes(relative) && files[relative].lines.pct < 60) failures.push({ file: relative, metric: 'lines', actual: files[relative].lines.pct, required: 60 });
+    else if (ownsNodeSource(relative) && !(scope.lineThresholdExceptions ?? []).includes(relative) && files[relative].lines.pct < 60) failures.push({ file: relative, metric: 'lines', actual: files[relative].lines.pct, required: 60 });
   }
   for (const missing of missingMaps) failures.push({ file: missing.source, metric: 'source map', actual: 'missing from capture', required: 'captured inline source map' });
   for (const mismatch of mismatches) failures.push({ file: mismatch.source, metric: 'source integrity', actual: 'capture differs from current source', required: 'identical source' });
-  const provenance = { node: process.version, tool: 'c8', version, root, rawDirectory, reportDirectory, scope: 'all src/**/*.{ts,tsx} runtime modules are preserved; TypeScript helpers retain their separate 60% gate, and measured TSX records are composed with the independent Vitest V8 report', nativeReport: { path: nativeReport, sha256: sha256(await fs.readFile(path.resolve(root, nativeReport))) }, captureRun, environmentOwnership: scope, inputs, sources: sourceHashes, sourceMaps, total, files, failures };
+  const provenance = { node: process.version, tool: 'c8', version, root, rawDirectory, reportDirectory, scope: 'All src/**/*.{ts,tsx} runtime modules are preserved. Node-owned helpers and server TSX retain the 60% gate; explicitly React-owned sources use the independent Vitest V8 report. Environment ownership grants no line threshold exception.', nativeReport: { path: nativeReport, sha256: sha256(await fs.readFile(path.resolve(root, nativeReport))) }, captureRun, environmentOwnership: scope, inputs, sources: sourceHashes, sourceMaps, total, files, failures };
   await fs.writeFile(path.join(reportDirectory, 'provenance.json'), JSON.stringify(provenance, null, 2) + '\n');
   return provenance;
 }

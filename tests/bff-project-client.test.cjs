@@ -55,7 +55,7 @@ function projectForm(overrides = {}) {
 
 describe('lecture des projets', () => {
   test('GET /projects-page transmet uniquement les filtres déclarés et normalise les dates', async () => {
-    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage() });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage(undefined, { pagination: { page: 2, limit: 10, total: 11, hasNextPage: false } }) });
 
     const page = await client.getProjectsPage({ q: 'éclairage', status: 'in-progress', priority: 'all', view: 'table', page: 2, limit: 10, dueBefore: '2026-12-31', dueAfter: '', });
 

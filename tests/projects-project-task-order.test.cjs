@@ -8,7 +8,7 @@ const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const { projectToFormState } = requireTs('src/lib/projectPageState.ts');
 const { taskConfirmationsAfter, reconcileTaskConfirmations } = requireTs('src/lib/projectTaskConfirmations.ts');
-const Page = requireTs('src/app/page.tsx').default;
+const Page = requireTs('src/app/projects-client.tsx').default;
 const harness = createFrontHarness();
 let view;
 const project = f.projectListItem();

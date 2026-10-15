@@ -12,7 +12,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
-const Page = requireTs('src/app/page.tsx').default;
+const Page = requireTs('src/app/projects-client.tsx').default;
 const { BffProjectError } = requireTs('src/lib/bffProjectClient.ts');
 const constraints = requireTs('src/lib/text-constraints.ts');
 const contract = require(path.join(__dirname, '..', 'contracts', 'openapi.json'));
