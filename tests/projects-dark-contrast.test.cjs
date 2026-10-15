@@ -14,6 +14,7 @@ const markup = `<body class="mairie-ui"><main><section class="bg-white text-[#17
 <span id="counter" class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d8dee4] px-1.5 text-xs font-semibold text-[#57606a]">2</span>
 <span id="badge" class="rounded-full border border-[#aceebb] bg-[#dafbe1] px-2 text-xs text-[#1a7f37]">En cours</span>
 <span id="priority" class="rounded-full border border-[#f1e5ff] bg-[#f1e5ff] px-2 text-xs text-[#8250df]">Moyenne</span>
+<div class="bg-[#f6f8fa]"><p id="assignee-help" class="text-xs text-[#6e7781]">Choisir un ou plusieurs assignés</p></div>
 <table><tbody><tr><td id="date" class="px-5 py-4 text-sm text-[#5e6873]">15/10/2026</td></tr></tbody></table>
 <button id="primary" class="!h-9 !min-h-0 !rounded-md !px-4 !text-sm !font-semibold !text-white !border-[#2da44e] !bg-[#2da44e] hover:!bg-[#2c974b]">Créer le projet</button>
 <button id="primary-hover" class="qa-hover !h-9 !min-h-0 !rounded-md !px-4 !text-sm !font-semibold !text-white !border-[#2da44e] !bg-[#2da44e] hover:!bg-[#2c974b]">Créer le projet</button>
@@ -42,6 +43,17 @@ async function screen(theme) {
   // JSDOM does not apply layered utility priority reliably. Keep the compiler's
   // layer order while exposing the declarations to its CSS cascade.
   const parsed = postcss.parse(transform({ filename: 'projects-contrast.css', code: Buffer.from(compiled), include: Features.Nesting }).code.toString());
+  const layers = [];
+  parsed.walkAtRules('layer', rule => {
+    rule.params.split(',').map(name => name.trim()).filter(Boolean).forEach(name => { if (!layers.includes(name)) layers.push(name); });
+  });
+  const importantLayers = new WeakMap();
+  parsed.walkDecls(declaration => {
+    if (!declaration.important || !['background', 'background-color'].includes(declaration.prop)) return;
+    let ancestor = declaration.parent; let layer;
+    while (ancestor) { if (ancestor.type === 'atrule' && ancestor.name === 'layer') { layer = ancestor.params.trim(); break; } ancestor = ancestor.parent; }
+    importantLayers.set(declaration, layer === undefined ? Infinity : layers.indexOf(layer));
+  });
   parsed.walkAtRules('layer', rule => rule.replaceWith(...(rule.nodes ?? [])));
   // There is no DaisyUI theme-controller input in this fixture. Its :has rules
   // cannot match; omit them because older JSDOM misparses escaped ! utilities
@@ -56,18 +68,43 @@ async function screen(theme) {
   // Model a hover-capable pointer explicitly; JSDOM has no native pointer media.
   parsed.walkAtRules('media', rule => { if (rule.params === '(hover: hover)') rule.replaceWith(...(rule.nodes ?? [])); });
   parsed.walkRules(rule => { rule.selector = rule.selector.replaceAll(':hover', '.qa-hover'); });
+  const importantBackgrounds = [];
+  parsed.walkDecls(declaration => {
+    if (declaration.important && ['background', 'background-color'].includes(declaration.prop)) importantBackgrounds.push({ rule: declaration.parent, rank: importantLayers.get(declaration) });
+  });
   style.textContent = parsed.toString();
   dom.window.document.head.append(style);
-  const computed = element => dom.window.getComputedStyle(element);
+  const computed = element => { try { return dom.window.getComputedStyle(element); } catch (error) { throw new Error(`${element.id}: ${error.name}: ${error.message}`, { cause: error }); } };
   // JSDOM drops shorthand backgrounds containing var(), unlike browsers.
   // Resolve only the actual active colour tokens before applying its cascade.
-  for (const [prefix, element] of [['mairie', dom.window.document.documentElement]]) {
-    const tokens = computed(element);
-    style.textContent = style.textContent.replace(new RegExp(`var\\((--${prefix}-[\\w-]+)\\)`, 'g'), (match, name) => {
-      const value = tokens.getPropertyValue(name).trim();
-      return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value) ? value : match;
+  const tokens = computed(dom.window.document.documentElement);
+  const resolveTokens = css => css.replace(/var\((--mairie-[\w-]+)\)/g, (match, name) => {
+    const value = tokens.getPropertyValue(name).trim();
+    return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value) ? value : match;
+  });
+  style.textContent = resolveTokens(style.textContent);
+  // Important declarations reverse layer order: base beats utilities, and any
+  // named layer beats unlayered !important. Flattening without this step gives
+  // a false positive for escaped !bg utilities (confirmed in native Chrome).
+  // Keep JSDOM's selector specificity/order only within the winning layer.
+  const layeredBackground = element => {
+    const matches = rule => rule.selectors.some(selector => !/::|:(?:before|after|first-letter|first-line)\b/.test(selector) && element.matches(selector));
+    const applicable = importantBackgrounds.filter(candidate => matches(candidate.rule));
+    if (!applicable.length) return computed(element).backgroundColor;
+    const strongest = Math.min(...applicable.map(candidate => candidate.rank));
+    const adjusted = parsed.clone(); let index = 0;
+    adjusted.walkDecls(declaration => {
+      if (!['background', 'background-color'].includes(declaration.prop)) return;
+      // Important declarations also beat all normal declarations, regardless
+      // of layer or selector specificity (older JSDOM misses this as well).
+      if (!declaration.important) { if (declaration.parent.type === 'rule' && matches(declaration.parent)) declaration.remove(); return; }
+      const candidate = importantBackgrounds[index++];
+      if (candidate.rank > strongest && matches(declaration.parent)) declaration.remove();
     });
-  }
+    const previous = style.textContent;
+    try { style.textContent = resolveTokens(adjusted.toString()); return computed(element).backgroundColor; }
+    finally { style.textContent = previous; }
+  };
   const variable = (element, name) => {
     for (let current = element; current; current = current.parentElement) {
       const value = computed(current).getPropertyValue(name).trim();
@@ -85,7 +122,7 @@ async function screen(theme) {
   };
   const background = element => {
     for (let current = element; current; current = current.parentElement) {
-      const value = computed(current).backgroundColor;
+      const value = layeredBackground(current);
       if (value && value !== 'transparent' && value !== 'rgba(0, 0, 0, 0)') return colour(value, current);
     }
     throw new Error('No rendered background');
@@ -147,5 +184,14 @@ test('light Projects medium priority badge reaches AA text contrast', async cont
     const ratio = view.contrast('priority');
     context.diagnostic(`priority: text rgb(${view.colour('priority')}) on rgb(${view.background('priority')}), contrast ${ratio.toFixed(2)}:1`);
     assert.ok(ratio >= 4.5, `priority contrast ${ratio.toFixed(2)} must reach4.5`);
+  } finally { view.dom.window.close(); }
+});
+
+test('light Projects assignee helper reaches AA on its actual pale surface', async context => {
+  const view = await screen('light');
+  try {
+    const ratio = view.contrast('assignee-help');
+    context.diagnostic(`assignee-help: text rgb(${view.colour('assignee-help')}) on rgb(${view.background('assignee-help')}), contrast ${ratio.toFixed(2)}:1`);
+    assert.ok(ratio >= 4.5, `assignee helper contrast ${ratio.toFixed(2)} must reach4.5`);
   } finally { view.dom.window.close(); }
 });
