@@ -647,7 +647,8 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   const readCurrentProjectDetails = useCallback(async (projectId: string, isCurrent: () => boolean) => {
     // A task confirmed during an opening requires a fresh GET, never a replay
     // of its write. Stop rereading as soon as this opening is superseded.
-    while (isCurrent()) {
+    const readLatest = async (): Promise<Awaited<ReturnType<typeof getProjectDetails>> | null> => {
+      if (!isCurrent()) return null;
       const revision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
       const verification = projectVerificationsRef.current.get(projectId);
       const newReceipts = new Map([...newProjectReceiptIssuesRef.current].filter(([, issue]) => issue.verificationId === projectId));
@@ -655,7 +656,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
         const details = await getProjectDetails(projectId);
         if (!isCurrent()) return null;
         if (projectVerificationsRef.current.get(projectId) !== verification) return null;
-        if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
+        if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) return readLatest();
         assertProjectDetailsIdentity(projectId, details);
         const known = knownTaskIdsRef.current.get(projectId) ?? new Set<string>();
         for (const task of details.taskItems) known.add(task.id);
@@ -677,11 +678,11 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
         // do not repeat their side effects as task-read recovery.
         if (error instanceof BffProjectNavigationRequiredError ||
           (error instanceof BffProjectError && (error.status === 401 || error.status === 403))) throw error;
-        if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) continue;
+        if ((taskConfirmationsRef.current.get(projectId)?.revision ?? 0) !== revision) return readLatest();
         throw error;
       }
-    }
-    return null;
+    };
+    return readLatest();
   }, [completeTaskVerifications, completeProjectVerification, completeNewProjectVerification]);
 
   useEffect(() => {

@@ -26,7 +26,9 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
     const archived = [...firstArchived.data.tasks];
     let pagination = firstArchived.data.pagination;
     if (pagination.page !== 1) throw new Error(WORKFLOW_UNVERIFIED);
-    while (pagination.hasNextPage) {
+    // Each page receipt determines whether another request is valid.
+    const readNextArchivedPage = async (): Promise<void> => {
+      if (!pagination.hasNextPage) return;
       const page = pagination.page + 1;
       if (page > 100000 || pagination.limit < 1) throw new Error(WORKFLOW_UNVERIFIED);
       const response = await operations.getProjectsProjectIdArchivedTasks(segment(projectId), { page, limit: 100 }, { signal });
@@ -34,7 +36,9 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       if (response.data.pagination.page !== page || response.data.tasks.length === 0) throw new Error(WORKFLOW_UNVERIFIED);
       archived.push(...response.data.tasks);
       pagination = response.data.pagination;
-    }
+      return readNextArchivedPage();
+    };
+    await readNextArchivedPage();
     const statuses = [...statusResponse.data.statuses].sort((a, b) => a.position - b.position).map(status => ({ id: status.id, name: status.name, color: status.color, category: fromCategory(status.category), taskCount: status.taskCount }));
     const tasks = [...detailsResponse.data.taskItems, ...archived].map(task => ({ id: task.id, title: task.title, statusId: task.statusId ?? '', canUpdateStatus: task.permissions?.canUpdateStatus === true }));
     const snapshot = { projectId, statuses, tasks, revision: fingerprint({ statuses, tasks }) };
@@ -71,8 +75,9 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       // Published operations are individual CRUD writes. Stop at the first
       // uncertain receipt; the UI retains its draft and requires a fresh read.
       let serverStatuses = current.statuses;
-      for (const status of draft.statuses) {
-        if (ids.has(status.id)) continue;
+      await draft.statuses.reduce(async (previous, status) => {
+        await previous;
+        if (ids.has(status.id)) return;
         const knownIds = new Set(serverStatuses.map(item => item.id));
         const receipt = await operations.postProjectsProjectIdStatuses(segment(draft.projectId), { name: status.name, color: status.color, category: toCategory(status.category) }, { signal });
         signal.throwIfAborted();
@@ -80,20 +85,22 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         if (created.length !== 1) throw new Error(WORKFLOW_UNVERIFIED);
         ids.set(status.id, created[0].id);
         serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
-      }
+      }, Promise.resolve());
       // Apply changed categories before removal, retaining the service's own
       // invariant that each category must have a status.
-      for (const status of draft.statuses) {
+      await draft.statuses.reduce(async (previous, status) => {
+        await previous;
         const id = ids.get(status.id)!;
         const existing = serverStatuses.find(item => item.id === id);
-        if (existing && existing.name === status.name && existing.color.toLowerCase() === status.color.toLowerCase() && existing.category === status.category) continue;
+        if (existing && existing.name === status.name && existing.color.toLowerCase() === status.color.toLowerCase() && existing.category === status.category) return;
         const receipt = await operations.patchProjectsProjectIdStatusesStatusId(segment(draft.projectId), segment(id), { name: status.name, color: status.color, category: toCategory(status.category) }, { signal });
         signal.throwIfAborted();
         const confirmed = receipt.data.statuses.find(item => item.id === id);
         if (!confirmed || confirmed.name !== status.name || confirmed.color.toLowerCase() !== status.color.toLowerCase() || fromCategory(confirmed.category) !== status.category) throw new Error(WORKFLOW_UNVERIFIED);
         serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
-      }
-      for (const status of current.statuses.filter(item => !draft.statuses.some(next => next.id === item.id))) {
+      }, Promise.resolve());
+      await current.statuses.filter(item => !draft.statuses.some(next => next.id === item.id)).reduce(async (previous, status) => {
+        await previous;
         const migration = draft.migrations.find(item => item.from === status.id);
         const targetId = migration ? ids.get(migration.to) : undefined;
         if (!targetId) throw new Error('Choisissez le statut de destination des tâches.');
@@ -101,15 +108,16 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         signal.throwIfAborted();
         if (receipt.data.statuses.some(item => item.id === status.id) || !receipt.data.statuses.some(item => item.id === targetId)) throw new Error(WORKFLOW_UNVERIFIED);
         serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
-      }
-      for (const [position, status] of draft.statuses.entries()) {
+      }, Promise.resolve());
+      await draft.statuses.reduce(async (previous, status, position) => {
+        await previous;
         const id = ids.get(status.id)!;
-        if (serverStatuses[position]?.id === id) continue;
+        if (serverStatuses[position]?.id === id) return;
         const receipt = await operations.patchProjectsProjectIdStatusesStatusId(segment(draft.projectId), segment(id), { position }, { signal });
         signal.throwIfAborted();
         serverStatuses = [...receipt.data.statuses].sort((a, b) => a.position - b.position).map(item => ({ ...item, category: fromCategory(item.category) }));
         if (serverStatuses[position]?.id !== id) throw new Error(WORKFLOW_UNVERIFIED);
-      }
+      }, Promise.resolve());
       const after = await readProject(draft.projectId, signal);
       const expected = draft.statuses.map(status => ({ ...status, id: ids.get(status.id)! }));
       if (!sameStatuses(after.statuses, expected) || current.tasks.some(task => {
