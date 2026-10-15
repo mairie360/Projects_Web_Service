@@ -1,3 +1,4 @@
+import { sessionFetch } from '@mairie360/front-kit/browser';
 import { createTaskFormState } from './projectPageState';
 import type { FilterOption } from './projectPageState';
 import type { Project } from '../types/project';
@@ -17,7 +18,7 @@ export function selectableCurrentAgent(agent: Awaited<ReturnType<CurrentAgentSou
 /** Optional frontend lookup through Login's existing published /me relay. */
 export const loginCurrentAgentSource: CurrentAgentSource = {
   async read(signal) {
-    const response = await fetch('/api/auth/current-user', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', signal });
+    const response = await sessionFetch('/api/auth/current-user', { credentials: 'same-origin', cache: 'no-store', redirect: 'manual', signal });
     signal.throwIfAborted();
     if (!response.ok || response.status !== 200 || response.type === 'opaqueredirect') return null;
     const body: unknown = await response.json();

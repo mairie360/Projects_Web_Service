@@ -18,7 +18,7 @@ const publishedContract = OpenApiContract.load(path.join(root, 'contracts', 'ope
 const network = analyseNetworkCalls();
 const routes = discoverRoutes();
 const CATCH_ALL = 'src/app/[...path]/route.ts';
-const LOCAL_ROUTES = { 'src/app/api/auth/logout/route.ts': ['POST'], 'src/app/api/auth/current-user/route.ts': ['GET'] };
+const LOCAL_ROUTES = { 'src/app/api/auth/refresh/route.ts': ['POST'], 'src/app/api/auth/resume/route.ts': ['GET'], 'src/app/api/auth/logout/route.ts': ['POST'], 'src/app/api/auth/current-user/route.ts': ['GET'] };
 
 /** Modules autorisés à appeler `fetch`, et la seule forme d'appel acceptée dans chacun. */
 const FETCH_GATEWAYS = {
@@ -58,11 +58,11 @@ describe('inventaire des appels réseau de src/', () => {
     for (const file of ['src/lib/bff-proxy.ts', ...Object.keys(LOCAL_ROUTES)]) {
       visit(parse(file), node => {
         if (ts.isImportDeclaration(node)) imports.push([file, node.moduleSpecifier.text]);
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && /^(proxyPublishedBffRequest|createSessionLogoutProxy)$/.test(node.expression.text)) calls.push([file, node.expression.text]);
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && /^(proxyPublishedBffRequest|createSessionLogoutProxy|createSessionRefreshProxy|createSessionResumeHandler)$/.test(node.expression.text)) calls.push([file, node.expression.text]);
       });
     }
-    assert.deepEqual(calls, [['src/lib/bff-proxy.ts', 'proxyPublishedBffRequest'], ['src/app/api/auth/logout/route.ts', 'createSessionLogoutProxy']]);
-    assert.equal(imports.filter(([, specifier]) => specifier === '@mairie360/lib-components/next').length, 2);
+    assert.deepEqual(calls, [['src/lib/bff-proxy.ts', 'proxyPublishedBffRequest'], ['src/app/api/auth/refresh/route.ts', 'createSessionRefreshProxy'], ['src/app/api/auth/resume/route.ts', 'createSessionResumeHandler'], ['src/app/api/auth/logout/route.ts', 'createSessionLogoutProxy']]);
+    assert.equal(imports.filter(([, specifier]) => specifier === '@mairie360/front-kit/next').length, 4);
     assert.deepEqual(routes.map(route => route.file).sort(), [CATCH_ALL, ...Object.keys(LOCAL_ROUTES)].sort());
     for (const [file, methods] of Object.entries(LOCAL_ROUTES)) assert.deepEqual(Object.keys(requireTs(file)).filter(name => /^[A-Z]+$/.test(name)), methods);
   });

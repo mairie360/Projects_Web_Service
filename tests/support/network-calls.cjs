@@ -107,7 +107,7 @@ function analyseNetworkCalls() {
       if (name === 'require' && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && FORBIDDEN_MODULES.has(node.arguments[0].text)) {
         forbidden.push(`${location} charge ${node.arguments[0].text}`);
       }
-      if (name === 'fetch') {
+      if (['fetch', 'sessionFetch'].includes(name)) {
         const [target, init] = node.arguments;
         fetchCalls.push({
           file, location, function: enclosingFunctionName(node), method: methodOf(init),

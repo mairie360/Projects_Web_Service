@@ -1,6 +1,14 @@
 # Projects_Web_Service
 
-## Current shared UI artifact — 10 October 2026
+## Shared sessions and instance preferences — 15 October 2026
+
+The `feat/shared-session-runtime` integration starts at `origin/main` commit `75e03aedd954540cb2817cb76874bc3a0402e812`. It adopts the reviewed `@mairie360/front-kit@0.1.0` local artifact, published UI library `@mairie360/lib-components@0.8.0`, shared session renewal, SSR navigation role, instance timezone and confirmed appearance. The artifact's exact source and integrity are recorded in [its provenance](vendor/front-kit-provenance.json); [runtime configuration and verification](docs/en/shared-runtime.md) describe the common integration.
+
+The published Project SDK remains exactly `@mairie360/bff-project-openapi@0.0.0-dev.0b18e81123c048d9d5b9dbfb71a6f46c202c6092`, matching the existing [contract snapshot](contracts/openapi.json). Project/task status fields and generated business operations retain this contract. The configurable task statuses and project templates of MAIR567 remain on the separate `feat/mair-567-project-statuses-templates` draft branch pending their published SDK adoption. This integration adds no status/template adapter, `statusId` or `templateId` operation.
+
+La branche commune conserve le SDK Project publié et son contrat existant. Le socle de session, rôle SSR, apparence confirmée et fuseau d'instance est décrit dans [la documentation française](docs/fr/socle-partage.md). Les statuts personnalisables et modèles MAIR567 restent dans leur branche distincte ; la politique npm de sept jours reste en vigueur.
+
+## Shared UI artifact history — 10 October 2026
 
 This frontend consumes the published `@mairie360/lib-components@0.6.12` artifact from source commit `6c022cb53da535fd16d4fa80a5cdb943d3791f31`. The selected manifest version, root lock entry, installed package, registry integrity and recorded distribution hashes are checked together by the release tests. Application pins and published BFF contracts are unchanged by this documentation update. Historical 0.6.11 notes below describe the earlier delivery.
 
