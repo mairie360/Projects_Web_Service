@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const ts = require('typescript');
 const { NextRequest } = require('next/server');
 const originalLoader = require.extensions['.ts'];
-require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, filename);
+require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { fileName: filename, compilerOptions: { inlineSourceMap: true, inlineSources: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, filename);
 const { middleware } = require('../src/middleware.ts');
 const { buildContentSecurityPolicy } = require('@mairie360/front-kit/shared');
 const nextConfig = require('../next.config.ts').default;
