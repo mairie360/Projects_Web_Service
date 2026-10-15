@@ -108,6 +108,7 @@ test('the exact required legacy status executes both real blocking scanners with
 
 test('the existing reusable frontend workflow keeps its blocking defaults and only declared secrets', () => {
   assert.deepEqual(workflow().jobs.CICD, {
+    permissions: { contents: 'write', packages: 'write', 'id-token': 'write' },
     uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@16c63d21eedbf6c6e3b58ebc30c61231e49e2536',
     with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: '16c63d21eedbf6c6e3b58ebc30c61231e49e2536' },
     secrets: {
@@ -117,9 +118,10 @@ test('the existing reusable frontend workflow keeps its blocking defaults and on
   });
 });
 
-test('the required scan runs for every existing workflow event without changing global permissions', () => {
+test('the required scan runs for every existing workflow event with a read-only default token', () => {
   const ci = workflow();
-  assert.deepEqual(ci.on, { push: null, pull_request: null, workflow_dispatch: null });
-  assert.deepEqual(ci.permissions, { contents: 'write', packages: 'write', 'id-token': 'write' });
+  // MAIR-436: push runs on main only and the workflow token is read-only by default.
+  assert.deepEqual(ci.on, { push: { branches: ['main'] }, pull_request: null, workflow_dispatch: null });
+  assert.deepEqual(ci.permissions, { contents: 'read' });
   assert.deepEqual(Object.keys(ci.jobs).sort(), ['CICD', 'required_security_scan']);
 });
