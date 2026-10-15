@@ -198,3 +198,24 @@ test('a failed native run cannot be turned into a component-only success', async
   assert.equal(result.exitCode, 1);
   assert.equal(result.published, false);
 });
+
+for (const filename of ['page', 'loading']) test(`server ownership never exempts an untested ${filename} route from the line threshold`, async t => {
+  const value = await fixture(t);
+  await fs.mkdir(path.join(value.root, 'src/app'));
+  const relative = `src/app/${filename}.tsx`;
+  await fs.writeFile(path.join(value.root, relative), 'export default function Entry() { return <main>Server entry</main>; }\n');
+  value.sources = await captureSources(value.root);
+  const node = value.node + record(relative, 0);
+  await fs.writeFile(path.join(value.root, 'coverage/source-mapped/lcov.info'), node);
+  const provenancePath = path.join(value.root, 'coverage/source-mapped/provenance.json');
+  const provenance = JSON.parse(await fs.readFile(provenancePath));
+  provenance.sources = value.sources;
+  provenance.primaryLcov.sha256 = hash(node);
+  provenance.environmentOwnership.serverTsxSources = [relative];
+  await fs.writeFile(provenancePath, JSON.stringify(provenance));
+  await fs.writeFile(path.join(value.root, 'coverage/lcov.info'), node);
+  const result = await composeCoverage({ ...value, componentSources: ['src/view.tsx'] });
+  assert.equal(result.files[relative].authority, 'node-c8');
+  assert.ok(result.failures.some(failure => failure.file === relative && failure.metric === 'lines'));
+  await assert.rejects(composeCoverage({ ...value, componentSources: ['src/view.tsx'], lineThresholdExceptions: [relative] }), /Only the documented server layout/);
+});

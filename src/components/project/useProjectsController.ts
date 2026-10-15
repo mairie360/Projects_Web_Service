@@ -3,9 +3,9 @@ import { subscribePageReturn } from '@/lib/page-return';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ProjectStatus as PublishedProjectStatus, ProjectPriority as PublishedProjectPriority } from '@mairie360/bff-project-openapi/model';
+import { projectUrlSchema, projectQueryKey } from '../../lib/project-page-query';
+import { readInitialProjectsPage, type InitialProjectsPage } from '../../lib/project-page-receipt';
 import { usePageUrlState } from '../../lib/use-page-url-state';
-import { urlChoice, urlDate, urlPage, urlText } from '../../lib/page-url-state';
 import {
   BffProjectError,
   BffProjectNavigationRequiredError,
@@ -53,14 +53,6 @@ type AlertState = {
   message: string;
 };
 
-const projectUrlSchema = {
-  q: urlText(200),
-  status: urlChoice(['all', ...Object.values(PublishedProjectStatus)], 'all'),
-  priority: urlChoice(['all', ...Object.values(PublishedProjectPriority)], 'all'),
-  dueBefore: urlDate,
-  view: urlChoice(['kanban', 'grid', 'table'], 'kanban'),
-  page: urlPage,
-};
 
 type RefreshProjectsOptions = {
   signal?: AbortSignal;
@@ -102,14 +94,16 @@ function validateProjectForm(form: ProjectFormState) {
   );
 }
 
-export function useProjectsController({ currentAgentSource }: { currentAgentSource?: CurrentAgentSource } = {}) {
-  const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
+export function useProjectsController({ currentAgentSource, initial }: { currentAgentSource?: CurrentAgentSource; initial?: InitialProjectsPage } = {}) {
+  const [initialReceipt] = useState(() => readInitialProjectsPage(initial));
+  const initialQueryRef = useRef(initialReceipt ? projectQueryKey(initialReceipt.query) : null);
+  const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(initialReceipt?.data ?? null);
   const readCurrentTaskAssignee = useCallback(async (signal: AbortSignal) => {
     const agent = await (currentAgentSource ?? loginCurrentAgentSource).read(signal);
     signal.throwIfAborted();
     return selectableCurrentAgent(agent, projectsPage?.options.members ?? []);
   }, [currentAgentSource, projectsPage?.options.members]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialReceipt?.data.projects ?? []);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<SelectedProjectDetails | null>(null);
   const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
   // Each opening owns a distinct lifetime, even when reopening the same ID.
@@ -135,7 +129,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   const [projectVerificationPendingIds, setProjectVerificationPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [projectVerificationErrors, setProjectVerificationErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   // IDs are learned only from coherent server reads/confirmations, never drafts.
-  const knownProjectIdsRef = useRef(new Set<string>());
+  const knownProjectIdsRef = useRef(new Set(initialReceipt?.data.projects.map(project => project.id) ?? []));
   const confirmedNewProjectIdsRef = useRef(new Set<string>());
   const newProjectReceiptIssuesRef = useRef(new Map<string, NewProjectReceiptIssue>());
   const [newProjectReceiptIssues, setNewProjectReceiptIssues] = useState<ReadonlyMap<string, NewProjectReceiptIssue>>(() => new Map());
@@ -152,28 +146,28 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
   const newProjectCatalogueReadRef = useRef(false);
   const [newProjectCatalogueReadPending, setNewProjectCatalogueReadPending] = useState(false);
   const [newProjectCatalogueReadError, setNewProjectCatalogueReadError] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [dueBeforeFilter, setDueBeforeFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>((initialReceipt?.query.view as ViewMode) ?? 'kanban');
+  const [statusFilter, setStatusFilter] = useState(initialReceipt?.query.status ?? 'all');
+  const [priorityFilter, setPriorityFilter] = useState(initialReceipt?.query.priority ?? 'all');
+  const [dueBeforeFilter, setDueBeforeFilter] = useState(initialReceipt?.query.dueBefore ?? '');
+  const [searchTerm, setSearchTerm] = useState(initialReceipt?.query.q ?? '');
   const pageUrl = usePageUrlState(projectUrlSchema);
-  const urlInitialized = useRef(false);
+  const urlInitialized = useRef(Boolean(initialReceipt));
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const logoutPendingRef = useRef(false);
-  const [pageLoading, setPageLoading] = useState(true);
-  const [pageError, setPageError] = useState('');
+  const [pageLoading, setPageLoading] = useState(!initialReceipt);
+  const [pageError, setPageError] = useState(initial?.status === 'unavailable' ? initial.message : '');
   const retryPendingRef = useRef(false);
   const pageRevisionRef = useRef(0);
-  const requestedPageRef = useRef(1);
+  const requestedPageRef = useRef(Number(initialReceipt?.query.page ?? 1));
   const pageReadPendingRef = useRef(false);
   const navigationReadRef = useRef<AbortController | null>(null);
   // Async writes must read the latest event-owned query, not a render captured
   // before their response. UI state remains the owner of the displayed controls.
   const queryRef = useRef<ProjectQueryState>({
-    search: '', status: 'all', priority: 'all', dueBefore: '', view: 'kanban',
+    search: initialReceipt?.query.q ?? '', status: initialReceipt?.query.status ?? 'all', priority: initialReceipt?.query.priority ?? 'all', dueBefore: initialReceipt?.query.dueBefore ?? '', view: (initialReceipt?.query.view as ViewMode) ?? 'kanban',
   });
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -252,6 +246,7 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
 
   const refreshProjectsPage = useCallback(
     async (options: RefreshProjectsOptions = {}) => {
+      initialQueryRef.current = null;
       const revision = ++pageRevisionRef.current;
       const isCurrent = () => revision === pageRevisionRef.current && !options.signal?.aborted;
       const query = queryRef.current;
@@ -335,6 +330,15 @@ export function useProjectsController({ currentAgentSource }: { currentAgentSour
 
   useEffect(() => {
     if (!pageUrl.ready) return;
+    if (initialQueryRef.current !== null) {
+      // Paging owns its immediate read; only filter changes drive this debounce.
+      const currentQueryKey = projectQueryKey({
+        q: searchTerm, status: statusFilter, priority: priorityFilter,
+        dueBefore: dueBeforeFilter, view: viewMode, page: String(requestedPageRef.current),
+      });
+      if (initialQueryRef.current === currentQueryKey) return;
+      initialQueryRef.current = null;
+    }
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       void refreshProjectsPage({ signal: controller.signal });

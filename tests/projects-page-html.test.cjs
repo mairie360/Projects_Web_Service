@@ -12,7 +12,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
-const ProjectsPage = requireTs('src/app/page.tsx').default;
+const ProjectsPage = requireTs('src/app/projects-client.tsx').default;
 const { setBrowserFrontUrls } = requireTs('src/lib/front-urls.ts');
 
 const harness = createFrontHarness();
