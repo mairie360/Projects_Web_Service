@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Button } from '@mairie360/lib-components';
+import { Button } from '@mairie360/lib-components/primitives';
 import { X } from 'lucide-react';
 import { ProgressMeter } from '../ProjectCard';
 import type { Project } from '../../types/project';

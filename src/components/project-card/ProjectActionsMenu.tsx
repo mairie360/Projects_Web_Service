@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ToolTip } from '@mairie360/lib-components';
+import { ToolTip } from '@mairie360/lib-components/primitives';
 import { MoreHorizontal } from 'lucide-react';
 
 import type { Project } from '../../types/project';

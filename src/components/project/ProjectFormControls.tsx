@@ -2,7 +2,7 @@
 
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '../../lib/text-constraints';
 import React from 'react';
-import { Button } from '@mairie360/lib-components';
+import { Button } from '@mairie360/lib-components/primitives';
 import { Check, ChevronDown, PencilLine, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

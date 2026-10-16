@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppShell, defaultSidebarItems } from '@mairie360/lib-components';
+import { AppShell, defaultSidebarItems } from '@mairie360/lib-components/shell';
 
 const stylesheet = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
 const hrefs = Object.fromEntries(defaultSidebarItems.map(({ id }) => [id, `https://${id}.example/`]));

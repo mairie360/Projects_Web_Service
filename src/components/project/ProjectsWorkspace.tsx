@@ -3,7 +3,7 @@
 import AccessibleShell from "@/components/accessible-shell";
 
 import React from 'react';
-import { Alert } from '@mairie360/lib-components';
+import { Skeleton, Toast } from '@mairie360/lib-components/primitives';
 import { Plus, Settings } from 'lucide-react';
 import { KanbanBoard } from '../Kanban';
 import { ActionButton } from './ProjectFormControls';
@@ -196,7 +196,7 @@ export function ProjectsWorkspace({
             {!projectsPage && !pageError && <section className="projects-initial-loading mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14" aria-busy="true">
               <h1 className="text-2xl font-bold leading-tight text-[#172033]">Projets</h1>
               <p role="status" className="mt-4 text-sm text-[#536171]">Chargement du tableau des projets...</p>
-              <div aria-hidden="true" className="mt-8 min-h-80 rounded-xl border border-[#d9d5d0] bg-white" />
+              <Skeleton className="mt-8 min-h-80" />
             </section>}
             <div hidden={!projectsPage && !pageError} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
               {logoutError && (
@@ -234,11 +234,9 @@ export function ProjectsWorkspace({
               })}
               {alert && (
                 <div className="mb-5">
-                  <Alert
-                    type={alert.type}
+                  <Toast
+                    variant={alert.type}
                     message={alert.message}
-                    closable
-                    autoDismiss={3000}
                     onClose={() => setAlert(null)}
                   />
                 </div>
@@ -321,9 +319,7 @@ export function ProjectsWorkspace({
                   </p>
                 )}
                 {pageLoading && projects.length === 0 && (
-                  <div className="rounded-md border border-[#d9d5d0] bg-white px-5 py-8 text-sm font-medium text-[#57606a]">
-                    Chargement des projets...
-                  </div>
+                  <Skeleton label="Chargement des projets..." className="min-h-32" />
                 )}
 
                 {pageError && (

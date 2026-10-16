@@ -969,6 +969,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
+    setAlert(null);
     requireVerifiedProject(projectId);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
@@ -999,6 +1000,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
 
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
     if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
+    setAlert(null);
 
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(project.id)?.revision ?? 0;
@@ -1020,6 +1022,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
     // The ref also protects two events captured before React renders disabled controls.
     if (projectFormPendingRef.current || (!editingProjectId && (newProjectReceiptIssuesRef.current.has('create') || verifiedCreationRef.current))) return;
     projectFormOpeningRef.current = null;
+    setAlert(null);
 
     if (!validateProjectForm(projectForm)) {
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
@@ -1078,6 +1081,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
       return;
     }
     // Prevent a second event before React renders the disabled action.
+    setAlert(null);
     duplicatingProjects.current.add(project.id);
     setDuplicatingProjectIds((current) => [...current, project.id]);
     const knownAtDispatch = new Set(knownProjectIdsRef.current);
@@ -1105,6 +1109,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
   const confirmProjectDeletion = async () => {
     const project = projectPendingDeletion;
     if (!project) return;
+    setAlert(null);
 
     try {
       await deleteBffProject(project.id);
@@ -1126,6 +1131,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
     if (!title) return;
     if (uncertainTaskCreationsRef.current.has(project.id)) throw new NewTaskReceiptVerificationRequiredError();
     if (taskCreationWritesRef.current.has(project.id)) throw new Error('Une création de tâche est déjà en cours pour ce projet. Le brouillon est conservé.');
+    setAlert(null);
     taskCreationWritesRef.current.add(project.id);
     setTaskCreationStates(current => new Map(current).set(project.id, { ...current.get(project.id), pending: true }));
     try {
@@ -1236,6 +1242,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
       if (rejectIfPending) throw new Error('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
       return;
     }
+    setAlert(null);
     taskWritesRef.current.add(key);
     setTaskWriteError(projectId, taskId);
     setPendingTasksByProject(current => {
@@ -1361,6 +1368,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
   };
 
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
+    setAlert(null);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     try {
@@ -1382,6 +1390,7 @@ export function useProjectsController({ currentAgentSource, initial }: { current
   const logout = async () => {
     if (logoutPendingRef.current) return;
     logoutPendingRef.current = true;
+    setAlert(null);
     setLogoutError(null);
     try { await logoutAndReload(); } catch (error) {
       setLogoutError(error instanceof Error ? error.message : 'La déconnexion n’a pas abouti. Veuillez réessayer.');
