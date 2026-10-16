@@ -54,7 +54,7 @@ function projectListItem(overrides = {}) {
     progress: 50,
     dueDate: '2026-12-15T00:00:00.000Z',
     createdAt: '2026-09-01T08:30:00.000Z',
-    tasks: { total: 2, completed: 1 },
+    tasks: { total: 2, completed: 1, active: 2, archived: 0 },
     permissions: { canView: true, canEdit: true, canDuplicate: true, canDelete: true, canCreateTask: true, canAssignMembers: true, canClose: true },
     ...overrides,
   };

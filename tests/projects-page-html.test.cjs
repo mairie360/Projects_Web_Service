@@ -296,6 +296,22 @@ test('opening a project loads its details and renders them in the modal', async 
   assert.equal(view.find('ProjectDetailModal').length, 0);
 });
 
+test('MAIR-569: the project detail says how many archived (done) tasks its counter includes but does not list', async () => {
+  await renderLoadedPage();
+  const counts = { total: 4, completed: 3, active: 1, archived: 3 };
+  bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({
+    body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId, progress: 75, tasks: counts }), [fixtures.projectTask()]),
+  }));
+
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+
+  assert.deepEqual(view.props('ProjectDetailModal').project.tasks, counts);
+  assert.deepEqual(view.props('ProjectDetailModal').tasks.map((task) => task.id), ['task-1']);
+  assert.match(view.text(), /3\/4 · 3 tâches archivées/);
+  await view.act(() => view.props('ProjectDetailModal').onClose());
+});
+
 test('a project deep link loads the authorized detail even when absent from the first project page', async () => {
   harness.location.search = '?source=dashboard&project=project-99';
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({
@@ -484,7 +500,7 @@ test('nested task deadline ownership reaches the actual project-create payload w
   assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
   const created = fixtures.projectListItem({
     id: 'project-date-qa', title: draft.title, dueDate: '2027-01-01',
-    tasks: { total: 3, completed: 0 }, progress: 0,
+    tasks: { total: 3, completed: 0, active: 3, archived: 0 }, progress: 0,
   });
   const officialTasks = draft.taskItems.map((task, index) => fixtures.projectTask({
     id: `official-date-${index + 1}`, title: task.title, dueDate: task.dueDate,
@@ -516,7 +532,7 @@ test('nested task primary assignee order survives an unrelated edit in the proje
   await view.click('Enregistrer la tâche');
   const created = fixtures.projectListItem({
     id: 'project-assignee-qa', title: 'Projet assignés propres', responsible: fixtures.people.admin,
-    tasks: { total: 1, completed: 0 }, progress: 0,
+    tasks: { total: 1, completed: 0, active: 1, archived: 0 }, progress: 0,
   });
   const official = fixtures.projectTask({ id: 'official-assignee-task', title: 'Titre modifié uniquement' });
   bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, [official]) });

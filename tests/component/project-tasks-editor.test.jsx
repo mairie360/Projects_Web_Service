@@ -13,8 +13,8 @@ const memberOptions = [
   { label: 'Marie Durand', name: 'Marie Durand', value: 'user-3' },
 ];
 
-function Editor({ responsible = '', taskItems = [], dueDate = '' }) {
-  const [form, setForm] = React.useState(() => ({ ...createProjectFormState(), responsible, taskItems, dueDate }));
+function Editor({ responsible = '', taskItems = [], dueDate = '', archivedTasks = 0 }) {
+  const [form, setForm] = React.useState(() => ({ ...createProjectFormState(), responsible, taskItems, dueDate, archivedTasks }));
 
   return (
     <>
@@ -191,6 +191,16 @@ describe('ProjectTasksEditor local task identities', () => {
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), title);
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
   };
+
+  it('MAIR-569: counts the archived (done) tasks it does not list when the active tasks change', async () => {
+    const user = userEvent.setup();
+    render(<Editor responsible="user-3" archivedTasks={3} />);
+    await addTask(user, 'Tâche active');
+    expect(JSON.parse(screen.getByTestId('task-summary').textContent)).toEqual({ total: 4, completed: 3, progress: 75 });
+    expect(screen.getByText(/3 tâches archivées/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Marquer Tâche active comme terminée' }));
+    expect(JSON.parse(screen.getByTestId('task-summary').textContent)).toEqual({ total: 4, completed: 4, progress: 100 });
+  });
 
   it('keeps same-tick drafts independently toggleable and editable with stable identities and dates', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1791290000000);

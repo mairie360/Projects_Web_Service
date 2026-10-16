@@ -40,7 +40,7 @@ test('dates de formulaire et progression', () => {
 test('formulaires vides et formulaire d’édition depuis un projet du BFF', () => {
   assert.deepEqual(state.createProjectFormState(), {
     title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '',
-    progress: 0, totalTasks: 0, completedTasks: 0, taskItems: [],
+    progress: 0, totalTasks: 0, completedTasks: 0, archivedTasks: 0, taskItems: [],
   });
   assert.equal(state.createProjectFormState('review').status, 'review');
 
@@ -52,8 +52,19 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
   const form = state.projectToFormState({ ...project, taskItems: tasks });
   assert.deepEqual({ ...form, taskItems: form.taskItems.length }, {
     title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: 'user-3',
-    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, taskItems: 1,
+    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
   });
+});
+
+test('MAIR-569: archived (done) tasks the BFF no longer lists still count in the edit form summary', () => {
+  // bff-project 1.0.0 (MAIR-559): `taskItems` only lists the active tasks, `tasks.archived` counts the hidden done ones.
+  assert.equal(state.calculateProjectProgress([{ completed: false }], 3), 75);
+  assert.equal(state.calculateProjectProgress([], 2), 100);
+  const project = fixtures.projectListItem({ progress: 75, tasks: { total: 4, completed: 3, active: 1, archived: 3 } });
+  const form = state.projectToFormState({ ...project, taskItems: [fixtures.projectTask()] });
+  assert.deepEqual([form.totalTasks, form.completedTasks, form.archivedTasks, form.progress], [4, 3, 3, 75]);
+  assert.equal(state.archivedTasksLabel(1), '1 tâche archivée');
+  assert.equal(state.archivedTasksLabel(3), '3 tâches archivées');
 });
 
 test('navigation: front URLs read at runtime, navigation only to a known target', () => {
