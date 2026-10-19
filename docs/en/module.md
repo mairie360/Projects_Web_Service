@@ -25,6 +25,14 @@ loaded, so opening a project reads `GET /projects/{projectId}` once, then the
 statuses and archived tasks once; the card task form reads the statuses alone.
 Write preflights and confirmations always read the current detail.
 
+Workflow writes go through the page controller (MAIR-570) and share the task
+write guards: a task move is refused while that task has a write in flight or
+awaits verification, statuses are not saved while a task write of the project is
+in flight, and no task write (status, edit, deletion, creation) starts while the
+project statuses are being saved. Such a refusal sends nothing and is shown as a
+plain message, not as an unverified write; after a confirmed write the controller
+re-reads the sheet and the page.
+
 The sheet keeps its existing behaviour: the detailed task list (follow-up,
 comments, task links) stays visible and the « Détails des tâches » button only
 hides it; a new task without an explicit choice takes the project's first status

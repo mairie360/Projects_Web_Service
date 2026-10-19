@@ -1,6 +1,6 @@
 'use client';
 import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow';
-import type { ProjectTemplate, ProjectWorkflowPort } from '../../lib/projectWorkflow';
+import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '@/lib/page-return';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
@@ -124,6 +124,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [pendingTasksByProject, setPendingTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
   const [taskWriteErrorsByProject, setTaskWriteErrorsByProject] = useState(() => new Map<string, ReadonlyMap<string, string>>());
   const taskVerificationsRef = useRef(new Map<string, ReadonlySet<string>>());
+  // MAIR-570: projects whose statuses are being saved accept no task write, and the reverse.
+  const workflowSavesRef = useRef(new Set<string>());
   const [unverifiedTasksByProject, setUnverifiedTasksByProject] = useState(() => new Map<string, ReadonlySet<string>>());
   const projectVerificationsRef = useRef(new Map<string, symbol>());
   const [unverifiedProjectIds, setUnverifiedProjectIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -1138,6 +1140,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!title) return;
     if (uncertainTaskCreationsRef.current.has(project.id)) throw new NewTaskReceiptVerificationRequiredError();
     if (taskCreationWritesRef.current.has(project.id)) throw new Error('Une création de tâche est déjà en cours pour ce projet. Le brouillon est conservé.');
+    if (workflowSavesRef.current.has(project.id)) throw new Error(`${WORKFLOW_STATUS_SAVE_PENDING} Le brouillon est conservé.`);
     setAlert(null);
     taskCreationWritesRef.current.add(project.id);
     setTaskCreationStates(current => new Map(current).set(project.id, { ...current.get(project.id), pending: true }));
@@ -1239,6 +1242,11 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const runTaskWrite = async (projectId: string, taskId: string, write: () => Promise<void>, rejectIfPending = false) => {
     if (taskVerificationsRef.current.get(projectId)?.has(taskId)) {
       if (rejectIfPending) throw new ProjectTaskVerificationRequiredError();
+      return;
+    }
+    if (workflowSavesRef.current.has(projectId)) {
+      if (rejectIfPending) throw new WorkflowWriteRefusedError(WORKFLOW_STATUS_SAVE_PENDING);
+      showInfo(WORKFLOW_STATUS_SAVE_PENDING);
       return;
     }
     // Tuple encoding avoids collisions between arbitrary project/task IDs.
@@ -1355,6 +1363,50 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     });
   };
 
+  // Workflow writes (MAIR-570) share the task write guards. A refusal before dispatch is a
+  // WorkflowWriteRefusedError; a dispatched write keeps the port's receipt and re-read checks.
+  const refreshAfterWorkflowWrite = async (projectId: string, selection: DetailSelection | null) => {
+    try {
+      if (await refreshProjectDetails(projectId, selection)) await refreshProjectsPage({ silent: true });
+    } catch (error) {
+      showInfo(`Modification enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
+    }
+  };
+
+  const moveWorkflowTask = async (draft: { projectId: string; revision: string; taskId: string; statusId: string }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
+    if (!workflowPort?.moveTask) throw new WorkflowWriteRefusedError(WORKFLOW_UNAVAILABLE);
+    const { projectId, taskId } = draft;
+    // The same refusals as runTaskWrite, checked here so that they surface as refusals, not uncertainty.
+    if (taskVerificationsRef.current.get(projectId)?.has(taskId)) throw new WorkflowWriteRefusedError(TASK_VERIFICATION_MESSAGE);
+    if (taskWritesRef.current.has(JSON.stringify([projectId, taskId]))) throw new WorkflowWriteRefusedError('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
+    if (workflowSavesRef.current.has(projectId)) throw new WorkflowWriteRefusedError(WORKFLOW_STATUS_SAVE_PENDING);
+    const selection = detailSelectionRef.current;
+    let snapshot: ProjectWorkflowSnapshot | undefined;
+    await runTaskWrite(projectId, taskId, async () => {
+      snapshot = await workflowPort.moveTask!(draft, signal);
+      await refreshAfterWorkflowWrite(projectId, selection);
+    }, true);
+    return snapshot!;
+  };
+
+  const saveWorkflowStatuses = async (draft: { projectId: string; revision: string; statuses: TaskStatusDefinition[]; migrations: StatusMigration[] }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
+    if (!workflowPort?.saveProjectStatuses) throw new WorkflowWriteRefusedError(WORKFLOW_UNAVAILABLE);
+    const { projectId } = draft;
+    if (workflowSavesRef.current.has(projectId)) throw new WorkflowWriteRefusedError(WORKFLOW_STATUS_SAVE_PENDING);
+    const taskWriteInFlight = [...taskWritesRef.current].some(key => (JSON.parse(key) as [string, string])[0] === projectId);
+    if (taskWriteInFlight || taskCreationWritesRef.current.has(projectId)) throw new WorkflowWriteRefusedError(WORKFLOW_TASK_WRITE_PENDING);
+    if (taskVerificationsRef.current.get(projectId)?.size) throw new WorkflowWriteRefusedError(WORKFLOW_TASKS_UNVERIFIED);
+    const selection = detailSelectionRef.current;
+    workflowSavesRef.current.add(projectId);
+    try {
+      const snapshot = await workflowPort.saveProjectStatuses(draft, signal);
+      await refreshAfterWorkflowWrite(projectId, selection);
+      return snapshot;
+    } finally {
+      workflowSavesRef.current.delete(projectId);
+    }
+  };
+
   const deleteProjectTask = async (projectId: string, taskId: string, taskTitle: string) => {
     const selection = detailSelectionRef.current;
     return runTaskWrite(projectId, taskId, async () => {
@@ -1420,6 +1472,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 
   return {
     workflowPort,
+    moveWorkflowTask,
+    saveWorkflowStatuses,
     readCurrentTaskAssignee,
     projectsPage,
     projects,
