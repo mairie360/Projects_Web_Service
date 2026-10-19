@@ -4,7 +4,7 @@ import { ProjectWorkflow } from './ProjectWorkflow';
 import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '../../lib/projectWorkflow';
 import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
-import { getInstanceTimeZone } from '@mairie360/front-kit/shared';
+import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';

@@ -1,7 +1,7 @@
 import axios, { type AxiosAdapter } from 'axios';
 import { NextRequest } from 'next/server';
 import { getBffProject } from '@mairie360/bff-project-openapi/endpoints/bffProject';
-import { isExpiredJwt, publicOrigin } from '@mairie360/front-kit/shared';
+import { isExpiredJwt, publicOrigin } from '@mairie360/lib-components/shared';
 import { proxyBffRequest } from './bff-proxy';
 import { parseProjectsPageReceipt, PROJECT_INITIAL_UNAVAILABLE, type InitialProjectsPage } from './project-page-receipt';
 import { projectPageQuery, type ProjectPageUrlState } from './project-page-query';

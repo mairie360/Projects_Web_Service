@@ -6,7 +6,7 @@ The contracts are pinned on their production releases: `@mairie360/bff-project-o
 
 ## Shared sessions and instance preferences — 15 October 2026
 
-The `feat/shared-session-runtime` integration starts at `origin/main` commit `75e03aedd954540cb2817cb76874bc3a0402e812`. It adopts the reviewed `@mairie360/front-kit@0.1.0` local artifact, published UI library `@mairie360/lib-components@0.8.0`, shared session renewal, SSR navigation role, instance timezone and confirmed appearance. The artifact's exact source and integrity are recorded in [its provenance](vendor/front-kit-provenance.json); [runtime configuration and verification](docs/en/shared-runtime.md) describe the common integration.
+The `feat/shared-session-runtime` integration starts at `origin/main` commit `75e03aedd954540cb2817cb76874bc3a0402e812`. It adopts the shared runtime and UI components of the published `@mairie360/lib-components` (the former `@mairie360/front-kit` artifact moved into it with MAIR-126), shared session renewal, SSR navigation role, instance timezone and confirmed appearance. [Runtime configuration and verification](docs/en/shared-runtime.md) describe the common integration.
 
 The published Project SDK remains exactly `@mairie360/bff-project-openapi@0.0.0-dev.0b18e81123c048d9d5b9dbfb71a6f46c202c6092`, matching the existing [contract snapshot](contracts/openapi.json). Project/task status fields and generated business operations retain this contract. The configurable task statuses and project templates of MAIR567 remain on the separate `feat/mair-567-project-statuses-templates` draft branch pending their published SDK adoption. This integration adds no status/template adapter, `statusId` or `templateId` operation.
 
