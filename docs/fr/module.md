@@ -3,11 +3,14 @@
 ## Périmètre du scan de sécurité (règle ZAP 10031)
 
 La règle ZAP 10031 signale une valeur de paramètre d’URL retrouvée dans un
-attribut HTML. `?view=` n’accepte que `kanban`, `grid` ou `table`, et `grid` est
-aussi une classe Tailwind présente sur chaque page : seule l’URL racine `/?view=…` sans
-autre paramètre est donc hors périmètre pour cette règle dans `.zap/rules.tsv`.
-Toutes les autres URL et tous les autres paramètres restent analysés par 10031 ;
-`tests/zap-rules.test.cjs` fige ce périmètre.
+attribut HTML. `view`, `status` et `priority` n’acceptent que les valeurs
+d’énumération de `src/lib/project-page-query.ts` (`grid` est aussi une classe
+Tailwind présente sur chaque page, et les valeurs de filtre sont les options
+sélectionnées) : l’URL racine dont la requête ne contient que ces valeurs est donc
+hors périmètre pour cette règle dans `.zap/rules.tsv`. Toutes les autres URL et tous
+les autres paramètres (texte de recherche, page, valeur inconnue) restent analysés
+par 10031 ; `tests/zap-rules.test.cjs` fige ce périmètre et échoue si les
+énumérations du contrat changent.
 
 ## Statuts de tâche par projet et modèles de projet (MAIR-567)
 
