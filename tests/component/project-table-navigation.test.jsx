@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ProjectsPage from '@/app/page';
+import ProjectsPage from '@/app/projects-client';
 import { TableView } from '@/components/project/ProjectViews';
 import { getProjectDetails, getProjectsPage } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
@@ -62,8 +62,8 @@ describe('Project Table detail entry', () => {
     const user = userEvent.setup(), project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project));
+    window.history.replaceState({}, '', '/?view=table');
     render(<ProjectsPage />);
-    await user.click(await screen.findByRole('tab', { name: 'Tableau', exact: true }));
     const table = await screen.findByRole('table');
     const opener = within(table).getByRole('button', { name: openerName(project), exact: true });
     opener.focus(); await user.keyboard(key);
@@ -83,8 +83,8 @@ describe('Project Table detail entry', () => {
     const user = userEvent.setup(), project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Fiche du tableau indisponible')).mockResolvedValueOnce(fixtures.projectDetails(project));
+    window.history.replaceState({}, '', '/?view=table');
     render(<ProjectsPage />);
-    await user.click(await screen.findByRole('tab', { name: 'Tableau', exact: true }));
     const opener = within(await screen.findByRole('table')).getByRole('button', { name: openerName(project), exact: true });
     opener.focus(); await user.keyboard('{Enter}');
     await screen.findByText('Fiche du tableau indisponible');
