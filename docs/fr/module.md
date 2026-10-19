@@ -1,5 +1,39 @@
 # Projects_Web_Service — Présentation du module
 
+## Périmètre du scan de sécurité (règle ZAP 10031)
+
+La règle ZAP 10031 signale une valeur de paramètre d’URL retrouvée dans un
+attribut HTML. `?view=` n’accepte que `kanban`, `grid` ou `table`, et `grid` est
+aussi une classe Tailwind présente sur chaque page : seule l’URL racine `/?view=…` sans
+autre paramètre est donc hors périmètre pour cette règle dans `.zap/rules.tsv`.
+Toutes les autres URL et tous les autres paramètres restent analysés par 10031 ;
+`tests/zap-rules.test.cjs` fige ce périmètre.
+
+## Statuts de tâche par projet et modèles de projet (MAIR-567)
+
+Chaque projet a ses propres statuts de tâche (nom, couleur, catégorie À faire /
+En cours / Terminé, ordre), lus via `GET /projects/{projectId}/statuses`. La fiche
+projet affiche les colonnes Kanban et les sélecteurs construits à partir d’eux, et
+le formulaire de tâche des cartes les propose. Responsables et administrateurs
+peuvent ajouter, renommer, recolorer, changer de catégorie, réordonner ou supprimer
+un statut (la suppression demande le statut de destination de ses tâches), et gérer
+les modèles de projet ; la création d’un projet peut partir d’un modèle dont les
+statuts sont d’abord prévisualisés. Chaque écriture attend un reçu confirmé et une
+relecture ; une écriture non vérifiée conserve le brouillon et demande une relecture.
+
+Les lectures restent minimales (MAIR-526) : la fiche transmet les tâches du détail
+qu’elle a déjà chargé, donc ouvrir un projet lit `GET /projects/{projectId}` une
+seule fois, puis les statuts et les tâches archivées une fois ; le formulaire de
+tâche des cartes ne lit que les statuts. Les vérifications avant et après une
+écriture relisent toujours le détail courant.
+
+La fiche garde son comportement existant : la liste détaillée des tâches (suivi,
+commentaires, liens vers une tâche) reste visible et le bouton « Détails des
+tâches » sert seulement à la masquer ; sans choix explicite, une nouvelle tâche
+prend le premier statut du projet de sa catégorie (À faire / En cours / Terminé) ;
+la case de fin de tâche la place dans le premier statut « Terminé », ou la remet
+dans le premier « À faire ».
+
 ## Ouverture clavier depuis Tableau (MAIR-310)
 
 Chaque titre de projet du Tableau est un bouton natif nommé annonçant le dialogue

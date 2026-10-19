@@ -22,7 +22,11 @@ async function loaded(open = true) {
   harness.bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: f.projectDetails(pathParams.projectId === project.id ? project : other, [original]) }));
   view = mount(React.createElement(Page));
   await view.waitFor(html => !html.includes('Chargement des projets'));
-  if (open) await view.act(() => workspace().openProjectDetails(project));
+  if (open) {
+    await view.act(() => workspace().openProjectDetails(project));
+    // The project statuses (MAIR-567) are read after the detail; request counts start once they are in.
+    await view.waitFor(html => html.includes('Statuts des tâches du projet') && !html.includes('Chargement des statuts'));
+  }
 }
 async function collide(id = original.id) {
   harness.bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: f.projectTask({ id, title: 'Reçu à ne pas appliquer' }) });
@@ -184,7 +188,8 @@ test('the uncertain task draft keeps subsequent field edits across detail closur
   await view.act(() => workspace().setViewMode('grid'));
   await view.waitFor(() => !workspace().pageLoading);
   await view.act(() => workspace().openProjectDetails(project));
-  assert.deepEqual(view.props('ProjectDetailModal').taskCreationState.draft, retained);
+  // The refused draft keeps the project status id of the task it was created from (MAIR-567).
+  assert.deepEqual(view.props('ProjectDetailModal').taskCreationState.draft, { ...retained, statusId: draft.statusId });
   const input = view.hostElements(props => props['aria-label'] === 'Titre de la tâche');
   assert.equal(input[0].props.value, retained.title);
   assert.equal(writes().length, 1);

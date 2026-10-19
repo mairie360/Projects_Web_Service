@@ -170,6 +170,12 @@ function createFrontHarness() {
     reset() {
       recordExercised();
       mocks.forEach((mock) => mock.reset());
+      // Opening a project or a task form reads its statuses (MAIR-567): answer them by default so tests that
+      // only open a project keep their fixtures; a test can still override them with `on()`.
+      const fixtures = require('./bff-fixtures.cjs');
+      bffProject.on('get', '/projects/{projectId}/statuses', { body: fixtures.projectTaskStatuses() });
+      bffProject.on('get', '/projects/{projectId}/archived-tasks', { body: fixtures.archivedTasks() });
+      bffProject.on('get', '/project-templates', { body: { templates: [] } });
       for (const call of ownerCalls) {
         const value = new NextRequest(call.url, call.init).cookies.get('refreshToken')?.value;
         if (value) forgetUserSession(bffUser.url, value);

@@ -21,6 +21,8 @@ export interface ProjectTask {
   id: string;
   title: string;
   status: ProjectStatus;
+  statusId?: string;
+  statusName?: string;
   statusLabel?: string;
   responsible: Person;
   assignees: Person[];
@@ -49,6 +51,7 @@ export type TaskCollaboration = TaskCollaborationResponse;
 export interface ProjectTaskDraft {
   title: string;
   status: ProjectStatus;
+  statusId?: string;
   responsible: Person;
   assignees: Person[];
   priority: ProjectPriority;

@@ -770,8 +770,11 @@ it('wires the existing Login identity to a received Project member only when the
     const opener=await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`});
     expect(fetch).not.toHaveBeenCalled();await user.click(opener);
     await screen.findByRole('button',{name:'Retirer Admin Mairie'});
-    expect(fetch).toHaveBeenCalledOnce();
-    expect(fetch.mock.calls[0][0]).toBe('/api/auth/current-user');
+    // Besides the Login identity, opening reads only the project statuses and archived tasks (MAIR-567).
+    const urls=fetch.mock.calls.map(([input])=>String(input instanceof Request?input.url:input));
+    expect(urls.filter(url=>url==='/api/auth/current-user')).toHaveLength(1);
+    expect(urls[0]).toBe('/api/auth/current-user');
+    expect(urls.filter(url=>url!=='/api/auth/current-user').every(url=>/\/projects\/[^/]+\/(statuses|archived-tasks)(\?|$)/.test(new URL(url,'http://front').pathname+new URL(url,'http://front').search))).toBe(true);
   } finally {vi.unstubAllGlobals();}
 });
 

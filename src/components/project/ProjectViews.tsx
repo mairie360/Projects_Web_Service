@@ -148,6 +148,7 @@ function EmptyState() {
 
 export function GridView({
   projects,
+  workflowPort,
   taskCreationStates,
   onInspectTaskCreation,
   onPreserveTaskDraft,
@@ -162,6 +163,7 @@ export function GridView({
   onProjectTaskAdd,
 }: {
   projects: Project[];
+  workflowPort?: import('../../lib/projectWorkflow').ProjectWorkflowPort;
   taskCreationStates?: ReadonlyMap<string, import('./TaskCreationNotice').TaskCreationState>;
   onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
   onPreserveTaskDraft?: import('../project-card/types').ProjectCardProps['onPreserveTaskDraft'];
@@ -183,6 +185,7 @@ export function GridView({
         <ProjectCard
           key={project.id}
           project={project}
+          workflowPort={workflowPort}
           variant="grid"
           taskCreationState={taskCreationStates?.get(project.id)}
           onInspectTaskCreation={onInspectTaskCreation}
