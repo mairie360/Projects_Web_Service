@@ -8,11 +8,11 @@ const { test } = require('node:test');
 // is out of scope for 10031. The rule stays active everywhere else, including any other parameter.
 const rules = fs.readFileSync(path.join(__dirname, '..', '.zap', 'rules.tsv'), 'utf8').trim().split('\n').map(line => line.split('\t'));
 
-test('ZAP keeps rule 10031 active and only scopes out the bare view URL', () => {
+test('ZAP keeps rule 10031 active and only scopes out the bare root view URL', () => {
   assert.equal(rules.some(([id, action]) => id === '10031' && action === 'IGNORE'), false);
   const scoped = rules.filter(([id, action]) => id === '10031' && action === 'OUTOFSCOPE');
   assert.equal(scoped.length, 1);
   const outOfScope = new RegExp(scoped[0][2]);
   for (const url of ['http://projects-front:5001/?view=grid', 'http://projects-front:5001/?view=kanban', 'http://projects-front:5001/?view=table']) assert.match(url, outOfScope);
-  for (const url of ['http://projects-front:5001/?view=grid&q=%3Cscript%3E', 'http://projects-front:5001/?q=grid', 'http://projects-front:5001/?view=%22onmouseover', 'http://projects-front:5001/?view=grid#x']) assert.doesNotMatch(url, outOfScope);
+  for (const url of ['http://projects-front:5001/?view=grid&q=%3Cscript%3E', 'http://projects-front:5001/?q=grid', 'http://projects-front:5001/?view=%22onmouseover', 'http://projects-front:5001/?view=grid#x', 'http://projects-front:5001/projects-page?view=grid', 'http://projects-front:5001/projects/1?view=grid']) assert.doesNotMatch(url, outOfScope);
 });
