@@ -10,8 +10,8 @@ const { propertyName } = require('./source-policy.cjs');
 
 const FORBIDDEN_CONSTRUCTORS = new Set(['XMLHttpRequest', 'EventSource', 'WebSocket']);
 const FORBIDDEN_MODULES = new Set(['axios', 'ky', 'got', 'superagent', 'undici', 'http', 'https', 'node:http', 'node:https', 'net', 'node:net']);
-// The only file allowed to carry the generated axios client over requestBff.
-const AXIOS_GATEWAY = 'src/lib/bffProjectClient.ts';
+// Generated browser transport and the GET-only request-local server adapter.
+const AXIOS_GATEWAYS = new Set(['src/lib/bffProjectClient.ts', 'src/lib/server-projects-page.ts']);
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
 /** Every operation of the generated BFF Project client: `{ name: { method, path } }` (path with `{param}` templates). */
@@ -94,7 +94,7 @@ function analyseNetworkCalls() {
   for (const file of sourceFiles()) {
     const source = parse(file);
     visit(source, (node) => {
-      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && FORBIDDEN_MODULES.has(node.moduleSpecifier.text) && !(file === AXIOS_GATEWAY && node.moduleSpecifier.text === 'axios')) {
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && FORBIDDEN_MODULES.has(node.moduleSpecifier.text) && !(AXIOS_GATEWAYS.has(file) && node.moduleSpecifier.text === 'axios')) {
         forbidden.push(`${file}:${lineOf(source, node)} importe ${node.moduleSpecifier.text}`);
       }
       if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && FORBIDDEN_CONSTRUCTORS.has(node.expression.text)) {
@@ -114,7 +114,7 @@ function analyseNetworkCalls() {
           target: target && ts.isIdentifier(target) && target.text !== 'path' ? { identifier: target.text } : target && pathOf(target),
         });
       }
-      if (ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression) && node.expression.expression.text === 'bffProject') {
+      if (ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression) && (node.expression.expression.text === 'bffProject' || file === 'src/lib/server-projects-page.ts' && node.expression.expression.text === 'api')) {
         const operation = operations[name];
         bffCalls.push({ file, location, operation: name, method: operation?.method, target: operation && { path: operation.path, query: false } });
       }

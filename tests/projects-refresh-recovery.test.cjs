@@ -7,7 +7,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
-const ProjectsPage = requireTs('src/app/page.tsx').default;
+const ProjectsPage = requireTs('src/app/projects-client.tsx').default;
 const harness = createFrontHarness();
 const { bffProject } = harness;
 let view;
@@ -48,7 +48,7 @@ async function performProjectOperation(operation, component, project) {
     await view.act(() => view.props(component).onProjectDelete(project));
     await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer' && props.className.includes('bg-[#cf222e]'));
     // The host button intentionally starts a void callback; wait for the actual outcome.
-    return view.waitFor(() => view.find('Alert').length > 0);
+    return view.waitFor(() => view.hostElements(props => props['aria-atomic'] === true && ['alert', 'status'].includes(props.role)).length > 0);
   }
   if (operation === 'edit-detail' || operation === 'close' || operation === 'review') {
     await view.act(() => view.props(component).onProjectOpen(project));

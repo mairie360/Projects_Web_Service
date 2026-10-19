@@ -175,7 +175,9 @@
           "createdAt": "2026-09-01T08:30:00.000Z",
           "tasks": {
             "total": 2,
-            "completed": 1
+            "completed": 1,
+            "active": 2,
+            "archived": 0
           },
           "permissions": {
             "canView": true,

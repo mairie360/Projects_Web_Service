@@ -18,9 +18,9 @@
     "test:node:native": "mkdir -p coverage && node --test --test-concurrency=1 --enable-source-maps --experimental-test-coverage --test-coverage-branches=60 --test-coverage-functions=60 --test-coverage-lines=60 --test-coverage-include='src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info tests/*.test.cjs"
   },
   "dependencies": {
-    "@mairie360/bff-project-openapi": "0.0.0-dev.0b18e81123c048d9d5b9dbfb71a6f46c202c6092",
+    "@mairie360/bff-project-openapi": "1.0.0",
     "@mairie360/front-kit": "file:vendor/mairie360-front-kit-0.1.0.tgz",
-    "@mairie360/lib-components": "0.8.0",
+    "@mairie360/lib-components": "0.9.0",
     "axios": "1.20.0",
     "daisyui": "^5.0.0",
     "next": "16.3.8",
@@ -28,6 +28,7 @@
     "react-dom": "^19.0.0"
   },
   "overrides": {
+    "braces": "$braces",
     "next": {
       ".": "$next",
       "postcss": "^8.5.23",
@@ -35,7 +36,7 @@
     }
   },
   "devDependencies": {
-    "@mairie360/bff-user-openapi": "0.0.0-dev.46a698bb9adbf3c86a5517b4c958b379cb03fe70",
+    "@mairie360/bff-user-openapi": "1.0.0",
     "@tailwindcss/postcss": "^4.0.12",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",
@@ -43,6 +44,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "5.0.2",
+    "braces": "file:./vendor/braces",
     "c8": "12.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",

@@ -1,3 +1,4 @@
+import { parseProjectsPageReceipt } from './project-page-receipt';
 import { sessionFetch } from '@mairie360/front-kit/browser';
 import axios, { type AxiosAdapter } from 'axios';
 import { getBffProject } from '@mairie360/bff-project-openapi/endpoints/bffProject';
@@ -264,10 +265,7 @@ export async function getProjectsPage(query?: ProjectsPageQuery, signal?: AbortS
     throw error;
   }
 
-  return {
-    ...response,
-    projects: response.projects.map(normalizeProject),
-  };
+  return parseProjectsPageReceipt(response, query?.page ?? 1);
 }
 
 export async function getProjectDetails(projectId: string) {

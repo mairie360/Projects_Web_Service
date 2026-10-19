@@ -21,6 +21,8 @@ export type ProjectFormState = {
   progress: number;
   totalTasks: number;
   completedTasks: number;
+  /** Archived (done) tasks of the project: counted as done, never listed in `taskItems`. */
+  archivedTasks: number;
   taskItems: ProjectTask[];
 };
 
@@ -81,6 +83,7 @@ export function createProjectFormState(status: Project['status'] = 'todo'): Proj
     progress: 0,
     totalTasks: 0,
     completedTasks: 0,
+    archivedTasks: 0,
     taskItems: [],
   };
 }
@@ -100,10 +103,17 @@ export function createInitialTaskItems(project: Project): ProjectTask[] {
   return project.taskItems ?? [];
 }
 
-export function calculateProjectProgress(tasks: ProjectTask[]) {
-  if (tasks.length === 0) return 0;
+/** Archived (done) tasks are counted but not listed (MAIR-559): the counter says how many are hidden. */
+export function archivedTasksLabel(archivedTasks: number) {
+  return archivedTasks === 1 ? '1 tâche archivée' : `${archivedTasks} tâches archivées`;
+}
 
-  return Math.round((tasks.filter((task) => task.completed).length / tasks.length) * 100);
+/** Share of done tasks, the `archivedTasks` (done tasks the BFF no longer lists) included. */
+export function calculateProjectProgress(tasks: Pick<ProjectTask, 'completed'>[], archivedTasks = 0) {
+  const total = tasks.length + archivedTasks;
+  if (total === 0) return 0;
+
+  return Math.round(((tasks.filter((task) => task.completed).length + archivedTasks) / total) * 100);
 }
 
 export function projectToFormState(project: Project): ProjectFormState {
@@ -122,6 +132,7 @@ export function projectToFormState(project: Project): ProjectFormState {
     progress: project.progress,
     totalTasks: project.tasks.total,
     completedTasks: project.tasks.completed,
+    archivedTasks: project.tasks.archived,
     taskItems: createInitialTaskItems(project),
   };
 }

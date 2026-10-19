@@ -14,6 +14,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.tsx", ...coverageScope.reactSources],
+      exclude: coverageScope.serverTsxSources,
       reportsDirectory: "coverage/components",
       reporter: ["text", "lcov", "json-summary"],
       thresholds: { lines: 60, branches: 60, functions: 60, statements: 60, perFile: { lines: 60 } },

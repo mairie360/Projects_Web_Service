@@ -8,7 +8,7 @@ const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const { projectToFormState } = requireTs('src/lib/projectPageState.ts');
 const { taskConfirmationsAfter, reconcileTaskConfirmations } = requireTs('src/lib/projectTaskConfirmations.ts');
-const Page = requireTs('src/app/page.tsx').default;
+const Page = requireTs('src/app/projects-client.tsx').default;
 const harness = createFrontHarness();
 let view;
 const project = f.projectListItem();
@@ -44,7 +44,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
         const route = ['done', 'review'].includes(projectOperation) ? '/projects/{projectId}/close' : '/projects/{projectId}';
         const method = 'patch';
         const confirmedProject = f.projectListItem({ title: 'Projet officiellement confirmé', status: 'review', priority: 'low', progress: 17,
-          tasks: { total: 9, completed: 2 }, permissions: { ...project.permissions, canDuplicate: false } });
+          tasks: { total: 9, completed: 2, active: 9, archived: 0 }, permissions: { ...project.permissions, canDuplicate: false } });
         harness.bffProject.on(method, route, { body: f.projectDetails(confirmedProject, [task, other]) });
         let release, held = 0, pending;
         const gate = new Promise(resolve => { release = resolve; });
@@ -103,7 +103,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
           const card = view.props('KanbanBoard').projects.find(p => p.id === project.id);
           assert.deepEqual(card.taskItems.map(t => t.title), expected.map(t => t.title));
           assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 2);
-          harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...confirmedProject, tasks: { total: expected.length, completed: 1 }, progress: 38 }, expected) });
+          harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...confirmedProject, tasks: { total: expected.length, completed: 1, active: expected.length, archived: 0 }, progress: 38 }, expected) });
           await view.act(() => view.props('ProjectDetailModal').onRetry());
           assert.equal(view.props('ProjectDetailModal').refreshError, '');
           assert.equal(view.props('ProjectDetailModal').project.progress, 38);

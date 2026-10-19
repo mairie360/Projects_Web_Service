@@ -5,9 +5,9 @@ import { subscribePageReturn } from '@/lib/page-return';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ProjectStatus as PublishedProjectStatus, ProjectPriority as PublishedProjectPriority } from '@mairie360/bff-project-openapi/model';
+import { projectUrlSchema, projectQueryKey } from '../../lib/project-page-query';
+import { readInitialProjectsPage, type InitialProjectsPage } from '../../lib/project-page-receipt';
 import { usePageUrlState } from '../../lib/use-page-url-state';
-import { urlChoice, urlDate, urlPage, urlText } from '../../lib/page-url-state';
 import {
   BffProjectError,
   BffProjectNavigationRequiredError,
@@ -55,14 +55,6 @@ type AlertState = {
   message: string;
 };
 
-const projectUrlSchema = {
-  q: urlText(200),
-  status: urlChoice(['all', ...Object.values(PublishedProjectStatus)], 'all'),
-  priority: urlChoice(['all', ...Object.values(PublishedProjectPriority)], 'all'),
-  dueBefore: urlDate,
-  view: urlChoice(['kanban', 'grid', 'table'], 'kanban'),
-  page: urlPage,
-};
 
 type RefreshProjectsOptions = {
   signal?: AbortSignal;
@@ -104,14 +96,16 @@ function validateProjectForm(form: ProjectFormState) {
   );
 }
 
-export function useProjectsController({ currentAgentSource, workflowPort = publishedProjectWorkflowPort }: { currentAgentSource?: CurrentAgentSource; workflowPort?: ProjectWorkflowPort } = {}) {
-  const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(null);
+export function useProjectsController({ currentAgentSource, initial, workflowPort = publishedProjectWorkflowPort }: { currentAgentSource?: CurrentAgentSource; initial?: InitialProjectsPage; workflowPort?: ProjectWorkflowPort } = {}) {
+  const [initialReceipt] = useState(() => readInitialProjectsPage(initial));
+  const initialQueryRef = useRef(initialReceipt ? projectQueryKey(initialReceipt.query) : null);
+  const [projectsPage, setProjectsPage] = useState<ProjectsPageResponse | null>(initialReceipt?.data ?? null);
   const readCurrentTaskAssignee = useCallback(async (signal: AbortSignal) => {
     const agent = await (currentAgentSource ?? loginCurrentAgentSource).read(signal);
     signal.throwIfAborted();
     return selectableCurrentAgent(agent, projectsPage?.options.members ?? []);
   }, [currentAgentSource, projectsPage?.options.members]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialReceipt?.data.projects ?? []);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<SelectedProjectDetails | null>(null);
   const [linkedTaskId, setLinkedTaskId] = useState<string | null>(null);
   // Each opening owns a distinct lifetime, even when reopening the same ID.
@@ -137,7 +131,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   const [projectVerificationPendingIds, setProjectVerificationPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [projectVerificationErrors, setProjectVerificationErrors] = useState<ReadonlyMap<string, string>>(() => new Map());
   // IDs are learned only from coherent server reads/confirmations, never drafts.
-  const knownProjectIdsRef = useRef(new Set<string>());
+  const knownProjectIdsRef = useRef(new Set(initialReceipt?.data.projects.map(project => project.id) ?? []));
   const confirmedNewProjectIdsRef = useRef(new Set<string>());
   const newProjectReceiptIssuesRef = useRef(new Map<string, NewProjectReceiptIssue>());
   const [newProjectReceiptIssues, setNewProjectReceiptIssues] = useState<ReadonlyMap<string, NewProjectReceiptIssue>>(() => new Map());
@@ -154,28 +148,28 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   const newProjectCatalogueReadRef = useRef(false);
   const [newProjectCatalogueReadPending, setNewProjectCatalogueReadPending] = useState(false);
   const [newProjectCatalogueReadError, setNewProjectCatalogueReadError] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [dueBeforeFilter, setDueBeforeFilter] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>((initialReceipt?.query.view as ViewMode) ?? 'kanban');
+  const [statusFilter, setStatusFilter] = useState(initialReceipt?.query.status ?? 'all');
+  const [priorityFilter, setPriorityFilter] = useState(initialReceipt?.query.priority ?? 'all');
+  const [dueBeforeFilter, setDueBeforeFilter] = useState(initialReceipt?.query.dueBefore ?? '');
+  const [searchTerm, setSearchTerm] = useState(initialReceipt?.query.q ?? '');
   const pageUrl = usePageUrlState(projectUrlSchema);
-  const urlInitialized = useRef(false);
+  const urlInitialized = useRef(Boolean(initialReceipt));
   const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const logoutPendingRef = useRef(false);
-  const [pageLoading, setPageLoading] = useState(true);
-  const [pageError, setPageError] = useState('');
+  const [pageLoading, setPageLoading] = useState(!initialReceipt);
+  const [pageError, setPageError] = useState(initial?.status === 'unavailable' ? initial.message : '');
   const retryPendingRef = useRef(false);
   const pageRevisionRef = useRef(0);
-  const requestedPageRef = useRef(1);
+  const requestedPageRef = useRef(Number(initialReceipt?.query.page ?? 1));
   const pageReadPendingRef = useRef(false);
   const navigationReadRef = useRef<AbortController | null>(null);
   // Async writes must read the latest event-owned query, not a render captured
   // before their response. UI state remains the owner of the displayed controls.
   const queryRef = useRef<ProjectQueryState>({
-    search: '', status: 'all', priority: 'all', dueBefore: '', view: 'kanban',
+    search: initialReceipt?.query.q ?? '', status: initialReceipt?.query.status ?? 'all', priority: initialReceipt?.query.priority ?? 'all', dueBefore: initialReceipt?.query.dueBefore ?? '', view: (initialReceipt?.query.view as ViewMode) ?? 'kanban',
   });
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -254,6 +248,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
 
   const refreshProjectsPage = useCallback(
     async (options: RefreshProjectsOptions = {}) => {
+      initialQueryRef.current = null;
       const revision = ++pageRevisionRef.current;
       const isCurrent = () => revision === pageRevisionRef.current && !options.signal?.aborted;
       const query = queryRef.current;
@@ -337,6 +332,15 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
 
   useEffect(() => {
     if (!pageUrl.ready) return;
+    if (initialQueryRef.current !== null) {
+      // Paging owns its immediate read; only filter changes drive this debounce.
+      const currentQueryKey = projectQueryKey({
+        q: searchTerm, status: statusFilter, priority: priorityFilter,
+        dueBefore: dueBeforeFilter, view: viewMode, page: String(requestedPageRef.current),
+      });
+      if (initialQueryRef.current === currentQueryKey) return;
+      initialQueryRef.current = null;
+    }
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       void refreshProjectsPage({ signal: controller.signal });
@@ -967,6 +971,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
+    setAlert(null);
     requireVerifiedProject(projectId);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
@@ -997,6 +1002,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
 
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
     if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
+    setAlert(null);
 
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(project.id)?.revision ?? 0;
@@ -1018,6 +1024,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
     // The ref also protects two events captured before React renders disabled controls.
     if (projectFormPendingRef.current || (!editingProjectId && (newProjectReceiptIssuesRef.current.has('create') || verifiedCreationRef.current))) return;
     projectFormOpeningRef.current = null;
+    setAlert(null);
 
     if (!validateProjectForm(projectForm)) {
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
@@ -1081,6 +1088,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
       return;
     }
     // Prevent a second event before React renders the disabled action.
+    setAlert(null);
     duplicatingProjects.current.add(project.id);
     setDuplicatingProjectIds((current) => [...current, project.id]);
     const knownAtDispatch = new Set(knownProjectIdsRef.current);
@@ -1108,6 +1116,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   const confirmProjectDeletion = async () => {
     const project = projectPendingDeletion;
     if (!project) return;
+    setAlert(null);
 
     try {
       await deleteBffProject(project.id);
@@ -1129,6 +1138,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
     if (!title) return;
     if (uncertainTaskCreationsRef.current.has(project.id)) throw new NewTaskReceiptVerificationRequiredError();
     if (taskCreationWritesRef.current.has(project.id)) throw new Error('Une création de tâche est déjà en cours pour ce projet. Le brouillon est conservé.');
+    setAlert(null);
     taskCreationWritesRef.current.add(project.id);
     setTaskCreationStates(current => new Map(current).set(project.id, { ...current.get(project.id), pending: true }));
     try {
@@ -1239,6 +1249,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
       if (rejectIfPending) throw new Error('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
       return;
     }
+    setAlert(null);
     taskWritesRef.current.add(key);
     setTaskWriteError(projectId, taskId);
     setPendingTasksByProject(current => {
@@ -1365,6 +1376,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   };
 
   const closeProject = async (projectId: string, status: 'done' | 'review') => {
+    setAlert(null);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
     try {
@@ -1386,6 +1398,7 @@ export function useProjectsController({ currentAgentSource, workflowPort = publi
   const logout = async () => {
     if (logoutPendingRef.current) return;
     logoutPendingRef.current = true;
+    setAlert(null);
     setLogoutError(null);
     try { await logoutAndReload(); } catch (error) {
       setLogoutError(error instanceof Error ? error.message : 'La déconnexion n’a pas abouti. Veuillez réessayer.');

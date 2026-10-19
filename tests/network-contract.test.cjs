@@ -83,6 +83,13 @@ describe('inventaire des appels réseau de src/', () => {
     }
   });
 
+  test('the server SDK reader uses only GET projects-page through its existing proxy adapter', () => {
+    const file = 'src/lib/server-projects-page.ts';
+    assert.deepEqual(network.bffCalls.filter(call => call.file === file).map(call => [call.operation, call.method]), [['getProjectsPage', 'GET']]);
+    assert.equal(network.fetchCalls.some(call => call.file === file), false);
+    assert.match(fs.readFileSync(path.join(root, file), 'utf8'), /proxyBffRequest\(/);
+  });
+
   test('les filtres de ProjectsPageQuery sont exactement les paramètres publiés de GET /projects-page', () => {
     let members;
     visit(parse('src/lib/bffProjectClient.ts'), (node) => {

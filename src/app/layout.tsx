@@ -7,7 +7,6 @@ import { Geist } from "next/font/google";
 import { readFrontUrlsFromEnv } from "@/lib/front-urls";
 import { FrontUrlsProvider } from "@/lib/front-urls-provider";
 import "./globals.css";
-import "./municipal-theme.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 

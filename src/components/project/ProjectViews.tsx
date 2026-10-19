@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, Grid3X3, Kanban, List, Search } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { EmptyState as SharedEmptyState } from '@mairie360/lib-components/primitives';
 
 import {
   formatProjectDate,
@@ -141,9 +142,7 @@ export function SearchInput({ value, onChange }: { value: string; onChange: (val
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-dashed border-[#d0ccc7] bg-white px-6 py-12 text-center text-sm text-[#66717c]">
-      Aucun projet ne correspond aux filtres sélectionnés.
-    </div>
+    <SharedEmptyState title="Aucun projet à afficher" description="Aucun projet ne correspond aux filtres sélectionnés." />
   );
 }
 

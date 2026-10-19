@@ -3,7 +3,7 @@
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
 import { civilDateInZone } from '@mairie360/front-kit/shared';
-import { Button } from '@mairie360/lib-components';
+import { Button } from '@mairie360/lib-components/primitives';
 import { CalendarDays, CheckSquare2, ListChecks, Square } from 'lucide-react';
 
 import {
@@ -14,6 +14,7 @@ import {
 } from '../ProjectCard';
 import type { Project, ProjectTask } from '../../types/project';
 import {
+  archivedTasksLabel,
   calculateProjectProgress,
   createPersonFromOptionValue,
   getPersonValue,
@@ -29,14 +30,15 @@ import {
   fieldClassName,
 } from './ProjectFormControls';
 
-function createTaskSummaryPatch(taskItems: ProjectTask[]): Pick<ProjectFormState, 'taskItems' | 'totalTasks' | 'completedTasks' | 'progress'> {
-  const completedTasks = taskItems.filter((task) => task.completed).length;
+// The listed tasks are the active ones: the archived (done) tasks still count in the summary.
+function createTaskSummaryPatch(taskItems: ProjectTask[], archivedTasks: number): Pick<ProjectFormState, 'taskItems' | 'totalTasks' | 'completedTasks' | 'progress'> {
+  const completedTasks = taskItems.filter((task) => task.completed).length + archivedTasks;
 
   return {
     taskItems,
-    totalTasks: taskItems.length,
+    totalTasks: taskItems.length + archivedTasks,
     completedTasks,
-    progress: calculateProjectProgress(taskItems),
+    progress: calculateProjectProgress(taskItems, archivedTasks),
   };
 }
 
@@ -121,7 +123,7 @@ export function ProjectTasksEditor({
   };
 
   const updateTasks = (taskItems: ProjectTask[]) => {
-    onChange(createTaskSummaryPatch(taskItems));
+    onChange(createTaskSummaryPatch(taskItems, form.archivedTasks));
   };
 
   const saveTask = () => {
@@ -208,6 +210,7 @@ export function ProjectTasksEditor({
         </div>
         <span className="text-xs font-medium text-[#57606a]">
           {form.completedTasks}/{form.totalTasks}
+          {form.archivedTasks > 0 && ` · ${archivedTasksLabel(form.archivedTasks)}`}
         </span>
       </div>
 

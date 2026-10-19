@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
-import ProjectsPage from '@/app/page';
+import ProjectsPage from '@/app/projects-client';
 import { getProjectsPage } from '@/lib/bffProjectClient';
 import { logoutAndReload } from '@/lib/auth-session';
 import { returnToLogin } from '@/lib/auth-token';

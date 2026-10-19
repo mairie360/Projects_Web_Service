@@ -50,7 +50,7 @@ async function runComponentCoverage({ root = process.cwd(), capture = runCompone
     component = await capture(command, args, root, archive);
     await fs.writeFile(path.join(archive, 'run.json'), JSON.stringify({ node: process.version, command, args, cwd: root, startedAt, finishedAt: new Date().toISOString(), sources, ...component }, null, 2) + '\n');
     if (component.error || component.signal || component.exitCode !== 0) throw new Error('Component coverage did not complete successfully.');
-    const report = await composeCoverage({ root, sources, componentSources, nodeReport, expectedNodeSha256, lineThresholdExceptions: scope.serverTsxSources });
+    const report = await composeCoverage({ root, sources, componentSources, nodeReport, expectedNodeSha256, lineThresholdExceptions: scope.lineThresholdExceptions ?? [] });
     return { exitCode: report.failures.length ? 1 : 0, published: true, component, failures: report.failures };
   } catch (error) {
     await fs.rm(path.join(root, 'coverage/lcov.info'), { force: true });

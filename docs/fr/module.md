@@ -279,6 +279,20 @@ l’attente. Le défaut de requête capturée est corrigé sans réintroduire d�
 ancien ni inventer données, permissions, compteurs ou opération backend. Contrat
 publié Project0.4.0, authentification, dépendances et environnements inchangés.
 
+## Compteurs des tâches archivées (MAIR-569)
+
+Une tâche terminée est archivée par BFF_Project (MAIR-502) : la fiche du projet
+ne liste que les tâches actives, alors que `tasks.total` / `tasks.completed` et la
+progression comptent aussi les tâches archivées. Depuis le contrat Project publié
+1.0.0, chaque projet porte aussi `tasks.active` et `tasks.archived` (MAIR-559).
+Les compteurs de la fiche et du formulaire d’édition affichent `terminées/total`
+suivi du nombre de tâches archivées (`3/4 · 3 tâches archivées`), et le
+formulaire d’édition continue de compter les tâches archivées quand ses tâches
+listées changent, au lieu de recalculer le résumé et la progression à partir des
+seules tâches actives. Les nouvelles routes de statuts de tâche et de modèles de
+projet (MAIR-566) sont déclarées par le contrat mais pas encore utilisées par ce
+front.
+
 ## Pages de résultats des projets (MAIR-472)
 
 La navigation Précédent/Suivant est commune aux vues Kanban, Grille et Tableau.

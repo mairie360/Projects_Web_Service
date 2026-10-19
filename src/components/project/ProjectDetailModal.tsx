@@ -9,12 +9,12 @@ import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
 import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
-import { Button, ToolTip } from '@mairie360/lib-components';
+import { Button, ToolTip } from '@mairie360/lib-components/primitives';
 import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import { createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { archivedTasksLabel, createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
@@ -660,6 +660,7 @@ export function ProjectDetailModal({
                   </div>
                   <span className="text-xs font-medium text-[#57606a]">
                     {project.tasks.completed}/{project.tasks.total}
+                    {project.tasks.archived > 0 && ` · ${archivedTasksLabel(project.tasks.archived)}`}
                   </span>
                 </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ToolTip } from '@mairie360/lib-components';
+import { ToolTip } from '@mairie360/lib-components/primitives';
 import { AlertCircle, CheckCircle2, Clock3, Eye, Plus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

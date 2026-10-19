@@ -99,7 +99,13 @@
           "status": {
             "$ref": "#/components/schemas/ArchivedTasksResponseTasksItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -309,6 +315,10 @@
             },
             "type": "array"
           },
+          "templateId": {
+            "pattern": "^template-\\d+$",
+            "type": "string"
+          },
           "title": {
             "pattern": "^[^<>]*$",
             "type": "string"
@@ -400,6 +410,89 @@
         ],
         "type": "string"
       },
+      "CreateProjectTaskStatusBody": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CreateProjectTaskStatusBodyCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "position": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "CreateProjectTaskStatusBodyCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
+      "CreateProjectTemplateBody": {
+        "properties": {
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/CreateProjectTemplateBodyStatusesItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "statuses"
+        ],
+        "type": "object"
+      },
+      "CreateProjectTemplateBodyStatusesItem": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/CreateProjectTemplateBodyStatusesItemCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "CreateProjectTemplateBodyStatusesItemCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
       "CreateTaskBody": {
         "properties": {
           "assigneeIds": {
@@ -428,6 +521,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/CreateTaskBodyStatus"
+          },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
           },
           "title": {
             "pattern": "^[^<>]*$",
@@ -461,6 +558,16 @@
           "done"
         ],
         "type": "string"
+      },
+      "DeleteProjectsProjectIdStatusesStatusIdParams": {
+        "properties": {
+          "moveTo": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
       },
       "ErrorResponse": {
         "properties": {
@@ -1051,6 +1158,12 @@
       },
       "GetProjectsPage200ProjectsItemTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -1060,7 +1173,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -1348,6 +1463,12 @@
       },
       "GetProjectsProjectId200ProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -1357,7 +1478,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -1402,7 +1525,13 @@
           "status": {
             "$ref": "#/components/schemas/GetProjectsProjectId200TaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -1689,6 +1818,54 @@
         "required": [],
         "type": "object"
       },
+      "PatchProjectTemplatesTemplateIdBody": {
+        "properties": {
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/PatchProjectTemplatesTemplateIdBodyStatusesItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "PatchProjectTemplatesTemplateIdBodyStatusesItem": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/PatchProjectTemplatesTemplateIdBodyStatusesItemCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "PatchProjectTemplatesTemplateIdBodyStatusesItemCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
       "PatchProjectsProjectId200": {
         "properties": {
           "project": {
@@ -1880,6 +2057,12 @@
       },
       "PatchProjectsProjectId200ProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -1889,7 +2072,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -1934,7 +2119,13 @@
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectId200TaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -2361,6 +2552,12 @@
       },
       "PatchProjectsProjectIdClose200ProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -2370,7 +2567,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -2415,7 +2614,13 @@
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdClose200TaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -2546,6 +2751,35 @@
         ],
         "type": "string"
       },
+      "PatchProjectsProjectIdStatusesStatusIdBody": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/PatchProjectsProjectIdStatusesStatusIdBodyCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "position": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "PatchProjectsProjectIdStatusesStatusIdBodyCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
       "PatchProjectsProjectIdTasksTaskId200": {
         "properties": {
           "assignees": {
@@ -2587,7 +2821,13 @@
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskId200Status"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -2731,6 +2971,10 @@
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskIdBodyStatus"
           },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
+          },
           "title": {
             "pattern": "^[^<>]*$",
             "type": "string"
@@ -2797,7 +3041,13 @@
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskIdStatus200Status"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -2916,11 +3166,13 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/PatchProjectsProjectIdTasksTaskIdStatusBodyStatus"
+          },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": [],
         "type": "object"
       },
       "PatchProjectsProjectIdTasksTaskIdStatusBodyStatus": {
@@ -2953,6 +3205,57 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "PostProjectTemplatesBody": {
+        "properties": {
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/PostProjectTemplatesBodyStatusesItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "statuses"
+        ],
+        "type": "object"
+      },
+      "PostProjectTemplatesBodyStatusesItem": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/PostProjectTemplatesBodyStatusesItemCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "PostProjectTemplatesBodyStatusesItemCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
       },
       "PostProjects201": {
         "properties": {
@@ -3145,6 +3448,12 @@
       },
       "PostProjects201ProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -3154,7 +3463,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -3199,7 +3510,13 @@
           "status": {
             "$ref": "#/components/schemas/PostProjects201TaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -3352,6 +3669,10 @@
               "$ref": "#/components/schemas/PostProjectsBodyTaskItemsItem"
             },
             "type": "array"
+          },
+          "templateId": {
+            "pattern": "^template-\\d+$",
+            "type": "string"
           },
           "title": {
             "pattern": "^[^<>]*$",
@@ -3635,6 +3956,12 @@
       },
       "PostProjectsProjectIdDuplicate201ProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -3644,7 +3971,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -3689,7 +4018,13 @@
           "status": {
             "$ref": "#/components/schemas/PostProjectsProjectIdDuplicate201TaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -3804,6 +4139,38 @@
         ],
         "type": "string"
       },
+      "PostProjectsProjectIdStatusesBody": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/PostProjectsProjectIdStatusesBodyCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "position": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "PostProjectsProjectIdStatusesBodyCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
       "PostProjectsProjectIdTasks201": {
         "properties": {
           "assignees": {
@@ -3845,7 +4212,13 @@
           "status": {
             "$ref": "#/components/schemas/PostProjectsProjectIdTasks201Status"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -3988,6 +4361,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/PostProjectsProjectIdTasksBodyStatus"
+          },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
           },
           "title": {
             "pattern": "^[^<>]*$",
@@ -4265,6 +4642,12 @@
       },
       "ProjectDetailsResponseProjectTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -4274,7 +4657,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -4319,7 +4704,13 @@
           "status": {
             "$ref": "#/components/schemas/ProjectDetailsResponseTaskItemsItemStatus"
           },
+          "statusId": {
+            "type": "string"
+          },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -4618,6 +5009,12 @@
       },
       "ProjectListItemTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -4627,7 +5024,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -4687,9 +5086,15 @@
             "$ref": "#/components/schemas/ProjectTaskResponsible"
           },
           "status": {
-            "$ref": "#/components/schemas/ProjectTaskStatus"
+            "$ref": "#/components/schemas/ProjectTaskStatusProperty"
+          },
+          "statusId": {
+            "type": "string"
           },
           "statusLabel": {
+            "type": "string"
+          },
+          "statusName": {
             "type": "string"
           },
           "title": {
@@ -4811,6 +5216,45 @@
         "type": "object"
       },
       "ProjectTaskStatus": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ProjectTaskStatusCategory"
+          },
+          "color": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          },
+          "taskCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "category",
+          "position",
+          "taskCount"
+        ],
+        "type": "object"
+      },
+      "ProjectTaskStatusCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
+      "ProjectTaskStatusProperty": {
         "enum": [
           "todo",
           "in-progress",
@@ -4818,6 +5262,120 @@
           "done"
         ],
         "type": "string"
+      },
+      "ProjectTaskStatuses": {
+        "properties": {
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTaskStatus"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "statuses"
+        ],
+        "type": "object"
+      },
+      "ProjectTemplate": {
+        "properties": {
+          "customFields": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTemplateCustomFieldsItem"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTemplateStatusesItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "isDefault",
+          "statuses",
+          "customFields"
+        ],
+        "type": "object"
+      },
+      "ProjectTemplateCustomFieldsItem": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "type"
+        ],
+        "type": "object"
+      },
+      "ProjectTemplateStatusesItem": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ProjectTemplateStatusesItemCategory"
+          },
+          "color": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "color",
+          "category",
+          "position"
+        ],
+        "type": "object"
+      },
+      "ProjectTemplateStatusesItemCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
+      "ProjectTemplates": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectTemplate"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "templates"
+        ],
+        "type": "object"
       },
       "ProjectsPageQuery": {
         "properties": {
@@ -5408,6 +5966,12 @@
       },
       "ProjectsPageResponseProjectsItemTasks": {
         "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
           "completed": {
             "type": "number"
           },
@@ -5417,7 +5981,9 @@
         },
         "required": [
           "total",
-          "completed"
+          "completed",
+          "active",
+          "archived"
         ],
         "type": "object"
       },
@@ -5813,6 +6379,83 @@
         ],
         "type": "string"
       },
+      "UpdateProjectTaskStatusBody": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/UpdateProjectTaskStatusBodyCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "position": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "UpdateProjectTaskStatusBodyCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
+      "UpdateProjectTemplateBody": {
+        "properties": {
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/UpdateProjectTemplateBodyStatusesItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "UpdateProjectTemplateBodyStatusesItem": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/UpdateProjectTemplateBodyStatusesItemCategory"
+          },
+          "color": {
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "category"
+        ],
+        "type": "object"
+      },
+      "UpdateProjectTemplateBodyStatusesItemCategory": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "done"
+        ],
+        "type": "string"
+      },
       "UpdateTaskBody": {
         "properties": {
           "assigneeIds": {
@@ -5841,6 +6484,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/UpdateTaskBodyStatus"
+          },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
           },
           "title": {
             "pattern": "^[^<>]*$",
@@ -5871,11 +6518,13 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/UpdateTaskStatusBodyStatus"
+          },
+          "statusId": {
+            "pattern": "^status-\\d+$",
+            "type": "string"
           }
         },
-        "required": [
-          "status"
-        ],
+        "required": [],
         "type": "object"
       },
       "UpdateTaskStatusBodyStatus": {
@@ -5900,7 +6549,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.0b18e81123c048d9d5b9dbfb71a6f46c202c6092"
+    "x-source-package": "@mairie360/bff-project-openapi@1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -5928,6 +6577,105 @@
         "parameters": [],
         "responses": {
           "2XX": {
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/project-templates": {
+      "get": {
+        "operationId": "getProjectTemplates",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTemplates"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postProjectTemplates",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProjectTemplatesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTemplate"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/project-templates/{templateId}": {
+      "delete": {
+        "operationId": "deleteProjectTemplatesTemplateId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "templateId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchProjectTemplatesTemplateId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "templateId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchProjectTemplatesTemplateIdBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTemplate"
+                }
+              }
+            },
             "description": "Succès (seul statut typé par orval)"
           }
         }
@@ -6234,6 +6982,155 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PostProjectsProjectIdDuplicate201"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/statuses": {
+      "get": {
+        "operationId": "getProjectsProjectIdStatuses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTaskStatuses"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postProjectsProjectIdStatuses",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostProjectsProjectIdStatusesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTaskStatuses"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/projects/{projectId}/statuses/{statusId}": {
+      "delete": {
+        "operationId": "deleteProjectsProjectIdStatusesStatusId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statusId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "moveTo",
+            "required": false,
+            "schema": {
+              "pattern": "^status-\\d+$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTaskStatuses"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchProjectsProjectIdStatusesStatusId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "statusId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchProjectsProjectIdStatusesStatusIdBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTaskStatuses"
                 }
               }
             },
