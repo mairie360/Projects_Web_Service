@@ -1,5 +1,13 @@
 # Projects_Web_Service — Module overview
 
+## Security scan scope (ZAP rule 10031)
+
+ZAP rule 10031 flags a URL parameter value found in an HTML attribute. `?view=`
+only accepts `kanban`, `grid` or `table`, and `grid` is also a Tailwind class on
+every page, so the bare `/?view=…` URL is out of scope for that rule in
+`.zap/rules.tsv`. Every other URL and parameter is still scanned by 10031;
+`tests/zap-rules.test.cjs` pins that scope.
+
 ## Per-project task statuses and project templates (MAIR-567)
 
 Each project has its own task statuses (name, colour, category To do / In

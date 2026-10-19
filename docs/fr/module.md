@@ -1,5 +1,14 @@
 # Projects_Web_Service — Présentation du module
 
+## Périmètre du scan de sécurité (règle ZAP 10031)
+
+La règle ZAP 10031 signale une valeur de paramètre d’URL retrouvée dans un
+attribut HTML. `?view=` n’accepte que `kanban`, `grid` ou `table`, et `grid` est
+aussi une classe Tailwind présente sur chaque page : seule l’URL `/?view=…` sans
+autre paramètre est donc hors périmètre pour cette règle dans `.zap/rules.tsv`.
+Toutes les autres URL et tous les autres paramètres restent analysés par 10031 ;
+`tests/zap-rules.test.cjs` fige ce périmètre.
+
 ## Statuts de tâche par projet et modèles de projet (MAIR-567)
 
 Chaque projet a ses propres statuts de tâche (nom, couleur, catégorie À faire /
