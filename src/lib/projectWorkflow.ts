@@ -8,8 +8,12 @@ export type WorkflowTask = { id: string; title: string; statusId: string; canUpd
 export type ProjectWorkflowSnapshot = { projectId: string; revision: string; statuses: TaskStatusDefinition[]; tasks: WorkflowTask[]; draftStatusIds?: Record<string, string> };
 export type ProjectTemplate = { id: string; revision: string; name: string; statuses: TaskStatusDefinition[] };
 export type StatusMigration = { from: string; to: string };
+/** Active tasks the caller already read with the project detail, so the port does not read it again. */
+export type LoadedWorkflowTask = { id: string; title: string; statusId?: string; permissions?: { canUpdateStatus?: boolean } };
 export type ProjectWorkflowPort = {
-  readProject: (projectId: string, signal: AbortSignal) => Promise<ProjectWorkflowSnapshot>;
+  readProject: (projectId: string, signal: AbortSignal, loaded?: { tasks: readonly LoadedWorkflowTask[] }) => Promise<ProjectWorkflowSnapshot>;
+  /** The project's statuses alone, for forms that only choose a status. */
+  readStatuses?: (projectId: string, signal: AbortSignal) => Promise<TaskStatusDefinition[]>;
   readTemplates: (signal: AbortSignal) => Promise<ProjectTemplate[]>;
   saveProjectStatuses?: (draft: { projectId: string; revision: string; statuses: TaskStatusDefinition[]; migrations: StatusMigration[] }, signal: AbortSignal) => Promise<ProjectWorkflowSnapshot>;
   moveTask?: (draft: { projectId: string; revision: string; taskId: string; statusId: string }, signal: AbortSignal) => Promise<ProjectWorkflowSnapshot>;

@@ -16,7 +16,8 @@ const template = { id: 'template-1', name: 'Instruction municipale', revision: '
 const port = { readProject: async projectId => ({ projectId, statuses, tasks: [], revision: 'v1' }), readTemplates: async () => [template], createProjectFromTemplate: async () => fixtures.projectDetails() };
 const page = fixtures.projectsPage();
 const project = fixtures.projectListItem();
-const props = { project, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
+// The sheet shows its statuses once the project detail (with its tasks) is loaded (MAIR-567).
+const props = { project: { ...project, taskItems: [] }, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
 
 describe('workflow adoption by existing project forms', () => {
   it('submits a custom project task status ID with its category from the detailed task form', async () => {

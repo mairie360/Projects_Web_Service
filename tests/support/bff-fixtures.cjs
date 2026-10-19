@@ -22,6 +22,7 @@ function projectTask(overrides = {}) {
     id: 'task-1',
     title: 'Relevé des candélabres',
     status,
+    statusId: STATUS_IDS[status],
     statusLabel: STATUS_LABELS[status],
     responsible: people.marie,
     assignees: [people.marie, people.alice],
@@ -135,4 +136,16 @@ const b64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url
  */
 const jwt = (sub, exp = 4102444800) => `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: String(sub), exp })}.signature`;
 
-module.exports = { agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };
+// Per-project task statuses (MAIR-567): one status per legacy task status, so each task's `statusId` resolves.
+// The contract identifies a status as `status-<n>`.
+const STATUS_IDS = { todo: 'status-1', 'in-progress': 'status-2', review: 'status-3', done: 'status-4' };
+const STATUS_CATEGORIES = { todo: 'todo', 'in-progress': 'in-progress', review: 'in-progress', done: 'done' };
+const STATUS_COLORS = { todo: '#57606a', 'in-progress': '#0969da', review: '#8250df', done: '#1a7f37' };
+function projectTaskStatuses() {
+  return { statuses: Object.entries(STATUS_LABELS).map(([status, name], position) => ({
+    id: STATUS_IDS[status], name, color: STATUS_COLORS[status], category: STATUS_CATEGORIES[status], position, taskCount: 0,
+  })) };
+}
+const archivedTasks = (tasks = []) => ({ tasks, pagination: { page: 1, limit: 100, total: tasks.length, hasNextPage: false } });
+
+module.exports = { projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };

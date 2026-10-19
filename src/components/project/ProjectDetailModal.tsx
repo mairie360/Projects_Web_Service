@@ -90,7 +90,10 @@ export function ProjectDetailModal({
   const receiveWorkflow = React.useCallback((snapshot: ProjectWorkflowSnapshot) => setWorkflow(snapshot), []);
   const dynamicStatuses = workflow?.projectId === project.id ? workflow.statuses : undefined;
   const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? statusOptions;
-  const [showTaskDetails, setShowTaskDetails] = React.useState(false);
+  // The detailed task list (follow-up, comments, task links) stays visible by default; the button only hides it.
+  const [showTaskDetails, setShowTaskDetails] = React.useState(true);
+  const firstStatusOf = (category: 'todo' | 'inprogress' | 'done') => dynamicStatuses?.find(status => status.category === category)?.id;
+  const categoryOf = (status: ProjectStatus) => status === 'done' ? 'done' as const : status === 'todo' ? 'todo' as const : 'inprogress' as const;
   const categoryStatus = (id: string): ProjectStatus => {
     const category = dynamicStatuses?.find(status => status.id === id)?.category;
     return category === 'inprogress' ? 'in-progress' : category ?? 'todo';
@@ -446,7 +449,9 @@ export function ProjectDetailModal({
       return;
     }
 
-    if (dynamicStatuses && !dynamicStatuses.some(status => status.id === taskForm.statusId)) {
+    // Without an explicit choice, a task takes the project's first status of its form category.
+    const formStatusId = dynamicStatuses && dynamicStatuses.some(status => status.id === taskForm.statusId) ? taskForm.statusId : firstStatusOf(categoryOf(taskForm.status));
+    if (dynamicStatuses && !formStatusId) {
       setTaskFormError('Choisissez un statut du projet pour la tâche.');
       return;
     }
@@ -459,8 +464,8 @@ export function ProjectDetailModal({
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
-      status: dynamicStatuses ? categoryStatus(taskForm.statusId ?? '') : taskForm.status,
-      ...(dynamicStatuses ? { statusId: taskForm.statusId } : {}),
+      status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : taskForm.status,
+      ...(dynamicStatuses ? { statusId: formStatusId } : {}),
       responsible: assignees[0],
       assignees,
       priority: taskForm.priority,
@@ -556,7 +561,8 @@ export function ProjectDetailModal({
                   </button>
                 </div>
               )}
-              <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} onSnapshot={receiveWorkflow} onMutation={() => void onRetry?.()} />
+{/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). */}
+              {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onMutation={() => void onRetry?.()} />}
               {dynamicStatuses && <button type="button" className="mb-4 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 text-sm" aria-expanded={showTaskDetails} onClick={() => setShowTaskDetails(value => !value)}>Détails des tâches</button>}
               {project.permissions?.canCreateTask !== false && (
                 <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
@@ -586,8 +592,9 @@ export function ProjectDetailModal({
                     <SelectField
                       id="detail-task-status"
                       label="Statut"
-                      value={dynamicStatuses ? taskForm.statusId ?? '' : taskForm.status}
-                      options={dynamicStatuses ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
+
+                      value={dynamicStatuses ? (dynamicStatuses.some(status => status.id === taskForm.statusId) ? taskForm.statusId : firstStatusOf(categoryOf(taskForm.status))) ?? '' : taskForm.status}
+                      options={dynamicStatuses && !firstStatusOf(categoryOf(taskForm.status)) ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
                       onChange={(status) => updateTaskForm(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] })}
                     />
                     <SelectField
@@ -736,14 +743,16 @@ export function ProjectDetailModal({
                         >
                           <button
                             type="button"
-                            disabled={!!dynamicStatuses || mutationPending || taskMutationBlocked || !canUpdateStatus}
+                            disabled={(!!dynamicStatuses && !firstStatusOf(task.completed || task.status === 'done' ? 'todo' : 'done')) || mutationPending || taskMutationBlocked || !canUpdateStatus}
                             className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
                             aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
                             onClick={() =>
                               onUpdateTaskStatus(
                                 project.id,
                                 task.id,
-                                task.completed || task.status === 'done' ? 'todo' : 'done'
+                                task.completed || task.status === 'done' ? 'todo' : 'done',
+                                // With project statuses, completing uses the first "Terminé" status, reopening the first "À faire".
+                                dynamicStatuses ? firstStatusOf(task.completed || task.status === 'done' ? 'todo' : 'done') : undefined
                               )
                             }
                           >

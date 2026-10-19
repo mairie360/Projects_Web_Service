@@ -14,15 +14,23 @@ function mapTemplate(value: Awaited<ReturnType<Operations['getProjectTemplates']
   return template;
 }
 export function createPublishedProjectWorkflowPort(operations: Operations): ProjectWorkflowPort {
-  const readProject: ProjectWorkflowPort['readProject'] = async (projectId, signal) => {
+  const mapStatuses = (statuses: Awaited<ReturnType<Operations['getProjectsProjectIdStatuses']>>['data']['statuses']) =>
+    [...statuses].sort((a, b) => a.position - b.position).map(status => ({ id: status.id, name: status.name, color: status.color, category: fromCategory(status.category), taskCount: status.taskCount }));
+  const readActiveTasks = async (projectId: string, signal: AbortSignal) => {
+    const { data } = await operations.getProjectsProjectId(segment(projectId), { signal });
+    if (data.project.id !== projectId) throw new Error(WORKFLOW_UNVERIFIED);
+    return data.taskItems;
+  };
+  // A caller that already holds the project detail passes its active tasks: the detail is not read twice.
+  // Write preflights and confirmations never pass them, so they always read the current detail.
+  const readProject: ProjectWorkflowPort['readProject'] = async (projectId, signal, loaded) => {
     signal.throwIfAborted();
-    const [statusResponse, detailsResponse, firstArchived] = await Promise.all([
+    const [statusResponse, activeTasks, firstArchived] = await Promise.all([
       operations.getProjectsProjectIdStatuses(segment(projectId), { signal }),
-      operations.getProjectsProjectId(segment(projectId), { signal }),
+      loaded ? Promise.resolve(loaded.tasks) : readActiveTasks(projectId, signal),
       operations.getProjectsProjectIdArchivedTasks(segment(projectId), { page: 1, limit: 100 }, { signal }),
     ]);
     signal.throwIfAborted();
-    if (detailsResponse.data.project.id !== projectId) throw new Error(WORKFLOW_UNVERIFIED);
     const archived = [...firstArchived.data.tasks];
     let pagination = firstArchived.data.pagination;
     if (pagination.page !== 1) throw new Error(WORKFLOW_UNVERIFIED);
@@ -39,11 +47,18 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       return readNextArchivedPage();
     };
     await readNextArchivedPage();
-    const statuses = [...statusResponse.data.statuses].sort((a, b) => a.position - b.position).map(status => ({ id: status.id, name: status.name, color: status.color, category: fromCategory(status.category), taskCount: status.taskCount }));
-    const tasks = [...detailsResponse.data.taskItems, ...archived].map(task => ({ id: task.id, title: task.title, statusId: task.statusId ?? '', canUpdateStatus: task.permissions?.canUpdateStatus === true }));
+    const statuses = mapStatuses(statusResponse.data.statuses);
+    const tasks = [...activeTasks, ...archived].map(task => ({ id: task.id, title: task.title, statusId: task.statusId ?? '', canUpdateStatus: task.permissions?.canUpdateStatus === true }));
     const snapshot = { projectId, statuses, tasks, revision: fingerprint({ statuses, tasks }) };
     assertWorkflowSnapshot(snapshot, projectId);
     return snapshot;
+  };
+  const readStatuses: NonNullable<ProjectWorkflowPort['readStatuses']> = async (projectId, signal) => {
+    const { data } = await operations.getProjectsProjectIdStatuses(segment(projectId), { signal });
+    signal.throwIfAborted();
+    const statuses = mapStatuses(data.statuses);
+    if (!validStatuses(statuses)) throw new Error(WORKFLOW_UNVERIFIED);
+    return statuses;
   };
   const readTemplates: ProjectWorkflowPort['readTemplates'] = async signal => {
     const response = await operations.getProjectTemplates({ signal }); signal.throwIfAborted();
@@ -57,7 +72,7 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
     return current;
   };
   return {
-    readProject, readTemplates,
+    readProject, readStatuses, readTemplates,
     moveTask: async (draft, signal) => {
       const before = await preflight(draft.projectId, draft.revision, signal);
       if (!before.statuses.some(status => status.id === draft.statusId) || !before.tasks.some(task => task.id === draft.taskId && task.canUpdateStatus)) throw new Error(WORKFLOW_UNVERIFIED);

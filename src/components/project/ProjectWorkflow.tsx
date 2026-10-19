@@ -2,16 +2,16 @@
 import React from 'react';
 import { TaskStatusKanban } from './TaskStatusKanban';
 import { StatusDefinitionEditor, workflowControl } from './StatusDefinitionEditor';
-import { assertTemplate, assertWorkflowSnapshot, canManageWorkflow, categoryLabels, sameStatuses, validStatuses, validTemplateStatuses, WORKFLOW_UNAVAILABLE, WORKFLOW_UNVERIFIED, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
+import { assertTemplate, assertWorkflowSnapshot, canManageWorkflow, categoryLabels, sameStatuses, validStatuses, validTemplateStatuses, WORKFLOW_UNAVAILABLE, WORKFLOW_UNVERIFIED, type ProjectTemplate, type LoadedWorkflowTask, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 
 const message = (error: unknown) => error instanceof Error ? error.message : WORKFLOW_UNVERIFIED;
 const copyStatuses = (statuses: TaskStatusDefinition[]) => statuses.map(status => ({ ...status }));
 
-export function ProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey }: { projectId: string; role?: string; port?: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown }) {
+export function ProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks }: { projectId: string; role?: string; port?: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[] }) {
   // A keyed child owns all drafts, requests and confirmations for one project.
-  return port ? <ConnectedProjectWorkflow key={projectId} projectId={projectId} role={role} port={port} onSnapshot={onSnapshot} onMutation={onMutation} refreshKey={refreshKey} /> : <p className="mb-4 rounded-md border border-[#d9d5d0] bg-white p-3 text-sm text-[#536171]">{WORKFLOW_UNAVAILABLE}</p>;
+  return port ? <ConnectedProjectWorkflow key={projectId} projectId={projectId} role={role} port={port} onSnapshot={onSnapshot} onMutation={onMutation} refreshKey={refreshKey} loadedTasks={loadedTasks} /> : <p className="mb-4 rounded-md border border-[#d9d5d0] bg-white p-3 text-sm text-[#536171]">{WORKFLOW_UNAVAILABLE}</p>;
 }
-function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey }: { projectId: string; role?: string; port: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown }) {
+function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks }: { projectId: string; role?: string; port: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[] }) {
   const [snapshot, setSnapshot] = React.useState<ProjectWorkflowSnapshot | null>(null);
   const [statuses, setStatuses] = React.useState<TaskStatusDefinition[]>([]);
   const statusesRef = React.useRef(statuses);
@@ -25,6 +25,9 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
   const [notice, setNotice] = React.useState('');
   const onSnapshotRef = React.useRef(onSnapshot);
   React.useEffect(() => { onSnapshotRef.current = onSnapshot; }, [onSnapshot]);
+  // The detail's own active tasks: the refresh below reuses them instead of reading the detail again.
+  const loadedTasksRef = React.useRef(loadedTasks);
+  React.useEffect(() => { loadedTasksRef.current = loadedTasks; }, [loadedTasks]);
   const active = React.useRef(true);
   const busy = React.useRef(false);
   const readRequest = React.useRef<AbortController | null>(null);
@@ -37,7 +40,7 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
     setLoading(true);
     setError('');
     try {
-      const response = await port.readProject(projectId, controller.signal);
+      const response = await port.readProject(projectId, controller.signal, loadedTasksRef.current ? { tasks: loadedTasksRef.current } : undefined);
       if (!active.current || controller.signal.aborted || readRequest.current !== controller) return;
       assertWorkflowSnapshot(response, projectId);
       setSnapshot(response);

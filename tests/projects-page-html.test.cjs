@@ -985,6 +985,8 @@ test('a confirmed inline task creation is not offered for retry when the followi
     ? harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée'))
     : { body: fixtures.projectDetails() });
   await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
+  // The card form first reads the project statuses (MAIR-567).
+  await view.waitFor(html => !html.includes('Chargement des statuts du projet'));
   await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Tâche enregistrée' } });
   await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
   await view.waitFor(() => alertText()?.includes('Actualisation impossible'));
@@ -1227,7 +1229,8 @@ test('task follow-up preserves its draft across a same-project status refresh', 
   await view.waitFor(html => html.includes('Devis reçu.'));
   await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Brouillon encore présent' } });
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: fixtures.projectTask({ status: 'done' }) });
-  await view.fire(props => props['aria-label'] === 'Statut de Relevé des candélabres', 'onChange', { target: { value: 'done' } });
+  // The selector offers the project statuses (MAIR-567): status-4 is the fixtures' "Terminé".
+  await view.fire(props => props['aria-label'] === 'Statut de Relevé des candélabres', 'onChange', { target: { value: 'status-4' } });
   await view.waitFor(() => alertText()?.includes('mis à jour'));
   assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value="Brouillon encore présent"/);
   assert.match(view.text(), /Devis reçu\./);

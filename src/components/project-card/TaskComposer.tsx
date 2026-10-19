@@ -145,8 +145,11 @@ function TaskComposerForm({
       if (controller.signal.aborted) return;
       setStatusLoading(true); setStatusUnavailable(false);
       try {
-        const snapshot = await workflowPort.readProject(project.id, controller.signal);
-        if (!controller.signal.aborted && snapshot.projectId === project.id) setDynamicStatuses(snapshot.statuses);
+        // Choosing a status needs the statuses alone, not the project detail and its archived tasks.
+        const statuses = workflowPort.readStatuses
+          ? await workflowPort.readStatuses(project.id, controller.signal)
+          : (await workflowPort.readProject(project.id, controller.signal)).statuses;
+        if (!controller.signal.aborted) setDynamicStatuses(statuses);
       } catch { if (!controller.signal.aborted) setStatusUnavailable(true); }
       finally { if (!controller.signal.aborted) setStatusLoading(false); }
     });
@@ -190,6 +193,11 @@ function TaskComposerForm({
   const availableLabels =
     labelOptions.length > 0 ? labelOptions : project.labels.map((label) => ({ label, value: label }));
 
+  // Without an explicit choice, a task takes the project's first status of its default category.
+  const defaultCategory = status === 'done' ? 'done' : status === 'todo' ? 'todo' : 'inprogress';
+  const effectiveStatusId = dynamicStatuses?.some(item => item.id === statusId)
+    ? statusId
+    : dynamicStatuses?.find(item => item.category === defaultCategory)?.id ?? '';
   const submitTask = async () => {
     if (savingRef.current || creationState?.pending) return;
     if (creationBlocked) {
@@ -197,13 +205,13 @@ function TaskComposerForm({
       noticeRef.current?.focus();
       return;
     }
-    if (statusLoading) { setError('Les statuts sont en cours de chargement.'); return; }
-    if (dynamicStatuses && !dynamicStatuses.some(item => item.id === statusId)) { setError('Choisissez un statut du projet.'); return; }
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setError('Le titre de la tâche est obligatoire.');
       return;
     }
+    if (statusLoading) { setError('Les statuts sont en cours de chargement.'); return; }
+    if (dynamicStatuses && !effectiveStatusId) { setError('Choisissez un statut du projet.'); return; }
 
     const assigneeValues = Array.from(
       new Set((assignees.length > 0 ? assignees : [getPersonValue(project.responsible)]).filter(Boolean))
@@ -217,7 +225,7 @@ function TaskComposerForm({
       await onAddTask(project, {
         title: trimmedTitle,
         status,
-        ...(dynamicStatuses ? { statusId } : {}),
+        ...(dynamicStatuses ? { statusId: effectiveStatusId } : {}),
         responsible: selectedAssignees[0] ?? project.responsible,
         assignees: selectedAssignees,
         priority,
@@ -299,7 +307,7 @@ function TaskComposerForm({
       {statusLoading && <p className="mt-2 text-xs text-[#536171]">Chargement des statuts du projet…</p>}
       {statusUnavailable && <p className="mt-2 text-xs text-[#536171]">Statuts personnalisés indisponibles ; les catégories standard restent disponibles.</p>}
       <div className="mt-2 grid grid-cols-2 gap-2">
-        {dynamicStatuses ? <select aria-label="Statut" value={statusId} className={compactFieldClassName} onChange={event => {
+        {dynamicStatuses ? <select aria-label="Statut" value={effectiveStatusId} className={compactFieldClassName} onChange={event => {
           const id = event.target.value;
           const category = dynamicStatuses.find(item => item.id === id)?.category;
           const value = category === 'inprogress' ? 'in-progress' : category ?? 'todo';

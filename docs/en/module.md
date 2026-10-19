@@ -1,5 +1,28 @@
 # Projects_Web_Service — Module overview
 
+## Per-project task statuses and project templates (MAIR-567)
+
+Each project has its own task statuses (name, colour, category To do / In
+progress / Done, order), read from `GET /projects/{projectId}/statuses`. The
+project sheet shows the Kanban columns and status selectors built from them, and
+the card task form offers them. Managers (Responsable) and administrators can add,
+rename, recolour, recategorise, reorder or delete a status (deletion asks for the
+target status of its tasks), and manage project templates; creating a project can
+start from a template whose statuses are previewed first. Every write waits for a
+confirmed receipt and a re-read; an unverified write keeps the draft and asks for
+a fresh read.
+
+Reads stay minimal (MAIR-526): the sheet passes the tasks of the detail it already
+loaded, so opening a project reads `GET /projects/{projectId}` once, then the
+statuses and archived tasks once; the card task form reads the statuses alone.
+Write preflights and confirmations always read the current detail.
+
+The sheet keeps its existing behaviour: the detailed task list (follow-up,
+comments, task links) stays visible and the « Détails des tâches » button only
+hides it; a new task without an explicit choice takes the project's first status
+of its form category (À faire / En cours / Terminé); the completion checkbox
+moves a task to the first « Terminé » status, or back to the first « À faire ».
+
 ## Functional stabilization composition (6 October 2026)
 
 This candidate retains the functional work covered by the existing project,
