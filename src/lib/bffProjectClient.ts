@@ -116,7 +116,7 @@ function normalizeProject<T extends Project>(project: T): T {
   };
 }
 
-function normalizeProjectDetails(details: ProjectDetailsResponse): ProjectDetailsResponse {
+export function normalizeProjectDetails(details: ProjectDetailsResponse): ProjectDetailsResponse {
   const taskItems = details.taskItems.map(normalizeProjectTask);
 
   return {

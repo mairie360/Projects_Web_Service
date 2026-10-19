@@ -122,7 +122,7 @@ test('MAIR-567: templates are read, created, edited and used for a new project o
     getProjectTemplates: async () => ({ data: { templates } }),
     postProjectTemplates: async (body) => { const value = { id: 'template-2', ...body, statuses: body.statuses.map((item, position) => ({ ...item, position })) }; templates = [...templates, value]; return { data: value }; },
     patchProjectTemplatesTemplateId: async (id, body) => { const value = { id, ...body, statuses: body.statuses.map((item, position) => ({ ...item, position })) }; templates = templates.map(item => item.id === id ? value : item); return { data: value }; },
-    postProjects: async (body) => { created.push(body); return { data: { project: { id: 'project-9' } } }; },
+    postProjects: async (body) => { created.push(body); return { data: { project: { id: 'project-9', dueDate: '2026-12-15', createdAt: '2026-09-01' }, taskItems: [] } }; },
   }));
   const [voirie] = await port.readTemplates(signal());
   assert.deepEqual(voirie.statuses.map(item => [item.name, item.category]), [['Demande', 'todo'], ['Instruction', 'inprogress'], ['Clos', 'done']]);
@@ -137,4 +137,34 @@ test('MAIR-567: templates are read, created, edited and used for a new project o
   assert.deepEqual(created, [{ title: 'Réfection', templateId: 'template-1' }]);
   await assert.rejects(port.createProjectFromTemplate(voirie, { title: 'Obsolète' }), /Sélectionnez à nouveau un modèle/);
   assert.equal(created.length, 1);
+});
+
+test('MAIR-567: status receipts are read in position order whatever order the service returns', async () => {
+  let columns = statuses.map(item => ({ ...item }));
+  const reversed = () => ({ data: { statuses: columns.map((item, position) => ({ ...item, position })).reverse() } });
+  const port = createPublishedProjectWorkflowPort(service({
+    getProjectsProjectIdStatuses: async () => reversed(),
+    patchProjectsProjectIdStatusesStatusId: async (_id, id, body) => {
+      if (body.position !== undefined) {
+        const moving = columns.find(item => item.id === id);
+        columns = columns.filter(item => item.id !== id);
+        columns.splice(body.position, 0, moving);
+      } else columns = columns.map(item => item.id === id ? { ...item, ...body } : item);
+      return reversed();
+    },
+  }));
+  const before = await port.readProject('project-1', signal());
+  const next = [{ ...before.statuses[0], name: 'Dossier reçu' }, before.statuses[1], before.statuses[2]];
+  const after = await port.saveProjectStatuses({ projectId: 'project-1', revision: before.revision, statuses: next, migrations: [] }, signal());
+  assert.deepEqual(after.statuses.map(item => item.name), ['Dossier reçu', 'Validation', 'Archivé']);
+});
+
+test('MAIR-567: a project created from a template is normalized like an ordinary creation', async () => {
+  const templates = [{ id: 'template-1', name: 'Voirie', statuses: templateStatuses }];
+  const created = { project: { id: 'project-9', title: 'Réfection', dueDate: '2026-12-15T00:00:00.000Z', createdAt: '2026-09-01T08:30:00.000Z' }, taskItems: [] };
+  const port = createPublishedProjectWorkflowPort(service({ getProjectTemplates: async () => ({ data: { templates } }), postProjects: async () => ({ data: created }) }));
+  const [template] = await port.readTemplates(signal());
+  const details = await port.createProjectFromTemplate(template, { title: 'Réfection' });
+  assert.equal(details.project.dueDate, '2026-12-15');
+  assert.equal(details.project.createdAt, '2026-09-01');
 });

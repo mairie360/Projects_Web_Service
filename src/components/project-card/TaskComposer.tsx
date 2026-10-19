@@ -176,6 +176,7 @@ function TaskComposerForm({
     if (!open && !creationBlocked) {
       setTitle('');
       setStatus(project.status);
+      setStatusId('');
       setPriority(project.priority);
       setAssignees([getPersonValue(project.responsible)]);
       setLabels([]);

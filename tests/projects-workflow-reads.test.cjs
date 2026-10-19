@@ -118,3 +118,31 @@ test('MAIR-567: completing a task from the sheet moves it to the first "Terminé
 
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch')[0].body, { statusId: 'status-4' });
 });
+
+test('MAIR-567: a status chosen in a cancelled card form does not survive its reopening', async () => {
+  const statuses = [
+    { id: 'status-a', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
+    { id: 'status-b', name: 'En instruction', color: '#4b908d', category: 'inprogress' },
+    { id: 'status-c', name: 'Dossiers clos', color: '#267845', category: 'done' },
+  ];
+  const saved = [];
+  const workflowPort = { readStatuses: async () => statuses, readProject: async () => { throw new Error('not expected'); }, readTemplates: async () => [] };
+  view = mount(React.createElement(TaskComposer, { project, workflowPort, onAddTask: async (_project, draft) => { saved.push(draft); } }));
+  await view.waitFor(html => html.includes('Ajouter une tâche'));
+  const openForm = () => view.fire((_props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'), 'onClick', { stopPropagation() {} });
+  const statusSelect = () => view.hostElements((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Statut')[0];
+  await openForm();
+  await view.waitFor(html => html.includes('Dossiers clos'));
+  await view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Statut', 'onChange', { target: { value: 'status-c' } });
+  await view.click((_props, text, tag) => tag === 'button' && text === 'Annuler');
+  await openForm();
+  await view.waitFor(html => html.includes('Dossiers clos'));
+
+  // The project default status is 'in-progress' (fixtures), so its first "En cours" status is offered again.
+  assert.equal(statusSelect().props.value, 'status-b');
+  await view.fire((props, _text, tag) => tag === 'input' && props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Nouvelle demande' } });
+  await view.fire((_props, _text, tag) => tag === 'form', 'onSubmit', { preventDefault() {} });
+  await view.waitFor(() => saved.length === 1);
+  assert.equal(saved[0].statusId, 'status-b');
+  assert.equal(saved[0].status, 'in-progress');
+});

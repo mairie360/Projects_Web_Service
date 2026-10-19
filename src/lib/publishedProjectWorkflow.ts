@@ -1,7 +1,8 @@
-import { bffProject, type CreateProjectBody } from './bffProjectClient';
+import { bffProject, normalizeProjectDetails, type CreateProjectBody, type ProjectDetailsResponse } from './bffProjectClient';
 import { assertTemplate, assertWorkflowSnapshot, sameStatuses, validStatuses, WORKFLOW_UNVERIFIED, type ProjectTemplate, type ProjectWorkflowPort, type TaskStatusDefinition } from './projectWorkflow';
 
 type Operations = typeof bffProject;
+type ServiceStatuses = Awaited<ReturnType<Operations['getProjectsProjectIdStatuses']>>['data']['statuses'];
 const segment = encodeURIComponent;
 const toCategory = (category: 'todo' | 'inprogress' | 'done') => category === 'inprogress' ? 'in-progress' as const : category;
 const fromCategory = (category: string): TaskStatusDefinition['category'] => category === 'in-progress' ? 'inprogress' : category as TaskStatusDefinition['category'];
@@ -87,6 +88,8 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       if (!validStatuses(draft.statuses)) throw new Error('Les statuts saisis sont invalides.');
       const current = await preflight(draft.projectId, draft.revision, signal);
       const ids = new Map(current.statuses.map(status => [status.id, status.id]));
+      // Every receipt is read in position order: the reorder phase compares positions by index.
+      const byPosition = (items: ServiceStatuses) => [...items].sort((a, b) => a.position - b.position).map(item => ({ ...item, category: fromCategory(item.category) }));
       // Published operations are individual CRUD writes. Stop at the first
       // uncertain receipt; the UI retains its draft and requires a fresh read.
       let serverStatuses = current.statuses;
@@ -99,7 +102,7 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         const created = receipt.data.statuses.filter(item => !knownIds.has(item.id) && item.name === status.name && item.color.toLowerCase() === status.color.toLowerCase() && fromCategory(item.category) === status.category);
         if (created.length !== 1) throw new Error(WORKFLOW_UNVERIFIED);
         ids.set(status.id, created[0].id);
-        serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
+        serverStatuses = byPosition(receipt.data.statuses);
       }, Promise.resolve());
       // Apply changed categories before removal, retaining the service's own
       // invariant that each category must have a status.
@@ -112,7 +115,7 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         signal.throwIfAborted();
         const confirmed = receipt.data.statuses.find(item => item.id === id);
         if (!confirmed || confirmed.name !== status.name || confirmed.color.toLowerCase() !== status.color.toLowerCase() || fromCategory(confirmed.category) !== status.category) throw new Error(WORKFLOW_UNVERIFIED);
-        serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
+        serverStatuses = byPosition(receipt.data.statuses);
       }, Promise.resolve());
       await current.statuses.filter(item => !draft.statuses.some(next => next.id === item.id)).reduce(async (previous, status) => {
         await previous;
@@ -122,7 +125,7 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         const receipt = await operations.deleteProjectsProjectIdStatusesStatusId(segment(draft.projectId), segment(status.id), { moveTo: targetId }, { signal });
         signal.throwIfAborted();
         if (receipt.data.statuses.some(item => item.id === status.id) || !receipt.data.statuses.some(item => item.id === targetId)) throw new Error(WORKFLOW_UNVERIFIED);
-        serverStatuses = receipt.data.statuses.map(item => ({ ...item, category: fromCategory(item.category) }));
+        serverStatuses = byPosition(receipt.data.statuses);
       }, Promise.resolve());
       await draft.statuses.reduce(async (previous, status, position) => {
         await previous;
@@ -130,7 +133,7 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
         if (serverStatuses[position]?.id === id) return;
         const receipt = await operations.patchProjectsProjectIdStatusesStatusId(segment(draft.projectId), segment(id), { position }, { signal });
         signal.throwIfAborted();
-        serverStatuses = [...receipt.data.statuses].sort((a, b) => a.position - b.position).map(item => ({ ...item, category: fromCategory(item.category) }));
+        serverStatuses = byPosition(receipt.data.statuses);
         if (serverStatuses[position]?.id !== id) throw new Error(WORKFLOW_UNVERIFIED);
       }, Promise.resolve());
       const after = await readProject(draft.projectId, signal);
@@ -155,7 +158,8 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       const signal = new AbortController().signal;
       const templates = await readTemplates(signal);
       if (!templates.some(item => item.id === template.id && item.revision === template.revision)) throw new Error('Le modèle a changé. Sélectionnez à nouveau un modèle.');
-      return (await operations.postProjects({ ...body, templateId: template.id })).data;
+      // Same date normalization as an ordinary project creation (createProject).
+      return normalizeProjectDetails((await operations.postProjects({ ...body, templateId: template.id })).data as ProjectDetailsResponse);
     },
   };
 }
