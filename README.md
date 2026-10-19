@@ -1,5 +1,9 @@
 # Projects_Web_Service
 
+## Production contracts — 16 October 2026 (MAIR-569)
+
+The contracts are pinned on their production releases: `@mairie360/bff-project-openapi@1.0.0` (dependency) and `@mairie360/bff-user-openapi@1.0.0` (session types, devDependency); `contracts/openapi.json` is rebuilt from the first one. Every `docker-compose*.yml` starts the matching `ghcr.io/mairie360/bff-project:1.0.0` and `ghcr.io/mairie360/bff-user:1.0.0` images. The 1.0.0 contract adds the required `tasks.active` / `tasks.archived` counts, which the front now reads (see [the module documentation](docs/en/module.md)), and the task status / project template routes of MAIR-566, which it does not use yet. The section below describes the earlier dev pin.
+
 ## Shared sessions and instance preferences — 15 October 2026
 
 The `feat/shared-session-runtime` integration starts at `origin/main` commit `75e03aedd954540cb2817cb76874bc3a0402e812`. It adopts the reviewed `@mairie360/front-kit@0.1.0` local artifact, published UI library `@mairie360/lib-components@0.8.0`, shared session renewal, SSR navigation role, instance timezone and confirmed appearance. The artifact's exact source and integrity are recorded in [its provenance](vendor/front-kit-provenance.json); [runtime configuration and verification](docs/en/shared-runtime.md) describe the common integration.

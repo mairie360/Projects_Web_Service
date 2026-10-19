@@ -12,7 +12,7 @@ import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSqua
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import { createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { archivedTasksLabel, createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
@@ -637,6 +637,7 @@ export function ProjectDetailModal({
                   </div>
                   <span className="text-xs font-medium text-[#57606a]">
                     {project.tasks.completed}/{project.tasks.total}
+                    {project.tasks.archived > 0 && ` · ${archivedTasksLabel(project.tasks.archived)}`}
                   </span>
                 </div>
 

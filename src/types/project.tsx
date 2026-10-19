@@ -70,9 +70,12 @@ export interface Project {
   priorityLabel?: string;
   labels: string[];
   taskItems?: ProjectTask[];
+  /** BFF task counts: `total` and `completed` include the archived (done) tasks, `taskItems` only lists the `active` ones. */
   tasks: {
     total: number;
     completed: number;
+    active: number;
+    archived: number;
   };
   permissions?: {
     canView?: boolean;

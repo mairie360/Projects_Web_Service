@@ -298,14 +298,14 @@ describe("Projects page", () => {
     await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
     const expected = successfulRead ? verified.title : confirmed.title;
     expect(await screen.findByRole('heading', { name: expected })).toBeTruthy();
-    await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2 } }, [task, other])));
+    await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2, active: 9, archived: 0 } }, [task, other])));
     expect(await screen.findByRole('dialog', { name: 'Projet confirmé tardivement' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: expected })).toBeTruthy();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
     expect(title.value).toBe('Brouillon à conserver');
     expect(screen.getByText('Tâches').parentElement.textContent).toContain('2/9');
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
-    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', tasks: { total: 2, completed: 1 }, progress: 50 }, [verified, other]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', tasks: { total: 2, completed: 1, active: 2, archived: 0 }, progress: 50 }, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(screen.getByRole('heading', { name: verified.title })).toBeTruthy();
@@ -459,7 +459,7 @@ describe("Projects page", () => {
     expect(await screen.findByRole('button', { name: 'Réessayer la fiche' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: task.title })).toBeNull();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
-    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, tasks: { total: 1, completed: 0 } }, [other]));
+    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, tasks: { total: 1, completed: 0, active: 1, archived: 0 } }, [other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(deleteProjectTask).toHaveBeenCalledTimes(1);
@@ -494,7 +494,7 @@ describe("Projects page", () => {
     expect(retry.getAttribute('aria-busy')).toBe('true');
     await user.dblClick(retry);
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
-    await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
+    await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1, active: 3, archived: 0 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(screen.getByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
     expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/3');
