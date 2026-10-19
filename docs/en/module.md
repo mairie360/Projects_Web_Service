@@ -2,11 +2,13 @@
 
 ## Security scan scope (ZAP rule 10031)
 
-ZAP rule 10031 flags a URL parameter value found in an HTML attribute. `?view=`
-only accepts `kanban`, `grid` or `table`, and `grid` is also a Tailwind class on
-every page, so the root `/?view=…` URL alone is out of scope for that rule in
-`.zap/rules.tsv`. Every other URL and parameter is still scanned by 10031;
-`tests/zap-rules.test.cjs` pins that scope.
+ZAP rule 10031 flags a URL parameter value found in an HTML attribute. `view`,
+`status` and `priority` only accept the enum values of `src/lib/project-page-query.ts`
+(`grid` is also a Tailwind class on every page, and the filter values are the
+selected options), so the root URL whose query holds nothing but those enum values
+is out of scope for that rule in `.zap/rules.tsv`. Every other URL and parameter
+(search text, page, any unknown value) is still scanned by 10031;
+`tests/zap-rules.test.cjs` pins that scope and fails if the contract enums change.
 
 ## Per-project task statuses and project templates (MAIR-567)
 
