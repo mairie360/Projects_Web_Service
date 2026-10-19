@@ -75,6 +75,7 @@ test('consumer CI retains blocking security defaults and explicit named secrets'
   assert.doesNotMatch(ci, /secrets:\s*inherit|continue-on-error:|image_scan_fail_on_findings:|semgrep_fail_on_findings:\s*false/);
   assert.deepEqual([...ci.matchAll(/^ {6}([A-Z0-9_]+): \$\{\{ secrets\.([A-Z0-9_]+) \}\}$/gm)].map(([, target, source]) => [target, source]), [
     ['CODECOV_TOKEN', 'CODECOV_TOKEN'], ['N8N_WEBHOOK_SECRET', 'N8N_WEBHOOK_SECRET'],
+    ['ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'], ['RELEASE_APP_ID', 'RELEASE_APP_ID'], ['RELEASE_APP_PK', 'RELEASE_APP_PK'],
   ]);
 });
 
@@ -109,11 +110,14 @@ test('the exact required legacy status executes both real blocking scanners with
 test('the existing reusable frontend workflow keeps its blocking defaults and only declared secrets', () => {
   assert.deepEqual(workflow().jobs.CICD, {
     permissions: { contents: 'write', packages: 'write', 'id-token': 'write' },
-    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@5b7d127d46f95d8951935b6209ca7c2ca857a21d',
-    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: '5b7d127d46f95d8951935b6209ca7c2ca857a21d' },
+    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@bbd2207256969f9f63e5477452d86e1f6c56339d',
+    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: 'bbd2207256969f9f63e5477452d86e1f6c56339d' },
     secrets: {
       CODECOV_TOKEN: '${{ secrets.CODECOV_TOKEN }}',
       N8N_WEBHOOK_SECRET: '${{ secrets.N8N_WEBHOOK_SECRET }}',
+      ANTHROPIC_API_KEY: '${{ secrets.ANTHROPIC_API_KEY }}',
+      RELEASE_APP_ID: '${{ secrets.RELEASE_APP_ID }}',
+      RELEASE_APP_PK: '${{ secrets.RELEASE_APP_PK }}',
     },
   });
 });
