@@ -20,6 +20,8 @@ import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE
 
 export function ProjectsWorkspace({
   workflowPort,
+  moveWorkflowTask,
+  saveWorkflowStatuses,
   readCurrentTaskAssignee,
   projectsPage,
   projects,
@@ -133,6 +135,8 @@ export function ProjectsWorkspace({
         <ProjectDetailModal
           project={selectedProject}
           workflowPort={workflowPort}
+          onMoveWorkflowTask={moveWorkflowTask}
+          onSaveWorkflowStatuses={saveWorkflowStatuses}
           workflowRole={projectsPage?.access.role}
           readCurrentTaskAssignee={readCurrentTaskAssignee}
           tasks={selectedProjectTasks}

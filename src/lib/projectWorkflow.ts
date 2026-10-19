@@ -21,6 +21,16 @@ export type ProjectWorkflowPort = {
   createProjectFromTemplate?: (template: Pick<ProjectTemplate, 'id' | 'revision'>, body: CreateProjectBody) => Promise<ProjectDetailsResponse>;
 };
 
+/** A workflow write refused before dispatch (MAIR-570): nothing was sent, so nothing needs verification. */
+export class WorkflowWriteRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkflowWriteRefusedError';
+  }
+}
+export const WORKFLOW_STATUS_SAVE_PENDING = 'Les statuts du projet sont en cours d’enregistrement. Réessayez après leur confirmation.';
+export const WORKFLOW_TASK_WRITE_PENDING = 'Une modification de tâche est en cours sur ce projet. Réessayez après sa confirmation.';
+export const WORKFLOW_TASKS_UNVERIFIED = 'Des tâches de ce projet sont à vérifier. Relisez la fiche avant de modifier les statuts.';
 export const WORKFLOW_UNAVAILABLE = 'La configuration des statuts et des modèles est indisponible avec le service actuellement connecté.';
 export const WORKFLOW_UNVERIFIED = 'La modification n’a pas pu être vérifiée. Relisez les données avant toute nouvelle écriture.';
 export const categoryLabels: Record<TaskStatusCategory, string> = { todo: 'À faire', inprogress: 'En cours', done: 'Terminé' };

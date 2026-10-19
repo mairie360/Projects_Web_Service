@@ -27,6 +27,15 @@ seule fois, puis les statuts et les tâches archivées une fois ; le formulaire 
 tâche des cartes ne lit que les statuts. Les vérifications avant et après une
 écriture relisent toujours le détail courant.
 
+Les écritures des statuts passent par le contrôleur de la page (MAIR-570) et
+partagent les gardes des écritures de tâches : un déplacement est refusé tant que
+la tâche a une écriture en cours ou est à vérifier, les statuts ne sont pas
+enregistrés pendant une écriture de tâche du projet, et aucune écriture de tâche
+(statut, modification, suppression, création) ne part pendant l’enregistrement
+des statuts. Un tel refus n’envoie rien et s’affiche comme un simple message, pas
+comme une écriture non vérifiée ; après une écriture confirmée, le contrôleur
+relit la fiche et la page.
+
 La fiche garde son comportement existant : la liste détaillée des tâches (suivi,
 commentaires, liens vers une tâche) reste visible et le bouton « Détails des
 tâches » sert seulement à la masquer ; sans choix explicite, une nouvelle tâche

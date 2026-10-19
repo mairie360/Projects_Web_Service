@@ -2,16 +2,16 @@
 import React from 'react';
 import { TaskStatusKanban } from './TaskStatusKanban';
 import { StatusDefinitionEditor, workflowControl } from './StatusDefinitionEditor';
-import { assertTemplate, assertWorkflowSnapshot, canManageWorkflow, categoryLabels, sameStatuses, validStatuses, validTemplateStatuses, WORKFLOW_UNAVAILABLE, WORKFLOW_UNVERIFIED, type ProjectTemplate, type LoadedWorkflowTask, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
+import { assertTemplate, assertWorkflowSnapshot, canManageWorkflow, categoryLabels, sameStatuses, validStatuses, validTemplateStatuses, WORKFLOW_UNAVAILABLE, WORKFLOW_UNVERIFIED, WorkflowWriteRefusedError, type ProjectTemplate, type LoadedWorkflowTask, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 
 const message = (error: unknown) => error instanceof Error ? error.message : WORKFLOW_UNVERIFIED;
 const copyStatuses = (statuses: TaskStatusDefinition[]) => statuses.map(status => ({ ...status }));
 
-export function ProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks }: { projectId: string; role?: string; port?: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[] }) {
+export function ProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks, onMoveTask, onSaveStatuses }: { projectId: string; role?: string; port?: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[]; onMoveTask?: ProjectWorkflowPort['moveTask']; onSaveStatuses?: ProjectWorkflowPort['saveProjectStatuses'] }) {
   // A keyed child owns all drafts, requests and confirmations for one project.
-  return port ? <ConnectedProjectWorkflow key={projectId} projectId={projectId} role={role} port={port} onSnapshot={onSnapshot} onMutation={onMutation} refreshKey={refreshKey} loadedTasks={loadedTasks} /> : <p className="mb-4 rounded-md border border-[#d9d5d0] bg-white p-3 text-sm text-[#536171]">{WORKFLOW_UNAVAILABLE}</p>;
+  return port ? <ConnectedProjectWorkflow key={projectId} projectId={projectId} role={role} port={port} onSnapshot={onSnapshot} onMutation={onMutation} refreshKey={refreshKey} loadedTasks={loadedTasks} onMoveTask={onMoveTask} onSaveStatuses={onSaveStatuses} /> : <p className="mb-4 rounded-md border border-[#d9d5d0] bg-white p-3 text-sm text-[#536171]">{WORKFLOW_UNAVAILABLE}</p>;
 }
-function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks }: { projectId: string; role?: string; port: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[] }) {
+function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutation, refreshKey, loadedTasks, onMoveTask, onSaveStatuses }: { projectId: string; role?: string; port: ProjectWorkflowPort; onSnapshot?: (snapshot: ProjectWorkflowSnapshot) => void; onMutation?: () => void; refreshKey?: unknown; loadedTasks?: readonly LoadedWorkflowTask[]; onMoveTask?: ProjectWorkflowPort['moveTask']; onSaveStatuses?: ProjectWorkflowPort['saveProjectStatuses'] }) {
   const [snapshot, setSnapshot] = React.useState<ProjectWorkflowSnapshot | null>(null);
   const [statuses, setStatuses] = React.useState<TaskStatusDefinition[]>([]);
   const statusesRef = React.useRef(statuses);
@@ -73,10 +73,13 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
     return () => { cancelled = true; active.current = false; readRequest.current?.abort(); writeRequest.current?.abort(); };
   }, [read, refreshKey]);
 
+  // MAIR-570: the page controller owns these writes (shared task write guards); the port is the fallback.
+  const saveProjectStatuses = onSaveStatuses ?? port.saveProjectStatuses;
+  const moveTask = onMoveTask ?? port.moveTask;
   const write = async (action: 'statuses' | 'task', taskId?: string, statusId?: string) => {
     if (busy.current || !snapshot || loading || uncertain) return;
-    if (action === 'statuses' && (!canManageWorkflow(role) || !port.saveProjectStatuses || !validStatuses(statuses))) return;
-    if (action === 'task' && (!port.moveTask || !snapshot.tasks.some(task => task.id === taskId && task.canUpdateStatus) || !snapshot.statuses.some(status => status.id === statusId))) return;
+    if (action === 'statuses' && (!canManageWorkflow(role) || !saveProjectStatuses || !validStatuses(statuses))) return;
+    if (action === 'task' && (!moveTask || !snapshot.tasks.some(task => task.id === taskId && task.canUpdateStatus) || !snapshot.statuses.some(status => status.id === statusId))) return;
     busy.current = true;
     setPending(true);
     setError('');
@@ -87,8 +90,8 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
     const expected = copyStatuses(statuses).map(status => ({ ...status, name: status.name.trim() }));
     try {
       const response = action === 'statuses'
-        ? await port.saveProjectStatuses!({ projectId, revision: before.revision, statuses: copyStatuses(expected), migrations: migrations.map(migration => ({ ...migration })) }, controller.signal)
-        : await port.moveTask!({ projectId, revision: before.revision, taskId: taskId!, statusId: statusId! }, controller.signal);
+        ? await saveProjectStatuses!({ projectId, revision: before.revision, statuses: copyStatuses(expected), migrations: migrations.map(migration => ({ ...migration })) }, controller.signal)
+        : await moveTask!({ projectId, revision: before.revision, taskId: taskId!, statusId: statusId! }, controller.signal);
       if (!active.current || controller.signal.aborted) return;
       assertWorkflowSnapshot(response, projectId);
       if (response.revision === before.revision || (action === 'statuses'
@@ -106,7 +109,10 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
       setNotice(action === 'statuses' ? 'Statuts enregistrés.' : 'Modification vérifiée.');
       onMutation?.();
     } catch (reason) {
-      if (active.current && !controller.signal.aborted) { setError(`${message(reason)} ${WORKFLOW_UNVERIFIED}`); setUncertain(true); }
+      if (!active.current || controller.signal.aborted) return;
+      // Nothing was sent: show why, without asking for a verification read.
+      if (reason instanceof WorkflowWriteRefusedError) setError(reason.message);
+      else { setError(`${message(reason)} ${WORKFLOW_UNVERIFIED}`); setUncertain(true); }
     } finally {
       busy.current = false;
       if (active.current && !controller.signal.aborted) setPending(false);
@@ -120,14 +126,14 @@ function ConnectedProjectWorkflow({ projectId, role, port, onSnapshot, onMutatio
     {notice && <p role="status">{notice}</p>}
     <div className="flex flex-wrap gap-2">
       <button type="button" className={workflowControl} disabled={loading || pending} onClick={() => void read()}>Relire les statuts</button>
-      {canManage && snapshot && <button type="button" className={workflowControl} disabled={!port.saveProjectStatuses || pending || loading || uncertain} onClick={() => { setEditing(true); editingRef.current = true; }}>Paramétrer les statuts</button>}
+      {canManage && snapshot && <button type="button" className={workflowControl} disabled={!saveProjectStatuses || pending || loading || uncertain} onClick={() => { setEditing(true); editingRef.current = true; }}>Paramétrer les statuts</button>}
     </div>
-    {canManage && !port.saveProjectStatuses && <p role="status" className="text-sm">L’enregistrement des statuts est indisponible.</p>}
+    {canManage && !saveProjectStatuses && <p role="status" className="text-sm">L’enregistrement des statuts est indisponible.</p>}
     {editing && canManage && snapshot && <form aria-label="Paramétrage des statuts" onSubmit={event => { event.preventDefault(); void write('statuses'); }} className="space-y-4">
       <StatusDefinitionEditor statuses={statuses} migrations={migrations} tasks={snapshot.tasks} disabled={pending || loading || uncertain} onChange={(next, moves) => { setStatuses(next); setMigrations(moves); }} />
       <div className="flex flex-wrap gap-2"><button type="submit" className={workflowControl} disabled={pending || loading || uncertain || !validTemplateStatuses(statuses) || (sameStatuses(snapshot.statuses, statuses) && migrations.length === 0)}>Enregistrer les statuts</button><button type="button" className={workflowControl} disabled={pending} onClick={() => { setStatuses(copyStatuses(snapshot.statuses)); setMigrations([]); setEditing(false); editingRef.current = false; }}>Annuler les modifications</button></div>
     </form>}
-    {snapshot && <TaskStatusKanban statuses={snapshot.statuses} tasks={snapshot.tasks} pending={pending || loading || uncertain || editing} onStatusChange={port.moveTask ? (id, status) => void write('task', id, status) : undefined} />}
+    {snapshot && <TaskStatusKanban statuses={snapshot.statuses} tasks={snapshot.tasks} pending={pending || loading || uncertain || editing} onStatusChange={moveTask ? (id, status) => void write('task', id, status) : undefined} />}
   </section>;
 }
 

@@ -28,6 +28,8 @@ type TaskFollowUpSelection = {
 export function ProjectDetailModal({
   project,
   workflowPort,
+  onMoveWorkflowTask,
+  onSaveWorkflowStatuses,
   workflowRole,
   defaultTaskAssigneeId,
   readCurrentTaskAssignee,
@@ -58,6 +60,9 @@ export function ProjectDetailModal({
 }: {
   project: Project;
   workflowPort?: ProjectWorkflowPort;
+  /** Controller-owned workflow writes (MAIR-570); without them the panel writes through the port. */
+  onMoveWorkflowTask?: ProjectWorkflowPort['moveTask'];
+  onSaveWorkflowStatuses?: ProjectWorkflowPort['saveProjectStatuses'];
   workflowRole?: string;
   defaultTaskAssigneeId?: string | null;
   readCurrentTaskAssignee?: (signal: AbortSignal) => Promise<string | null>;
@@ -562,7 +567,7 @@ export function ProjectDetailModal({
                 </div>
               )}
 {/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). */}
-              {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onMutation={() => void onRetry?.()} />}
+              {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onMoveTask={onMoveWorkflowTask} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onMoveWorkflowTask || onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
               {dynamicStatuses && <button type="button" className="mb-4 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 text-sm" aria-expanded={showTaskDetails} onClick={() => setShowTaskDetails(value => !value)}>Détails des tâches</button>}
               {project.permissions?.canCreateTask !== false && (
                 <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
