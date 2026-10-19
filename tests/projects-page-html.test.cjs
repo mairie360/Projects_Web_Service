@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { JSDOM } = require('jsdom');
 const { test, before, after, beforeEach, afterEach } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
 const { installReactRuntime, mount } = require('./support/server-view.cjs');
@@ -12,7 +13,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
-const ProjectsPage = requireTs('src/app/page.tsx').default;
+const ProjectsPage = requireTs('src/app/projects-client.tsx').default;
 const { setBrowserFrontUrls } = requireTs('src/lib/front-urls.ts');
 
 const harness = createFrontHarness();
@@ -295,6 +296,22 @@ test('opening a project loads its details and renders them in the modal', async 
   assert.equal(view.find('ProjectDetailModal').length, 0);
 });
 
+test('MAIR-569: the project detail says how many archived (done) tasks its counter includes but does not list', async () => {
+  await renderLoadedPage();
+  const counts = { total: 4, completed: 3, active: 1, archived: 3 };
+  bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({
+    body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId, progress: 75, tasks: counts }), [fixtures.projectTask()]),
+  }));
+
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+
+  assert.deepEqual(view.props('ProjectDetailModal').project.tasks, counts);
+  assert.deepEqual(view.props('ProjectDetailModal').tasks.map((task) => task.id), ['task-1']);
+  assert.match(view.text(), /3\/4 · 3 tâches archivées/);
+  await view.act(() => view.props('ProjectDetailModal').onClose());
+});
+
 test('a project deep link loads the authorized detail even when absent from the first project page', async () => {
   harness.location.search = '?source=dashboard&project=project-99';
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({
@@ -483,7 +500,7 @@ test('nested task deadline ownership reaches the actual project-create payload w
   assert.equal(bffProject.requests.filter(request => request.method.toLowerCase() !== 'get').length, 0);
   const created = fixtures.projectListItem({
     id: 'project-date-qa', title: draft.title, dueDate: '2027-01-01',
-    tasks: { total: 3, completed: 0 }, progress: 0,
+    tasks: { total: 3, completed: 0, active: 3, archived: 0 }, progress: 0,
   });
   const officialTasks = draft.taskItems.map((task, index) => fixtures.projectTask({
     id: `official-date-${index + 1}`, title: task.title, dueDate: task.dueDate,
@@ -515,7 +532,7 @@ test('nested task primary assignee order survives an unrelated edit in the proje
   await view.click('Enregistrer la tâche');
   const created = fixtures.projectListItem({
     id: 'project-assignee-qa', title: 'Projet assignés propres', responsible: fixtures.people.admin,
-    tasks: { total: 1, completed: 0 }, progress: 0,
+    tasks: { total: 1, completed: 0, active: 1, archived: 0 }, progress: 0,
   });
   const official = fixtures.projectTask({ id: 'official-assignee-task', title: 'Titre modifié uniquement' });
   bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, [official]) });
@@ -593,7 +610,12 @@ test('an incomplete creation form is refused in the page without any network cal
 // Filters, card actions and the detail modal: every interaction below goes through the real component
 // callbacks or host elements (buttons, inputs) of the rendered page.
 
-const alertText = () => view.find('Alert')[0]?.props.message;
+const alertText = () => {
+  const dom = new JSDOM(view.html);
+  try {
+    return dom.window.document.querySelector('[aria-atomic="true"][role="alert"] p.text-sm, [aria-atomic="true"][role="status"] p.text-sm')?.textContent;
+  } finally { dom.window.close(); }
+};
 
 const pagedFixture = (page) => fixtures.projectsPage([
   fixtures.projectListItem({ id: `project-${page}`, title: `Projet page ${page}` }),
@@ -831,8 +853,8 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   assert.match(view.text(), /\(copie\)/);
   assert.doesNotMatch(view.html, /role="menuitem"/, 'the menu closes after an action');
 
-  await view.act(() => view.props('Alert').onClose());
-  assert.equal(view.find('Alert').length, 0);
+  await view.click(props => props['aria-label'] === 'Fermer la notification');
+  assert.equal(alertText(), undefined);
 
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
@@ -1206,7 +1228,7 @@ test('task follow-up preserves its draft across a same-project status refresh', 
   await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Brouillon encore présent' } });
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: fixtures.projectTask({ status: 'done' }) });
   await view.fire(props => props['aria-label'] === 'Statut de Relevé des candélabres', 'onChange', { target: { value: 'done' } });
-  await view.waitFor(() => alertText().includes('mis à jour'));
+  await view.waitFor(() => alertText()?.includes('mis à jour'));
   assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value="Brouillon encore présent"/);
   assert.match(view.text(), /Devis reçu\./);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length, 0);

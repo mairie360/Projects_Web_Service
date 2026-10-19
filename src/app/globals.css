@@ -1,4 +1,4 @@
-@import "@mairie360/lib-components/dist/styles.css";
+@import "@mairie360/lib-components/styles.css";
 @import "tailwindcss";
 
 @plugin "daisyui";
@@ -26,13 +26,13 @@ body {
 
 body {
   margin: 0;
-  background: #f6f4f1;
+  background: var(--mairie-background);
   font-family: system-ui, sans-serif;
 }
 
 .projects-shell {
-  background: #f6f4f1;
-  color: #172033;
+  background: var(--mairie-background);
+  color: var(--mairie-text);
 }
 
 /* Match the reference presentation on the published navigation only. */
@@ -55,7 +55,7 @@ aside[aria-label="Navigation principale"] > nav button {
 
 .projects-shell > .flex > .flex > main {
   padding: 0;
-  background: #f6f4f1;
+  background: var(--mairie-background);
   overflow-y: auto;
 }
 

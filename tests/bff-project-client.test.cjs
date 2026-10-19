@@ -55,7 +55,7 @@ function projectForm(overrides = {}) {
 
 describe('lecture des projets', () => {
   test('GET /projects-page transmet uniquement les filtres déclarés et normalise les dates', async () => {
-    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage() });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage(undefined, { pagination: { page: 2, limit: 10, total: 11, hasNextPage: false } }) });
 
     const page = await client.getProjectsPage({ q: 'éclairage', status: 'in-progress', priority: 'all', view: 'table', page: 2, limit: 10, dueBefore: '2026-12-31', dueAfter: '', });
 
@@ -66,6 +66,23 @@ describe('lecture des projets', () => {
     assert.equal(page.projects[0].dueDate, '2026-12-15');
     assert.equal(page.projects[0].createdAt, '2026-09-01');
     assert.equal(page.access.role, 'Responsable');
+  });
+
+  test('MAIR-569: GET /projects-page keeps the active and archived task counts of bff-project 1.0.0', async () => {
+    const project = fixtures.projectListItem({ progress: 75, tasks: { total: 4, completed: 3, active: 1, archived: 3 } });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([project]) });
+
+    const page = await client.getProjectsPage();
+
+    // The receipt reader rebuilds every DTO from its declared fields: it used to drop `active` / `archived`.
+    assert.deepEqual(page.projects[0].tasks, { total: 4, completed: 3, active: 1, archived: 3 });
+    const { parseProjectsPageReceipt } = requireTs('src/lib/project-page-receipt.ts');
+    const { active, ...withoutActive } = project.tasks;
+    assert.equal(active, 1);
+    assert.throws(
+      () => parseProjectsPageReceipt(fixtures.projectsPage([{ ...project, tasks: withoutActive }])),
+      { message: 'Les données reçues ne correspondent pas au contrat publié.' },
+    );
   });
 
   test('sans cookie, aucun jeton de stockage actuel ou historique ne devient une Authorization', async () => {
@@ -409,7 +426,7 @@ describe('erreurs du BFF', () => {
     assert.equal(harness.location.reloads, 0);
     assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
     assert.deepEqual(harness.ownerCalls, []);
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page']);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page', 'POST /api/auth/refresh']);
   });
 
   test('une requête annulée rejette avec AbortError', async () => {

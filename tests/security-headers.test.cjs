@@ -1,8 +1,10 @@
 const assert = require('node:assert/strict');
 const { test, beforeEach, afterEach } = require('node:test');
 const savedLoginUrl = process.env.LOGIN_FRONT_URL;
-beforeEach(() => { process.env.LOGIN_FRONT_URL = 'https://login.mairie.test/'; });
+const savedFrontUrl = process.env.PROJECT_FRONT_URL;
+beforeEach(() => { process.env.LOGIN_FRONT_URL = 'https://login.mairie.test/'; process.env.PROJECT_FRONT_URL = 'https://projects.mairie.test'; });
 afterEach(() => {
+  if (savedFrontUrl === undefined) delete process.env.PROJECT_FRONT_URL; else process.env.PROJECT_FRONT_URL = savedFrontUrl;
   if (savedLoginUrl === undefined) delete process.env.LOGIN_FRONT_URL;
   else process.env.LOGIN_FRONT_URL = savedLoginUrl;
 });
@@ -10,9 +12,9 @@ const fs = require('node:fs');
 const ts = require('typescript');
 const { NextRequest } = require('next/server');
 const originalLoader = require.extensions['.ts'];
-require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, filename);
+require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { fileName: filename, compilerOptions: { inlineSourceMap: true, inlineSources: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, filename);
 const { middleware } = require('../src/middleware.ts');
-const { buildContentSecurityPolicy } = require('../src/lib/content-security-policy.ts');
+const { buildContentSecurityPolicy } = require('@mairie360/front-kit/shared');
 const nextConfig = require('../next.config.ts').default;
 require.extensions['.ts'] = originalLoader;
 
@@ -35,7 +37,7 @@ test('authenticated pages get a per-request nonce CSP forwarded to Next.js', () 
   assert.notEqual(second.headers.get('x-middleware-request-x-nonce'), nonce);
 });
 
-test('missing or expired sessions are redirected to Login without a CSP', () => {
+test('missing or expired sessions are redirected to the local resume route without a CSP', () => {
   for (const token of [undefined, jwt(1)]) {
     const response = middleware(pageRequest(token));
     assert.equal(response.status, 307);
@@ -57,19 +59,19 @@ test('static security headers apply to every route and X-Powered-By is disabled'
   assert.deepEqual(rule.headers.map(({ key }) => key).sort(), ['Cross-Origin-Embedder-Policy', 'Cross-Origin-Opener-Policy', 'Cross-Origin-Resource-Policy', 'Permissions-Policy', 'Referrer-Policy', 'X-Content-Type-Options', 'X-Frame-Options']);
 });
 
-test('JWT sans exp, opaque ou illisible : seul un payload illisible est traité comme expiré', () => {
+test('JWT sans exp, opaque ou illisible : chaque session invalide exige une reprise', () => {
   const noExp = `${b64url({ alg: 'HS256' })}.${b64url({ sub: '2' })}.signature`;
-  assert.equal(middleware(pageRequest(noExp)).status, 200);
-  assert.equal(middleware(pageRequest('opaque-session')).status, 200);
+  assert.equal(middleware(pageRequest(noExp)).status, 307);
+  assert.equal(middleware(pageRequest('opaque-session')).status, 307);
   assert.equal(middleware(pageRequest('a.%%%.c')).status, 307);
 });
 
-test('la redirection suit LOGIN_FRONT_URL sans modifier le cookie partagé sur COOKIE_DOMAIN', () => {
+test('la redirection suit PROJECT_FRONT_URL sans modifier le cookie partagé sur COOKIE_DOMAIN', () => {
   process.env.LOGIN_FRONT_URL = 'https://login.example/';
   process.env.COOKIE_DOMAIN = ' .mairie360.test ';
   try {
     const response = middleware(pageRequest());
-    assert.equal(response.headers.get('location'), 'https://login.example/');
+    assert.equal(response.headers.get('location'), 'https://projects.mairie.test/api/auth/resume?next=%2F');
     assert.equal(response.headers.get('set-cookie'), null);
     assert.equal(response.headers.get('cache-control'), 'no-store');
   } finally {

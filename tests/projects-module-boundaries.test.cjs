@@ -7,11 +7,11 @@ const root = join(__dirname, '..');
 const imports = source => imported(source).map(row => row.specifier);
 const names = source => { const aliases = importedCallNames(source); return calls(source).map(node => aliases.get(callName(node.expression)) ?? callName(node.expression)); };
 // AST architecture policy only. Real dialog/rerender/draft behavior is tested separately.
-test('the Projects route only composes a stable controller and workspace', () => {
-  const page = parse('src/app/page.tsx');
+test('the interactive Projects client composes a stable controller and workspace', () => {
+  const page = parse('src/app/projects-client.tsx');
   const aliases = importedCallNames(page);
   const controller = calls(page).filter(node => (aliases.get(callName(node.expression)) ?? callName(node.expression)) === 'useProjectsController');
-  assert.equal(controller.length, 1); assert.equal(controller[0].arguments.length, 0);
+  assert.equal(controller.length, 1); assert.equal(controller[0].arguments.length, 1);
   const workspace = nodes(page, node => ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)).filter(node => (aliases.get(callName(node.tagName)) ?? callName(node.tagName)) === 'ProjectsWorkspace');
   assert.equal(workspace.length, 1);
   assert.equal(names(page).some(name => ['useState', 'useEffect', 'useRef'].includes(name)), false);

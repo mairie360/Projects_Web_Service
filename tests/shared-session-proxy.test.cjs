@@ -19,7 +19,7 @@ const business = () => h.bffProject.on('get', '/projects-page', request => reque
 test('expired access renews through the Login owner and retries the published read with its cookies', async () => {
   rotated(); business();
   await client.getProjectsPage({ view: 'table', q: 'éclairage' });
-  assert.deepEqual(h.browserCalls.map(x => x.path), ['/projects-page']);
+  assert.deepEqual(h.browserCalls.map(x => x.path), ['/projects-page', '/api/auth/refresh', '/projects-page']);
   assert.deepEqual(h.ownerCalls.map(x => [x.url.pathname, x.init.method]), [['/api/auth/refresh', 'POST']]);
   const renewal = h.bffUser.calls('/auth/refresh', 'post')[0];
   assert.deepEqual(renewal.body, { refresh_token: 'initial-refresh' });
@@ -41,7 +41,7 @@ test('simultaneous reads share one User refresh and receive the same rotated pai
   rotated(); business();
   await Promise.all([client.getProjectsPage(), client.getProjectsPage(), client.getProjectsPage()]);
   assert.equal(h.bffUser.calls('/auth/refresh', 'post').length, 1);
-  assert.equal(h.ownerCalls.length, 3);
+  assert.equal(h.ownerCalls.length, 1);
   assert.equal(h.bffProject.requests.length, 6);
 });
 
@@ -117,6 +117,6 @@ test('Login navigation rejects invalid configuration and never forwards a foreig
 
 test('missing Login transport cannot trigger a renewal to a caller-selected host', async () => {
   business(); process.env.LOGIN_FRONT_URL = '';
-  await assert.rejects(client.getProjectsPage(), { status: 401 });
+  await assert.rejects(client.getProjectsPage(), { status: 503 });
   assert.deepEqual(h.ownerCalls, []);
 });

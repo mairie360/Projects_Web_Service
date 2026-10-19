@@ -1,0 +1,9 @@
+# Source coverage reporting
+
+Run `npm test` with the pinned Node 24/npm runtime. The pipeline runs the native Node suite once with one worker, remaps its actual V8 captures through exact `c8@12.0.0`, then runs the Vitest V8 component suite and composes the final report. Existing native and Vitest thresholds remain blocking. The final report requires 60% lines per runtime source module and 60% global lines, branches and functions; the existing server-layout exception is declared explicitly where applicable.
+
+`coverage/lcov.info` is the final primary report for CI. Source ownership is declared in `scripts/coverage-scope.cjs` before measurement: React sources use their unchanged Vitest V8 records; the other sources retain their unchanged Node/c8 records. The composer never adds incompatible Node import-only line inventories to component records or selects a report by its score. The complete TS/TSX source inventory must be present, with matching hashes before and after measurement.
+
+Native LCOV, stdout, stderr, run status and raw V8 captures remain under `coverage/native/`. Remapped reports and source/map/input hashes are under `coverage/source-mapped/`; composition inputs and provenance are under `coverage/source-inputs/`. Previous reports move to `coverage/history/`. The driver archives native LCOV before removing it from the primary path. Missing maps, missing embedded source, changed source or invalid reports block primary publication. A failing native test or threshold still fails the pipeline even when remapping succeeds.
+
+Individual `test:node` and `test:components` commands produce intermediate evidence; use `npm test` for the complete primary report. The shared CI uploader explicitly uses this primary report with report discovery disabled. Raw audit files remain in the local/CI workspace; this change adds no persistent CI artifact upload or external raw-data upload. Package audit and publication gates remain separate and unchanged.

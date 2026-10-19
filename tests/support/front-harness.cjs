@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./typescript.cjs');
-const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession, proxyPublishedBffRequest } = require('@mairie360/lib-components/next');
+const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession, proxyPublishedBffRequest } = require('@mairie360/front-kit/next');
 const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 
@@ -102,7 +102,7 @@ function createFrontHarness() {
     const headers = new Headers(init.headers);
     headers.set('Origin', ORIGIN);
     headers.set('Sec-Fetch-Site', 'same-origin');
-    if (cookies.size) headers.set('cookie', [...cookies].map(([name, value]) => `${name}=${value}`).join('; '));
+    if (cookies.size) headers.set('cookie', [...cookies].filter(([name]) => name !== 'refreshToken' || url.pathname === '/api' || url.pathname.startsWith('/api/')).map(([name, value]) => `${name}=${value}`).join('; '));
     browserCalls.push({ method, path: url.pathname, search: url.search });
 
     const route = matchRoute(routes, url.pathname);

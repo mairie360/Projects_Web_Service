@@ -6,7 +6,7 @@ installReactRuntime();
 const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
-const Page = requireTs('src/app/page.tsx').default;
+const Page = requireTs('src/app/projects-client.tsx').default;
 const harness = createFrontHarness();
 const { bffProject } = harness;
 let view;
@@ -56,7 +56,7 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
     assert.match(view.text(), /Actualisation impossible/);
     assert.match(view.html, /Réessayer la fiche/);
     const expected = operation === 'delete' ? [other] : operation === 'create' ? [task, other, confirmed] : [confirmed, other];
-    const refreshedProject = { ...project, tasks: { total: expected.length, completed: operation === 'delete' ? 0 : 1 }, progress: 37 };
+    const refreshedProject = { ...project, tasks: { total: expected.length, completed: operation === 'delete' ? 0 : 1, active: expected.length, archived: 0 }, progress: 37 };
     bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(refreshedProject, expected) });
     bffProject.on('get', '/projects-page', { body: f.projectsPage([{ ...refreshedProject, taskItems: expected }]) });
     await view.click('Réessayer la fiche');

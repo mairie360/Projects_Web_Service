@@ -265,6 +265,18 @@ This closes a captured-query defect without reproducing old optimistic state or
 inventing records, permissions, counters or backend operations. Published Project
 0.4.0, authentication, dependencies and environments are unchanged.
 
+## Archived task counts (MAIR-569)
+
+A done task is archived by BFF_Project (MAIR-502): the project detail only lists
+the active tasks, while `tasks.total` / `tasks.completed` and the progress still
+include the archived ones. Since the published Project contract 1.0.0, each
+project also carries `tasks.active` and `tasks.archived` (MAIR-559). The detail
+and edit counters show `completed/total` followed by the number of archived
+tasks (`3/4 · 3 tâches archivées`), and the edit form keeps counting the archived
+tasks when its listed tasks change, instead of recomputing the summary and the
+progress from the active tasks alone. The new task status and project template
+routes (MAIR-566) are declared by the contract but not used by this front yet.
+
 ## Project result pages (MAIR-472)
 
 Previous/Next navigation is shared by Kanban, Grid and Table. The page number,

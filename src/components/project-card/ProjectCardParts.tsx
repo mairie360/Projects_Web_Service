@@ -1,4 +1,4 @@
-import { Avatar } from '@mairie360/lib-components';
+import { Avatar } from '@mairie360/lib-components/primitives';
 import { CheckSquare2, ListChecks, Square } from 'lucide-react';
 
 import type { Project, ProjectTask } from '../../types/project';

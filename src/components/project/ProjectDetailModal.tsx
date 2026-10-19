@@ -2,16 +2,17 @@
 
 import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
+import { getInstanceTimeZone } from '@mairie360/front-kit/shared';
 import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
 import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
-import { Button, ToolTip } from '@mairie360/lib-components';
+import { Button, ToolTip } from '@mairie360/lib-components/primitives';
 import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
-import { createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
+import { archivedTasksLabel, createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
 import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
 import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
@@ -636,6 +637,7 @@ export function ProjectDetailModal({
                   </div>
                   <span className="text-xs font-medium text-[#57606a]">
                     {project.tasks.completed}/{project.tasks.total}
+                    {project.tasks.archived > 0 && ` · ${archivedTasksLabel(project.tasks.archived)}`}
                   </span>
                 </div>
 
@@ -845,7 +847,7 @@ export function ProjectDetailModal({
                                         {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
                                         {collaboration.comments.map((comment) => (
                                           <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
-                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR')}</time></div>
+                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</time></div>
                                             <p className="mt-1 whitespace-pre-wrap text-[#57606a] [overflow-wrap:anywhere]">{comment.message}</p>
                                           </div>
                                         ))}
@@ -866,7 +868,7 @@ export function ProjectDetailModal({
                                         {collaboration.history.map((entry) => (
                                           <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs [overflow-wrap:anywhere]">
                                             <p className="font-medium text-[#24292f]">{entry.label}</p>
-                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR')}</p>
+                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</p>
                                           </div>
                                         ))}
                                       </div>

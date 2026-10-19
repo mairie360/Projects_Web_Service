@@ -80,7 +80,7 @@ test('consumer CI retains blocking security defaults and explicit named secrets'
 
 const workflow = () => yaml.load(read('.github/workflows/cicd.yml'));
 const checkout = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1';
-const scannerCommit = '16c63d21eedbf6c6e3b58ebc30c61231e49e2536';
+const scannerCommit = '5b7d127d46f95d8951935b6209ca7c2ca857a21d';
 
 test('the exact required legacy status executes both real blocking scanners without extra access', () => {
   assert.deepEqual(workflow().jobs.required_security_scan, {
@@ -109,8 +109,8 @@ test('the exact required legacy status executes both real blocking scanners with
 test('the existing reusable frontend workflow keeps its blocking defaults and only declared secrets', () => {
   assert.deepEqual(workflow().jobs.CICD, {
     permissions: { contents: 'write', packages: 'write', 'id-token': 'write' },
-    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@16c63d21eedbf6c6e3b58ebc30c61231e49e2536',
-    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: '16c63d21eedbf6c6e3b58ebc30c61231e49e2536' },
+    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@5b7d127d46f95d8951935b6209ca7c2ca857a21d',
+    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: '5b7d127d46f95d8951935b6209ca7c2ca857a21d' },
     secrets: {
       CODECOV_TOKEN: '${{ secrets.CODECOV_TOKEN }}',
       N8N_WEBHOOK_SECRET: '${{ secrets.N8N_WEBHOOK_SECRET }}',
