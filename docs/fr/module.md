@@ -1,5 +1,17 @@
 # Projects_Web_Service — Présentation du module
 
+## Ouverture clavier depuis Tableau (MAIR-310)
+
+Chaque titre de projet du Tableau est un bouton natif nommé annonçant le dialogue
+de détail. Tab rend son focus visible ; Entrée/Espace ou clic déclenchent une fois
+le callback existant, sans remonter au clic de ligne. Le reste d’une ligne autorisée
+reste ouvrable au pointeur ; les actions de son menu restent indépendantes.
+`canView: false` reçu désactive le titre et l’ouverture de ligne, sans modifier
+les permissions serveur ni celles des autres actions. Dialogue nommé, confinement
+clavier, Échap/Fermer et retour au déclencheur encore présent restent inchangés.
+Un GET refusé ne fabrique pas de fiche ; la reprise volontaire utilise toujours
+le GET publié. Aucun changement API/BFF/contrat/environnement n’est requis.
+
 ## Composition de stabilisation fonctionnelle (6 octobre 2026)
 
 Ce candidat conserve les corrections couvertes par les tickets existants de
