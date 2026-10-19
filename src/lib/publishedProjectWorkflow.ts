@@ -152,7 +152,10 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
       signal.throwIfAborted();
       const receipt = mapTemplate(response.data);
       if ((draft.id && receipt.id !== draft.id) || (!draft.id && templates.some(template => template.id === receipt.id)) || receipt.name !== draft.name || !sameStatuses(receipt.statuses, draft.statuses, true)) throw new Error(WORKFLOW_UNVERIFIED);
-      return receipt;
+      // A matching receipt is not enough: the re-read catalogue must hold the saved template.
+      const persisted = (await readTemplates(signal)).find(template => template.id === receipt.id);
+      if (!persisted || persisted.name !== draft.name || !sameStatuses(persisted.statuses, draft.statuses, true)) throw new Error(WORKFLOW_UNVERIFIED);
+      return persisted;
     },
     createProjectFromTemplate: async (template, body: CreateProjectBody) => {
       const signal = new AbortController().signal;

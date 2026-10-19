@@ -168,3 +168,14 @@ test('MAIR-567: a project created from a template is normalized like an ordinary
   assert.equal(details.project.dueDate, '2026-12-15');
   assert.equal(details.project.createdAt, '2026-09-01');
 });
+
+test('MAIR-567: a template write is confirmed only by the re-read catalogue', async () => {
+  const templates = [{ id: 'template-1', name: 'Voirie', statuses: templateStatuses }];
+  const port = createPublishedProjectWorkflowPort(service({
+    getProjectTemplates: async () => ({ data: { templates } }),
+    // The receipt matches the draft but the catalogue never stores it.
+    postProjectTemplates: async (body) => ({ data: { id: 'template-2', ...body, statuses: body.statuses.map((item, position) => ({ ...item, position })) } }),
+  }));
+  const [voirie] = await port.readTemplates(signal());
+  await assert.rejects(port.saveTemplate({ name: 'Écoles', statuses: voirie.statuses }, signal()), /vérifi/);
+});
