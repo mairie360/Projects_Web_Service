@@ -1,6 +1,6 @@
 import React from 'react';
 import { cookies } from 'next/headers';
-import { createNonce } from '@mairie360/front-kit/shared';
+import { createNonce } from '@mairie360/lib-components/shared';
 import { readPageUrlState } from '@/lib/page-url-state';
 import { projectUrlSchema, searchFromPageParams } from '@/lib/project-page-query';
 import { loadInitialProjectsPage } from '@/lib/server-projects-page';

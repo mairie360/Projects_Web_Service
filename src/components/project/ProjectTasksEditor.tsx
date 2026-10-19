@@ -2,7 +2,7 @@
 
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
-import { civilDateInZone } from '@mairie360/front-kit/shared';
+import { civilDateInZone } from '@mairie360/lib-components/shared';
 import { Button } from '@mairie360/lib-components/primitives';
 import { CalendarDays, CheckSquare2, ListChecks, Square } from 'lucide-react';
 

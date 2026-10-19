@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { NextRequest } = require('next/server');
 const { requireTs, root } = require('./typescript.cjs');
-const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession, proxyPublishedBffRequest } = require('@mairie360/front-kit/next');
+const { createSessionRefreshHandler, createSessionLogoutHandler, forgetUserSession, proxyPublishedBffRequest } = require('@mairie360/lib-components/next');
 const { ContractMockServer } = requireTs('tests/support/contract-mock-server.ts');
 const { OpenApiContract } = requireTs('tests/support/openapi-contract.ts');
 

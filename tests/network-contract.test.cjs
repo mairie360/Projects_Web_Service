@@ -62,7 +62,7 @@ describe('inventaire des appels réseau de src/', () => {
       });
     }
     assert.deepEqual(calls, [['src/lib/bff-proxy.ts', 'proxyPublishedBffRequest'], ['src/app/api/auth/refresh/route.ts', 'createSessionRefreshProxy'], ['src/app/api/auth/resume/route.ts', 'createSessionResumeHandler'], ['src/app/api/auth/logout/route.ts', 'createSessionLogoutProxy']]);
-    assert.equal(imports.filter(([, specifier]) => specifier === '@mairie360/front-kit/next').length, 4);
+    assert.equal(imports.filter(([, specifier]) => specifier === '@mairie360/lib-components/next').length, 4);
     assert.deepEqual(routes.map(route => route.file).sort(), [CATCH_ALL, ...Object.keys(LOCAL_ROUTES)].sort());
     for (const [file, methods] of Object.entries(LOCAL_ROUTES)) assert.deepEqual(Object.keys(requireTs(file)).filter(name => /^[A-Z]+$/.test(name)), methods);
   });

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import type { SessionResponse } from '@mairie360/bff-user-openapi/model/sessionResponse';
-import { validSessionToken } from '@mairie360/front-kit/next';
+import { validSessionToken } from '@mairie360/lib-components/next';
 
 const unavailable = (status: number) => Response.json({ id: null }, { status, headers: { 'Cache-Control': 'no-store' } });
 

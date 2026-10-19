@@ -1,4 +1,4 @@
-import { sessionFetch } from '@mairie360/front-kit/browser';
+import { sessionFetch } from '@mairie360/lib-components/browser';
 import { createTaskFormState } from './projectPageState';
 import type { FilterOption } from './projectPageState';
 import type { Project } from '../types/project';
