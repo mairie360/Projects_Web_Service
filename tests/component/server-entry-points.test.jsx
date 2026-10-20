@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useInstanceRole, useInstanceTimeZone } from '@mairie360/front-kit/react';
+import { useInstanceRole, useInstanceTimeZone } from '@mairie360/lib-components/react';
 
 const request = vi.hoisted(() => ({ cookies: {} }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: name => request.cookies[name] === undefined ? undefined : { value: request.cookies[name] } }) }));

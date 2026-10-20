@@ -1,5 +1,5 @@
 import { parseProjectsPageReceipt } from './project-page-receipt';
-import { sessionFetch } from '@mairie360/front-kit/browser';
+import { sessionFetch } from '@mairie360/lib-components/browser';
 import axios, { type AxiosAdapter } from 'axios';
 import { getBffProject } from '@mairie360/bff-project-openapi/endpoints/bffProject';
 import { describeBffProjectError } from './text-constraints';

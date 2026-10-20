@@ -7,4 +7,4 @@
 10111	IGNORE	Authentication Request Identified
 10112	IGNORE	Session Management Response Identified
 90005	IGNORE	Sec-Fetch-* Headers Not Present (requetes emises par ZAP, non applicable)
-10031	OUTOFSCOPE	^https?://[^/?#]+/\?view=(kanban|grid|table)$
+10031	OUTOFSCOPE	^https?://[^/?#]+/\?(view=(kanban|grid|table)|status=(all|todo|in-progress|review|done)|priority=(all|high|medium|low))(&(view=(kanban|grid|table)|status=(all|todo|in-progress|review|done)|priority=(all|high|medium|low)))*$
