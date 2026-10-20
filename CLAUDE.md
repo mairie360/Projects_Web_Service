@@ -36,10 +36,10 @@ The `tests/*.test.cjs` suite uses CommonJS `node:test`; component tests use Vite
 
   The only route files allowed are the catch-all and that local logout route, which must not import the proxy. Every `bffProject.<operation>(…)` call must name an operation of the generated client whose method+path match the contract and are served by the catch-all, and `ProjectsPageQuery` keys must equal the declared query params. `bff-project-client.test.cjs` then checks that every consumed operation was exercised against the mock. A new client call must use a generated `bffProject.<operation>` function: `bffProjectClient.ts` may not contain any hand-written path, and axios is allowed only in that file.
 - `package-contract.test.cjs` checks that:
-  - the package is pinned to an accepted exact version (`scripts/contract-version.mjs`: a release `X.Y.Z` or a `0.0.0-dev.<sha40>` dev package of BFF_Project `main`, never `staging`), installed and locked at that version; the `@mairie360/bff-user-openapi` session types follow the same policy as a devDependency;
+  - the package is pinned to an accepted exact version (`scripts/contract-version.mjs`: a release `X.Y.Z`, a `0.0.0-dev.<sha40>` dev package of BFF_Project `main` or, since MAIR-600, the `0.0.0-staging.<sha40>` staging package of that commit; `0.0.0-staging.<short sha>` and ranges are refused), installed and locked at that version; the `@mairie360/bff-user-openapi` session types follow the same policy as a devDependency;
   - it is the only `@mairie360/bff-*-openapi` dependency;
   - `contracts/openapi.json` equals the rebuild from the package;
-  - every `docker-compose*.yml` uses the `bff-project` and `bff-user` images built from the pinned commits (`X.Y.Z`, or `dev-<sha7>` for a dev package; never a `../BFF_Project` build);
+  - every `docker-compose*.yml` uses the `bff-project` and `bff-user` images built from the pinned commits (`X.Y.Z`, `dev-<sha7>` for a dev package, or `staging-<sha7>` for a staging package; never a `../BFF_Project` build);
   - the `projects-front` service references no other service than BFF_Project.
 - `projects-page-html.test.cjs` renders the real `src/app/page.tsx` with its components through `tests/support/server-view.cjs` (`react-dom/server` with hook state kept between passes, same file in every front, see `../CLAUDE.md`) on the harness: loading, `/projects-page` with the declared query, search/filters/views, card menu (duplicate, edit, delete with confirmation), task composer, detail modal (task status, deletion, collaboration and comments, inline edit, close) are driven through `view.click` / `view.fire` / component props and asserted on the HTML and the BFF calls.
 - `session.test.cjs` replaces `react` in `require.cache` with a one-render `useState`/`useEffect` stub to test `useAuthSession`.
@@ -54,7 +54,7 @@ The only contract is **BFF_Project's, as published in `@mairie360/bff-project-op
 - Source code imports its types straight from the package (`import type { ProjectsPageResponse } from '@mairie360/bff-project-openapi/model'`). There is no generated `.d.ts`.
 
 ```bash
-npm install --save-exact @mairie360/bff-project-openapi@<version>   # bump: a release X.Y.Z or a published 0.0.0-dev.<sha40>, never staging
+npm install --save-exact @mairie360/bff-project-openapi@<version>   # bump: a release X.Y.Z, a published 0.0.0-dev.<sha40> or 0.0.0-staging.<sha40> (MAIR-600)
 npm run contracts:sync      # (= contracts:generate) rebuild contracts/openapi.json from the installed package
 npm run contracts:check     # fail if the version isn't an accepted exact version, installed != package.json, a second business bff-*-openapi exists, or the snapshot is stale
 ```

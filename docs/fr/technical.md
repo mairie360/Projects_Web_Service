@@ -232,7 +232,7 @@ Conserver le délai npm et l’audit bloquant intégral. L’alerte braces reste
 indépendante. Cette maintenance ne certifie pas
 une image déployée et n’autorise pas la fusion d’une CI en échec.
 
-Le contrat provient d’un paquet **publié** de BFF_Project : une release `X.Y.Z`, ou, tant qu’aucune release n’est coupée, le paquet `0.0.0-dev.<sha>` publié par la CICD pour le commit courant de son `main` (MAIR-509 ; jamais une préversion `staging`). Après un nouveau paquet, l’épingler (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur l’image construite depuis le même commit (`X.Y.Z`, ou `dev-<sha7>` pour un paquet dev, voir `scripts/contract-version.mjs`), puis exécuter :
+Le contrat provient d’un paquet **publié** de BFF_Project : une release `X.Y.Z`, ou, tant qu’aucune release n’est coupée, le paquet `0.0.0-dev.<sha>` publié par la CICD pour le commit courant de son `main` (MAIR-509), ou, une fois ce commit livré en staging, le paquet `0.0.0-staging.<sha40>` du même commit, préféré lors d’une release staging pour la lisibilité (MAIR-600 ; jamais `0.0.0-staging.<sha court>` ni une plage). Après un nouveau paquet, l’épingler (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur l’image construite depuis le même commit (`X.Y.Z`, `dev-<sha7>` pour un paquet dev, ou `staging-<sha7>` pour un paquet staging, voir `scripts/contract-version.mjs`), puis exécuter :
 
 ```bash
 npm run contracts:sync

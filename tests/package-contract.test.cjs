@@ -5,7 +5,7 @@ const composePolicy = require('./support/compose-policy.cjs');
 const { test } = require('node:test');
 
 // Le contrat du front est celui de BFF_Project publié dans @mairie360/bff-project-openapi, épinglé à une
-// version exacte (release X.Y.Z ou paquet dev 0.0.0-dev.<sha> du main du BFF, scripts/contract-version.mjs) :
+// version exacte (release X.Y.Z ou paquet dev/staging d'un commit du main du BFF, scripts/contract-version.mjs) :
 // contracts/openapi.json doit en être la reconstruction exacte (scripts/orval-contract.mjs), et BFF_Project est le
 // seul BFF que le front joint, dans l'image construite depuis le même commit partout où ce dépôt le démarre.
 // Les stacks Docker démarrent aussi BFF User, mais uniquement comme dépendance de BFF_Project.
@@ -19,7 +19,7 @@ const composeFiles = fs.readdirSync(ROOT).filter((name) => /^docker-compose.*\.y
 
 test('le paquet de contrat BFF_Project est épinglé à une version publiée exacte, installée et verrouillée', async () => {
   const { isAcceptedContractVersion } = await import('../scripts/contract-version.mjs');
-  assert.ok(isAcceptedContractVersion(pinned), `${PACKAGE_NAME} doit être épinglé à une version exacte X.Y.Z ou 0.0.0-dev.<sha> (pas de plage ni de pré-version staging)`);
+  assert.ok(isAcceptedContractVersion(pinned), `${PACKAGE_NAME} must be pinned to an exact version X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha> (no range)`);
   assert.equal(readJson(`node_modules/${PACKAGE_NAME}/package.json`).version, pinned);
   assert.equal(readJson('package-lock.json').packages[`node_modules/${PACKAGE_NAME}`].version, pinned);
 });
@@ -31,7 +31,7 @@ test('seul le contrat métier Project est routé ; les types de session publiés
   assert.deepEqual(Object.keys(all).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name) && name !== sessionTypes), [PACKAGE_NAME]);
   assert.equal(manifest.dependencies[sessionTypes], undefined);
   const sessionPinned = manifest.devDependencies[sessionTypes];
-  assert.ok(isAcceptedContractVersion(sessionPinned), `${sessionTypes} doit être épinglé à une version exacte X.Y.Z ou 0.0.0-dev.<sha>`);
+  assert.ok(isAcceptedContractVersion(sessionPinned), `${sessionTypes} must be pinned to an exact version X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha>`);
   assert.equal(readJson(`node_modules/${sessionTypes}/package.json`).version, sessionPinned);
   const locked = readJson('package-lock.json').packages[`node_modules/${sessionTypes}`];
   assert.equal(locked.version, sessionPinned);
@@ -70,11 +70,13 @@ test('dans chaque stack, le service du front ne connaît que BFF_Project', () =>
   }
 });
 
-test('la politique de version accepte les releases et les paquets dev et les associe aux tags d’images', async () => {
+test('the contract version policy accepts releases, dev and staging packages and maps them to image tags', async () => {
   const { isAcceptedContractVersion, imageTagForContractVersion } = await import('../scripts/contract-version.mjs');
   assert.equal(imageTagForContractVersion('0.4.0'), '0.4.0');
   assert.equal(imageTagForContractVersion('0.0.0-dev.68d15b9b3719a593289d8833da176bb555a2c991'), 'dev-68d15b9');
-  for (const rejected of ['^0.4.0', '0.4', '0.0.0-staging.68d15b9b3719a593289d8833da176bb555a2c991', '0.0.0-dev.68d15b9', 'latest']) {
+  assert.equal(isAcceptedContractVersion('0.0.0-staging.68d15b9b3719a593289d8833da176bb555a2c991'), true);
+  assert.equal(imageTagForContractVersion('0.0.0-staging.68d15b9b3719a593289d8833da176bb555a2c991'), 'staging-68d15b9');
+  for (const rejected of ['^0.4.0', '0.4', '0.0.0-staging.68d15b9', '0.0.0-dev.68d15b9', 'latest']) {
     assert.equal(isAcceptedContractVersion(rejected), false, rejected);
   }
 });

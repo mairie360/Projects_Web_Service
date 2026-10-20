@@ -199,7 +199,7 @@ services:
   bff-project:
     container_name: bff-project-projects-front
     # Seul BFF de ce front : même version que le contrat @mairie360/bff-project-openapi de package.json.
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:dev-1c2e664}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:staging-b643e72}
     ports:
       - "4001:4001"
     networks:

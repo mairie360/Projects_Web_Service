@@ -220,7 +220,7 @@ services:
       - backend
 
   bff-project:
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:dev-1c2e664}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:staging-b643e72}
     container_name: projects-front-sec-bff-project
     depends_on:
       seeder:

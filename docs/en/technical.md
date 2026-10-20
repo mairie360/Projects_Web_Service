@@ -230,7 +230,7 @@ Keep the npm release-age policy and full blocking audit unchanged. The braces
 finding remains independent. This maintenance does not certify deployed
 images or permit merging a failing CI.
 
-The contract comes from a **published** BFF_Project package: a release `X.Y.Z`, or, while no release is cut, the `0.0.0-dev.<sha>` package the CICD publishes for the current commit of its `main` (MAIR-509; never a `staging` pre-release). After a new package, pin it (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), move the `bff-project` image tags in `docker-compose*.yml` to the image built from the same commit (`X.Y.Z`, or `dev-<sha7>` for a dev package, see `scripts/contract-version.mjs`), then run:
+The contract comes from a **published** BFF_Project package: a release `X.Y.Z`, or, while no release is cut, the `0.0.0-dev.<sha>` package the CICD publishes for the current commit of its `main` (MAIR-509), or, once that commit is released on staging, the `0.0.0-staging.<sha40>` package of the same commit, preferred on a staging release for readability (MAIR-600; never `0.0.0-staging.<short sha>` or a range). After a new package, pin it (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), move the `bff-project` image tags in `docker-compose*.yml` to the image built from the same commit (`X.Y.Z`, `dev-<sha7>` for a dev package, or `staging-<sha7>` for a staging package, see `scripts/contract-version.mjs`), then run:
 
 ```bash
 npm run contracts:sync

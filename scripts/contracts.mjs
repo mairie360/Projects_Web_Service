@@ -6,7 +6,7 @@ import { PACKAGE_NAME, buildOrvalOpenApi, resolveOrvalPackage } from './orval-co
 import { isAcceptedContractVersion } from './contract-version.mjs';
 
 // Le seul contrat routé par le proxy de ce front est celui de BFF_Project publié dans @mairie360/bff-project-openapi,
-// épinglé à une version exacte (release X.Y.Z, ou paquet dev 0.0.0-dev.<sha> du main du BFF, voir
+// épinglé à une version exacte (release X.Y.Z, ou paquet dev/staging d'un commit du main du BFF, voir
 // contract-version.mjs). contracts/openapi.json en est la reconstruction versionnée
 // (lue par le proxy au build et par les tests) ; il n'est jamais copié depuis un checkout du BFF.
 //   --sync   (alias --generate) : régénère contracts/openapi.json depuis le paquet installé
@@ -20,16 +20,16 @@ function checkPinnedPackage() {
   const { dependencies = {}, devDependencies = {} } = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
   const pinned = dependencies[PACKAGE_NAME] ?? devDependencies[PACKAGE_NAME];
   if (!pinned) throw new Error(`${PACKAGE_NAME} doit être une dépendance de package.json.`);
-  if (!isAcceptedContractVersion(pinned)) throw new Error(`${PACKAGE_NAME} doit être épinglé à une version publiée exacte (X.Y.Z ou 0.0.0-dev.<sha>, trouvé « ${pinned} »).`);
+  if (!isAcceptedContractVersion(pinned)) throw new Error(`${PACKAGE_NAME} must be pinned to an exact published version (X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha>), found "${pinned}".`);
   const bffPackages = Object.keys({ ...dependencies, ...devDependencies }).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name));
   // User supplies types for Login's existing /me relay, never an additional
   // operation in Project's generated contract or business proxy allowlist. It follows the same
-  // version policy (release X.Y.Z or 0.0.0-dev.<sha> of BFF_user main) and stays a devDependency.
+  // version policy (release X.Y.Z, or 0.0.0-dev.<sha> / 0.0.0-staging.<sha> of a BFF_user main commit) and stays a devDependency.
   const sessionTypes = '@mairie360/bff-user-openapi';
   const sessionPinned = devDependencies[sessionTypes];
   if (dependencies[sessionTypes] || !isAcceptedContractVersion(sessionPinned) ||
     JSON.parse(readFileSync(resolve('node_modules', sessionTypes, 'package.json'), 'utf8')).version !== sessionPinned) {
-    throw new Error('Les types de session User doivent rester épinglés en devDependency à une version publiée exacte (X.Y.Z ou 0.0.0-dev.<sha>), installée telle quelle.');
+    throw new Error('The User session types must stay a devDependency pinned to an exact published version (X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha>), installed as is.');
   }
   const businessPackages = bffPackages.filter(name => name !== sessionTypes);
   if (businessPackages.length !== 1) throw new Error(`Un seul contrat métier de BFF est autorisé (trouvé : ${businessPackages.join(', ')}).`);
