@@ -5,6 +5,7 @@ const { test } = require('node:test');
 const yaml = require('js-yaml');
 
 const read = file => readFileSync(join(__dirname, '..', file), 'utf8');
+const cicdCommit = /frontend-cicd\.yml@([a-f0-9]{40})/.exec(read('.github/workflows/cicd.yml'))[1];
 const digest = '0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6';
 
 test('production and development install the lock with a required ephemeral secret and readonly npm policy', () => {
@@ -110,8 +111,8 @@ test('the exact required legacy status executes both real blocking scanners with
 test('the existing reusable frontend workflow keeps its blocking defaults and only declared secrets', () => {
   assert.deepEqual(workflow().jobs.CICD, {
     permissions: { contents: 'write', packages: 'write', 'id-token': 'write' },
-    uses: 'mairie360/CICD/.github/workflows/frontend-cicd.yml@bbd2207256969f9f63e5477452d86e1f6c56339d',
-    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: 'bbd2207256969f9f63e5477452d86e1f6c56339d' },
+    uses: `mairie360/CICD/.github/workflows/frontend-cicd.yml@${cicdCommit}`,
+    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: cicdCommit },
     secrets: {
       CODECOV_TOKEN: '${{ secrets.CODECOV_TOKEN }}',
       N8N_WEBHOOK_SECRET: '${{ secrets.N8N_WEBHOOK_SECRET }}',
