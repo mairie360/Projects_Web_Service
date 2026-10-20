@@ -19,7 +19,7 @@
     "test:bundle": "node --test tests/bundle/*.test.cjs"
   },
   "dependencies": {
-    "@mairie360/bff-project-openapi": "0.0.0-dev.1c2e6646885128c6442f398ccb5d64a29d81fc9c",
+    "@mairie360/bff-project-openapi": "0.0.0-staging.b643e720f51e25126c93bb0286ec1bfd427327c5",
     "@mairie360/lib-components": "0.10.2",
     "axios": "1.20.0",
     "daisyui": "^5.0.0",
