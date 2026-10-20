@@ -61,7 +61,13 @@ npm run contracts:check     # fail if the version isn't an accepted exact versio
 
 These commands run offline. After a bump, also move the `bff-project` (and `bff-user`) image tags in the `docker-compose*.yml` files to the images built from the same commits (`package-contract.test.cjs` enforces it), then adapt the client. The stacks also pin dev images of Core API, Project API and the database: the dev Liquibase needs `-Dallow_template_admin=true`, the database enforces argon2id hashes in `init-test.sql`, the dev APIs need `JWT_ALLOW_WEAK_SECRET` for the shared test secret and `RATE_LIMIT_ENABLED=false`, BFF_Project needs `JWT_SECRET` at startup and BFF User `AUTH_RATE_LIMIT_ENABLED=false` for the ZAP scan. BFF errors use the shared `ErrorResponse` envelope (`{ error: { code, message, details } }`, `code` in a fixed enum).
 
+## Figma mockup
+
+Figma is the source of truth: design and agree any UI change on **Mairie360 – Projects_Web_Service** (https://www.figma.com/design/d34hTymLXPWK5JMbGWJ8bY) first, then code it. Shared components come from the lib mockup https://www.figma.com/design/T7vetUfuzPEXk5TxjHRiO2 and are instantiated, never redrawn.
+
 ## Architecture
+
+- **Shell from the lib (MAIR-578)** — `src/components/project/ProjectsWorkspace.tsx` renders `AccessibleShell` from `@mairie360/lib-components/shell`; `src/lib/front-urls-provider.tsx` uses the lib `configureSidebarCookieDomain`. No local `accessible-shell.tsx`, `desktop-navigation.tsx` or `sidebar-preference.ts` (pinned by `tests/lib-shell-adoption.test.cjs`).
 
 - **Shared shell and profile routing (MAIR-180)** — `ProjectsWorkspace` uses
   the published-library `AppShell` with BFF-derived role/permissions and runtime

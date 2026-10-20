@@ -1,6 +1,6 @@
 'use client';
 
-import AccessibleShell from "@/components/accessible-shell";
+import { AccessibleShell } from "@mairie360/lib-components/shell";
 
 import React from 'react';
 import { Skeleton, Toast } from '@mairie360/lib-components/primitives';
