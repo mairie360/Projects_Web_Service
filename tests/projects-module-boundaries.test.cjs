@@ -18,23 +18,23 @@ test('the interactive Projects client composes a stable controller and workspace
   assert.equal(imports(page).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
 });
 test('the controller owns existing state and commands without JSX or component dependencies', () => {
-  const source = parse('src/components/project/useProjectsController.ts');
+  const source = parse('src/components/ProjectsWorkspace/use-projects-controller.ts');
   assert.equal(nodes(source, node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)).length, 0);
   assert.ok(exportedCallable(source, 'useProjectsController'));
   assert.equal(imports(source).some(name => /ProjectViews|ProjectModals|ProjectsWorkspace|lib-components|Kanban/.test(name)), false);
 });
 test('the workspace renders controller props without duplicating business state or requests', () => {
-  const source = parse('src/components/project/ProjectsWorkspace.tsx');
+  const source = parse('src/components/ProjectsWorkspace/ProjectsWorkspace.tsx');
   assert.ok(exportedCallable(source, 'ProjectsWorkspace'));
   assert.equal(names(source).some(name => ['useState', 'useEffect', 'useRef', 'useProjectsController', 'getProjectsPage'].includes(name)), false);
   assert.equal(imports(source).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
-  assert.ok(imports(source).includes('./CreateProjectModal'));
-  assert.ok(imports(source).includes('./ProjectDetailModal'));
+  assert.ok(imports(source).includes('./components/CreateProjectModal'));
+  assert.ok(imports(source).includes('./components/ProjectDetailModal'));
 });
 test('creation and detail dialogs have separate stable top-level components', () => {
   for (const name of ['CreateProjectModal', 'ProjectDetailModal']) {
-    const source = parse(`src/components/project/${name}.tsx`);
+    const source = parse(`src/components/ProjectsWorkspace/components/${name}/${name}.tsx`);
     assert.ok(exportedCallable(source, name));
   }
-  assert.equal(existsSync(join(root, 'src/components/project/ProjectModals.tsx')), false);
+  assert.equal(existsSync(join(root, 'src/components/ProjectsWorkspace/components/ProjectModals/ProjectModals.tsx')), false);
 });

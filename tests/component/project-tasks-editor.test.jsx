@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ProjectTasksEditor } from '@/components/project/ProjectTasksEditor';
+import { ProjectTasksEditor } from '@/components/ProjectsWorkspace/components/ProjectTasksEditor';
 import { createProjectFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
 

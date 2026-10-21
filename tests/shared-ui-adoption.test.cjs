@@ -4,8 +4,10 @@ const { JSDOM } = require('jsdom');
 const { requireTs } = require('./support/typescript.cjs');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const { GridView, TableView } = requireTs('src/components/project/ProjectViews.tsx');
-const AccessibleShell = requireTs('src/components/accessible-shell.tsx').default;
+const { GridView } = requireTs('src/components/ProjectsWorkspace/components/GridView/GridView.tsx');
+const { TableView } = requireTs('src/components/ProjectsWorkspace/components/TableView/TableView.tsx');
+// MAIR-578: the shell adapter is the library's AccessibleShell.
+const { AccessibleShell } = require('@mairie360/lib-components/shell');
 
 test('the application adapter retains the shared shell sole skip link and actual main focus target', t => {
   const dom = new JSDOM(renderToStaticMarkup(React.createElement(AccessibleShell, {

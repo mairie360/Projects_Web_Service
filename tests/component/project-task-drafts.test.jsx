@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectDetailModal } from "@/components/project/ProjectDetailModal";
-import { TaskComposer } from "@/components/project-card/TaskComposer";
+import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { TaskComposer } from '@/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer';
 import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
 import fixtures from "../support/bff-fixtures.cjs";
 

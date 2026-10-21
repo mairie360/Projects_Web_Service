@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
 const { AlertCircle, CheckCircle2, Clock3, Eye } = require('lucide-react');
-const { getInitials, formatProjectDate, getProjectNumber, statusMeta, priorityMeta, labelStyles } = requireTs('src/components/project-card/projectCardMeta.ts');
+const { getInitials, formatProjectDate, getProjectNumber, statusMeta, priorityMeta, labelStyles } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
 
 // These are the public card labels and icon choices used by the legacy project DTO.
 test('each published project status has its distinct readable label and icon', () => {

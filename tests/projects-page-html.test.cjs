@@ -650,7 +650,8 @@ test('an incomplete creation form is refused in the page without any network cal
 const alertText = () => {
   const dom = new JSDOM(view.html);
   try {
-    return dom.window.document.querySelector('[aria-atomic="true"][role="alert"] p.text-sm, [aria-atomic="true"][role="status"] p.text-sm')?.textContent;
+    // MAIR-608: the page feedback is the lib Alert; its title carries the message.
+    return dom.window.document.querySelector('[data-tone][role="alert"] p, [data-tone][role="status"] p')?.textContent;
   } finally { dom.window.close(); }
 };
 
@@ -890,7 +891,7 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   assert.match(view.text(), /\(copie\)/);
   assert.doesNotMatch(view.html, /role="menuitem"/, 'the menu closes after an action');
 
-  await view.click(props => props['aria-label'] === 'Fermer la notification');
+  await view.click(props => props['aria-label'] === 'Fermer le message');
   assert.equal(alertText(), undefined);
 
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));

@@ -3,8 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { describe, expect, it, vi } from 'vitest';
-import { CreateProjectModal } from '@/components/project/CreateProjectModal';
-import { ProjectActionsMenu } from '@/components/project-card/ProjectActionsMenu';
+import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
+import { ProjectActionsMenu } from '@/components/ProjectsWorkspace/components/ProjectCard/components/ProjectActionsMenu';
 import { createProjectFormState } from '@/lib/projectPageState';
 
 function FormHarness({ mode, onSubmit, fromMenu = false }) {

@@ -4,7 +4,9 @@ const { requireTs } = require('./support/typescript.cjs');
 const { installReactRuntime, mount } = require('./support/server-view.cjs');
 installReactRuntime();
 const React = require('react');
-const { ProjectWorkflow, ProjectTemplatePicker, ProjectTemplateManager } = requireTs('src/components/project/ProjectWorkflow.tsx');
+const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow/ProjectWorkflow.tsx');
+const { ProjectTemplatePicker } = requireTs('src/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker/ProjectTemplatePicker.tsx');
+const { ProjectTemplateManager } = requireTs('src/components/ProjectsWorkspace/components/ProjectTemplateManager/ProjectTemplateManager.tsx');
 const statuses = [
   { id: 'status-1', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
   { id: 'status-2', name: 'Conseil municipal', color: '#4b908d', category: 'inprogress' },

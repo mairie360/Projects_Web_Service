@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ProjectsWorkspace } from '../components/project/ProjectsWorkspace';
-import { useProjectsController } from '../components/project/useProjectsController';
+import { ProjectsWorkspace } from '../components/ProjectsWorkspace';
+import { useProjectsController } from '../components/ProjectsWorkspace';
 
 import type { InitialProjectsPage } from '../lib/project-page-receipt';
 

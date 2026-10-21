@@ -110,7 +110,7 @@ test('active shell destinations reject credential-bearing and non-web URLs', () 
 });
 
 test('métadonnées des cartes projet : initiales, dates et numéro affiché', () => {
-  const meta = requireTs('src/components/project-card/projectCardMeta.ts');
+  const meta = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   assert.deepEqual(Object.keys(meta.statusMeta), ['todo', 'in-progress', 'review', 'done']);
   assert.deepEqual(Object.keys(meta.priorityMeta), ['high', 'medium', 'low']);
   assert.equal(meta.getInitials('marie  anne durand'), 'MA');
@@ -143,7 +143,7 @@ test('jeton stocké : normalisation, effacement et stockage inaccessible', () =>
 });
 
 test('missing deadlines remain distinct from malformed or impossible dates', () => {
-  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  const { formatProjectDate } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   for (const withYear of [true, false]) {
     for (const date of ['', ' ', '\t\n']) {
       assert.equal(formatProjectDate(date, withYear), 'Sans échéance');
@@ -157,7 +157,7 @@ test('missing deadlines remain distinct from malformed or impossible dates', () 
 });
 
 test('valid deadline formatting preserves calendar dates without time-zone conversion', () => {
-  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  const { formatProjectDate } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   for (const [date, full, short] of [
     ['2026-01-01', '01/01/2026', '01/01'],
     ['2026-04-30', '30/04/2026', '30/04'],

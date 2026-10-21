@@ -1,5 +1,15 @@
 # Projects_Web_Service
 
+## Figma mockup / Maquette Figma
+
+Source of truth for every screen of this front: **[Mairie360 – Projects_Web_Service](https://www.figma.com/design/d34hTymLXPWK5JMbGWJ8bY)** (Mairie360 Figma team), built from the published **[Mairie360 – lib-components](https://www.figma.com/design/T7vetUfuzPEXk5TxjHRiO2)** library. A visual or behavioural change is designed and agreed in Figma first; the code then implements the mockup.
+
+Référence de chaque écran de ce front : **[Mairie360 – Projects_Web_Service](https://www.figma.com/design/d34hTymLXPWK5JMbGWJ8bY)**, construit à partir de la bibliothèque **[Mairie360 – lib-components](https://www.figma.com/design/T7vetUfuzPEXk5TxjHRiO2)**. Tout changement visuel ou de comportement est d’abord conçu et validé dans Figma ; le code implémente ensuite la maquette.
+
+## Shared shell — MAIR-578
+
+The application shell (collapsible sidebar, top bar, footer) comes from `@mairie360/lib-components/shell` (`AccessibleShell`, sidebar-preference helpers); this front keeps no local copy. `tests/lib-shell-adoption.test.cjs` pins that.
+
 ## Production contracts — 16 October 2026 (MAIR-569)
 
 The contracts are pinned on their production releases: `@mairie360/bff-project-openapi@1.0.0` (dependency) and `@mairie360/bff-user-openapi@1.0.0` (session types, devDependency); `contracts/openapi.json` is rebuilt from the first one. Every `docker-compose*.yml` starts the matching `ghcr.io/mairie360/bff-project:1.0.0` and `ghcr.io/mairie360/bff-user:1.0.0` images. The 1.0.0 contract adds the required `tasks.active` / `tasks.archived` counts, which the front now reads (see [the module documentation](docs/en/module.md)), and the task status / project template routes of MAIR-566, which it does not use yet. The section below describes the earlier dev pin.

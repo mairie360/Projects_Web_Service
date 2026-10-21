@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProjectsPage from '@/app/projects-client';
-import { TableView } from '@/components/project/ProjectViews';
+import { TableView } from '@/components/ProjectsWorkspace/components/TableView';
 import { getProjectDetails, getProjectsPage } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
 

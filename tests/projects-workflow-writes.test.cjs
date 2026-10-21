@@ -7,7 +7,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { ProjectWorkflow } = requireTs('src/components/project/ProjectWorkflow.tsx');
+const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow/ProjectWorkflow.tsx');
 const { WorkflowWriteRefusedError } = requireTs('src/lib/projectWorkflow.ts');
 
 // MAIR-570: the project workflow writes (task moves, status settings) share the controller's task write
