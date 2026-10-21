@@ -267,7 +267,7 @@ For a proxy error, compare the path and method with the inventory, then check th
 - [src/app/page.tsx](../../src/app/page.tsx)
 - [src/lib/bffProjectClient.ts](../../src/lib/bffProjectClient.ts)
 - [src/lib/projectPageState.ts](../../src/lib/projectPageState.ts)
-- [src/components/project](../../src/components/project)
+- [src/components/ProjectsWorkspace](../../src/components/ProjectsWorkspace)
 - [src/middleware.ts](../../src/middleware.ts)
 - [src/lib/bff-proxy.ts](../../src/lib/bff-proxy.ts)
 - [src/app/[...path]/route.ts](../../src/app/%5B...path%5D/route.ts)

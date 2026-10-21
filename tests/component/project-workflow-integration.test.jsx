@@ -2,9 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { ProjectDetailModal } from '@/components/project/ProjectDetailModal';
-import { CreateProjectModal } from '@/components/project/CreateProjectModal';
-import { TaskComposer } from '@/components/project-card/TaskComposer';
+import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
+import { TaskComposer } from '@/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer';
 import { projectToFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
 const statuses = [

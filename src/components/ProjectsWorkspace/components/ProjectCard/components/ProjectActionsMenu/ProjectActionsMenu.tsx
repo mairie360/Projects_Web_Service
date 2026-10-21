@@ -1,0 +1,122 @@
+'use client';
+
+import React from 'react';
+import { ToolTip } from '@mairie360/lib-components/primitives';
+import { MoreHorizontal } from 'lucide-react';
+
+import type { Project } from '@/types/project';
+
+export function ProjectActionsMenu({
+  project,
+  onEdit,
+  onDuplicate,
+  duplicationPending = false,
+  duplicationVerificationRequired = false,
+  onDelete,
+}: {
+  project: Project;
+  onEdit?: (project: Project) => void;
+  onDuplicate?: (project: Project) => void;
+  duplicationPending?: boolean;
+  duplicationVerificationRequired?: boolean;
+  onDelete?: (project: Project) => void;
+}) {
+  const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
+  const canDuplicate = project.permissions?.canDuplicate !== false && Boolean(onDuplicate);
+  const canDelete = project.permissions?.canDelete !== false && Boolean(onDelete);
+  const hasActions = canEdit || canDuplicate || canDelete;
+  const [open, setOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  const runAction = (action?: (project: Project) => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    triggerRef.current?.focus();
+    setOpen(false);
+    action?.(project);
+  };
+
+  if (!hasActions) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className="relative shrink-0"
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <ToolTip text="Actions">
+        <button
+          ref={triggerRef}
+          type="button"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#f6f8fa] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
+          aria-label={`Actions pour ${project.title}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={(event) => {
+            event.stopPropagation();
+            setOpen((current) => !current);
+          }}
+        >
+          <MoreHorizontal className="h-4 w-4" strokeWidth={2.2} />
+        </button>
+      </ToolTip>
+
+      {open && (
+        <div
+          className="absolute right-0 top-[calc(100%+4px)] z-50 w-36 overflow-hidden rounded-md border border-[#d0d7de] bg-white py-1 text-sm text-[#24292f] shadow-[0_8px_24px_rgba(140,149,159,0.2)]"
+          role="menu"
+        >
+          {canEdit && <button
+            type="button"
+            role="menuitem"
+            className="flex h-9 w-full items-center px-3 text-left transition hover:bg-[#0969da] hover:text-white"
+            onClick={runAction(onEdit)}
+          >
+            Modifier
+          </button>}
+          {canDuplicate && <button
+            type="button"
+            role="menuitem"
+            disabled={duplicationPending || duplicationVerificationRequired}
+            aria-busy={duplicationPending || undefined}
+            className={`flex h-9 w-full items-center px-3 text-left transition enabled:hover:bg-[#0969da] enabled:hover:text-white disabled:opacity-50 ${duplicationVerificationRequired ? 'disabled:cursor-not-allowed' : 'disabled:cursor-wait'}`}
+            onClick={runAction(onDuplicate)}
+          >
+            {duplicationVerificationRequired ? 'Copie à vérifier' : 'Dupliquer'}
+          </button>}
+          {canDelete && (canEdit || canDuplicate) && <div className="my-1 border-t border-[#d8dee4]" />}
+          {canDelete && <button
+            type="button"
+            role="menuitem"
+            className="flex h-9 w-full items-center px-3 text-left text-[#cf222e] transition hover:bg-[#ffebe9]"
+            onClick={runAction(onDelete)}
+          >
+            Supprimer
+          </button>}
+        </div>
+      )}
+    </div>
+  );
+}

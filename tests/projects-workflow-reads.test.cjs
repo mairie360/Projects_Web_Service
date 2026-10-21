@@ -7,7 +7,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { TaskComposer } = requireTs('src/components/project-card/TaskComposer.tsx');
+const { TaskComposer } = requireTs('src/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer/TaskComposer.tsx');
 const { createPublishedProjectWorkflowPort } = requireTs('src/lib/publishedProjectWorkflow.ts');
 
 // MAIR-567 reads stay minimal (MAIR-526): the detail already loaded by the project sheet is not read

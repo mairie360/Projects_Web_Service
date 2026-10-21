@@ -65,9 +65,40 @@ These commands run offline. After a bump, also move the `bff-project` (and `bff-
 
 Figma is the source of truth: design and agree any UI change on **Mairie360 – Projects_Web_Service** (https://www.figma.com/design/d34hTymLXPWK5JMbGWJ8bY) first, then code it. Shared components come from the lib mockup https://www.figma.com/design/T7vetUfuzPEXk5TxjHRiO2 and are instantiated, never redrawn.
 
+## Component tree convention
+
+Every component under `src/components/` is a **folder named after it**, and the folder tree
+mirrors the composition tree:
+
+```
+Name/
+  index.ts          # exports the component (and the helpers it owns)
+  Name.tsx          # imports ONLY its direct sub-components, through their index.ts
+  Name.test.tsx     # its tests, co-located (vitest + jsdom)
+  components/       # one such folder per direct sub-component, recursively
+```
+
+- A component needs nothing but the `index.ts` of its direct sub-components: `Name.tsx` imports
+  `./components/Sub`, never `./components/Sub/Sub` nor a sub-sub-component. Leaves are folders
+  too (without `components/`).
+- Helpers a component owns (models, hooks, `*.ts`) sit beside it and are exported by its
+  `index.ts`; a helper shared by two siblings sits in their closest common ancestor.
+- A big component is acceptable only for a technical reason stated in a comment; otherwise
+  split it so that each visible part is a component and what composes it a sub-component.
+- Page and journey tests stay in `tests/`; per-component tests are the co-located
+  `Name.test.tsx`. `tests/component-tree-convention.test.cjs` enforces the folder, the index,
+  the co-located test and the index-only imports.
+
+## Front tickets and the Figma mockup
+
+A front ticket (Jira + GitHub issue + PR) **must link the Figma frame that serves as the
+example** of what is being built or changed. Without that link the ticket cannot be worked
+on, unless the change does not affect the display (tooling, tests, proxy, contracts…). Update
+and agree the mockup first, then code it: the sync direction is Figma → code.
+
 ## Architecture
 
-- **Shell from the lib (MAIR-578)** — `src/components/project/ProjectsWorkspace.tsx` renders `AccessibleShell` from `@mairie360/lib-components/shell`; `src/lib/front-urls-provider.tsx` uses the lib `configureSidebarCookieDomain`. No local `accessible-shell.tsx`, `desktop-navigation.tsx` or `sidebar-preference.ts` (pinned by `tests/lib-shell-adoption.test.cjs`).
+- **Shell from the lib (MAIR-578)** — `src/components/ProjectsWorkspace/ProjectsWorkspace.tsx` renders `AccessibleShell` from `@mairie360/lib-components/shell`; `src/lib/front-urls-provider.tsx` uses the lib `configureSidebarCookieDomain`. No local `accessible-shell.tsx`, `desktop-navigation.tsx` or `sidebar-preference.ts` (pinned by `tests/lib-shell-adoption.test.cjs`).
 
 - **Shared shell and profile routing (MAIR-180)** — `ProjectsWorkspace` uses
   the published-library `AppShell` with BFF-derived role/permissions and runtime
@@ -95,7 +126,7 @@ Figma is the source of truth: design and agree any UI change on **Mairie360 – 
   `ProjectDetailModal` still contains the task/collaboration workflow; this split
   does not complete that further audit or change session/revocation policy.
 - `src/lib/bffProjectClient.ts` adapts the OpenAPI contract to the presentation model (`src/types/project.tsx`) and `src/lib/projectPageState.ts` centralises page-state updates.
-- `src/components/project/` implements forms, modals, task editor and views; `src/components/project-card/` + `Kanban.tsx` / `ProjectCard.tsx` render cards. `src/lib/navigation.ts` supplies validated runtime destinations to the shared shell.
+- **Component tree (MAIR-608)** — `src/components/ProjectsWorkspace/` is the single page root (`ProjectsWorkspace.tsx`, `use-projects-controller.ts`, helpers `project-card-meta.ts`, `field-style.ts`, `workflow-helpers.ts`) and follows the component tree convention above. Its `components/` holds the workspace parts (`WorkspaceHeader`, `ProjectFiltersBar` → filter/search/view controls, the notices, `ProjectPagination`), the views (`KanbanBoard`, `GridView`, `TableView`, `ProjectsEmptyState`), `ProjectCard` (→ `ProjectActionsMenu`, `TaskComposer` with its `use-task-composer.ts` hook, labels/avatars/recent tasks), the shared leaves (`StatusPill`, `PriorityPill`, `PriorityLabel`, `PersonAvatar`, `ProgressMeter`, `FieldLabel`, `FormField`, `TextAreaField`, `SelectField`, `MultiSelectField`, `TaskEditButton`, `TaskCreationNotice`, `StatusDefinitionEditor`), `ProjectTasksEditor` (`task-form-state.ts`, `use-task-drafts.ts` → `TaskDraftForm`, `DraftTaskRow`), `ProjectTemplateManager` (→ `TemplateManagerEditor`), `CreateProjectModal` (→ feedback, fields, footer, `ProjectTemplatePicker`) and `ProjectDetailModal`, whose state lives in hooks beside it (`use-project-edit`, `use-detail-task-form`, `use-task-collaboration`, `use-task-filters`, `use-linked-task-scroll`, `use-dialog-focus`) and whose parts are `DetailHeader`, `DetailRefreshAlert`, `TaskFormPanel`, `ProjectEditForm`, `ProjectSummary`, `ProjectLifecycle`, `ProjectWorkflow` (→ `TaskStatusKanban` → `TaskStatusSelect`) and `DetailTaskList` (→ `TaskFilters`, `TaskRow`, `TaskDeleteConfirm`, `TaskFollowUp`). `tests/project-component-tree.test.cjs` pins that composition; `tests/component-tree-convention.test.cjs` the convention. Component tests are the co-located `Name.test.jsx` (vitest + jsdom); journeys stay in `tests/component/`. `src/lib/navigation.ts` supplies validated runtime destinations to the shared shell.
 - `next.config.ts` sets `output: 'standalone'` (required by the Dockerfile), `poweredByHeader: false` and static security headers on every route (`tests/security-headers.test.cjs` pins them, and the ZAP baseline fails without them). `*_FRONT_URL` destinations are read at runtime, not baked into the image.
 - **Text constraints of the contract (MAIR-514)** — `src/lib/text-constraints.ts` mirrors the published rules: every free text refuses `<` and `>` (`NO_MARKUP_PATTERN`, the HTML form of `^[^<>]*$`, with `NO_MARKUP_HINT` as `title`) and a task comment is at most `COMMENT_MAX_LENGTH` (2 000). `FormField` always carries them, `TextAreaField` reports them through `reportMarkupValidity` (`setCustomValidity`, textareas have no `pattern`), the task title inputs (`ProjectDetailModal`, `TaskComposer`, `ProjectTasksEditor`) and the comment input carry them too. `getBffProjectErrorMessage` goes through `describeBffProjectError`: a BFF 400 whose `error.details[]` add information lists the refused fields in French (`Titre : ne doit pas contenir les caractères < ou >`); details that only repeat the BFF message keep that message. `tests/projects-text-constraints.test.cjs` pins the pattern to `contracts/openapi.json`.
 

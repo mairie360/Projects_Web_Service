@@ -2,7 +2,7 @@ import React from 'react';
 import { expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TaskStatusKanban } from '@/components/project/TaskStatusKanban';
+import { TaskStatusKanban } from '@/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow/components/TaskStatusKanban';
 const statuses = [
   { id: 'pending', name: 'À instruire', color: '#1256a6', category: 'todo' },
   { id: 'review', name: 'Conseil municipal', color: '#4b908d', category: 'inprogress' },
