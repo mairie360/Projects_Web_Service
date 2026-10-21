@@ -115,9 +115,9 @@ for (const mode of ['create', 'edit']) {
     assert.equal(view.find('CreateProjectModal').length, 0);
     assert.equal(harness.bffProject.calls(path, method).length, 1);
     assert.match(view.text(), /Lecture indisponible/);
-    const receipt = view.hostElements(props => props['aria-atomic'] === true && props.role === 'status')[0];
+    const receipt = view.hostElements(props => props['data-tone'] !== undefined && props.role === 'status')[0];
     assert.ok(receipt, 'the confirmed write must have a polite receipt rather than a refusal alert');
-    assert.match(receipt.text, /enregistré\. Actualisation impossible/);
+    assert.match(view.text(), /enregistré\. Actualisation impossible/); // the lib Alert renders its title in a nested Text
     assert.equal(view.find('ProjectDetailModal').length, mode === 'create' ? 1 : 0);
     const received = view.props('KanbanBoard').projects;
     assert.equal(received.filter(project => project.id === official.id).length, 1);

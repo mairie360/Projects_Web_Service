@@ -303,7 +303,7 @@ export function CreateProjectModal({
         </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
-          <Button
+          <Button variant="outline" tone="neutral"
             label={creationConfirmed ? 'Fermer' : 'Annuler'}
             disabled={pending}
             type="button"
@@ -314,7 +314,6 @@ export function CreateProjectModal({
             label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : creationConfirmed ? 'Création vérifiée' : 'Créer le projet'}
             disabled={submitBlocked}
             type="submit"
-            primary
             className={`!h-9 !min-h-0 !rounded-md !px-4 !text-sm !font-semibold !text-white ${submitBlocked ? '!border-[#a5bca9] !bg-[#a5bca9] !cursor-not-allowed' : '!border-[#2da44e] !bg-[#2da44e] hover:!bg-[#2c974b]'}`}
           />
         </div>

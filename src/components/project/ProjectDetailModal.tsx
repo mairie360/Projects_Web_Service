@@ -641,7 +641,7 @@ export function ProjectDetailModal({
 
                   <div className="flex justify-end gap-2">
                     {editingTaskId && (
-                      <Button
+                      <Button variant="outline" tone="neutral"
                         label="Annuler"
                         type="button"
                         onClick={cancelTaskEdit}
@@ -652,7 +652,6 @@ export function ProjectDetailModal({
                       label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
                       type="submit"
                       disabled={editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle)}
-                      primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b] disabled:!cursor-not-allowed disabled:!opacity-50"
                     />
                   </div>
@@ -1013,7 +1012,7 @@ export function ProjectDetailModal({
                   </div>
 
                   <div className="flex justify-end gap-2 pt-1">
-                    <Button
+                    <Button variant="outline" tone="neutral"
                       label="Annuler"
                       type="button"
                       onClick={cancelProjectEdit}
@@ -1023,7 +1022,6 @@ export function ProjectDetailModal({
                       label="Enregistrer"
                       type="submit"
                       disabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
-                      primary
                       className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
                     />
                   </div>

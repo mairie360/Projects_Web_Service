@@ -29,7 +29,8 @@ export function ActionButton({
       />
       <Button
         label={label}
-        primary={primary ? true : undefined}
+        variant={primary ? 'solid' : 'outline'}
+        tone={primary ? 'primary' : 'neutral'}
         onClick={onClick}
         className={`!h-10 !min-h-0 !rounded-md !pl-10 !pr-4 !text-sm !font-semibold ${
           primary

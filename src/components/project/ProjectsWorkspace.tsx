@@ -3,7 +3,7 @@
 import { AccessibleShell } from "@mairie360/lib-components/shell";
 
 import React from 'react';
-import { Skeleton, Toast } from '@mairie360/lib-components/primitives';
+import { Alert, Skeleton } from '@mairie360/lib-components/primitives';
 import { Plus, Settings } from 'lucide-react';
 import { KanbanBoard } from '../Kanban';
 import { ActionButton } from './ProjectFormControls';
@@ -196,7 +196,6 @@ export function ProjectsWorkspace({
 
       <AccessibleShell
         activeItem="projects"
-        isAdmin={session.isAdmin}
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
@@ -243,10 +242,11 @@ export function ProjectsWorkspace({
               })}
               {alert && (
                 <div className="mb-5">
-                  <Toast
-                    variant={alert.type}
-                    message={alert.message}
-                    onClose={() => setAlert(null)}
+                  {/* MAIR-608: in-page feedback is the lib Alert (a standalone Toast is not announced). */}
+                  <Alert
+                    tone={alert.type === 'error' ? 'danger' : alert.type}
+                    title={alert.message}
+                    onDismiss={() => setAlert(null)}
                   />
                 </div>
               )}

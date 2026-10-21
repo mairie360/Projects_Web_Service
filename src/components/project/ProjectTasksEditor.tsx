@@ -287,7 +287,7 @@ export function ProjectTasksEditor({
 
           <div className="flex justify-end gap-2">
             {editingTaskId && (
-              <Button
+              <Button variant="outline" tone="neutral"
                 label="Annuler"
                 type="button"
                 onClick={cancelTaskEdit}
@@ -297,7 +297,6 @@ export function ProjectTasksEditor({
             <Button
               label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
               type="button"
-              primary
               onClick={saveTask}
               className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
             />
