@@ -37,7 +37,7 @@ x-service: &service-template
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:3.2.0}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:3.3.0}
     restart: always
     container_name: mairie360-db-projects-front #change front name
     environment:
@@ -57,7 +57,7 @@ services:
       retries: 5
 
   liquibase:
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:3.2.0}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:3.3.0}
     container_name: mairie360-liquibase-projects-front #change front name
     depends_on:
       postgres:
@@ -95,7 +95,7 @@ services:
 
   core:
     container_name: core-projects-front-developpement
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:2.1.0}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:2.2.0}
     ports:
       - "3000:3000"
     networks:
@@ -133,7 +133,7 @@ services:
 
   project-api:
     container_name: project-api-front-projects-developpement
-    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:1.1.0}
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:1.2.0}
     ports:
       - "3001:3001"
     networks:
@@ -168,7 +168,7 @@ services:
 
   bff-user:
     container_name: bff-user-projects-front
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.0.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.1.0}
     networks:
       - backend
     environment:
@@ -199,7 +199,7 @@ services:
   bff-project:
     container_name: bff-project-projects-front
     # Seul BFF de ce front : même version que le contrat @mairie360/bff-project-openapi de package.json.
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:staging-b643e72}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.1.0}
     ports:
       - "4001:4001"
     networks:
