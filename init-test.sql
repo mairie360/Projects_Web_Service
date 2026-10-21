@@ -13,3 +13,11 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO user_roles (user_id, role_id)
 SELECT 2, r.id FROM roles r WHERE lower(r.name) IN ('user', 'admin')
 ON CONFLICT DO NOTHING;
+-- End-to-end journeys (MAIR-603): user 3 only carries the "User" role, so BFF Project refuses its
+-- project writes (403) and the page hides "Nouveau projet" for it. Same template password hash.
+INSERT INTO users (id, first_name, last_name, email, password, status)
+VALUES (3, 'Membre', 'Lecteur', 'membre-lecteur@mairie360.fr', '$argon2id$v=19$m=19456,t=2,p=1$/iKF9PbiDRDs4EKPjlIIhg$UKx9vfwwps250mEP/bYp63CXbEnQGULeUAhDq+az9Aw', 'active')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO user_roles (user_id, role_id)
+SELECT 3, r.id FROM roles r WHERE lower(r.name) = 'user'
+ON CONFLICT DO NOTHING;

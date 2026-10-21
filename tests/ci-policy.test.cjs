@@ -55,9 +55,9 @@ test('Docker excludes local environments and artifacts while retaining tracked n
   assert.ok(!patterns.includes('.npmrc') && !patterns.includes('.npmrc*'));
 });
 
-test('all three Compose frontend builds use the required secret without runtime credentials', () => {
+test('all four Compose frontend builds use the required secret without runtime credentials', () => {
   const yaml = require('js-yaml');
-  for (const file of ['docker-compose.yml', 'docker-compose-security.yml', 'docker-compose-performance.yml']) {
+  for (const file of ['docker-compose.yml', 'docker-compose-security.yml', 'docker-compose-performance.yml', 'docker-compose-e2e.yml']) {
     const compose = yaml.load(read(file));
     assert.deepEqual(compose.secrets, { node_auth_token: { environment: 'NODE_AUTH_TOKEN' } });
     assert.deepEqual(compose.services['projects-front'].build, {
