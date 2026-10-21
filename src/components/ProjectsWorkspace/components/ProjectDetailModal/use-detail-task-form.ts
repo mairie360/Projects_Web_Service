@@ -11,9 +11,9 @@ import { categoryOf, projectStatusHelpers } from './status-helpers';
 import type { MutationLock } from './use-project-edit';
 
 // The task form of the detail: creation draft (with the current agent as default assignee) or edit of one task.
-export function useDetailTaskForm({ project, lock, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask }: {
+export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask }: {
   project: Project;
-  lock: MutationLock;
+  lockRef: MutationLock;
   memberOptions: FilterOption[];
   defaultTaskAssigneeId?: string | null;
   readCurrentTaskAssignee?: (signal: AbortSignal) => Promise<string | null>;
@@ -72,7 +72,7 @@ export function useDetailTaskForm({ project, lock, memberOptions, defaultTaskAss
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (lock.current.task || lock.current.project) return;
+    if (lockRef.current.task || lockRef.current.project) return;
     if (!editingTaskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return;
     if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
     if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
@@ -110,7 +110,7 @@ export function useDetailTaskForm({ project, lock, memberOptions, defaultTaskAss
       dueDate: form.dueDate,
     };
 
-    lock.current.task = true;
+    lockRef.current.task = true;
     setSaving(true);
     setError('');
     try {
@@ -127,13 +127,13 @@ export function useDetailTaskForm({ project, lock, memberOptions, defaultTaskAss
       setError(getBffProjectErrorMessage(error));
       setVerificationError(error instanceof ProjectTaskVerificationRequiredError || error instanceof NewTaskReceiptVerificationRequiredError);
     } finally {
-      lock.current.task = false;
+      lockRef.current.task = false;
       setSaving(false);
     }
   };
 
   const edit = (task: ProjectTask) => {
-    if (lock.current.task || lock.current.project || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
+    if (lockRef.current.task || lockRef.current.project || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
     touchedRef.current = true;
     agentReadRef.current?.abort();
     setForm(taskToFormState(task));
@@ -142,7 +142,7 @@ export function useDetailTaskForm({ project, lock, memberOptions, defaultTaskAss
   };
 
   const cancel = () => {
-    if (lock.current.task || lock.current.project) return;
+    if (lockRef.current.task || lockRef.current.project) return;
     agentReadRef.current?.abort();
     touchedRef.current = !!taskCreationState?.draft;
     setForm(taskCreationState?.draft ?? newTaskForm());

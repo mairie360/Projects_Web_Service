@@ -4,12 +4,12 @@ import { projectToFormState, type ProjectFormState } from '@/lib/projectPageStat
 import { ProjectReceiptVerificationRequiredError } from '@/lib/projectReceiptVerification';
 import type { Project } from '@/types/project';
 
-// One project write at a time: the project form and the task form share this lock.
+// One project write at a time: the project form and the task form share this lockRef.
 export type MutationLock = React.MutableRefObject<{ project: boolean; task: boolean }>;
 
-export function useProjectEdit({ project, lock, dialogRef, verificationBlocked, onUpdateProject }: {
+export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocked, onUpdateProject }: {
   project: Project;
-  lock: MutationLock;
+  lockRef: MutationLock;
   dialogRef: React.RefObject<HTMLElement | null>;
   verificationBlocked: boolean;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
@@ -21,7 +21,7 @@ export function useProjectEdit({ project, lock, dialogRef, verificationBlocked, 
   const [saving, setSaving] = React.useState(false);
   const projectIdRef = React.useRef(project.id);
   const editingRef = React.useRef(false);
-  const busy = () => lock.current.project || lock.current.task;
+  const busy = () => lockRef.current.project || lockRef.current.task;
 
   // Official refreshes update defaults, never an active same-project draft.
   const syncProject = (next: Project) => {
@@ -35,7 +35,7 @@ export function useProjectEdit({ project, lock, dialogRef, verificationBlocked, 
   };
 
   const update = (patch: Partial<ProjectFormState>) => {
-    if (lock.current.project) return;
+    if (lockRef.current.project) return;
     setForm((current) => ({ ...current, ...patch }));
     if (error) setError('');
   };
@@ -76,7 +76,7 @@ export function useProjectEdit({ project, lock, dialogRef, verificationBlocked, 
       return;
     }
 
-    lock.current.project = true;
+    lockRef.current.project = true;
     setSaving(true);
     setError('');
     try {
@@ -88,7 +88,7 @@ export function useProjectEdit({ project, lock, dialogRef, verificationBlocked, 
       setVerificationError(error instanceof ProjectReceiptVerificationRequiredError);
       setError(getBffProjectErrorMessage(error));
     } finally {
-      lock.current.project = false;
+      lockRef.current.project = false;
       setSaving(false);
     }
   };

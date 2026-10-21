@@ -92,13 +92,14 @@ export function ProjectDetailModal({
   const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? statusOptions;
   // The detailed task list (follow-up, comments, task links) stays visible by default; the button only hides it.
   const [showTaskDetails, setShowTaskDetails] = React.useState(true);
-  const lock: MutationLock = React.useRef({ project: false, task: false });
+  const lockRef: MutationLock = React.useRef({ project: false, task: false });
   const closeDetail = () => {
-    if (!lock.current.project && !lock.current.task) onClose();
+    if (!lockRef.current.project && !lockRef.current.task) onClose();
   };
   const { overlayRef, dialogRef, handleDialogKeyDown } = useDialogFocus(closeDetail);
-  const projectEdit = useProjectEdit({ project, lock, dialogRef, verificationBlocked: projectVerificationRequired || projectVerificationPending, onUpdateProject });
-  const taskForm = useDetailTaskForm({ project, lock, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
+  const projectEdit = useProjectEdit({ project, lockRef, dialogRef, verificationBlocked: projectVerificationRequired || projectVerificationPending, onUpdateProject });
+  // The ref stays out of the `taskForm` object so the compiler lint does not read it as a ref access during render.
+  const { noticeRef: taskNoticeRef, ...taskForm } = useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
   const filters = useTaskFilters({ tasks, dynamicStatuses });
   const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
   const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
@@ -175,7 +176,7 @@ export function ProjectDetailModal({
                   onCancelEdit={taskForm.cancel}
                   onSubmit={taskForm.submit}
                 >
-                  <div ref={taskForm.noticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+                  <div ref={taskNoticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
                     <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
                   </div>
                 </TaskFormPanel>
