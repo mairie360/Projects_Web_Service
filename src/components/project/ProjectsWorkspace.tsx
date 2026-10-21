@@ -4,15 +4,16 @@ import { AccessibleShell } from "@mairie360/lib-components/shell";
 
 import React from 'react';
 import { Alert, Skeleton } from '@mairie360/lib-components/primitives';
-import { Plus, Settings } from 'lucide-react';
 import { KanbanBoard } from '../Kanban';
-import { ActionButton } from './ProjectFormControls';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ProjectDetailModal } from './ProjectDetailModal';
 import { ProjectTemplateManager } from './ProjectWorkflow';
 import { ProjectPagination } from './ProjectPagination';
 import { TaskCreationNotice } from './TaskCreationNotice';
-import { FilterSelect, GridView, SearchInput, TableView, ViewToggle } from './ProjectViews';
+import { GridView, TableView } from './ProjectViews';
+import { ProjectFiltersBar } from './workspace/ProjectFiltersBar';
+import { WorkspaceHeader } from './workspace/WorkspaceHeader';
+import { LogoutErrorNotice, PageReadError, VerificationNotice, WorkspaceLoading } from './workspace/WorkspaceNotices';
 import { navigateToPage } from '../../lib/navigation';
 import { returnToLogin } from '../../lib/auth-token';
 import type { ProjectsController } from './useProjectsController';
@@ -201,44 +202,36 @@ export function ProjectsWorkspace({
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
         className="projects-shell"
       >
-            {!projectsPage && !pageError && <section className="projects-initial-loading mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14" aria-busy="true">
-              <h1 className="text-2xl font-bold leading-tight text-[#172033]">Projets</h1>
-              <p role="status" className="mt-4 text-sm text-[#536171]">Chargement du tableau des projets...</p>
-              <Skeleton className="mt-8 min-h-80" />
-            </section>}
+            {!projectsPage && !pageError && <WorkspaceLoading />}
             <div hidden={!projectsPage && !pageError} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
-              {logoutError && (
-                <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
-                  <p>{logoutError}</p>
-                  <button type="button" onClick={returnToLogin} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f]">
-                    Retour à la connexion
-                  </button>
-                </div>
-              )}
+              {logoutError && <LogoutErrorNotice message={logoutError} onBackToLogin={returnToLogin} />}
               {[...taskCreationStates].filter(([, state]) => state.uncertainTitle).map(([projectId, state]) => (
                 <TaskCreationNotice key={projectId} state={state} onInspect={() => inspectTaskCreation(projectId)} />
               ))}
               {[...newProjectReceiptIssues].map(([key, issue]) => (
-                <div key={key} role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
-                  <p className="font-semibold">{issue.kind === 'create' ? 'Création' : 'Duplication'} non vérifiée : {issue.title}</p>
-                  <p>{issue.verificationId ? NEW_PROJECT_TASK_VERIFICATION_MESSAGE : NEW_PROJECT_VERIFICATION_MESSAGE}</p>
-                  {(issue.verificationId ? newProjectReceiptErrors.get(key) : newProjectCatalogueReadError) && <p className="mt-2">{issue.verificationId ? newProjectReceiptErrors.get(key) : newProjectCatalogueReadError}</p>}
-                  <button type="button" disabled={issue.verificationId ? newProjectReceiptPendingKeys.has(key) : newProjectCatalogueReadPending} aria-busy={issue.verificationId ? newProjectReceiptPendingKeys.has(key) : newProjectCatalogueReadPending} onClick={() => void verifyNewProjectReceipt(key)} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                    {issue.verificationId ? newProjectReceiptPendingKeys.has(key) ? 'Vérification du projet…' : 'Vérifier le projet' : newProjectCatalogueReadPending ? 'Actualisation du catalogue…' : 'Actualiser le catalogue'}
-                  </button>
-                </div>
+                <VerificationNotice
+                  key={key}
+                  title={`${issue.kind === 'create' ? 'Création' : 'Duplication'} non vérifiée : ${issue.title}`}
+                  message={issue.verificationId ? NEW_PROJECT_TASK_VERIFICATION_MESSAGE : NEW_PROJECT_VERIFICATION_MESSAGE}
+                  error={issue.verificationId ? newProjectReceiptErrors.get(key) : newProjectCatalogueReadError}
+                  pending={issue.verificationId ? newProjectReceiptPendingKeys.has(key) : newProjectCatalogueReadPending}
+                  label={issue.verificationId ? 'Vérifier le projet' : 'Actualiser le catalogue'}
+                  pendingLabel={issue.verificationId ? 'Vérification du projet…' : 'Actualisation du catalogue…'}
+                  onVerify={() => void verifyNewProjectReceipt(key)}
+                />
               ))}
               {[...unverifiedProjectIds].map(projectId => {
                 const title = projects.find(project => project.id === projectId)?.title ?? projectId;
-                const pending = projectVerificationPendingIds.has(projectId);
-                return <div key={projectId} role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
-                  <p className="font-semibold">{title}</p>
-                  <p>{PROJECT_VERIFICATION_MESSAGE}</p>
-                  {projectVerificationErrors.get(projectId) && <p className="mt-2">{projectVerificationErrors.get(projectId)}</p>}
-                  <button type="button" disabled={pending} aria-busy={pending} onClick={() => void verifyProjectReceipt(projectId)} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                    {pending ? 'Vérification du projet…' : `Vérifier le projet ${title}`}
-                  </button>
-                </div>;
+                return <VerificationNotice
+                  key={projectId}
+                  title={title}
+                  message={PROJECT_VERIFICATION_MESSAGE}
+                  error={projectVerificationErrors.get(projectId)}
+                  pending={projectVerificationPendingIds.has(projectId)}
+                  label={`Vérifier le projet ${title}`}
+                  pendingLabel="Vérification du projet…"
+                  onVerify={() => void verifyProjectReceipt(projectId)}
+                />;
               })}
               {alert && (
                 <div className="mb-5">
@@ -251,77 +244,33 @@ export function ProjectsWorkspace({
                 </div>
               )}
 
-              <section className="border-b border-[#dedbd6] pb-8">
-                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold leading-tight text-[#172033]">{pageTitle}</h1>
-                    <p className="mt-2 text-sm text-[#536171]">{pageSubtitle}</p>
-                    {projectsPage?.access && (
-                      <span className="mt-3 inline-flex rounded-full border border-[#b9d6d5] bg-[#d4eeee] px-3 py-1 text-xs font-semibold text-[#2b706c]">
-                        {projectsPage.access.scope === 'all' ? 'Tous les projets municipaux' : projectsPage.access.scope === 'team' ? 'Projets de mon équipe' : 'Mes projets assignés'}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-3">
-                    {canCreateProject && (
-                      <ActionButton label="Nouveau projet" icon={Plus} primary onClick={() => openCreateProject()} />
-                    )}
-                    <ActionButton
-                      label="Paramètres"
-                      icon={Settings}
-                      onClick={() => navigateToPage('settings')}
-                    />
-                  </div>
-                </div>
-              </section>
+              <WorkspaceHeader
+                title={pageTitle}
+                subtitle={pageSubtitle}
+                scope={projectsPage?.access?.scope}
+                onCreate={canCreateProject ? () => openCreateProject() : undefined}
+                onSettings={() => navigateToPage('settings')}
+              />
 
               <ProjectTemplateManager role={projectsPage?.access.role} port={workflowPort} />
 
-              <section className="border-b border-[#e3e0dc] py-7">
-                <div className="flex flex-col items-start gap-4 2xl:flex-row 2xl:flex-wrap 2xl:items-center 2xl:justify-between">
-                  <div className="flex w-full min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-center 2xl:basis-[50rem]">
-                    <div className="w-full md:min-w-[280px] md:max-w-[448px] md:flex-1 2xl:min-w-[240px]">
-                      <SearchInput value={searchTerm} onChange={setSearchTerm} />
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <FilterSelect
-                        label="Filtrer par statut"
-                        value={statusFilter}
-                        options={statusFilterOptions}
-                        open={openFilter === 'status'}
-                        onOpenChange={(open) => setOpenFilter(open ? 'status' : null)}
-                        onChange={setStatusFilter}
-                      />
-                      <FilterSelect
-                        label="Filtrer par priorité"
-                        value={priorityFilter}
-                        options={priorityFilterOptions}
-                        open={openFilter === 'priority'}
-                        widthClassName="sm:w-48"
-                        onOpenChange={(open) => setOpenFilter(open ? 'priority' : null)}
-                        onChange={setPriorityFilter}
-                      />
-                      <label className="block w-full sm:w-44" title="Filtrer par échéance maximale">
-                        <span className="mb-1 block text-sm font-medium">Échéance avant</span>
-                        <input
-                          type="date"
-                          aria-label="Échéance avant"
-                          value={dueBeforeFilter}
-                          className="h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm font-normal text-[#2f3438] shadow-sm outline-none transition focus:border-[#4b908d] focus:ring-2 focus:ring-[#4b908d]/15"
-                          onChange={(event) => setDueBeforeFilter(event.target.value)}
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  <ViewToggle
-                    value={viewMode}
-                    options={projectsPage?.page.views ?? []}
-                    onChange={setViewMode}
-                  />
-                </div>
-              </section>
+              <ProjectFiltersBar
+                search={searchTerm}
+                status={statusFilter}
+                priority={priorityFilter}
+                dueBefore={dueBeforeFilter}
+                statusOptions={statusFilterOptions}
+                priorityOptions={priorityFilterOptions}
+                openFilter={openFilter}
+                viewMode={viewMode}
+                views={projectsPage?.page.views ?? []}
+                onSearchChange={setSearchTerm}
+                onStatusChange={setStatusFilter}
+                onPriorityChange={setPriorityFilter}
+                onDueBeforeChange={setDueBeforeFilter}
+                onOpenFilterChange={setOpenFilter}
+                onViewModeChange={setViewMode}
+              />
 
               <section className="pt-8">
                 {duplicatingProjectIds.length > 0 && (
@@ -333,24 +282,7 @@ export function ProjectsWorkspace({
                   <Skeleton label="Chargement des projets..." className="min-h-32" />
                 )}
 
-                {pageError && (
-                  <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-5 py-4 text-sm font-medium text-[#cf222e]">
-                    <div>{pageError}</div>
-                    {projects.length > 0 && (
-                      <p className="mt-2">Dernières données reçues et confirmations conservées : la liste n’a pas pu être actualisée. Les statistiques restent celles de la dernière lecture réussie.</p>
-                    )}
-                    <button
-                      type="button"
-                      disabled={pageLoading}
-                      aria-busy={pageLoading}
-                      className="mt-3 rounded-md border border-[#cf222e] bg-white px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#cf222e] disabled:cursor-wait disabled:opacity-60"
-                      onClick={() => void retryProjectsPage()}
-                    >
-                      Réessayer
-                    </button>
-                    {pageLoading && <p role="status" className="mt-2">Actualisation des projets...</p>}
-                  </div>
-                )}
+                {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
                   <KanbanBoard

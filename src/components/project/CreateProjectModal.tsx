@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Button } from '@mairie360/lib-components/primitives';
 import { X } from 'lucide-react';
-import { ProgressMeter } from '../ProjectCard';
-import type { Project } from '../../types/project';
 import { type FilterOption, type ProjectFormState } from '../../lib/projectPageState';
-import { FieldLabel, FormField, MultiSelectField, SelectField, TextAreaField, fieldClassName } from './ProjectFormControls';
+import { CreateProjectFeedback } from './create-project/CreateProjectFeedback';
+import { CreateProjectFooter } from './create-project/CreateProjectFooter';
+import { ProjectMainFields } from './create-project/ProjectMainFields';
+import { ProjectSideFields } from './create-project/ProjectSideFields';
 import { ProjectTasksEditor } from './ProjectTasksEditor';
 import { ProjectTemplatePicker } from './ProjectWorkflow';
 import type { ProjectTemplate, ProjectWorkflowPort } from '../../lib/projectWorkflow';
@@ -157,60 +157,24 @@ export function CreateProjectModal({
         </div>
 
         <div className="min-h-0 overflow-y-auto bg-[#f6f4f1] p-5">
-          {pending && (
-            <p id={feedbackId} role="status" className="mb-4 text-sm font-medium text-[#24292f]">Enregistrement en cours…</p>
-          )}
-          {verificationRequired && (
-            <div ref={verificationFeedbackRef} tabIndex={-1} id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e] [overflow-wrap:anywhere]">
-              <p>{verificationMessage}</p>
-              {verificationError && <p className="mt-2">{verificationError}</p>}
-              <button type="button" disabled={verificationPending || pending} aria-busy={verificationPending} onClick={() => void onVerify?.()} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                {verificationPending ? verificationPendingLabel : verificationLabel}
-              </button>
-            </div>
-          )}
-          {creationConfirmed && (
-            <div ref={verificationFeedbackRef} tabIndex={-1} id={feedbackId} role="status" className="mb-4 rounded-md border border-[#9ac5e5] bg-[#ddf4ff] px-4 py-3 text-sm text-[#24292f] [overflow-wrap:anywhere]">
-              <p className="font-semibold">Création vérifiée : {confirmedCreationTitle}</p>
-              <p>La fiche a été vérifiée par lecture, sans répéter la création. Votre brouillon reste ci-dessous et ne sera pas renvoyé. Fermez ce formulaire pour démarrer un autre projet.</p>
-            </div>
-          )}
-          {error && !verificationRequired && (
-            <div id={feedbackId} role="alert" className="mb-4 rounded-md border border-[#ffcecb] bg-[#ffebe9] px-4 py-3 text-sm font-medium text-[#cf222e]">
-              {error}
-            </div>
-          )}
+          <CreateProjectFeedback
+            feedbackId={feedbackId}
+            feedbackRef={verificationFeedbackRef}
+            pending={pending}
+            error={error}
+            verificationRequired={verificationRequired}
+            verificationMessage={verificationMessage}
+            verificationError={verificationError}
+            verificationPending={verificationPending}
+            verificationLabel={verificationLabel}
+            verificationPendingLabel={verificationPendingLabel}
+            confirmedCreationTitle={creationConfirmed ? confirmedCreationTitle : undefined}
+            onVerify={() => void onVerify?.()}
+          />
 
           <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-5 border-0 p-0 lg:grid-cols-[minmax(0,1fr)_300px]">
             <section className="space-y-4">
-              <div className="rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-                <FormField
-                  id="project-title"
-                  label="Titre"
-                  value={form.title}
-                  required
-                  placeholder="Ajouter un titre..."
-                  onChange={(title) => onChange({ title })}
-                />
-              </div>
-
-              <div className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
-                <div className="flex h-10 items-center border-b border-[#dedbd6] bg-[#f1eee9] px-3">
-                  <span className="rounded-md border border-[#d0d7de] bg-white px-3 py-1 text-xs font-semibold text-[#24292f]">
-                    Écrire
-                  </span>
-                </div>
-                <div className="p-4">
-                  <TextAreaField
-                    id="project-description"
-                    label="Description"
-                    value={form.description}
-                    required
-                    placeholder="Ajouter une description, des critères d'acceptation ou des notes..."
-                    onChange={(description) => onChange({ description })}
-                  />
-                </div>
-              </div>
+              <ProjectMainFields form={form} onChange={onChange} />
 
               <ProjectTasksEditor
                 form={form}
@@ -224,99 +188,20 @@ export function CreateProjectModal({
 
             <aside className="space-y-4 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
               {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
-              <div>
-                <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
-                <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
-              </div>
-
-              <SelectField
-                id="project-status"
-                label="Statut"
-                value={form.status}
-                options={statusOptions}
-                onChange={(status) => onChange({ status: status as Project['status'] })}
+              <ProjectSideFields
+                form={form}
+                statusOptions={statusOptions}
+                priorityOptions={priorityOptions}
+                responsibleOptions={responsibleOptions}
+                memberOptions={memberOptions}
+                labelOptions={labelOptions}
+                onChange={onChange}
               />
-
-              <SelectField
-                id="project-priority"
-                label="Priorité"
-                value={form.priority}
-                options={priorityOptions}
-                onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
-              />
-
-              <SelectField
-                id="project-responsible"
-                label="Assigné principal"
-                value={form.responsible}
-                options={responsibleOptions}
-                onChange={(responsible) => onChange({ responsible })}
-              />
-
-              <MultiSelectField
-                id="project-assignees"
-                label="Assignés"
-                values={form.assignees}
-                options={memberOptions}
-                placeholder="Choisir un ou plusieurs assignés"
-                onChange={(assignees) => onChange({ assignees })}
-              />
-
-              <MultiSelectField
-                id="project-labels"
-                label="Étiquettes"
-                values={form.labels}
-                options={labelOptions}
-                placeholder="Choisir une ou plusieurs étiquettes"
-                onChange={(labels) => onChange({ labels })}
-              />
-
-              <div>
-                <FieldLabel htmlFor="project-due-date" label="Échéance" required />
-                <input
-                  id="project-due-date"
-                  type="date"
-                  value={form.dueDate}
-                  required
-                  className={fieldClassName}
-                  onChange={(event) => onChange({ dueDate: event.target.value })}
-                />
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
-                <ProgressMeter value={form.progress} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
-                  <div className="text-xs font-semibold text-[#57606a]">Terminées</div>
-                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.completedTasks}</div>
-                </div>
-                <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
-                  <div className="text-xs font-semibold text-[#57606a]">Total</div>
-                  <div className="mt-1 text-lg font-semibold text-[#24292f]">{form.totalTasks}</div>
-                </div>
-              </div>
             </aside>
           </fieldset>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-[#dedbd6] bg-[#fbfaf8] px-5 py-3 sm:flex-row sm:justify-end">
-          <Button variant="outline" tone="neutral"
-            label={creationConfirmed ? 'Fermer' : 'Annuler'}
-            disabled={pending}
-            type="button"
-            onClick={onClose}
-            className="!h-9 !min-h-0 !rounded-md !border-[#d9d5d0] !bg-[#fbfaf8] !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#f1eee9]"
-          />
-          <Button
-            label={pending ? 'Enregistrement en cours…' : isEditMode ? 'Enregistrer' : creationConfirmed ? 'Création vérifiée' : 'Créer le projet'}
-            disabled={submitBlocked}
-            type="submit"
-            className={`!h-9 !min-h-0 !rounded-md !px-4 !text-sm !font-semibold !text-white ${submitBlocked ? '!border-[#a5bca9] !bg-[#a5bca9] !cursor-not-allowed' : '!border-[#2da44e] !bg-[#2da44e] hover:!bg-[#2c974b]'}`}
-          />
-        </div>
+        <CreateProjectFooter editing={isEditMode} pending={pending} creationConfirmed={creationConfirmed} submitBlocked={submitBlocked} onClose={onClose} />
       </form>
     </div>
   );

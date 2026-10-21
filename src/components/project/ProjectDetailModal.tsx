@@ -2,20 +2,25 @@
 
 import { ProjectWorkflow } from './ProjectWorkflow';
 import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '../../lib/projectWorkflow';
-import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '../../lib/text-constraints';
 import React from 'react';
-import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import { createDetailTaskFormState } from '../../lib/current-agent';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '../../lib/projectTaskVerification';
 import { TaskCreationNotice, type TaskCreationState } from './TaskCreationNotice';
 import { ProjectReceiptVerificationRequiredError } from '../../lib/projectReceiptVerification';
-import { Button, ToolTip } from '@mairie360/lib-components/primitives';
-import { CalendarDays, CheckSquare2, CircleDot, History, ListChecks, MessageSquare, Search, Square, Trash2, X } from 'lucide-react';
-import { formatProjectDate, PersonAvatar, PriorityPill, ProgressMeter, StatusPill } from '../ProjectCard';
+import { ListChecks } from 'lucide-react';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft, TaskCollaboration, TaskComment } from '../../types/project';
 import { addTaskComment, getBffProjectErrorMessage, getTaskCollaboration } from '../../lib/bffProjectClient';
 import { archivedTasksLabel, createPersonFromOptionValue, getPersonValue, projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '../../lib/projectPageState';
-import { FieldLabel, FormField, MultiSelectField, SelectField, TaskEditButton, TextAreaField, fieldClassName } from './ProjectFormControls';
+import { DetailHeader } from './project-detail/DetailHeader';
+import { DetailRefreshAlert } from './project-detail/DetailRefreshAlert';
+import { ProjectEditForm } from './project-detail/ProjectEditForm';
+import { ProjectLifecycle } from './project-detail/ProjectLifecycle';
+import { ProjectSummary } from './project-detail/ProjectSummary';
+import { TaskDeleteConfirm } from './project-detail/TaskDeleteConfirm';
+import { TaskFilters } from './project-detail/TaskFilters';
+import { TaskFollowUp } from './project-detail/TaskFollowUp';
+import { TaskFormPanel } from './project-detail/TaskFormPanel';
+import { TaskRow } from './project-detail/TaskRow';
 import { taskToFormState, uniqueAssigneesInOrder } from './ProjectTasksEditor';
 
 type TaskFollowUpSelection = {
@@ -525,142 +530,53 @@ export function ProjectDetailModal({
 
       {/* Clip rather than hide overflow: native field focus must scroll only the body, never this header-bearing container. */}
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="relative z-10 flex h-full w-full flex-col overflow-clip border-l border-[#d0d7de] bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)] sm:max-w-6xl sm:rounded-md sm:border">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#dedbd6] bg-[#fbfaf8] px-5 py-4">
-          <div className="min-w-0">
-            <p className="mb-1 text-xs font-medium text-[#57606a]">Mairie360 / projets #{project.id}</p>
-            <h2 id={titleId} className="line-clamp-2 text-lg font-semibold leading-snug text-[#24292f]">{project.title}</h2>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {project.permissions?.canEdit !== false && <button
-              type="button"
-              disabled={mutationPending || (projectVerificationRequired && !editingProject)}
-              className="inline-flex h-8 items-center rounded-md border border-[#d0d7de] bg-white px-3 text-xs font-semibold text-[#24292f] transition hover:bg-[#f6f8fa]"
-              onClick={toggleProjectEdit}
-            >
-              {editingProject ? 'Annuler' : 'Modifier'}
-            </button>}
-            <ToolTip text="Fermer">
-              <button
-                type="button"
-                aria-label="Fermer la fiche projet"
-                disabled={mutationPending}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
-                onClick={closeDetail}
-              >
-                <X className="h-4 w-4" strokeWidth={2} />
-              </button>
-            </ToolTip>
-          </div>
-        </header>
+        <DetailHeader
+          project={project}
+          titleId={titleId}
+          editing={editingProject}
+          editDisabled={mutationPending || (projectVerificationRequired && !editingProject)}
+          closeDisabled={mutationPending}
+          onToggleEdit={toggleProjectEdit}
+          onClose={closeDetail}
+        />
 
         <div ref={contentRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f6f4f1]">
           <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
             <main className="min-w-0 border-r border-[#d8dee4] p-5">
               {refreshError && (
-                <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
-                  <p>{refreshError}</p>
-                  <p className="mt-2 text-[#57606a]">{projectVerificationRequired ? 'Le dernier projet vérifié reste affiché. Aucune écriture supplémentaire ne sera envoyée par cette vérification.' : 'Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.'}</p>
-                  <button type="button" disabled={refreshPending || projectVerificationPending || mutationPending || !!pendingTaskIds?.size} aria-busy={refreshPending || projectVerificationPending} onClick={() => void onRetry?.()}
-                    className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-                    {refreshPending || projectVerificationPending ? 'Actualisation de la fiche…' : 'Réessayer la fiche'}
-                  </button>
-                </div>
+                <DetailRefreshAlert
+                  error={refreshError}
+                  verificationRequired={projectVerificationRequired}
+                  busy={refreshPending || projectVerificationPending}
+                  retryDisabled={refreshPending || projectVerificationPending || mutationPending || !!pendingTaskIds?.size}
+                  onRetry={() => void onRetry?.()}
+                />
               )}
-{/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). */}
+              {/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). */}
               {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onMoveTask={onMoveWorkflowTask} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onMoveWorkflowTask || onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
               {dynamicStatuses && <button type="button" className="mb-4 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 text-sm" aria-expanded={showTaskDetails} onClick={() => setShowTaskDetails(value => !value)}>Détails des tâches</button>}
               {project.permissions?.canCreateTask !== false && (
-                <div className="mb-5 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#24292f]">
-                    <CircleDot className="h-4 w-4 text-[#1a7f37]" strokeWidth={2} />
-                    {editingTaskId ? 'Modifier la tâche' : 'Ajouter une tâche'}
-                  </div>
-
-                  <form className="space-y-3" aria-label={editingTaskId ? 'Modifier une tâche' : 'Créer une tâche'} aria-busy={taskSaving} onSubmit={submitTask}>
-                  <fieldset disabled={mutationPending} className="min-w-0 space-y-3 border-0 p-0">
-                  <input
-                    value={taskForm.title}
-                    placeholder="Ajouter une tâche..."
-                    aria-label="Titre de la tâche"
-                    pattern={NO_MARKUP_PATTERN}
-                    title={NO_MARKUP_HINT}
-                    className="h-10 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3 text-sm text-[#24292f] outline-none transition placeholder:text-[#6e7781] focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
-                    onChange={(event) => updateTaskForm({ title: event.target.value })}
-                  />
-
-                  {taskFormError && (!taskFormVerificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) && (
-                    <p role="alert" className="text-xs font-medium text-[#cf222e]">{taskFormError}</p>
-                  )}
-                  {taskSaving && <p role="status" className="text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
-
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <SelectField
-                      id="detail-task-status"
-                      label="Statut"
-
-                      value={dynamicStatuses ? (dynamicStatuses.some(status => status.id === taskForm.statusId) ? taskForm.statusId : firstStatusOf(categoryOf(taskForm.status))) ?? '' : taskForm.status}
-                      options={dynamicStatuses && !firstStatusOf(categoryOf(taskForm.status)) ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
-                      onChange={(status) => updateTaskForm(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] })}
-                    />
-                    <SelectField
-                      id="detail-task-priority"
-                      label="Priorité"
-                      value={taskForm.priority}
-                      options={priorityOptions}
-                      onChange={(priority) => updateTaskForm({ priority: priority as Project['priority'] })}
-                    />
-                    <div>
-                      <FieldLabel htmlFor="detail-task-due-date" label="Échéance" />
-                      <input
-                        id="detail-task-due-date"
-                        type="date"
-                        value={taskForm.dueDate}
-                        className={fieldClassName}
-                        onChange={(event) => updateTaskForm({ dueDate: event.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <MultiSelectField
-                    id="detail-task-assignees"
-                    label="Assignés"
-                    values={taskForm.assignees}
-                    options={memberOptions}
-                    placeholder="Choisir un ou plusieurs assignés"
-                    onChange={(assignees) => updateTaskForm({ assignees })}
-                  />
-
-                  <MultiSelectField
-                    id="detail-task-labels"
-                    label="Étiquettes"
-                    values={taskForm.labels}
-                    options={labelOptions}
-                    placeholder="Choisir une ou plusieurs étiquettes"
-                    onChange={(labels) => updateTaskForm({ labels })}
-                  />
-
-                  <div className="flex justify-end gap-2">
-                    {editingTaskId && (
-                      <Button variant="outline" tone="neutral"
-                        label="Annuler"
-                        type="button"
-                        onClick={cancelTaskEdit}
-                        className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
-                      />
-                    )}
-                    <Button
-                      label={editingTaskId ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
-                      type="submit"
-                      disabled={editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle)}
-                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b] disabled:!cursor-not-allowed disabled:!opacity-50"
-                    />
-                  </div>
-                  </fieldset>
-                  </form>
+                <TaskFormPanel
+                  form={taskForm}
+                  editing={!!editingTaskId}
+                  saving={taskSaving}
+                  error={taskFormError && (!taskFormVerificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) ? taskFormError : undefined}
+                  disabled={mutationPending}
+                  submitDisabled={editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle)}
+                  statusValue={dynamicStatuses ? (dynamicStatuses.some(status => status.id === taskForm.statusId) ? taskForm.statusId : firstStatusOf(categoryOf(taskForm.status))) ?? '' : taskForm.status}
+                  statusOptions={dynamicStatuses && !firstStatusOf(categoryOf(taskForm.status)) ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
+                  priorityOptions={priorityOptions}
+                  memberOptions={memberOptions}
+                  labelOptions={labelOptions}
+                  onStatusChange={(status) => updateTaskForm(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] })}
+                  onChange={updateTaskForm}
+                  onCancelEdit={cancelTaskEdit}
+                  onSubmit={submitTask}
+                >
                   <div ref={taskCreationNoticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
                     <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
                   </div>
-                </div>
+                </TaskFormPanel>
               )}
 
               {(!dynamicStatuses || showTaskDetails) && <section className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
@@ -680,44 +596,18 @@ export function ProjectDetailModal({
                 )}
 
                 {tasks.length > 0 && (
-                  <div className="grid grid-cols-1 gap-2 border-b border-[#dedbd6] bg-white p-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <label className="relative sm:col-span-2 xl:col-span-1">
-                      <span className="sr-only">Rechercher une tâche</span>
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6e7781]" />
-                      <input
-                        type="search"
-                        value={taskSearch}
-                        placeholder="Rechercher une tâche"
-                        className="h-9 w-full rounded-md border border-[#d0d7de] bg-[#f6f8fa] pl-9 pr-3 text-xs outline-none focus:border-[#0969da] focus:bg-white focus:ring-2 focus:ring-[#0969da]/20"
-                        onChange={(event) => setTaskSearch(event.target.value)}
-                      />
-                    </label>
-                    <select
-                      aria-label="Filtrer les tâches par statut"
-                      value={taskStatusFilter}
-                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
-                      onChange={(event) => setTaskStatusFilter(event.target.value)}
-                    >
-                      <option value="all">Tous les statuts</option>
-                      {taskStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                    <select
-                      aria-label="Filtrer les tâches par priorité"
-                      value={taskPriorityFilter}
-                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
-                      onChange={(event) => setTaskPriorityFilter(event.target.value)}
-                    >
-                      <option value="all">Toutes les priorités</option>
-                      {priorityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                    <input
-                      type="date"
-                      aria-label="Échéance maximale des tâches"
-                      value={taskDueFilter}
-                      className="h-9 rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-2 text-xs outline-none focus:border-[#0969da]"
-                      onChange={(event) => setTaskDueFilter(event.target.value)}
-                    />
-                  </div>
+                  <TaskFilters
+                    search={taskSearch}
+                    status={taskStatusFilter}
+                    priority={taskPriorityFilter}
+                    due={taskDueFilter}
+                    statusOptions={taskStatusOptions}
+                    priorityOptions={priorityOptions}
+                    onSearchChange={setTaskSearch}
+                    onStatusChange={setTaskStatusFilter}
+                    onPriorityChange={setTaskPriorityFilter}
+                    onDueChange={setTaskDueFilter}
+                  />
                 )}
 
                 {tasks.length === 0 ? (
@@ -727,195 +617,62 @@ export function ProjectDetailModal({
                 ) : (
                   <div className="divide-y divide-[#d8dee4]">
                     {filteredTasks.map((task) => {
-                      const TaskIcon = task.completed ? CheckSquare2 : Square;
                       const isLinkedTask = highlightTaskId === task.id;
-                      const canUpdateStatus = task.permissions?.canUpdateStatus !== false;
-                      const canEditTask = task.permissions?.canEdit !== false;
-                      const canDeleteTask = task.permissions?.canDelete !== false;
                       const taskPending = pendingTaskIds?.has(task.id) ?? false;
                       const taskMutationBlocked = taskPending || (unverifiedTaskIds?.has(task.id) ?? false);
+                      const reopening = task.completed || task.status === 'done';
+                      const toggleStatusId = dynamicStatuses ? firstStatusOf(reopening ? 'todo' : 'done') : undefined;
 
                       return (
-                        <article
+                        <TaskRow
                           key={task.id}
-                          aria-busy={taskPending || undefined}
-                          ref={isLinkedTask ? highlightedTaskRef : undefined}
-                          tabIndex={isLinkedTask ? -1 : undefined}
-                          aria-current={isLinkedTask ? 'true' : undefined}
-                          data-linked-task={isLinkedTask ? task.id : undefined}
-                          className={`grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3 ${isLinkedTask ? 'bg-[#ddf4ff] ring-2 ring-inset ring-[#0969da]' : ''}`}
+                          task={task}
+                          linked={isLinkedTask}
+                          articleRef={isLinkedTask ? highlightedTaskRef : undefined}
+                          pending={taskPending}
+                          blocked={taskMutationBlocked}
+                          mutationPending={mutationPending}
+                          toggleDisabled={(!!dynamicStatuses && !toggleStatusId) || mutationPending || taskMutationBlocked || task.permissions?.canUpdateStatus === false}
+                          statusValue={dynamicStatuses ? task.statusId : task.status}
+                          statusOptions={taskStatusOptions}
+                          writeError={taskWriteErrors?.get(task.id)}
+                          deleting={deletingTaskId === task.id}
+                          // With project statuses, completing uses the first "Terminé" status, reopening the first "À faire".
+                          onToggleDone={() => onUpdateTaskStatus(project.id, task.id, reopening ? 'todo' : 'done', toggleStatusId)}
+                          onStatusChange={(value) => onUpdateTaskStatus(project.id, task.id, dynamicStatuses ? categoryStatus(value) : value as ProjectStatus, dynamicStatuses ? value : undefined)}
+                          onFollowUp={() => void openTaskCollaboration(task.id)}
+                          onEdit={() => editTask(task)}
+                          onAskDelete={() => setDeletingTaskId(task.id)}
                         >
-                          <button
-                            type="button"
-                            disabled={(!!dynamicStatuses && !firstStatusOf(task.completed || task.status === 'done' ? 'todo' : 'done')) || mutationPending || taskMutationBlocked || !canUpdateStatus}
-                            className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[#57606a] transition enabled:hover:bg-[#f6f8fa] enabled:hover:text-[#0969da] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
-                            aria-label={task.completed ? `Marquer ${task.title} comme non terminée` : `Marquer ${task.title} comme terminée`}
-                            onClick={() =>
-                              onUpdateTaskStatus(
-                                project.id,
-                                task.id,
-                                task.completed || task.status === 'done' ? 'todo' : 'done',
-                                // With project statuses, completing uses the first "Terminé" status, reopening the first "À faire".
-                                dynamicStatuses ? firstStatusOf(task.completed || task.status === 'done' ? 'todo' : 'done') : undefined
-                              )
-                            }
-                          >
-                            <TaskIcon
-                              className={`h-4 w-4 ${task.completed ? 'text-[#1a7f37]' : 'text-[#8c959f]'}`}
-                              strokeWidth={1.9}
+                          {deletingTaskId === task.id && (
+                            <TaskDeleteConfirm
+                              cancelDisabled={mutationPending}
+                              confirmDisabled={mutationPending || taskMutationBlocked}
+                              onCancel={() => setDeletingTaskId(null)}
+                              onConfirm={() => {
+                                setDeletingTaskId(null);
+                                void onDeleteTask(project.id, task.id, task.title);
+                              }}
                             />
-                          </button>
-                          <div className="min-w-0">
-                            <div className="flex min-w-0 flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
-                              <h3 className="w-full min-w-0 text-sm font-semibold leading-snug text-[#24292f] [overflow-wrap:anywhere] sm:flex-1">{task.title}</h3>
-                              <div className="flex max-w-full flex-wrap items-center gap-1 sm:shrink-0">
-                                <button
-                                  type="button"
-                                  className="inline-flex h-7 items-center gap-1 rounded-md border border-[#d0d7de] bg-white px-2 text-[11px] font-semibold text-[#57606a] hover:bg-[#f6f8fa]"
-                                  onClick={() => void openTaskCollaboration(task.id)}
-                                >
-                                  <MessageSquare className="h-3.5 w-3.5" />
-                                  Suivi
-                                </button>
-                                {canEditTask && <TaskEditButton disabled={mutationPending || taskMutationBlocked} onClick={() => editTask(task)} />}
-                                {canDeleteTask && deletingTaskId !== task.id && (
-                                  <button
-                                    type="button"
-                                    aria-label={`Supprimer ${task.title}`}
-                                    disabled={mutationPending || taskMutationBlocked}
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#cf222e] hover:bg-[#ffebe9]"
-                                    onClick={() => setDeletingTaskId(task.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
-                              {canUpdateStatus ? (
-                                <label className="inline-flex items-center gap-1.5">
-                                  <span className="sr-only">Statut de {task.title}</span>
-                                  <select
-                                    aria-label={`Statut de ${task.title}`}
-                                    disabled={mutationPending || taskMutationBlocked}
-                                    value={dynamicStatuses ? task.statusId : task.status}
-                                    className="h-7 rounded-md border border-[#b7c8db] bg-white px-2 text-xs font-semibold text-[#24292f] outline-none transition hover:border-[#0969da] focus:border-[#0969da] focus:ring-2 focus:ring-[#0969da]/20"
-                                    onChange={(event) =>
-                                      onUpdateTaskStatus(
-                                        project.id,
-                                        task.id,
-                                        dynamicStatuses ? categoryStatus(event.target.value) : event.target.value as ProjectStatus,
-                                        dynamicStatuses ? event.target.value : undefined
-                                      )
-                                    }
-                                  >
-                                    {taskStatusOptions.map((option) => (
-                                      <option key={option.value} value={option.value}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                              ) : (
-                                <StatusPill status={task.status} />
-                              )}
-                              <PriorityPill priority={task.priority} />
-                              <span className="inline-flex items-center gap-1">
-                                {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 3).map((assignee) => (
-                                  <PersonAvatar key={assignee.name} name={assignee.name} />
-                                ))}
-                                {(task.assignees?.length ? task.assignees : [task.responsible]).length > 3 && (
-                                  <span>+{(task.assignees?.length ? task.assignees : [task.responsible]).length - 3}</span>
-                                )}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />
-                                {formatProjectDate(task.dueDate)}
-                              </span>
-                              {task.labels.map((label) => (
-                                <span
-                                  key={label}
-                                  className="inline-flex h-5 items-center rounded-full border border-[#d0d7de] bg-[#f6f8fa] px-2 text-[11px] font-semibold text-[#57606a]"
-                                >
-                                  {label}
-                                </span>
-                              ))}
-                            </div>
-
-                            {taskPending && <p role="status" className="mt-2 text-xs text-[#57606a]">Opération sur la tâche en cours…</p>}
-                            {taskWriteErrors?.get(task.id) && <p role="alert" className="mt-2 text-xs text-[#cf222e] [overflow-wrap:anywhere]">{taskWriteErrors.get(task.id)}</p>}
-
-                            {deletingTaskId === task.id && (
-                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-2 text-xs text-[#cf222e]">
-                                <span>Supprimer définitivement cette tâche ?</span>
-                                <span className="flex gap-2">
-                                  <button type="button" disabled={mutationPending} className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 font-semibold text-[#24292f]" onClick={() => setDeletingTaskId(null)}>Annuler</button>
-                                  <button
-                                    type="button"
-                                    disabled={mutationPending || taskMutationBlocked}
-                                    className="rounded-md bg-[#cf222e] px-2 py-1 font-semibold text-white"
-                                    onClick={() => {
-                                      setDeletingTaskId(null);
-                                      void onDeleteTask(project.id, task.id, task.title);
-                                    }}
-                                  >
-                                    Supprimer
-                                  </button>
-                                </span>
-                              </div>
-                            )}
-
-                            {collaborationTaskId === task.id && (
-                              <div className="mt-3 min-w-0 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
-                                {collaborationLoading && <p role="status" className="text-xs text-[#57606a]">Chargement du suivi...</p>}
-                                {commentSaving && <p role="status" className="text-xs text-[#57606a]">Envoi du commentaire...</p>}
-                                {collaborationError && <p role="alert" className="text-xs font-medium text-[#cf222e] [overflow-wrap:anywhere]">{collaborationError}</p>}
-                                {collaborationError && (
-                                  <button type="button" disabled={collaborationLoading || commentSaving} className="mt-2 rounded-md border border-[#d0d7de] bg-white px-2 py-1 text-xs font-semibold text-[#24292f] disabled:opacity-50" onClick={() => {
-                                    const selection = collaborationSelectionRef.current;
-                                    if (selection && !commentRequestRef.current && !selection.loading) void loadTaskCollaboration(selection);
-                                  }}>Actualiser le suivi</button>
-                                )}
-                                {collaboration && (
-                                  <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-                                    <div className="min-w-0">
-                                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><MessageSquare className="h-3.5 w-3.5" /> Commentaires</h4>
-                                      <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
-                                        {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
-                                        {collaboration.comments.map((comment) => (
-                                          <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
-                                            <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{new Date(comment.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</time></div>
-                                            <p className="mt-1 whitespace-pre-wrap text-[#57606a] [overflow-wrap:anywhere]">{comment.message}</p>
-                                          </div>
-                                        ))}
-                                      </div>
-                                      {task.permissions?.canComment !== false && (
-                                        <form className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row" onSubmit={(event) => void submitComment(event, task.id)}>
-                                          <input value={commentMessage} disabled={commentSaving} aria-label={`Commentaire pour ${task.title}`} pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} placeholder="Ajouter un commentaire..." maxLength={COMMENT_MAX_LENGTH} className="h-8 min-w-0 rounded-md border border-[#d0d7de] bg-white px-2 text-xs outline-none focus:border-[#0969da] sm:flex-1" onChange={(event) => {
-                                            if (!commentRequestRef.current) setCommentMessage(event.target.value);
-                                          }} />
-                                          <button type="submit" disabled={commentSaving || collaborationLoading || !commentMessage.trim()} className="min-h-8 shrink-0 rounded-md bg-[#0969da] px-3 text-xs font-semibold text-white disabled:opacity-50">Envoyer</button>
-                                        </form>
-                                      )}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><History className="h-3.5 w-3.5" /> Historique</h4>
-                                      <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
-                                        {collaboration.history.length === 0 && <p className="text-xs text-[#6e7781]">Aucune modification enregistrée.</p>}
-                                        {collaboration.history.map((entry) => (
-                                          <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs [overflow-wrap:anywhere]">
-                                            <p className="font-medium text-[#24292f]">{entry.label}</p>
-                                            <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {new Date(entry.createdAt).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() })}</p>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </article>
+                          )}
+                          {collaborationTaskId === task.id && (
+                            <TaskFollowUp
+                              taskTitle={task.title}
+                              loading={collaborationLoading}
+                              saving={commentSaving}
+                              error={collaborationError}
+                              collaboration={collaboration}
+                              canComment={task.permissions?.canComment !== false}
+                              message={commentMessage}
+                              onMessageChange={(value) => { if (!commentRequestRef.current) setCommentMessage(value); }}
+                              onRefresh={() => {
+                                const selection = collaborationSelectionRef.current;
+                                if (selection && !commentRequestRef.current && !selection.loading) void loadTaskCollaboration(selection);
+                              }}
+                              onSubmit={(event) => void submitComment(event, task.id)}
+                            />
+                          )}
+                        </TaskRow>
                       );
                     })}
                   </div>
@@ -925,194 +682,30 @@ export function ProjectDetailModal({
 
             <aside className="bg-[#fbfaf8] p-5">
               {editingProject ? (
-                <form className="space-y-4" aria-label="Modifier le projet" aria-busy={projectSaving} onSubmit={submitProjectEdit}>
-                  <div>
-                    <h3 className="text-sm font-semibold text-[#24292f]">Modifier le projet</h3>
-                    <p className="mt-1 text-xs text-[#57606a]">Les tâches restent visibles pendant l’édition.</p>
-                  </div>
-
-                  {projectEditError && (!projectEditVerificationError || projectVerificationRequired) && (
-                    <div role="alert" className="rounded-md border border-[#ffcecb] bg-[#ffebe9] px-3 py-2 text-xs font-medium text-[#cf222e]">
-                      {projectEditError}
-                    </div>
-                  )}
-                  {projectSaving && <p role="status" className="text-xs text-[#57606a]">Enregistrement du projet…</p>}
-                  <fieldset disabled={mutationPending} className="min-w-0 space-y-4 border-0 p-0">
-
-                  <FormField
-                    id="detail-project-title"
-                    label="Titre"
-                    value={projectEditForm.title}
-                    required
-                    placeholder="Ajouter un titre..."
-                    onChange={(title) => updateProjectEditForm({ title })}
-                  />
-
-                  <TextAreaField
-                    id="detail-project-description"
-                    label="Description"
-                    value={projectEditForm.description}
-                    required
-                    placeholder="Ajouter une description..."
-                    onChange={(description) => updateProjectEditForm({ description })}
-                  />
-
-                  <SelectField
-                    id="detail-project-status"
-                    label="Statut"
-                    value={projectEditForm.status}
-                    options={statusOptions}
-                    onChange={(status) => updateProjectEditForm({ status: status as Project['status'] })}
-                  />
-
-                  <SelectField
-                    id="detail-project-priority"
-                    label="Priorité"
-                    value={projectEditForm.priority}
-                    options={priorityOptions}
-                    onChange={(priority) => updateProjectEditForm({ priority: priority as Project['priority'] })}
-                  />
-
-                  <SelectField
-                    id="detail-project-responsible"
-                    label="Assigné principal"
-                    value={projectEditForm.responsible}
-                    options={responsibleOptions}
-                    onChange={(responsible) => updateProjectEditForm({ responsible })}
-                  />
-
-                  <MultiSelectField
-                    id="detail-project-assignees"
-                    label="Assignés"
-                    values={projectEditForm.assignees}
-                    options={memberOptions}
-                    placeholder="Choisir un ou plusieurs assignés"
-                    onChange={(assignees) => updateProjectEditForm({ assignees })}
-                  />
-
-                  <MultiSelectField
-                    id="detail-project-labels"
-                    label="Étiquettes"
-                    values={projectEditForm.labels}
-                    options={labelOptions}
-                    placeholder="Choisir une ou plusieurs étiquettes"
-                    onChange={(labels) => updateProjectEditForm({ labels })}
-                  />
-
-                  <div>
-                    <FieldLabel htmlFor="detail-project-due-date" label="Échéance" required />
-                    <input
-                      id="detail-project-due-date"
-                      type="date"
-                      value={projectEditForm.dueDate}
-                      required
-                      className={fieldClassName}
-                      onChange={(event) => updateProjectEditForm({ dueDate: event.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button variant="outline" tone="neutral"
-                      label="Annuler"
-                      type="button"
-                      onClick={cancelProjectEdit}
-                      className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
-                    />
-                    <Button
-                      label="Enregistrer"
-                      type="submit"
-                      disabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
-                      className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
-                    />
-                  </div>
-                  </fieldset>
-                </form>
+                <ProjectEditForm
+                  form={projectEditForm}
+                  saving={projectSaving}
+                  error={projectEditError && (!projectEditVerificationError || projectVerificationRequired) ? projectEditError : undefined}
+                  disabled={mutationPending}
+                  saveDisabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
+                  statusOptions={statusOptions}
+                  priorityOptions={priorityOptions}
+                  responsibleOptions={responsibleOptions}
+                  memberOptions={memberOptions}
+                  labelOptions={labelOptions}
+                  onChange={updateProjectEditForm}
+                  onCancel={cancelProjectEdit}
+                  onSubmit={submitProjectEdit}
+                />
               ) : (
                 <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-[#24292f]">Description</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-[#57606a]">{project.description}</p>
-                  </div>
-
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
-                    <ProgressMeter value={project.progress} />
-                  </div>
-
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[#57606a]">Statut</span>
-                      <StatusPill status={project.status} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[#57606a]">Priorité</span>
-                      <PriorityPill priority={project.priority} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[#57606a]">Responsable</span>
-                      <span className="inline-flex min-w-0 items-center gap-2 font-medium text-[#24292f]">
-                        <PersonAvatar name={project.responsible.name} />
-                        <span className="truncate">{project.responsible.name}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[#57606a]">Échéance</span>
-                      <span className="font-medium text-[#24292f]">{formatProjectDate(project.dueDate)}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Assignés</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {project.assignees.map((assignee) => (
-                        <span
-                          key={assignee.name}
-                          className="inline-flex items-center gap-2 rounded-full border border-[#d0d7de] bg-white px-2.5 py-1 text-xs font-medium text-[#24292f]"
-                        >
-                          <PersonAvatar name={assignee.name} />
-                          {assignee.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Étiquettes</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {project.labels.map((label) => (
-                        <span
-                          key={label}
-                          className="inline-flex h-6 items-center rounded-full border border-[#d0d7de] bg-white px-2.5 text-xs font-semibold text-[#57606a]"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
+                  <ProjectSummary project={project} />
                   {project.permissions?.canClose !== false && (
-                    <div className="border-t border-[#dedbd6] pt-4">
-                      <h3 className="text-sm font-semibold text-[#24292f]">Cycle de vie</h3>
-                      <p className="mt-1 text-xs text-[#57606a]">Clôturez le projet terminé ou suspendez-le temporairement.</p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          disabled={projectVerificationRequired || projectVerificationPending}
-                          className="h-9 rounded-md border border-[#d0d7de] bg-white text-xs font-semibold text-[#57606a] hover:bg-[#f1eee9]"
-                          onClick={() => void onCloseProject(project.id, 'review')}
-                        >
-                          Suspendre
-                        </button>
-                        <button
-                          type="button"
-                          disabled={projectVerificationRequired || projectVerificationPending}
-                          className="h-9 rounded-md bg-[#1a7f37] text-xs font-semibold text-white hover:bg-[#116329]"
-                          onClick={() => void onCloseProject(project.id, 'done')}
-                        >
-                          Clôturer
-                        </button>
-                      </div>
-                    </div>
+                    <ProjectLifecycle
+                      disabled={projectVerificationRequired || projectVerificationPending}
+                      onSuspend={() => void onCloseProject(project.id, 'review')}
+                      onClose={() => void onCloseProject(project.id, 'done')}
+                    />
                   )}
                 </div>
               )}
