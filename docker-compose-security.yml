@@ -185,7 +185,7 @@ services:
       - backend
 
   bff-user:
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.0.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.1.0}
     container_name: projects-front-sec-bff-user
     depends_on:
       seeder:
@@ -220,7 +220,7 @@ services:
       - backend
 
   bff-project:
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:staging-b643e72}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.1.0}
     container_name: projects-front-sec-bff-project
     depends_on:
       seeder:

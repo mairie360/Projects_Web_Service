@@ -19,7 +19,7 @@
     "test:bundle": "node --test tests/bundle/*.test.cjs"
   },
   "dependencies": {
-    "@mairie360/bff-project-openapi": "0.0.0-staging.b643e720f51e25126c93bb0286ec1bfd427327c5",
+    "@mairie360/bff-project-openapi": "1.1.0",
     "@mairie360/lib-components": "0.10.2",
     "axios": "1.20.0",
     "daisyui": "^5.0.0",
@@ -36,7 +36,7 @@
     }
   },
   "devDependencies": {
-    "@mairie360/bff-user-openapi": "1.0.0",
+    "@mairie360/bff-user-openapi": "1.1.0",
     "@tailwindcss/postcss": "^4.0.12",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",
