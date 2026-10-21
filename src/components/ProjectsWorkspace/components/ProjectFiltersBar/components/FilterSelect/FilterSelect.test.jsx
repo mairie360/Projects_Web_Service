@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { statusOptions } from '@tests/component/units/project-fixtures';
 import { describe, expect, it, vi } from 'vitest';
 import { FilterSelect } from './FilterSelect';
 
