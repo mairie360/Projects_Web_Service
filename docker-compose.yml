@@ -168,7 +168,7 @@ services:
 
   bff-user:
     container_name: bff-user-projects-front
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.0.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.1.0}
     networks:
       - backend
     environment:
