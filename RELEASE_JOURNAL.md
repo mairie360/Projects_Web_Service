@@ -1,71 +1,80 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod": "da250aa37446fe138a848433814bd1aa5ab3230b", "prod_tag": "v1.1.0", "staging": "8bfd3743ada9c6d4f6899c52f14d438587355c09", "updated": {"dev": "2026-10-21 11:07 UTC", "staging": "2026-10-20 19:11 UTC"}} -->
+<!-- release-journal-state {"dev": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod": "da250aa37446fe138a848433814bd1aa5ab3230b", "prod_tag": "v1.1.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-10-21 11:07 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.1.0 | `da250aa` | — |
-| staging | — | `8bfd374` | 2026-10-20 19:11 UTC |
+| staging | — | `214ddfa` | 2026-10-21 11:12 UTC |
 | dev | — | `214ddfa` | 2026-10-21 11:07 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.1.0)
 
 #### Nouveautés
-- Statuts de tâche paramétrables par projet : le Kanban, les sélecteurs de statut et le formulaire de tâche des cartes utilisent les statuts du projet, lus via `GET /projects/{projectId}/statuses`. Responsables et administrateurs peuvent ajouter, renommer, recolorer, recatégoriser, réordonner et supprimer un statut ; la suppression demande un statut de destination pour les tâches (`moveTo`). (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
-- Modèles de projet : la création d'un projet peut partir d'un modèle (`/project-templates`, `templateId`) dont les statuts sont prévisualisés avant validation. (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
-- Les listes vides affichent un libellé explicite, les chargements affichent des placeholders et les reçus d'action confirmée peuvent être fermés. (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
+
+- Statuts de tâche paramétrables par projet : les colonnes Kanban et les sélecteurs de statut viennent désormais des statuts propres au projet (`GET /projects/{projectId}/statuses`). Les Responsables et administrateurs peuvent ajouter, renommer, recolorer, recatégoriser, réordonner ou supprimer un statut ; la suppression demande un statut de destination pour les tâches concernées. (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Modèles de projet : la création d'un projet peut partir d'un modèle dont les statuts sont prévisualisés avant validation. (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Nouvelle tâche sans choix explicite de statut : elle prend le premier statut du projet correspondant à sa catégorie (À faire / En cours / Terminé). La case de fin de tâche la place dans le premier statut « Terminé », ou la remet dans le premier « À faire ». (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Vue Tableau : chaque titre de projet est un bouton nommé « Ouvrir la fiche du projet … », atteignable avec Tab puis Entrée ou Espace, avec focus visible. (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+- Retour utilisateur : squelettes de chargement, résultats vides libellés, reçus de confirmation fermables, lien d'évitement en tête de page. (MAIR-126 / MAIR-526, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
 
 #### Changements de comportement
-- Le contrat `bff-project` 1.0.0 rend obligatoires `tasks.active` et `tasks.archived` sur chaque projet et ajoute `statusId` / `statusName` aux tâches ; le front valide désormais ces champs dans les pages et les fiches projet. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
-- Une écriture de statut de tâche est refusée sans envoi (message affiché, sans demande de vérification) si la tâche a déjà une écriture en cours ou attend une vérification. L'enregistrement des statuts est refusé pendant une écriture de tâche du projet, et toute écriture de tâche (statut, modification, suppression, création) est refusée pendant cet enregistrement. Avant, le déplacement de statut contournait ces gardes. (MAIR-570, [#283](https://github.com/mairie360/Projects_Web_Service/pull/283))
-- Apparence : couleurs et règles communes viennent de la feuille publiée de lib-components 0.9.0 ; le fichier local `municipal-theme.css` est supprimé et le lien d'évitement unique précède la navigation répétée. Le rendu peut donc différer visuellement. (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
+
+- Vue Tableau : un projet dont `permissions.canView` vaut `false` n'est plus ouvrable, ni par son titre (bouton désactivé), ni par un clic sur la ligne (qui n'affiche plus le curseur pointeur). (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+- Contrat BFF projet 1.0.0 puis 1.1.0 : `tasks.active` et `tasks.archived` deviennent obligatoires dans les projets (page projets et fiche) ; les tâches exposent `statusId` et `statusName` ; les corps de création et de modification de tâche acceptent `statusId` ; `PATCH /projects/{projectId}/tasks/{taskId}/status` n'exige plus le champ `status` ; les routes de statuts et de modèles de projet sont ajoutées. Les appelants qui valident strictement ces réponses doivent accepter ces champs. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280) ; MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276) ; MAIR-612, [#306](https://github.com/mairie360/Projects_Web_Service/pull/306))
+- Écritures de statuts et de tâches : un déplacement de tâche est refusé si une écriture de cette tâche est en cours ou attend vérification ; l'enregistrement des statuts est refusé pendant une écriture de tâche du projet, et inversement. Un refus avant envoi affiche seulement son motif. (MAIR-570, [#283](https://github.com/mairie360/Projects_Web_Service/pull/283))
 
 #### Corrections
-- Édition d'une tâche : avant, toute modification recalculait total, terminées et progression à partir des seules tâches actives, ce qui effaçait les tâches archivées (3/4 à 75 % devenait 0/1 à 0 %). Maintenant le formulaire conserve les compteurs `active` et `archived`. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
-- Tableau : avant, seul un clic souris ouvrait la fiche d'un projet. Maintenant chaque titre est un bouton « Ouvrir la fiche du projet … » ouvrable au clavier (Tab, Entrée, Espace) ; un `canView: false` le désactive. (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+
+- Édition d'une tâche : avant, le formulaire recalculait total, terminées et progression à partir des seules tâches actives ; les tâches archivées (terminées) disparaissaient, par exemple 3/4 à 75 % devenait 0/1 à 0 %. Maintenant les compteurs archivés sont conservés. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
 
 #### Technique
-- Contrats : `@mairie360/bff-project-openapi` 1.1.0 et `@mairie360/bff-user-openapi` 1.1.0 ; la snapshot `contracts/openapi.json` ne change que sa référence de paquet. Les stacks de test lancent `bff-project` et `bff-user` en 1.1.0. (MAIR-612, [#306](https://github.com/mairie360/Projects_Web_Service/pull/306))
-- Stacks de test : `project-api` 1.2.0, `core-api` 2.2.0, `database` et `liquibase-migrations` 3.3.0 (Renovate, [#304](https://github.com/mairie360/Projects_Web_Service/pull/304), [#303](https://github.com/mairie360/Projects_Web_Service/pull/303), [#305](https://github.com/mairie360/Projects_Web_Service/pull/305)).
-- Bibliothèque : `@mairie360/front-kit` remplacé par les sous-chemins de `@mairie360/lib-components` 0.10.2, archive vendue supprimée, test de bundle ajouté (MAIR-126, [#287](https://github.com/mairie360/Projects_Web_Service/pull/287)). Dépendance `braces` de développement vendue avec override npm (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278)).
-- CI : CICD épinglé de v4.3.1 à v4.4.3, secrets du journal de release transmis, promotions staging et prod manuelles (MAIR-494, [#300](https://github.com/mairie360/Projects_Web_Service/pull/300) ; MAIR-571, [#289](https://github.com/mairie360/Projects_Web_Service/pull/289), [#285](https://github.com/mairie360/Projects_Web_Service/pull/285)). `cicd.yml` et `contracts.yml` ne tournent sur push que pour `main`, jeton en lecture seule par défaut (MAIR-436, [#274](https://github.com/mairie360/Projects_Web_Service/pull/274)).
-- Scan ZAP : la règle 10031 est hors périmètre pour les URL racines ne portant que des valeurs d'énumération (MAIR-567, [#291](https://github.com/mairie360/Projects_Web_Service/pull/291)).
+
+- Intégration continue : `mairie360/CICD` passe de v4.3.x à v4.4.3, avec des workflows de promotion staging et prod manuels (MAIR-494) ; `cicd.yml` et `contracts.yml` ne tournent sur push que sur `main`, avec un jeton en lecture seule par défaut (MAIR-436). Renovate et les tests de cohérence des versions CICD ont été ajustés.
+- Images des stacks de test (`docker-compose*.yml`) : `project-api` en 1.2.0, `core-api` en 2.2.0, `database` et `liquibase-migrations` en 3.3.0, `bff-user` et `bff-project` en 1.1.0. Le comportement de ces nouvelles versions n'est pas visible dans les diffs de ce journal.
+- Socle partagé : `@mairie360/front-kit` retiré au profit des sous-chemins de `@mairie360/lib-components` 0.10.2 ; test de bundle client ajouté (MAIR-126, [#287](https://github.com/mairie360/Projects_Web_Service/pull/287)).
+- Scan ZAP : la règle 10031 n'est exclue que pour les URL racine dont les paramètres sont des valeurs d'énumération (MAIR-567, [#291](https://github.com/mairie360/Projects_Web_Service/pull/291)).
+- Dépendances et tests : mises à jour de versions internes et de dépendances (`bff-project-openapi`, `bff-user-openapi`, tests de politique CI et de contrats).
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
-#### Technique
-- Contrats : `@mairie360/bff-project-openapi` 1.1.0 et `@mairie360/bff-user-openapi` 1.1.0 épinglés ; la snapshot ne change que sa référence de paquet, et les stacks de test lancent les images `bff-project` et `bff-user` en 1.1.0 (MAIR-612, [#306](https://github.com/mairie360/Projects_Web_Service/pull/306)).
-- Stacks de test : `project-api` 1.2.0, `core-api` 2.2.0, `database` et `liquibase-migrations` 3.3.0 (Renovate, [#304](https://github.com/mairie360/Projects_Web_Service/pull/304), [#303](https://github.com/mairie360/Projects_Web_Service/pull/303), [#305](https://github.com/mairie360/Projects_Web_Service/pull/305)).
-- CI : CICD passe de v4.3.3 à v4.4.3, avec les workflows de promotion staging et prod manuels (MAIR-494, [#300](https://github.com/mairie360/Projects_Web_Service/pull/300) ; [#301](https://github.com/mairie360/Projects_Web_Service/pull/301), [#298](https://github.com/mairie360/Projects_Web_Service/pull/298)). Un push sur `main` ne lance plus que `release-dev`.
-- Aucun changement fonctionnel distinct n'apparaît dans cette plage.
+_Rien._
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
 #### Nouveautés
-- Statuts de tâche paramétrables par projet et modèles de projet : Kanban et sélecteurs construits à partir des statuts du projet (`GET /projects/{projectId}/statuses`), gestion des statuts par les responsables et administrateurs, création de projet à partir d'un modèle prévisualisé (`/project-templates`, `templateId`). (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
-- Les listes vides affichent un libellé explicite, les chargements affichent des placeholders et les reçus d'action confirmée peuvent être fermés. (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
+
+- Statuts de tâche paramétrables par projet : les colonnes Kanban et les sélecteurs de statut viennent désormais des statuts propres au projet (`GET /projects/{projectId}/statuses`). Les Responsables et administrateurs peuvent ajouter, renommer, recolorer, recatégoriser, réordonner ou supprimer un statut ; la suppression demande un statut de destination pour les tâches concernées. (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Modèles de projet : la création d'un projet peut partir d'un modèle dont les statuts sont prévisualisés avant validation. (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Nouvelle tâche sans choix explicite de statut : elle prend le premier statut du projet correspondant à sa catégorie (À faire / En cours / Terminé). La case de fin de tâche la place dans le premier statut « Terminé », ou la remet dans le premier « À faire ». (MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276))
+- Vue Tableau : chaque titre de projet est un bouton nommé « Ouvrir la fiche du projet … », atteignable avec Tab puis Entrée ou Espace, avec focus visible. (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+- Retour utilisateur : squelettes de chargement, résultats vides libellés, reçus de confirmation fermables, lien d'évitement en tête de page. (MAIR-126 / MAIR-526, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
 
 #### Changements de comportement
-- Le contrat `bff-project` 1.0.0 rend obligatoires `tasks.active` et `tasks.archived` sur chaque projet et ajoute `statusId` / `statusName` aux tâches ; le front valide ces champs. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
-- Écritures de statut : une écriture refusée avant envoi (tâche déjà en cours d'écriture ou à vérifier, enregistrement des statuts en cours) affiche son message sans demande de vérification. Les écritures de tâches et l'enregistrement des statuts ne se croisent plus. (MAIR-570, [#283](https://github.com/mairie360/Projects_Web_Service/pull/283))
-- Apparence : couleurs et règles communes viennent de la feuille publiée de lib-components 0.9.0 ; `municipal-theme.css` local supprimé, lien d'évitement unique avant la navigation répétée. (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278))
+
+- Vue Tableau : un projet dont `permissions.canView` vaut `false` n'est plus ouvrable, ni par son titre (bouton désactivé), ni par un clic sur la ligne (qui n'affiche plus le curseur pointeur). (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+- Contrat BFF projet 1.0.0 puis 1.1.0 : `tasks.active` et `tasks.archived` deviennent obligatoires dans les projets (page projets et fiche) ; les tâches exposent `statusId` et `statusName` ; les corps de création et de modification de tâche acceptent `statusId` ; `PATCH /projects/{projectId}/tasks/{taskId}/status` n'exige plus le champ `status` ; les routes de statuts et de modèles de projet sont ajoutées. Les appelants qui valident strictement ces réponses doivent accepter ces champs. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280) ; MAIR-567, [#276](https://github.com/mairie360/Projects_Web_Service/pull/276) ; MAIR-612, [#306](https://github.com/mairie360/Projects_Web_Service/pull/306))
+- Écritures de statuts et de tâches : un déplacement de tâche est refusé si une écriture de cette tâche est en cours ou attend vérification ; l'enregistrement des statuts est refusé pendant une écriture de tâche du projet, et inversement. Un refus avant envoi affiche seulement son motif. (MAIR-570, [#283](https://github.com/mairie360/Projects_Web_Service/pull/283))
 
 #### Corrections
-- Édition d'une tâche : avant, la modification recalculait total, terminées et progression à partir des seules tâches actives, ce qui effaçait les tâches archivées (3/4 à 75 % devenait 0/1 à 0 %). Maintenant les compteurs `active` et `archived` sont conservés. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
-- Tableau : avant, seul un clic souris ouvrait la fiche d'un projet. Maintenant le titre est un bouton nommé, ouvrable au clavier (Tab, Entrée, Espace). (MAIR-310, [#281](https://github.com/mairie360/Projects_Web_Service/pull/281))
+
+- Édition d'une tâche : avant, le formulaire recalculait total, terminées et progression à partir des seules tâches actives ; les tâches archivées (terminées) disparaissaient, par exemple 3/4 à 75 % devenait 0/1 à 0 %. Maintenant les compteurs archivés sont conservés. (MAIR-569, [#280](https://github.com/mairie360/Projects_Web_Service/pull/280))
 
 #### Technique
-- Contrats : `bff-project` passe par `0.0.0-staging.<sha40>` (MAIR-600, [#295](https://github.com/mairie360/Projects_Web_Service/pull/295)) et par un paquet `0.0.0-dev` (MAIR-575, [#293](https://github.com/mairie360/Projects_Web_Service/pull/293)) avant 1.0.0 ; la politique de version accepte le paquet staging.
-- Bibliothèque : `@mairie360/front-kit` remplacé par les sous-chemins de `@mairie360/lib-components`, archive vendue supprimée, test de bundle ajouté (MAIR-126, [#287](https://github.com/mairie360/Projects_Web_Service/pull/287)). `braces` de développement vendue avec override npm (sans clé Jira, [#278](https://github.com/mairie360/Projects_Web_Service/pull/278)).
-- CI : CICD passe de v4.3.1 à v4.3.2 puis v4.4.0 (MAIR-571, [#285](https://github.com/mairie360/Projects_Web_Service/pull/285), [#289](https://github.com/mairie360/Projects_Web_Service/pull/289)) ; `cicd.yml` et `contracts.yml` ne tournent sur push que pour `main`, jeton en lecture seule (MAIR-436, [#274](https://github.com/mairie360/Projects_Web_Service/pull/274)).
-- Scan ZAP : règle 10031 hors périmètre pour les URL racines ne portant que des valeurs d'énumération (MAIR-567, [#291](https://github.com/mairie360/Projects_Web_Service/pull/291)).
+
+- Intégration continue : `mairie360/CICD` passe de v4.3.x à v4.4.3, avec des workflows de promotion staging et prod manuels (MAIR-494) ; `cicd.yml` et `contracts.yml` ne tournent sur push que sur `main`, avec un jeton en lecture seule par défaut (MAIR-436). Renovate et les tests de cohérence des versions CICD ont été ajustés.
+- Images des stacks de test (`docker-compose*.yml`) : `project-api` en 1.2.0, `core-api` en 2.2.0, `database` et `liquibase-migrations` en 3.3.0, `bff-user` et `bff-project` en 1.1.0. Le comportement de ces nouvelles versions n'est pas visible dans les diffs de ce journal.
+- Socle partagé : `@mairie360/front-kit` retiré au profit des sous-chemins de `@mairie360/lib-components` 0.10.2 ; test de bundle client ajouté (MAIR-126, [#287](https://github.com/mairie360/Projects_Web_Service/pull/287)).
+- Scan ZAP : la règle 10031 n'est exclue que pour les URL racine dont les paramètres sont des valeurs d'énumération (MAIR-567, [#291](https://github.com/mairie360/Projects_Web_Service/pull/291)).
+- Dépendances et tests : mises à jour de versions internes et de dépendances (`bff-project-openapi`, `bff-user-openapi`, tests de politique CI et de contrats).
 
 ## Historique des passages
 
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-10-21 11:12 UTC | staging | — | `214ddfa` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39589804908) |
 | 2026-10-21 11:07 UTC | dev | — | `214ddfa` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39587884074) |
 | 2026-10-21 10:57 UTC | dev | — | `6e41d95` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39585067611) |
 | 2026-10-21 10:55 UTC | dev | — | `a944d2b` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39584933340) |
