@@ -7,6 +7,7 @@ export function SearchInput({ value, onChange }: { value: string; onChange: (val
     <div className="relative w-full max-w-[448px]">
       <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8b97a6]" />
       <input
+        aria-label="Rechercher un projet"
         type="search"
         value={value}
         placeholder="Rechercher des projets..."

@@ -74,7 +74,7 @@ mirrors the composition tree:
 Name/
   index.ts          # exports the component (and the helpers it owns)
   Name.tsx          # imports ONLY its direct sub-components, through their index.ts
-  Name.test.tsx     # its tests, co-located (vitest + jsdom)
+  Name.test.jsx     # its tests, co-located (vitest + jsdom; `.jsx` in this repo, `.tsx` in the TypeScript-tested fronts)
   components/       # one such folder per direct sub-component, recursively
 ```
 
@@ -86,7 +86,7 @@ Name/
 - A big component is acceptable only for a technical reason stated in a comment; otherwise
   split it so that each visible part is a component and what composes it a sub-component.
 - Page and journey tests stay in `tests/`; per-component tests are the co-located
-  `Name.test.tsx`. `tests/component-tree-convention.test.cjs` enforces the folder, the index,
+  `Name.test.jsx`. `tests/component-tree-convention.test.cjs` enforces the folder, the index,
   the co-located test and the index-only imports.
 
 ## Front tickets and the Figma mockup

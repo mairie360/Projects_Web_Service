@@ -7,7 +7,7 @@ export function ProjectLabels({ labels }: { labels: string[] }) {
     <div className="flex flex-wrap gap-1.5">
       {labels.slice(0, 2).map((label, index) => (
         <span
-          key={label}
+          key={`${label}-${index}`}
           className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-semibold leading-none ${labelStyles[index % labelStyles.length]}`}
         >
           {label}
