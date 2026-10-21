@@ -11,7 +11,8 @@ import { useTaskComposer, type TaskComposerProps } from './use-task-composer';
 
 function TaskComposerForm(props: TaskComposerProps) {
   const { project, creationState, onInspect, onAddTask } = props;
-  const composer = useTaskComposer(props);
+  // The ref stays out of the `composer` object so the compiler lint does not read it as a ref access during render.
+  const { noticeRef, ...composer } = useTaskComposer(props);
   const inspect = onInspect ? () => onInspect(project.id) : undefined;
 
   if (!onAddTask || project.permissions?.canCreateTask === false) return null;
@@ -56,7 +57,7 @@ function TaskComposerForm(props: TaskComposerProps) {
       </div>
 
       {composer.error && !composer.creationBlocked && <p role="alert" className="mt-2 text-xs font-medium text-[#cf222e]">{composer.error}</p>}
-      <div ref={composer.noticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+      <div ref={noticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
         <TaskCreationNotice state={creationState} onInspect={inspect} />
       </div>
       {composer.saving && <p role="status" className="mt-2 text-xs text-[#57606a]">Enregistrement de la tâche…</p>}

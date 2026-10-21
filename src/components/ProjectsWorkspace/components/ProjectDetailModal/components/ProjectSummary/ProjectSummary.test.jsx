@@ -1,8 +1,6 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { memberOptions, person, priorityOptions, project, statusOptions, task } from '@tests/component/units/project-fixtures';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { project } from '@tests/component/units/project-fixtures';
 import { ProjectSummary } from './ProjectSummary';
 
 describe('ProjectSummary', () => {

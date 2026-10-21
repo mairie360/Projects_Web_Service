@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 const feedback = { feedbackId: 'f', feedbackRef: React.createRef(), pending: false, verificationRequired: false, verificationMessage: 'À vérifier', verificationPending: false, verificationLabel: 'Vérifier le projet', verificationPendingLabel: 'Vérification…', onVerify: vi.fn() };

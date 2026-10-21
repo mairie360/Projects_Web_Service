@@ -1,5 +1,4 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 const statuses = [{ id: 'd1', name: 'À faire', color: '#1256a6', category: 'todo' }, { id: 'd2', name: 'En cours', color: '#4b908d', category: 'inprogress' }, { id: 'd3', name: 'Terminé', color: '#267845', category: 'done' }];

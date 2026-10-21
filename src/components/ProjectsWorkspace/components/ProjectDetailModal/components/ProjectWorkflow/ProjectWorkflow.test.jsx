@@ -1,7 +1,5 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { WORKFLOW_UNAVAILABLE } from '@/lib/projectWorkflow';
 import { ProjectWorkflow } from './ProjectWorkflow';
 

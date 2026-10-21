@@ -1,8 +1,7 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { memberOptions, person, priorityOptions, project, statusOptions, task } from '@tests/component/units/project-fixtures';
+import { project } from '@tests/component/units/project-fixtures';
 import { DetailHeader } from './DetailHeader';
 
 describe('DetailHeader', () => {
