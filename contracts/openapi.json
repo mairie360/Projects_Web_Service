@@ -6549,7 +6549,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-staging.b643e720f51e25126c93bb0286ec1bfd427327c5"
+    "x-source-package": "@mairie360/bff-project-openapi@1.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
