@@ -39,14 +39,16 @@ test('docker-compose-e2e.yml runs the journeys with the browser image of the pin
   const pinned = readJson('e2e/package.json').devDependencies['@playwright/test'];
   const runner = compose.services.playwright;
   assert.equal(runner.image, `mcr.microsoft.com/playwright:v${pinned}-noble`);
-  assert.equal(runner.environment.E2E_BASE_URL, 'http://projects-front:5001');
+  // The browser reaches the front as localhost (a secure context) from the front's own network.
+  assert.equal(runner.environment.E2E_BASE_URL, 'http://localhost:5001');
+  assert.equal(runner.network_mode, 'service:projects-front');
   assert.equal(runner.environment.E2E_REPORT_DIR, '/report');
   assert.deepEqual(runner.depends_on, { 'projects-front': { condition: 'service_healthy' } });
   assert.ok(runner.volumes.includes('./e2e:/src/e2e:ro'), 'specs mounted read-only');
   assert.ok(runner.volumes.includes('./e2e-report:/report'), 'report kept on the host');
   assert.ok(!runner.build && !runner.secrets, 'the runner is a published image without secrets');
-  // The front's public URL is the origin the proxy demands on writes: overridable for host runs.
-  assert.equal(compose.services['projects-front'].environment.PROJECT_FRONT_URL, '${E2E_FRONT_URL:-http://projects-front:5001/}');
+  // The front's public URL is the origin its guards accept on writes: the one the browser uses.
+  assert.equal(compose.services['projects-front'].environment.PROJECT_FRONT_URL, 'http://localhost:5001/');
   assert.ok(compose.services['projects-front'].ports.includes('${E2E_FRONT_PORT:-5001}:5001'));
 });
 

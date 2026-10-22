@@ -8,6 +8,11 @@
 # the BFFs, the front built here or TARGET_IMAGE), with Playwright in place of k6. The prod
 # promotion (MAIR-602) runs it on the verified `staging-<sha>` front image with the other images
 # at the tags of the target environment (the *_IMAGE variables).
+#
+# The browser always reaches the front as http://localhost:5001: the `playwright` service shares
+# the front container's network, and local runs use the published port. Chromium treats localhost
+# as a secure context, so it keeps the `Secure` session cookies and sends the `Sec-Fetch-Site`
+# header the fronts' same-origin guards require, which a compose host name over HTTP would not.
 
 secrets:
   node_auth_token:
@@ -276,9 +281,9 @@ services:
       PORT: 5001
       # Readiness resumes on this isolated frontend origin without following Login.
       LOGIN_FRONT_URL: "${LOGIN_FRONT_URL:-http://login-front.invalid/}"
-      # Origin the same-origin proxy accepts on writes: E2E_FRONT_URL=http://localhost:5001/ when
-      # the journeys run from the host against the published port (local iterations).
-      PROJECT_FRONT_URL: ${E2E_FRONT_URL:-http://projects-front:5001/}
+      # Public origin of the front, the one its same-origin guards accept on writes: the browser of
+      # the journeys reaches it as localhost (see the header), in the stack as on the host.
+      PROJECT_FRONT_URL: http://localhost:5001/
       BFF_PROJECT_BASE_URL: http://bff-project:4001
     expose:
       - "5001"
@@ -300,6 +305,8 @@ services:
     # two versions identical (the test runner refuses a browser build of another version).
     image: mcr.microsoft.com/playwright:v1.64.1-noble
     container_name: projects-front-e2e-playwright
+    # The host user (exported by e2e_test.sh): the report written in ./e2e-report stays theirs.
+    user: "${E2E_UID:-1000}:${E2E_GID:-1000}"
     depends_on:
       projects-front:
         condition: service_healthy
@@ -308,14 +315,15 @@ services:
       - ./e2e-report:/report
     environment:
       CI: "true"
-      E2E_BASE_URL: http://projects-front:5001
+      E2E_BASE_URL: http://localhost:5001
       E2E_JWT_SECRET: 'b"secret"'
       E2E_REPORT_DIR: /report
+      HOME: /tmp
       E2E_MANAGER_USER_ID: "2"
       E2E_MEMBER_USER_ID: "3"
-    # The specs are copied: /src/e2e is read-only and the host must not receive a root-owned node_modules.
+    # The specs are copied: /src/e2e is read-only and the host must not receive the runner's node_modules.
     command: >
-      sh -c 'cp -r /src/e2e /work && cd /work && npm ci --no-audit --no-fund
+      sh -c 'cp -r /src/e2e /tmp/work && cd /tmp/work && npm ci --no-audit --no-fund
       && npx playwright test'
-    networks:
-      - backend
+    # Same network namespace as the front: the browser opens http://localhost:5001 (see the header).
+    network_mode: service:projects-front

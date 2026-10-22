@@ -13,13 +13,15 @@ if ! ls e2e/*.spec.ts >/dev/null 2>&1; then
   exit 1
 fi
 mkdir -p e2e-report
+# The Playwright service runs as the caller, so the report stays theirs (and the CI runner's).
+export E2E_UID="$(id -u)" E2E_GID="$(id -g)"
 
 echo "==> [1/4] Starting the stack and the Playwright journeys..."
 if [ -n "${TARGET_IMAGE:-}" ]; then
   echo "Image under test: $TARGET_IMAGE (no local build)."
   docker compose -f "$COMPOSE_FILE" up -d --no-build --pull missing
 else
-  docker compose -f "$COMPOSE_FILE" up -d --build
+  docker compose -f "$COMPOSE_FILE" up -d --build --pull missing
 fi
 UP_EXIT_CODE=$?
 

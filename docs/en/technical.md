@@ -259,14 +259,13 @@ Before running Docker, check service variables, build secrets and networks in th
 ### End-to-end journeys (MAIR-603)
 
 `./e2e_test.sh` starts `docker-compose-e2e.yml` (the performance stack with a Playwright runner in
-place of k6) and runs the journeys of `e2e/`: project creation, task, rename and deletion as an
-`Admin`, refusal (no "Nouveau projet", `403` on `POST /projects`) as a `User`, and the redirect
-of a visitor without a session. The prod promotion runs the same script on the verified
-`staging-<sha>` image (`e2e_tests` job, mairie360/CICD `actions/e2e/fronts`, MAIR-602) and blocks
-the release when a journey fails or when the folder is missing. The report (HTML, traces and
-videos of the failed journeys) is kept in `e2e-report/`. For local iterations, start the front
-with `E2E_FRONT_URL=http://localhost:5001/` and run `E2E_BASE_URL=http://localhost:5001 npm run e2e`
-(after `npm run e2e:install`).
+place of k6) and runs the journeys of `e2e/`: project creation, task, rename and deletion as an `Admin`; refusal (no « Nouveau projet », `403` on `POST /projects`) as a `User`; the redirect of a visitor without a session. The prod promotion runs the same script on
+the verified `staging-<sha>` image (`e2e_tests` job, mairie360/CICD `actions/e2e/fronts`,
+MAIR-602) and blocks the release when a journey fails or when the folder is missing. The report
+(HTML, traces and videos of the failed journeys) is kept in `e2e-report/`. For local iterations,
+start the stack with `docker compose -f docker-compose-e2e.yml up -d projects-front` and run
+`E2E_BASE_URL=http://localhost:5001 npm run e2e` (after `npm run e2e:install`); tear it down with
+`down -v` before a new run.
 
 ## Troubleshooting
 

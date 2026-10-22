@@ -261,14 +261,13 @@ Avant un lancement Docker, vérifier les variables de service, les secrets de bu
 ### Parcours de bout en bout (MAIR-603)
 
 `./e2e_test.sh` démarre `docker-compose-e2e.yml` (la stack de performance avec un exécuteur
-Playwright à la place de k6) et lance les parcours de `e2e/` : création d'un projet, tâche,
-renommage et suppression en `Admin`, refus (pas de « Nouveau projet », `403` sur
-`POST /projects`) en `User`, et redirection d'un visiteur sans session. La promotion prod lance le
-même script sur l'image `staging-<sha>` vérifiée (job `e2e_tests`, action `actions/e2e/fronts` de
-mairie360/CICD, MAIR-602) et bloque la release si un parcours échoue ou si le dossier manque. Le
-rapport (HTML, traces et vidéos des parcours en échec) est conservé dans `e2e-report/`. Pour
-itérer en local, démarrer le front avec `E2E_FRONT_URL=http://localhost:5001/` puis lancer
-`E2E_BASE_URL=http://localhost:5001 npm run e2e` (après `npm run e2e:install`).
+Playwright à la place de k6) et lance les parcours de `e2e/` : création d'un projet, ajout d'une tâche, renommage et suppression en `Admin` ; refus (pas de « Nouveau projet », `403` sur `POST /projects`) en `User` ; redirection d'un visiteur sans session. La promotion prod lance
+le même script sur l'image `staging-<sha>` vérifiée (job `e2e_tests`, action `actions/e2e/fronts`
+de mairie360/CICD, MAIR-602) et bloque la release si un parcours échoue ou si le dossier manque.
+Le rapport (HTML, traces et vidéos des parcours en échec) est conservé dans `e2e-report/`. Pour
+itérer en local, démarrer la stack avec `docker compose -f docker-compose-e2e.yml up -d projects-front`
+puis lancer `E2E_BASE_URL=http://localhost:5001 npm run e2e` (après `npm run e2e:install`) ; la
+supprimer avec `down -v` avant un nouveau lancement.
 
 ## Diagnostic
 
