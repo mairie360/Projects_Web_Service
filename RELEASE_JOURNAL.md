@@ -1,37 +1,45 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "b462ef029f277aff6a54af58f3be99a1b1420109", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-10-21 18:07 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
+<!-- release-journal-state {"dev": "ff7d225405db8cd017dde15f0ce4366e2a8b6ba9", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-10-23 13:12 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.2.0 | `214ddfa` | 2026-10-21 11:15 UTC |
 | staging | — | `214ddfa` | 2026-10-21 11:12 UTC |
-| dev | — | `b462ef0` | 2026-10-21 18:07 UTC |
+| dev | — | `ff7d225` | 2026-10-23 13:12 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.2.0)
 
 #### Changements de comportement
-- Le retour après création d'un projet s'affiche désormais dans une alerte intégrée de la lib (`Alert`, rôle status/alert, fermable) au lieu d'un toast autonome, qui n'est plus annoncé hors d'un `ToastProvider`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- L'état vide du board affiche le composant `DataState` de la lib. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- Les boutons : l'ancien drapeau `primary` devient le style `solid` par défaut ; les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- La confirmation de suppression passe par la modale `Confirm` de la lib, en variante danger, selon la maquette Figma décrite dans la PR. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Le retour après création d'un projet s'affiche désormais en `Alert` inline de la lib (rôle status ou alert, fermable) au lieu d'un toast. Un `Toast` de la lib utilisé hors `ToastProvider` n'est plus annoncé aux lecteurs d'écran. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La suppression d'une tâche passe par une modale de confirmation de la lib en variante danger (`TaskDeleteConfirm`). (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Le chargement de l'espace projets affiche des `Skeleton` de la lib, et le tableau vide utilise `DataState`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Les boutons changent d'apparence : le flag `primary` retiré devient la variante `solid` par défaut, et les anciens boutons secondaires prennent la variante outline avec le ton neutral. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La coque de l'application (barre latérale repliable, barre haute, pied de page) vient désormais de `AccessibleShell` de `@mairie360/lib-components/shell`. Les composants locaux `accessible-shell`, `desktop-navigation` et `sidebar-preference` sont supprimés. (MAIR-578, MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+
+#### Corrections
+- Le focus des modales est corrigé par la version de la lib utilisée (mairie360/lib-components#471) et consommé par la fiche projet via `use-dialog-focus`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 #### Technique
-- `@mairie360/lib-components` passe de 0.10.2 à 1.0.3 dans `package.json` (la description de la PR cite 1.0.1). La barre latérale vient de `@mairie360/lib-components/shell` ; les fichiers locaux `accessible-shell`, `desktop-navigation` et `sidebar-preference` sont supprimés.
-- Découpage de `ProjectsWorkspace` et `ProjectDetailModal` en dossiers par zone, avec tests co-localisés et convention d'arbre vérifiée par des tests. Le diff est tronqué : le détail des comportements reste à confirmer.
+- Node.js passe de 24.21.0 à 24.22.1 dans les deux Dockerfile (nouveaux digests d'image), dans les workflows CI et dans les tests de politique CI ; Next.js et eslint-config-next passent de 16.3.8 à 16.4.2. (sans clé Jira, [#314](https://github.com/mairie360/Projects_Web_Service/pull/314))
+- `@mairie360/lib-components` passe de 0.10.2 à 1.0.3. L'espace projets est découpé en arborescence `ProjectsWorkspace/` (un dossier par composant, tests co-localisés), les anciens fichiers sont supprimés et les scripts de couverture excluent les fichiers de test. Le diff étant tronqué, cette liste s'appuie sur la partie visible. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
 #### Changements de comportement
-- Le retour après création d'un projet s'affiche désormais dans une alerte intégrée de la lib (`Alert`, rôle status/alert, fermable) au lieu d'un toast autonome, qui n'est plus annoncé hors d'un `ToastProvider`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- L'état vide du board affiche le composant `DataState` de la lib. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- Les boutons : l'ancien drapeau `primary` devient le style `solid` par défaut ; les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- La confirmation de suppression passe par la modale `Confirm` de la lib, en variante danger, selon la maquette Figma décrite dans la PR. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Le retour après création d'un projet s'affiche désormais en `Alert` inline de la lib (rôle status ou alert, fermable) au lieu d'un toast. Un `Toast` de la lib utilisé hors `ToastProvider` n'est plus annoncé aux lecteurs d'écran. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La suppression d'une tâche passe par une modale de confirmation de la lib en variante danger (`TaskDeleteConfirm`). (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Le chargement de l'espace projets affiche des `Skeleton` de la lib, et le tableau vide utilise `DataState`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Les boutons changent d'apparence : le flag `primary` retiré devient la variante `solid` par défaut, et les anciens boutons secondaires prennent la variante outline avec le ton neutral. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La coque de l'application (barre latérale repliable, barre haute, pied de page) vient désormais de `AccessibleShell` de `@mairie360/lib-components/shell`. Les composants locaux `accessible-shell`, `desktop-navigation` et `sidebar-preference` sont supprimés. (MAIR-578, MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+
+#### Corrections
+- Le focus des modales est corrigé par la version de la lib utilisée (mairie360/lib-components#471) et consommé par la fiche projet via `use-dialog-focus`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 #### Technique
-- `@mairie360/lib-components` passe de 0.10.2 à 1.0.3 dans `package.json` (la description de la PR cite 1.0.1). La barre latérale vient de `@mairie360/lib-components/shell` ; les fichiers locaux `accessible-shell`, `desktop-navigation` et `sidebar-preference` sont supprimés.
-- Découpage de `ProjectsWorkspace` et `ProjectDetailModal` en dossiers par zone, avec tests co-localisés et convention d'arbre vérifiée par des tests. Le diff est tronqué : le détail des comportements reste à confirmer.
+- Node.js passe de 24.21.0 à 24.22.1 dans les deux Dockerfile (nouveaux digests d'image), dans les workflows CI et dans les tests de politique CI ; Next.js et eslint-config-next passent de 16.3.8 à 16.4.2. (sans clé Jira, [#314](https://github.com/mairie360/Projects_Web_Service/pull/314))
+- `@mairie360/lib-components` passe de 0.10.2 à 1.0.3. L'espace projets est découpé en arborescence `ProjectsWorkspace/` (un dossier par composant, tests co-localisés), les anciens fichiers sont supprimés et les scripts de couverture excluent les fichiers de test. Le diff étant tronqué, cette liste s'appuie sur la partie visible. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
@@ -42,6 +50,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-10-23 13:12 UTC | dev | — | `ff7d225` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39957552979) |
 | 2026-10-21 18:07 UTC | dev | — | `b462ef0` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39647876873) |
 | 2026-10-21 11:15 UTC | prod | v1.2.0 | `214ddfa` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39590396889) |
 | 2026-10-21 11:12 UTC | staging | — | `214ddfa` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39589804908) |
