@@ -228,7 +228,7 @@ states:
     route: /
     steps:
       - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      - click: { role: button, name: Supprimer Diagnostic énergétique }
+      - click: { role: button, name: Supprimer Remplacement des fenêtres }
       - wait_for: { text: Supprimer définitivement cette tâche ? }
   - id: deep-link-task
     description: Link to a task (?project=&task=), the detail opens on the highlighted task
@@ -242,7 +242,7 @@ states:
     route: /?project=project-101&task=task-1002
     steps:
       - click: { selector: 'article[aria-current="true"] button:has-text("Suivi")' }
-      - wait_for: { text: Aucune modification enregistrée. }
+      - wait_for: { text: Aucun commentaire. }
   - id: deep-link-invalid
     description: Invalid project link (error alert)
     as: manager
