@@ -243,3 +243,9 @@ test('MAIR-316: each accessibility run starts from an empty report', () => {
   assert.ok(clear >= 0, 'accessibility_test.sh clears rgaa-report/');
   assert.ok(clear < shell.indexOf('docker compose -f "$COMPOSE_FILE" up'), 'before the stack starts');
 });
+
+test('MAIR-316: the RGAA stack passes plain values, never backslash-escaped quotes', () => {
+  // A plain YAML scalar keeps backslashes: `\"false\"` reached BFF User as the text \"false\",
+  // so its auth rate limit stayed on.
+  assert.doesNotMatch(read('docker-compose-accessibility.yml'), /: \\"/);
+});
