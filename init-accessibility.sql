@@ -16,9 +16,9 @@ BEGIN;
 --   11 creator  (Responsable): owns project 111, only for the duplicate state (writes)
 --   12 newcomer (User): no project, empty board
 INSERT INTO users (id, first_name, last_name, email, password, status) VALUES
-    (10, 'Claire', 'Martin', 'rgaa-manager@mairie360.fr', 'dummy', 'active'),
-    (11, 'Paul', 'Bernard', 'rgaa-creator@mairie360.fr', 'dummy', 'active'),
-    (12, 'Léa', 'Petit', 'rgaa-newcomer@mairie360.fr', 'dummy', 'active')
+    (10, 'Claire', 'Martin', 'rgaa-manager@mairie360.fr', NULL, 'active'),
+    (11, 'Paul', 'Bernard', 'rgaa-creator@mairie360.fr', NULL, 'active'),
+    (12, 'Léa', 'Petit', 'rgaa-newcomer@mairie360.fr', NULL, 'active')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)

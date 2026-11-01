@@ -3,9 +3,11 @@ import console from 'node:console';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PACKAGE_NAME, buildOrvalOpenApi, resolveOrvalPackage } from './orval-contract.mjs';
+import { isAcceptedContractVersion } from './contract-version.mjs';
 
-// Le seul contrat utilisé par ce front est celui de BFF_Project publié dans @mairie360/bff-project-openapi,
-// épinglé à une version exacte X.Y.Z. contracts/openapi.json en est la reconstruction versionnée
+// Le seul contrat routé par le proxy de ce front est celui de BFF_Project publié dans @mairie360/bff-project-openapi,
+// épinglé à une version exacte (release X.Y.Z, ou paquet dev/staging d'un commit du main du BFF, voir
+// contract-version.mjs). contracts/openapi.json en est la reconstruction versionnée
 // (lue par le proxy au build et par les tests) ; il n'est jamais copié depuis un checkout du BFF.
 //   --sync   (alias --generate) : régénère contracts/openapi.json depuis le paquet installé
 //   --check  : échoue si la version n'est pas exacte, si le paquet installé diffère de package.json
@@ -13,15 +15,24 @@ import { PACKAGE_NAME, buildOrvalOpenApi, resolveOrvalPackage } from './orval-co
 
 const mode = process.argv[2] ?? '--check';
 const spec = resolve('contracts/openapi.json');
-const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
 
 function checkPinnedPackage() {
   const { dependencies = {}, devDependencies = {} } = JSON.parse(readFileSync(resolve('package.json'), 'utf8'));
   const pinned = dependencies[PACKAGE_NAME] ?? devDependencies[PACKAGE_NAME];
   if (!pinned) throw new Error(`${PACKAGE_NAME} doit être une dépendance de package.json.`);
-  if (!EXACT_VERSION.test(pinned)) throw new Error(`${PACKAGE_NAME} doit être épinglé à une version publiée exacte X.Y.Z (trouvé « ${pinned} »).`);
+  if (!isAcceptedContractVersion(pinned)) throw new Error(`${PACKAGE_NAME} must be pinned to an exact published version (X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha>), found "${pinned}".`);
   const bffPackages = Object.keys({ ...dependencies, ...devDependencies }).filter((name) => /^@mairie360\/bff-.*-openapi$/.test(name));
-  if (bffPackages.length !== 1) throw new Error(`Un seul contrat de BFF est autorisé (trouvé : ${bffPackages.join(', ')}).`);
+  // User supplies types for Login's existing /me relay, never an additional
+  // operation in Project's generated contract or business proxy allowlist. It follows the same
+  // version policy (release X.Y.Z, or 0.0.0-dev.<sha> / 0.0.0-staging.<sha> of a BFF_user main commit) and stays a devDependency.
+  const sessionTypes = '@mairie360/bff-user-openapi';
+  const sessionPinned = devDependencies[sessionTypes];
+  if (dependencies[sessionTypes] || !isAcceptedContractVersion(sessionPinned) ||
+    JSON.parse(readFileSync(resolve('node_modules', sessionTypes, 'package.json'), 'utf8')).version !== sessionPinned) {
+    throw new Error('The User session types must stay a devDependency pinned to an exact published version (X.Y.Z, 0.0.0-dev.<sha> or 0.0.0-staging.<sha>), installed as is.');
+  }
+  const businessPackages = bffPackages.filter(name => name !== sessionTypes);
+  if (businessPackages.length !== 1) throw new Error(`Un seul contrat métier de BFF est autorisé (trouvé : ${businessPackages.join(', ')}).`);
   const installed = resolveOrvalPackage().version;
   if (installed !== pinned) throw new Error(`${PACKAGE_NAME}@${installed} est installé mais package.json épingle ${pinned} : lancer npm ci.`);
   return pinned;

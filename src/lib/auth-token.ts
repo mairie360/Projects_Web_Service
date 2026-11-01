@@ -1,3 +1,6 @@
+import { frontUrl } from './front-urls';
+import { parseFrontUrl } from './front-url';
+
 export const MAIRIE360_AUTH_JWT_STORAGE_KEY = 'mairie360.auth.jwt';
 
 const LEGACY_AUTH_JWT_STORAGE_KEYS = ['mairie360.projects.jwt'];
@@ -67,18 +70,72 @@ export function getStoredAuthorizationHeader() {
   return token ? formatBearerToken(token) : null;
 }
 
-/** Efface la session (cookie via la route locale /api/auth/logout, jetons locaux) puis recharge la page. */
+const navigatingLocations = new WeakSet<Location>();
+const recoveryLocations = new WeakSet<Location>();
+const logoutFlights = new WeakMap<Location, Promise<void>>();
+
+/** A rejected renewal returns to Login without revoking or replaying a write. */
+export function navigateToLogin() {
+  if (typeof window === 'undefined' || navigatingLocations.has(window.location) || recoveryLocations.has(window.location)) return;
+  const login = parseFrontUrl(frontUrl('LOGIN_FRONT_URL'));
+  if (!login) return;
+  const own = parseFrontUrl(frontUrl('PROJECT_FRONT_URL'));
+  const current = parseFrontUrl(window.location.href);
+  if (own && current?.origin === own.origin) login.searchParams.set('redirect', current.href);
+  navigatingLocations.add(window.location);
+  clearStoredAuthJwtToken();
+  window.location.assign(login.href);
+}
+
+/** Return only on an explicit choice after an unconfirmed logout. */
+export function returnToLogin() {
+  if (typeof window === 'undefined') return;
+  recoveryLocations.delete(window.location);
+  navigatingLocations.delete(window.location);
+  navigateToLogin();
+}
+
+/** Explicit logout checks Login's revocation receipt before clearing legacy browser storage. */
 export async function logoutAndReload() {
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      cache: 'no-store',
-    });
-  } finally {
+  if (typeof window === 'undefined') return;
+  const location = window.location;
+  const running = logoutFlights.get(location);
+  if (running) return running;
+  recoveryLocations.add(location);
+  const pending = (async () => {
+    let response: Response;
     try {
-      clearStoredAuthJwtToken();
-    } finally {
-      window.location.reload();
+      response = await fetch('/api/auth/logout', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+    } catch {
+      throw new Error('La déconnexion n’a pas abouti. Vérifiez votre connexion et réessayez.');
     }
-  }
+    if (!response.ok) throw new Error('La déconnexion n’a pas abouti. Veuillez réessayer.');
+    let receipt: unknown;
+    try { receipt = await response.json(); } catch {
+      throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
+    }
+    if (typeof receipt !== 'object' || receipt === null || !('message' in receipt) || typeof receipt.message !== 'string' || !('session_revoked' in receipt) || typeof receipt.session_revoked !== 'boolean') {
+      throw new Error('La déconnexion n’a pas pu être confirmée. Veuillez réessayer.');
+    }
+    if (!receipt.session_revoked) {
+      throw new Error('La déconnexion n’a pas pu être confirmée. Votre session reste à vérifier.');
+    }
+    let destination = parseFrontUrl(frontUrl('LOGIN_FRONT_URL'));
+    if ('logout_url' in receipt) {
+      if (typeof receipt.logout_url !== 'string') throw new Error('La destination de déconnexion est invalide.');
+      const url = parseFrontUrl(receipt.logout_url);
+      if (!url || url.protocol !== 'https:' || url.hash || !/^\/realms\/[^/]+\/protocol\/openid-connect\/logout$/.test(url.pathname)) {
+        throw new Error('La destination de déconnexion est invalide.');
+      }
+      destination = url;
+    }
+    if (!destination) throw new Error('La connexion partagée n’est pas configurée.');
+    clearStoredAuthJwtToken();
+    location.assign(destination.href);
+  })();
+  logoutFlights.set(location, pending);
+  try { await pending; } finally { logoutFlights.delete(location); }
 }

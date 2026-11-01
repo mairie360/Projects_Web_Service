@@ -73,7 +73,7 @@ export function useAuthSession() {
       .then((page) => setSession(authSessionFromAccess(page.access)))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        // Un 401 a déjà déclenché la déconnexion dans le client BFF.
+        // Un 401 a déjà déclenché le retour à Login dans le client BFF.
         if (error instanceof BffProjectError && error.status === 401) return;
         setSession((current) => ({
           ...current,
