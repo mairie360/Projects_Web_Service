@@ -26,7 +26,7 @@ export type MockReply = {
   raw?: string;
   contentType?: string;
   /** En-têtes de réponse supplémentaires (ex. `Authorization` renvoyé par un login). */
-  headers?: Record<string, string>;
+  headers?: Record<string, string | string[]>;
   /** Coupe la connexion sans répondre (panne réseau simulée). */
   dropConnection?: boolean;
   /** Autorise volontairement une réponse hors contrat (statut non documenté, corps non conforme). */
@@ -168,7 +168,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-function send(res: http.ServerResponse, status: number, payload: string, contentType = 'application/json', headers: Record<string, string> = {}) {
+function send(res: http.ServerResponse, status: number, payload: string, contentType = 'application/json', headers: Record<string, string | string[]> = {}) {
   if (res.headersSent) return;
   res.writeHead(status, { ...(payload ? { 'Content-Type': contentType } : {}), ...headers });
   res.end(payload);

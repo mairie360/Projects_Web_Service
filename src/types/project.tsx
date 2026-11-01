@@ -21,6 +21,8 @@ export interface ProjectTask {
   id: string;
   title: string;
   status: ProjectStatus;
+  statusId?: string;
+  statusName?: string;
   statusLabel?: string;
   responsible: Person;
   assignees: Person[];
@@ -49,6 +51,7 @@ export type TaskCollaboration = TaskCollaborationResponse;
 export interface ProjectTaskDraft {
   title: string;
   status: ProjectStatus;
+  statusId?: string;
   responsible: Person;
   assignees: Person[];
   priority: ProjectPriority;
@@ -70,9 +73,12 @@ export interface Project {
   priorityLabel?: string;
   labels: string[];
   taskItems?: ProjectTask[];
+  /** BFF task counts: `total` and `completed` include the archived (done) tasks, `taskItems` only lists the `active` ones. */
   tasks: {
     total: number;
     completed: number;
+    active: number;
+    archived: number;
   };
   permissions?: {
     canView?: boolean;

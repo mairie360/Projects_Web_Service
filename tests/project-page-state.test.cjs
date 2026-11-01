@@ -40,20 +40,31 @@ test('dates de formulaire et progression', () => {
 test('formulaires vides et formulaire d’édition depuis un projet du BFF', () => {
   assert.deepEqual(state.createProjectFormState(), {
     title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '',
-    progress: 0, totalTasks: 0, completedTasks: 0, taskItems: [],
+    progress: 0, totalTasks: 0, completedTasks: 0, archivedTasks: 0, taskItems: [],
   });
   assert.equal(state.createProjectFormState('review').status, 'review');
 
   const project = { ...fixtures.projectListItem({ dueDate: '2026-12-15' }), assignees: [fixtures.people.alice, fixtures.people.marie, fixtures.people.alice] };
-  assert.deepEqual(state.createTaskFormState(project), { title: '', status: 'in-progress', priority: 'high', assignees: ['3'], labels: [], dueDate: '2026-12-15' });
+  assert.deepEqual(state.createTaskFormState(project), { title: '', status: 'in-progress', priority: 'high', assignees: ['user-3'], labels: [], dueDate: '2026-12-15' });
   assert.deepEqual(state.createInitialTaskItems(project), []);
 
   const tasks = [fixtures.projectTask()];
   const form = state.projectToFormState({ ...project, taskItems: tasks });
   assert.deepEqual({ ...form, taskItems: form.taskItems.length }, {
-    title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: '3',
-    assignees: ['2', '3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, taskItems: 1,
+    title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: 'user-3',
+    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
   });
+});
+
+test('MAIR-569: archived (done) tasks the BFF no longer lists still count in the edit form summary', () => {
+  // bff-project 1.0.0 (MAIR-559): `taskItems` only lists the active tasks, `tasks.archived` counts the hidden done ones.
+  assert.equal(state.calculateProjectProgress([{ completed: false }], 3), 75);
+  assert.equal(state.calculateProjectProgress([], 2), 100);
+  const project = fixtures.projectListItem({ progress: 75, tasks: { total: 4, completed: 3, active: 1, archived: 3 } });
+  const form = state.projectToFormState({ ...project, taskItems: [fixtures.projectTask()] });
+  assert.deepEqual([form.totalTasks, form.completedTasks, form.archivedTasks, form.progress], [4, 3, 3, 75]);
+  assert.equal(state.archivedTasksLabel(1), '1 tâche archivée');
+  assert.equal(state.archivedTasksLabel(3), '3 tâches archivées');
 });
 
 test('navigation: front URLs read at runtime, navigation only to a known target', () => {
@@ -99,7 +110,7 @@ test('active shell destinations reject credential-bearing and non-web URLs', () 
 });
 
 test('métadonnées des cartes projet : initiales, dates et numéro affiché', () => {
-  const meta = requireTs('src/components/project-card/projectCardMeta.ts');
+  const meta = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   assert.deepEqual(Object.keys(meta.statusMeta), ['todo', 'in-progress', 'review', 'done']);
   assert.deepEqual(Object.keys(meta.priorityMeta), ['high', 'medium', 'low']);
   assert.equal(meta.getInitials('marie  anne durand'), 'MA');
@@ -132,7 +143,7 @@ test('jeton stocké : normalisation, effacement et stockage inaccessible', () =>
 });
 
 test('missing deadlines remain distinct from malformed or impossible dates', () => {
-  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  const { formatProjectDate } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   for (const withYear of [true, false]) {
     for (const date of ['', ' ', '\t\n']) {
       assert.equal(formatProjectDate(date, withYear), 'Sans échéance');
@@ -146,7 +157,7 @@ test('missing deadlines remain distinct from malformed or impossible dates', () 
 });
 
 test('valid deadline formatting preserves calendar dates without time-zone conversion', () => {
-  const { formatProjectDate } = requireTs('src/components/project-card/projectCardMeta.ts');
+  const { formatProjectDate } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
   for (const [date, full, short] of [
     ['2026-01-01', '01/01/2026', '01/01'],
     ['2026-04-30', '30/04/2026', '30/04'],

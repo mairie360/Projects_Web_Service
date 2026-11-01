@@ -41,20 +41,21 @@ function projectForm(overrides = {}) {
     status: 'todo',
     priority: 'high',
     responsible: '',
-    assignees: ['3', ' 2 ', '3', ''],
+    assignees: ['user-3', ' user-2 ', 'user-3', ''],
     labels: ['voirie', ' voirie', 'énergie'],
     dueDate: '2026-12-15',
     progress: 0,
     totalTasks: 1,
     completedTasks: 0,
-    taskItems: [fixtures.projectTask({ title: ' Relevé ', assignees: [fixtures.people.alice, { name: 'Prestataire' }], labels: ['voirie', 'voirie'] })],
+    // A person without id (free text) cannot be sent any more: assigneeIds must match ^user-\d+$.
+    taskItems: [fixtures.projectTask({ title: ' Relevé ', assignees: [fixtures.people.alice, fixtures.people.alice], labels: ['voirie', 'voirie'] })],
     ...overrides,
   };
 }
 
 describe('lecture des projets', () => {
   test('GET /projects-page transmet uniquement les filtres déclarés et normalise les dates', async () => {
-    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage() });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage(undefined, { pagination: { page: 2, limit: 10, total: 11, hasNextPage: false } }) });
 
     const page = await client.getProjectsPage({ q: 'éclairage', status: 'in-progress', priority: 'all', view: 'table', page: 2, limit: 10, dueBefore: '2026-12-31', dueAfter: '', });
 
@@ -67,8 +68,26 @@ describe('lecture des projets', () => {
     assert.equal(page.access.role, 'Responsable');
   });
 
-  test('sans filtre ni cookie, le jeton stocké (y compris la clé historique) sert d’Authorization', async () => {
+  test('MAIR-569: GET /projects-page keeps the active and archived task counts of bff-project 1.0.0', async () => {
+    const project = fixtures.projectListItem({ progress: 75, tasks: { total: 4, completed: 3, active: 1, archived: 3 } });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([project]) });
+
+    const page = await client.getProjectsPage();
+
+    // The receipt reader rebuilds every DTO from its declared fields: it used to drop `active` / `archived`.
+    assert.deepEqual(page.projects[0].tasks, { total: 4, completed: 3, active: 1, archived: 3 });
+    const { parseProjectsPageReceipt } = requireTs('src/lib/project-page-receipt.ts');
+    const { active, ...withoutActive } = project.tasks;
+    assert.equal(active, 1);
+    assert.throws(
+      () => parseProjectsPageReceipt(fixtures.projectsPage([{ ...project, tasks: withoutActive }])),
+      { message: 'Les données reçues ne correspondent pas au contrat publié.' },
+    );
+  });
+
+  test('sans cookie, aucun jeton de stockage actuel ou historique ne devient une Authorization', async () => {
     harness.cookies.clear();
+    harness.storage.setItem('mairie360.auth.jwt', 'stale-session');
     harness.storage.setItem('mairie360.projects.jwt', ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
@@ -76,18 +95,43 @@ describe('lecture des projets', () => {
 
     const call = onlyCall('/projects-page', 'get');
     assert.equal(call.url.search, '');
-    assert.equal(call.headers.authorization, bearer(fixtures.agents.alice));
-    assert.equal(client.getStoredBffProjectJwtToken(), fixtures.jwt(fixtures.agents.alice.id));
-    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), fixtures.jwt(fixtures.agents.alice.id));
+    assert.equal(call.headers.authorization, undefined);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), 'stale-session');
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), ` ${fixtures.jwt(fixtures.agents.alice.id)} `);
   });
 
-  test('un en-tête Authorization explicite n’est jamais remplacé par le cookie', async () => {
+  test('un jeton stocké ne remplace jamais la session valide du cookie', async () => {
     client.storeBffProjectJwtToken('Bearer explicit-session');
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
 
     await client.getProjectsPage({ view: 'kanban' });
 
-    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, 'Bearer explicit-session');
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
+    assert.equal(harness.cookies.has('accessToken'), true);
+  });
+
+  test('la lecture des projets ne lit ni ne migre le stockage hérité', async (t) => {
+    harness.storage.setItem('mairie360.projects.jwt', fixtures.jwt(fixtures.agents.alice.id));
+    const read = t.mock.method(harness.storage, 'getItem', () => { throw new Error('Storage inaccessible'); });
+    const write = t.mock.method(harness.storage, 'setItem', () => { throw new Error('Storage inaccessible'); });
+    bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
+
+    await client.getProjectsPage();
+
+    assert.equal(onlyCall('/projects-page', 'get').headers.authorization, bearer());
+    assert.equal(read.mock.callCount(), 0);
+    assert.equal(write.mock.callCount(), 0);
+  });
+
+  test('une mutation ne transmet aucun jeton stocké en remplacement du cookie', async () => {
+    harness.storage.setItem('mairie360.auth.jwt', 'expired-local-token');
+    bffProject.on('post', '/projects/{projectId}/duplicate', { status: 201, body: fixtures.projectDetails() });
+
+    await client.duplicateProject('project-1');
+
+    assert.equal(onlyCall('/projects/{projectId}/duplicate', 'post').headers.authorization, bearer());
+    assert.equal(harness.location.reloads, 0);
   });
 
   test('clearStoredBffProjectJwtToken efface le jeton stocké', () => {
@@ -144,11 +188,11 @@ describe('écritures sur les projets', () => {
       description: 'Remplacement des candélabres.',
       status: 'todo',
       priority: 'high',
-      responsibleId: '3',
-      assigneeIds: ['3', '2'],
+      responsibleId: 'user-3',
+      assigneeIds: ['user-3', 'user-2'],
       labels: ['voirie', 'énergie'],
       dueDate: '2026-12-15',
-      taskItems: [{ title: 'Relevé', status: 'todo', priority: 'medium', assigneeIds: ['2', 'Prestataire'], labels: ['voirie'], dueDate: '2026-10-01T00:00:00.000Z' }],
+      taskItems: [{ title: 'Relevé', status: 'todo', priority: 'medium', assigneeIds: ['user-2'], labels: ['voirie'], dueDate: '2026-10-01T00:00:00.000Z' }],
     });
     assert.equal(details.project.dueDate, '2026-12-15');
   });
@@ -156,11 +200,11 @@ describe('écritures sur les projets', () => {
   test('PATCH /projects/{projectId} place le responsable choisi en tête des participants', async () => {
     bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails() });
 
-    await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ responsible: ' 1 ', assignees: ['2'], taskItems: [] })));
+    await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ responsible: ' user-1 ', assignees: ['user-2'], taskItems: [] })));
 
     const { body } = onlyCall('/projects/{projectId}', 'patch');
-    assert.equal(body.responsibleId, '1');
-    assert.deepEqual(body.assigneeIds, ['1', '2']);
+    assert.equal(body.responsibleId, 'user-1');
+    assert.deepEqual(body.assigneeIds, ['user-1', 'user-2']);
     assert.deepEqual(body.taskItems, []);
   });
 
@@ -196,7 +240,7 @@ describe('écritures sur les tâches', () => {
   const draft = {
     title: ' Commander les lampes ',
     status: 'todo',
-    responsible: { name: 'Marie Durand' },
+    responsible: fixtures.people.marie,
     assignees: [fixtures.people.alice, fixtures.people.alice],
     priority: 'low',
     labels: ['achat', ''],
@@ -209,16 +253,16 @@ describe('écritures sur les tâches', () => {
     const task = await client.createProjectTask('project-1', client.taskBodyFromDraft(draft));
 
     assert.deepEqual(onlyCall('/projects/{projectId}/tasks', 'post').body, {
-      title: 'Commander les lampes', status: 'todo', priority: 'low', responsibleId: 'Marie Durand',
-      assigneeIds: ['Marie Durand', '2'], labels: ['achat'], dueDate: '2026-11-01',
+      title: 'Commander les lampes', status: 'todo', priority: 'low', responsibleId: 'user-3',
+      assigneeIds: ['user-3', 'user-2'], labels: ['achat'], dueDate: '2026-11-01',
     });
     assert.equal(task.dueDate, '2026-10-01');
   });
 
   test('un brouillon sans responsable prend le premier participant', () => {
     const body = client.taskBodyFromDraft({ ...draft, responsible: { name: '' } });
-    assert.equal(body.responsibleId, '2');
-    assert.deepEqual(body.assigneeIds, ['2']);
+    assert.equal(body.responsibleId, 'user-2');
+    assert.deepEqual(body.assigneeIds, ['user-2']);
   });
 
   test('PATCH /projects/{projectId}/tasks/{taskId} et /status ciblent la tâche encodée', async () => {
@@ -250,6 +294,78 @@ describe('écritures sur les tâches', () => {
 });
 
 describe('erreurs du BFF', () => {
+  test('les redirections opaques des lectures rechargent la page protégée sans inspecter ni suivre leur destination', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return Object.defineProperties({ type: 'opaqueredirect' }, {
+        status: { get() { throw new Error('opaque status must not be read'); } },
+        ok: { get() { throw new Error('opaque status must not be read'); } },
+        headers: { get() { throw new Error('opaque Location must not be read'); } },
+        json: { get() { throw new Error('opaque body must not be read'); } },
+      });
+    });
+
+    const results = await Promise.allSettled([
+      client.getProjectsPage({ q: 'éclairage' }),
+      client.getProjectDetails('project-1'),
+      client.getTaskCollaboration('project-1', 'task-1'),
+    ]);
+
+    assert.ok(results.every(result => result.status === 'rejected' && result.reason.name === 'BffProjectNavigationRequiredError'));
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 3);
+    assert.ok(requests.every(({ init }) => init.redirect === 'manual'));
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('une redirection opaque après mutation ne réémet pas automatiquement cette mutation', async (t) => {
+    const previousLocation = global.window.location;
+    const location = { reloads: 0, reload() { this.reloads++; } };
+    global.window.location = location;
+    t.after(() => { global.window.location = previousLocation; });
+    const requests = [];
+    t.mock.method(global, 'fetch', async (path, init) => {
+      requests.push({ path, init });
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.duplicateProject('project-1'), { name: 'BffProjectNavigationRequiredError' });
+
+    assert.equal(location.reloads, 1);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].path, '/projects/project-1/duplicate');
+    assert.equal(requests[0].init.method, 'POST');
+    assert.equal(requests[0].init.redirect, 'manual');
+    assert.equal(requests[0].init.body, undefined);
+  });
+
+  test('une réponse opaque annulée ne déclenche aucune navigation', async (t) => {
+    const controller = new AbortController();
+    t.mock.method(global, 'fetch', async () => {
+      controller.abort();
+      return { type: 'opaqueredirect' };
+    });
+
+    await assert.rejects(client.getProjectsPage({}, controller.signal), { name: 'AbortError' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
+  test('un refus réseau générique ne devient ni une session expirée ni une navigation', async (t) => {
+    t.mock.method(global, 'fetch', async () => { throw new TypeError('Network unavailable'); });
+
+    await assert.rejects(client.getProjectsPage(), { name: 'TypeError', message: 'Network unavailable' });
+
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.browserCalls, []);
+  });
+
   test('les erreurs ApiError documentées deviennent des BffProjectError typées', async () => {
     const cases = [
       [400, () => client.createProject(client.createProjectBodyFromForm(projectForm())), 'post', '/projects', fixtures.apiError('BAD_REQUEST', 'Titre requis', [{ path: 'title' }])],
@@ -292,17 +408,25 @@ describe('erreurs du BFF', () => {
     assert.deepEqual(bffProject.requests, []);
   });
 
-  test('un 401 déconnecte localement sans autre BFF, vide le stockage et recharge la page', async () => {
+  test('un 401 renvoie vers Login avec le retour validé sans révoquer la session', async () => {
     client.storeBffProjectJwtToken('stale-session');
+    harness.storage.setItem('mairie360.projects.jwt', 'old-project-session');
+    harness.storage.setItem('projects.draft', 'unsaved project');
+    harness.storage.setItem('ui.theme', 'dark');
     bffProject.on('get', '/projects-page', harness.errorReply(401, fixtures.apiError('UNAUTHORIZED', 'Session expirée')));
 
     await assert.rejects(client.getProjectsPage(), { status: 401, code: 'UNAUTHORIZED', message: 'Votre session a expiré.' });
 
     assert.equal(bffProject.requests.length, 1);
-    assert.equal(harness.storage.length, 0);
-    assert.equal(harness.cookies.has('accessToken'), false);
-    assert.equal(harness.location.reloads, 1);
-    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page', 'POST /api/auth/logout']);
+    assert.equal(harness.storage.getItem('mairie360.auth.jwt'), null);
+    assert.equal(harness.storage.getItem('mairie360.projects.jwt'), null);
+    assert.equal(harness.storage.getItem('projects.draft'), 'unsaved project');
+    assert.equal(harness.storage.getItem('ui.theme'), 'dark');
+    assert.equal(harness.cookies.has('accessToken'), true);
+    assert.equal(harness.location.reloads, 0);
+    assert.deepEqual(harness.location.assigned, ['https://login.mairie.test/?redirect=' + encodeURIComponent(harness.location.href)]);
+    assert.deepEqual(harness.ownerCalls, []);
+    assert.deepEqual(harness.browserCalls.map(({ method, path }) => `${method} ${path}`), ['GET /projects-page', 'POST /api/auth/refresh']);
   });
 
   test('une requête annulée rejette avec AbortError', async () => {

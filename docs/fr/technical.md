@@ -1,5 +1,50 @@
 # Projects_Web_Service — Documentation technique
 
+## Assignés de tâches ordonnés — MAIR-408
+
+`uniqueAssigneesInOrder` trimme, filtre et déduplique avec un `Set` ordonné, sans
+utiliser le helper trié de catalogue `getUniqueValues` (inchangé).
+`taskToFormState` place le responsable réellement reçu avant ses autres membres
+et déduplique. Sauvegardes imbriquées et fiche utilisent le même helper ordonné ;
+choix, retraits et fallback restent dans les handlers existants. Aucun nouvel
+effet, appel, champ de contrat, DTO ou backend. Les tests vérifient responsable
+et membres indépendamment des labels optionnels du reçu, puis les corps réels
+POST projet/POST-PATCH tâche et le refus/réessai explicite identique.
+
+## Défaut de date des tâches imbriquées — MAIR-408
+
+`ProjectTasksEditor` conserve une date privée `string | null` : `null` signifie
+non choisie, toute chaîne (y compris `''`) appartient à la tâche. La date rendue
+et enregistrée est `draft.dueDate ?? form.dueDate`, sans copie dans un effet.
+Les dates des tâches existantes restent des chaînes. Le marqueur ne modifie ni
+`TaskFormState`, ni la tâche de présentation, ni le DTO, proxy ou BFF. Les
+régressions composant couvrent années intermédiaires, brouillon titré, choix,
+effacement, édition et annulation ; la régression page/harnais réel vérifie les
+dates parent/tâches du POST unique, l’absence de marqueur/ID et le reçu canonique.
+
+## Redirections opaques du client navigateur — MAIR-408
+
+`requestBff` impose `redirect: 'manual'` puis vérifie l’AbortSignal après réception.
+Le type `opaqueredirect` est traité avant statut, en-têtes et corps :
+`BffProjectNavigationRequiredError` signale la navigation sans supposer un 401
+ni inspecter Location. Un WeakSet indexé par Location limite les réponses
+parallèles à un rechargement du document ; aucune lecture ni mutation n’est
+rejouée. Le middleware inchangé construit Login et le retour au document initial.
+Le cleanup 401 existant reste conservé. Erreurs réseau et vrais 403/503 ne
+rechargent pas la page. Routes, méthodes et payloads contractuels sont inchangés.
+
+## Construction des credentials frontend — MAIR-408
+
+`createRequestHeaders` ajoute seulement Accept et Content-Type JSON par défaut
+et conserve les en-têtes explicitement fournis. Il n’appelle plus les helpers
+de jeton stocké. Le proxy same-origin inchangé dérive Authorization du cookie
+HttpOnly en l’absence d’en-tête explicite ; l’authentification serveur ne change
+pas. Les helpers historiques restent disponibles mais ne sont pas branchés sur
+la construction des requêtes Projects. Le cleanup existant après401 est conservé.
+Les tests client avec contrat couvrent stockage ancien/actuel/historique, priorité
+du cookie, stockage refusé, lectures et duplication ; ils ne certifient pas un
+stockage navigateur ou une session déployée de bout en bout.
+
 ## Pied de page partagé — MAIR-180
 
 L’audit CI inchangé a détecté la dépendance d’outillage transitive
@@ -51,7 +96,7 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 ## Architecture et traitement des requêtes
 
-Application Next.js 16.3.6, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
+Application Next.js 16.3.8, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.
 
 ```mermaid
 flowchart LR
@@ -59,7 +104,16 @@ flowchart LR
   Next --> BFF["BFF_Project"]
 ```
 
-`src/app/page.tsx` orchestre vues et formulaires. `bffProjectClient.ts` adapte le contrat au modèle de présentation; `projectPageState.ts` centralise la mise à jour de l’état de page. Les composants du dossier `src/components/project` portent les formulaires et détails.
+`src/app/page.tsx` compose le contrôleur stable `useProjectsController` et
+`ProjectsWorkspace`. Le contrôleur conserve état/effets, révisions des lectures
+et gardes synchrones des mutations ; le rendu utilise ses props inférées sans
+lecture supplémentaire ni état métier dupliqué. Les dialogues sont importés
+directement depuis `CreateProjectModal.tsx` et `ProjectDetailModal.tsx`.
+Ordre des hooks, corps des callbacks, focus et protections pendant l'attente
+restent identiques. `bffProjectClient.ts` adapte toujours le contrat et
+`projectPageState.ts` centralise les mises à jour. Les tâches/collaborations du
+détail restent un volet d'audit distinct ; ce découpage ne certifie ni révocation,
+persistance des métadonnées, déploiement ou totalité de MAIR-408.
 
 Le proxy générique lit le contrat OpenAPI versionné pour autoriser chemins et méthodes. Il conserve paramètres de requête, corps binaire, statuts et en-têtes utiles, filtre les en-têtes de transport, désactive le cache et n’effectue pas de suivi automatique des redirections. Son délai est de 15 secondes.
 
@@ -75,7 +129,7 @@ L’état React gère l’affichage et les opérations en cours. Ce dépôt ne d
 
 ## Installation et lancement local
 
-Utiliser Node.js 22 pour reproduire le job de contrats et npm avec le fichier de verrouillage versionné. Les versions des autres jobs et de Docker sont précisées plus bas.
+Utiliser Node.js 24.21.0 (la version épinglée en CI et dans Docker) pour reproduire le job de contrats et npm avec le fichier de verrouillage versionné. Les versions des autres jobs et de Docker sont précisées plus bas.
 
 Les dépendances privées `@mairie360/*` nécessitent un accès GitHub Packages. Configurer `NODE_AUTH_TOKEN` dans l’environnement avec un jeton autorisé à lire ces packages, conformément à `.npmrc`. Ne pas enregistrer la valeur dans Git.
 
@@ -168,7 +222,17 @@ Toutes les réponses portent `X-Frame-Options: DENY`, `X-Content-Type-Options: n
 
 ## Synchronisation et vérifications
 
-Le contrat provient d’une version **publiée** de BFF_Project. Après une publication, épingler la nouvelle version (`npm install --save-exact @mairie360/bff-project-openapi@X.Y.Z`, jamais une préversion `0.0.0-dev`/`staging`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur cette version, puis exécuter :
+La maintenance frontend suivie par l’issue #23 conserve l’override sharp limité
+à Next vers `^0.35.5`, épingle Next et eslint-config-next à `16.3.8` et résout
+source-map-js à `1.2.2`. Le complément du 8 octobre ne change que quatorze
+entrées du verrou liées à Next et source-map ; les versions du contrat Project
+publié et de la bibliothèque UI restent identiques. `tests/image-runtime.test.cjs` vérifie la version chargée
+et verrouillée, librsvg précompilé et une conversion SVG-to-PNG bénigne.
+Conserver le délai npm et l’audit bloquant intégral. L’alerte braces reste
+indépendante. Cette maintenance ne certifie pas
+une image déployée et n’autorise pas la fusion d’une CI en échec.
+
+Le contrat provient d’un paquet **publié** de BFF_Project : une release `X.Y.Z`, ou, tant qu’aucune release n’est coupée, le paquet `0.0.0-dev.<sha>` publié par la CICD pour le commit courant de son `main` (MAIR-509), ou, une fois ce commit livré en staging, le paquet `0.0.0-staging.<sha40>` du même commit, préféré lors d’une release staging pour la lisibilité (MAIR-600 ; jamais `0.0.0-staging.<sha court>` ni une plage). Après un nouveau paquet, l’épingler (`npm install --save-exact @mairie360/bff-project-openapi@<version>`), aligner les tags d’image `bff-project` des `docker-compose*.yml` sur l’image construite depuis le même commit (`X.Y.Z`, `dev-<sha7>` pour un paquet dev, ou `staging-<sha7>` pour un paquet staging, voir `scripts/contract-version.mjs`), puis exécuter :
 
 ```bash
 npm run contracts:sync
@@ -178,19 +242,19 @@ npm run lint
 npm run build
 ```
 
-`contracts:sync` reconstruit `contracts/openapi.json` depuis le paquet installé (`scripts/orval-contract.mjs`). `contracts:check` échoue si la version n’est pas un `X.Y.Z` exact, si le paquet installé diffère, si un autre paquet `bff-*-openapi` existe ou si le snapshot est périmé. Les deux fonctionnent hors ligne. Les types sont importés de `@mairie360/bff-project-openapi/model`. `test:contracts` exécute les tests Node sans coverage ; `npm test` les exécute avec le seuil de 60 % (lignes, branches, fonctions) sur les modules `src/**/*.ts` chargés, rapportés aux lignes TypeScript grâce aux source maps.
+`contracts:sync` reconstruit `contracts/openapi.json` depuis le paquet installé (`scripts/orval-contract.mjs`). `contracts:check` échoue si la version n’est pas une version exacte acceptée, si le paquet installé diffère, si un autre paquet `bff-*-openapi` existe ou si le snapshot est périmé. Les deux fonctionnent hors ligne. Les types sont importés de `@mairie360/bff-project-openapi/model`. `test:contracts` exécute les tests Node sans coverage ; `npm test` les exécute avec le seuil de 60 % (lignes, branches, fonctions) sur les modules `src/**/*.ts` chargés, rapportés aux lignes TypeScript grâce aux source maps.
 
-Les tests reprennent les mocks pilotés par contrat des BFF : `tests/support/contract-mock-server.ts` et `openapi-contract.ts` sont des copies à l’identique des helpers des BFF. Un seul vrai serveur HTTP local simule BFF_Project, piloté par `contracts/openapi.json` ; il refuse tout chemin, méthode, paramètre ou corps hors contrat et valide les réponses simulées. `tests/support/front-harness.cjs` route le `fetch` same-origin du navigateur vers les vrais handlers `src/app/**/route.ts` et n’autorise le proxy serveur qu’à joindre ce mock. `tests/network-contract.test.cjs` inventorie statiquement chaque appel réseau de `src/` et échoue si l’un d’eux contourne `requestBff` ou le contrat. `tests/package-contract.test.cjs` vérifie l’épinglage exact, l’unicité du paquet de contrat, le snapshot et les tags d’image Docker.
+Les tests reprennent les mocks pilotés par contrat des BFF : `tests/support/contract-mock-server.ts` et `openapi-contract.ts` sont des copies à l’identique des helpers des BFF. Un seul vrai serveur HTTP local simule BFF_Project, piloté par `contracts/openapi.json` ; il refuse tout chemin, méthode, paramètre ou corps hors contrat et valide les réponses simulées. `tests/support/front-harness.cjs` route le `fetch` same-origin du navigateur vers les vrais handlers `src/app/**/route.ts` et n’autorise le proxy serveur qu’à joindre ce mock. `tests/network-contract.test.cjs` inventorie statiquement chaque appel réseau de `src/` et échoue si l’un d’eux contourne les opérations générées `bffProject` (axios, acheminé par `requestBff`) ou le contrat. `tests/package-contract.test.cjs` vérifie l’épinglage exact, l’unicité du paquet de contrat, le snapshot et les tags d’image Docker.
 
 Pour une modification uniquement documentaire, vérifier les liens, l’exactitude des deux langues et `git diff --check`; ne pas régénérer les contrats sans modification de leur source.
 
 ## CI/CD et exécution Docker
 
-Le job `contracts.yml` utilise Node.js 22, `actions/checkout@v7` et `actions/setup-node@v7`. Il s’exécute sur push, pull request et lancement manuel; il installe avec `npm ci`, contrôle les contrats et lance les tests dédiés.
+Le job `contracts.yml` utilise Node.js 24.21.0, `actions/checkout@v7` et `actions/setup-node@v7`. Il s’exécute sur pull request, lancement manuel et push vers `main` uniquement (MAIR-436); il installe avec `npm ci`, contrôle les contrats et lance les tests dédiés.
 
-`cicd.yml` appelle `mairie360/CICD/.github/workflows/frontend-cicd.yml@v2.0.0`, avec `cicd_version: v2.0.0` et `node_version: "23"`. Les étapes réutilisables et les environnements GitHub déterminent les contrôles, publications et déploiements effectifs.
+`cicd.yml` appelle `mairie360/CICD/.github/workflows/frontend-cicd.yml` épinglé sur un commit CICD, avec le même `cicd_version` et `node_version: "24.21.0"`. Il s’exécute sur les pull requests, au déclenchement manuel et sur les push vers `main` uniquement ; son jeton est en lecture seule par défaut et seul le job qui appelle le pipeline de release reçoit les droits d’écriture `contents`, `packages` et `id-token` (MAIR-436, `tests/workflow-permissions.test.cjs`). Les étapes réutilisables et les environnements GitHub déterminent les contrôles, publications et déploiements effectifs.
 
-Le Dockerfile utilise par défaut `NODE_VERSION=23.10.0` et le build Next.js `standalone`; la commande de l’image est `["node", "server.js"]`. Le port de l’image et les mappings Compose peuvent différer du port local proposé plus haut.
+Le Dockerfile épingle `NODE_VERSION=24.21.0` (image officielle bookworm-slim épinglée par digest) et le build Next.js `standalone` ; la commande de l’image est `["node", "server.js"]`. Le port de l’image et les mappings Compose peuvent différer du port local proposé plus haut.
 
 Avant un lancement Docker, vérifier les variables de service, les secrets de build et les réseaux dans les fichiers du dépôt. Une CI verte valide ses jobs; elle ne prouve pas la disponibilité des services métier dans un environnement distant.
 
@@ -229,7 +293,7 @@ En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, 
 - [src/app/page.tsx](../../src/app/page.tsx)
 - [src/lib/bffProjectClient.ts](../../src/lib/bffProjectClient.ts)
 - [src/lib/projectPageState.ts](../../src/lib/projectPageState.ts)
-- [src/components/project](../../src/components/project)
+- [src/components/ProjectsWorkspace](../../src/components/ProjectsWorkspace)
 - [src/middleware.ts](../../src/middleware.ts)
 - [src/lib/bff-proxy.ts](../../src/lib/bff-proxy.ts)
 - [src/app/[...path]/route.ts](../../src/app/%5B...path%5D/route.ts)
@@ -243,3 +307,5 @@ En cas d’erreur de proxy, comparer la route et la méthode à l’inventaire, 
 - [docker-compose.yml](../../docker-compose.yml)
 
 Compléments historiques: [BFF.md](../../BFF.md), [BACKEND.md](../../BACKEND.md). Les besoins proposés doivent rester distincts du comportement effectivement implémenté.
+
+Le contrôle de l’ombre calculée accepte les formes CSS valides avec la couleur en début ou en fin, tout en conservant les contraintes de décalage, flou, étalement et couleur. Seul le parseur du test change ; styles du produit et dépendances restent inchangés.

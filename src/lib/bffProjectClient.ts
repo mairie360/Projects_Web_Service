@@ -1,4 +1,10 @@
+import { parseProjectsPageReceipt } from './project-page-receipt';
+import { sessionFetch } from '@mairie360/lib-components/browser';
+import axios, { type AxiosAdapter } from 'axios';
+import { getBffProject } from '@mairie360/bff-project-openapi/endpoints/bffProject';
+import { describeBffProjectError } from './text-constraints';
 import type {
+  GetProjectsPageParams,
   CreateProjectBody as ContractCreateProjectBody,
   CreateTaskBody as ContractCreateTaskBody,
   ProjectDetailsResponse as ContractProjectDetailsResponse,
@@ -18,8 +24,7 @@ import type {
 import {
   clearStoredAuthJwtToken,
   getStoredAuthJwtToken,
-  getStoredAuthorizationHeader,
-  logoutAndReload,
+  navigateToLogin,
   storeAuthJwtToken,
 } from './auth-token';
 import { getPersonValue, type ProjectFormState, type ViewMode } from './projectPageState';
@@ -76,6 +81,15 @@ export class BffProjectError extends Error {
   }
 }
 
+export class BffProjectNavigationRequiredError extends Error {
+  constructor() {
+    super('Une redirection nécessite de rouvrir la page des projets.');
+    this.name = 'BffProjectNavigationRequiredError';
+  }
+}
+
+const navigatingLocations = new WeakSet<Location>();
+
 function uniquePreservingOrder(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
@@ -102,7 +116,7 @@ function normalizeProject<T extends Project>(project: T): T {
   };
 }
 
-function normalizeProjectDetails(details: ProjectDetailsResponse): ProjectDetailsResponse {
+export function normalizeProjectDetails(details: ProjectDetailsResponse): ProjectDetailsResponse {
   const taskItems = details.taskItems.map(normalizeProjectTask);
 
   return {
@@ -111,19 +125,17 @@ function normalizeProjectDetails(details: ProjectDetailsResponse): ProjectDetail
   };
 }
 
-function createQueryString(query?: ProjectsPageQuery) {
-  const params = new URLSearchParams();
+function createQueryParams(query?: ProjectsPageQuery) {
+  const params: Record<string, string> = {};
 
-  if (!query) return '';
+  if (!query) return params;
 
   Object.entries(query).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '') return;
-    params.set(key, String(value));
+    params[key] = String(value);
   });
 
-  const queryString = params.toString();
-
-  return queryString ? `?${queryString}` : '';
+  return params;
 }
 
 export function getStoredBffProjectJwtToken() {
@@ -147,14 +159,6 @@ function createRequestHeaders(init: RequestInit) {
 
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
-  }
-
-  if (!headers.has('Authorization')) {
-    const authorizationHeader = getStoredAuthorizationHeader();
-
-    if (authorizationHeader) {
-      headers.set('Authorization', authorizationHeader);
-    }
   }
 
   return headers;
@@ -185,13 +189,28 @@ async function parseResponseError(response: Response) {
 }
 
 async function requestBff<T>(path: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
+  const response = await sessionFetch(path, {
     ...init,
     headers: createRequestHeaders(init),
+    redirect: 'manual',
   });
 
+  // A superseded filter read must not navigate after its response arrives.
+  init.signal?.throwIfAborted();
+
+  if (response.type === 'opaqueredirect') {
+    // Opaque responses expose neither status nor Location. Reopen the current
+    // protected document so the existing middleware owns Login and return URL.
+    // Never follow a data-route redirect or automatically replay a mutation.
+    if (typeof window !== 'undefined' && !navigatingLocations.has(window.location)) {
+      navigatingLocations.add(window.location);
+      window.location.reload();
+    }
+    throw new BffProjectNavigationRequiredError();
+  }
+
   if (response.status === 401) {
-    await logoutAndReload();
+    navigateToLogin();
     throw new BffProjectError('Votre session a expiré.', 401, 'UNAUTHORIZED');
   }
 
@@ -204,121 +223,117 @@ async function requestBff<T>(path: string, init: RequestInit = {}) {
   return (await response.json()) as T;
 }
 
-export function getBffProjectErrorMessage(error: unknown) {
-  if (error instanceof BffProjectError) return error.message;
-  if (error instanceof Error) return error.message;
+// The generated operations of the published BFF Project contract own every path: axios only carries the
+// request through requestBff, which keeps the same-origin cookie, redirect and 401 handling.
+const contractAdapter: AxiosAdapter = async (config) => {
+  const body = typeof config.data === 'string' ? config.data : undefined;
+  const headers = config.headers.toJSON() as Record<string, string>;
+  // Axios defaults a bodiless POST to a form content type; the BFF contract declares none.
+  if (body === undefined) delete headers['Content-Type'];
 
-  return 'Une erreur inconnue est survenue.';
+  const data = await requestBff<unknown>(axios.getUri(config), {
+    method: (config.method ?? 'get').toUpperCase(),
+    headers,
+    body,
+    signal: (config.signal as AbortSignal | undefined) ?? undefined,
+  });
+
+  return {
+    data,
+    status: data === undefined ? 204 : 200,
+    statusText: data === undefined ? 'No Content' : 'OK',
+    headers: {},
+    config,
+  };
+};
+
+export const bffProject = getBffProject(axios.create({ adapter: contractAdapter, headers: { Accept: 'application/json' } }));
+
+export function getBffProjectErrorMessage(error: unknown) {
+  // A 400 of the BFF lists the refused fields (MAIR-514); other errors keep their message.
+  return describeBffProjectError(error, 'Une erreur inconnue est survenue.');
 }
 
 export async function getProjectsPage(query?: ProjectsPageQuery, signal?: AbortSignal) {
-  const response = await requestBff<ProjectsPageResponse>(`/projects-page${createQueryString(query)}`, { signal });
+  let response: ProjectsPageResponse;
 
-  return {
-    ...response,
-    projects: response.projects.map(normalizeProject),
-  };
+  try {
+    response = (await bffProject.getProjectsPage(createQueryParams(query) as GetProjectsPageParams, { signal })).data as ProjectsPageResponse;
+  } catch (error) {
+    // Axios reports a cancelled read as CanceledError; callers rely on the signal's own AbortError.
+    signal?.throwIfAborted();
+    throw error;
+  }
+
+  return parseProjectsPageReceipt(response, query?.page ?? 1);
 }
 
 export async function getProjectDetails(projectId: string) {
-  return normalizeProjectDetails(await requestBff<ProjectDetailsResponse>(`/projects/${encodeURIComponent(projectId)}`));
+  const { data } = await bffProject.getProjectsProjectId(encodeURIComponent(projectId));
+
+  return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
 export async function createProject(body: CreateProjectBody) {
-  return normalizeProjectDetails(
-    await requestBff<ProjectDetailsResponse>('/projects', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-  );
+  const { data } = await bffProject.postProjects(body);
+
+  return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
 export async function updateProject(projectId: string, body: UpdateProjectBody) {
-  return normalizeProjectDetails(
-    await requestBff<ProjectDetailsResponse>(`/projects/${encodeURIComponent(projectId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    })
-  );
+  const { data } = await bffProject.patchProjectsProjectId(encodeURIComponent(projectId), body);
+
+  return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
 export async function duplicateProject(projectId: string) {
-  return normalizeProjectDetails(
-    await requestBff<ProjectDetailsResponse>(`/projects/${encodeURIComponent(projectId)}/duplicate`, {
-      method: 'POST',
-    })
-  );
+  const { data } = await bffProject.postProjectsProjectIdDuplicate(encodeURIComponent(projectId));
+
+  return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
-export function deleteProject(projectId: string) {
-  return requestBff<void>(`/projects/${encodeURIComponent(projectId)}`, {
-    method: 'DELETE',
-  });
+export async function deleteProject(projectId: string) {
+  await bffProject.deleteProjectsProjectId(encodeURIComponent(projectId));
 }
 
 export async function createProjectTask(projectId: string, body: CreateTaskBody) {
-  return normalizeProjectTask(
-    await requestBff<ProjectTask>(`/projects/${encodeURIComponent(projectId)}/tasks`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-  );
+  const { data } = await bffProject.postProjectsProjectIdTasks(encodeURIComponent(projectId), body);
+
+  return normalizeProjectTask(data as ProjectTask);
 }
 
 export async function updateProjectTask(projectId: string, taskId: string, body: UpdateTaskBody) {
-  return normalizeProjectTask(
-    await requestBff<ProjectTask>(
-      `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-      }
-    )
-  );
+  const { data } = await bffProject.patchProjectsProjectIdTasksTaskId(encodeURIComponent(projectId), encodeURIComponent(taskId), body);
+
+  return normalizeProjectTask(data as ProjectTask);
 }
 
-export async function updateProjectTaskStatus(projectId: string, taskId: string, status: ProjectStatus) {
-  return normalizeProjectTask(
-    await requestBff<ProjectTask>(
-      `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/status`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      }
-    )
-  );
+export async function updateProjectTaskStatus(projectId: string, taskId: string, status: ProjectStatus, statusId?: string) {
+  const { data } = await bffProject.patchProjectsProjectIdTasksTaskIdStatus(encodeURIComponent(projectId), encodeURIComponent(taskId), statusId ? { statusId } : { status });
+
+  return normalizeProjectTask(data as ProjectTask);
 }
 
-export function deleteProjectTask(projectId: string, taskId: string) {
-  return requestBff<void>(
-    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`,
-    { method: 'DELETE' }
-  );
+export async function deleteProjectTask(projectId: string, taskId: string) {
+  await bffProject.deleteProjectsProjectIdTasksTaskId(encodeURIComponent(projectId), encodeURIComponent(taskId));
 }
 
 export async function closeProject(projectId: string, status: 'done' | 'review') {
-  return normalizeProjectDetails(
-    await requestBff<ProjectDetailsResponse>(`/projects/${encodeURIComponent(projectId)}/close`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    })
-  );
+  const { data } = await bffProject.patchProjectsProjectIdClose(encodeURIComponent(projectId), { status });
+
+  return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
-export function getTaskCollaboration(projectId: string, taskId: string) {
-  return requestBff<TaskCollaboration>(
-    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/collaboration`
-  );
+export async function getTaskCollaboration(projectId: string, taskId: string) {
+  const { data } = await bffProject.getProjectsProjectIdTasksTaskIdCollaboration(encodeURIComponent(projectId), encodeURIComponent(taskId));
+
+  return data as TaskCollaboration;
 }
 
-export function addTaskComment(projectId: string, taskId: string, message: string) {
-  return requestBff<TaskComment>(
-    `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/comments`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ message }),
-    }
-  );
+export async function addTaskComment(projectId: string, taskId: string, message: string) {
+  const { data } = await bffProject.postProjectsProjectIdTasksTaskIdComments(encodeURIComponent(projectId), encodeURIComponent(taskId), { message });
+
+  return data as TaskComment;
 }
 
 export function mergeProjectDetails(details: ProjectDetailsResponse): Project {
@@ -363,6 +378,7 @@ export function taskBodyFromDraft(task: ProjectTaskDraft): CreateTaskBody {
   return {
     title: task.title.trim(),
     status: task.status,
+    ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,
     responsibleId,
     assigneeIds: uniquePreservingOrder([responsibleId, ...assigneeIds]),
