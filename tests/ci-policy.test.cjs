@@ -249,3 +249,18 @@ test('MAIR-316: the RGAA stack passes plain values, never backslash-escaped quot
   // so its auth rate limit stayed on.
   assert.doesNotMatch(read('docker-compose-accessibility.yml'), /: \\"/);
 });
+
+test('MAIR-769: no docker stack passes backslash-escaped quotes to a service', () => {
+  // `AUTH_RATE_LIMIT_ENABLED: \"false\"` in the dev, ZAP and k6 stacks reached BFF User as the
+  // text \"false\", so its login rate limit stayed on and repeated logins ended in 429.
+  const { readdirSync } = require('node:fs');
+  const stacks = readdirSync(join(__dirname, '..')).filter(file => /^docker-compose.*\.ya?ml$/.test(file));
+  for (const file of ['docker-compose.yml', 'docker-compose-security.yml', 'docker-compose-performance.yml', 'docker-compose-accessibility.yml']) {
+    assert.ok(stacks.includes(file), file);
+  }
+  for (const file of stacks) {
+    assert.doesNotMatch(read(file), /: \\"/, file);
+    const env = yaml.load(read(file)).services?.['bff-user']?.environment;
+    if (env && 'AUTH_RATE_LIMIT_ENABLED' in env) assert.equal(env.AUTH_RATE_LIMIT_ENABLED, 'false', file);
+  }
+});
