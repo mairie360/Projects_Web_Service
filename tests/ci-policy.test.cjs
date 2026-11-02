@@ -274,3 +274,16 @@ test('MAIR-769: no docker stack passes backslash-escaped quotes to a service', (
     assert.equal(String(environment(bffUser.environment).AUTH_RATE_LIMIT_ENABLED), 'false', file);
   }
 });
+
+test('GHSA-mrwp-f3q8-3g9p: the lock resolves follow-redirects to a patched release', () => {
+  // follow-redirects 1.16.0 - 1.16.1 (through axios) let custom credentials follow cross-origin
+  // redirects; npm audit --omit=dev fails on it.
+  const { packages } = JSON.parse(read('package-lock.json'));
+  const copies = Object.entries(packages).filter(([path]) => path.endsWith('node_modules/follow-redirects'));
+  assert.ok(copies.length > 0, 'follow-redirects is in the lock');
+  for (const [path, { version }] of copies) {
+    const [major, minor, patch] = version.split('.').map(Number);
+    assert.ok(major > 1 || (major === 1 && (minor > 16 || (minor === 16 && patch >= 2))), `${path} ${version}`);
+  }
+});
+
