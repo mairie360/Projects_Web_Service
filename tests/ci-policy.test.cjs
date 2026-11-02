@@ -249,3 +249,28 @@ test('MAIR-316: the RGAA stack passes plain values, never backslash-escaped quot
   // so its auth rate limit stayed on.
   assert.doesNotMatch(read('docker-compose-accessibility.yml'), /: \\"/);
 });
+
+test('MAIR-769: no docker stack passes backslash-escaped quotes to a service', () => {
+  // `AUTH_RATE_LIMIT_ENABLED: \"false\"` in the dev, ZAP and k6 stacks reached BFF User as the
+  // text \"false\", so its login rate limit stayed on and repeated logins ended in 429.
+  const { readdirSync } = require('node:fs');
+  const stacks = readdirSync(join(__dirname, '..')).filter(file => /^docker-compose.*\.ya?ml$/.test(file));
+  // Compose accepts both `KEY: value` maps and `- KEY=value` lists.
+  const environment = env => Array.isArray(env)
+    ? Object.fromEntries(env.map(entry => { const at = String(entry).indexOf('='); return at < 0 ? [entry, undefined] : [entry.slice(0, at), entry.slice(at + 1)]; }))
+    : env ?? {};
+  for (const file of stacks) {
+    for (const [name, service] of Object.entries(yaml.load(read(file)).services ?? {})) {
+      for (const [key, value] of Object.entries(environment(service.environment))) {
+        assert.doesNotMatch(String(value ?? ''), /\\"/, `${file} ${name}.${key}`);
+      }
+    }
+  }
+  // BFF User defaults the limit to on: each stack must turn it off explicitly.
+  for (const file of ['docker-compose.yml', 'docker-compose-security.yml', 'docker-compose-performance.yml', 'docker-compose-accessibility.yml']) {
+    assert.ok(stacks.includes(file), file);
+    const bffUser = yaml.load(read(file)).services?.['bff-user'];
+    assert.ok(bffUser, `${file} runs bff-user`);
+    assert.equal(String(environment(bffUser.environment).AUTH_RATE_LIMIT_ENABLED), 'false', file);
+  }
+});
