@@ -1,49 +1,53 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "a0f7eec2b368e69cb4bc3fa7989fe4e3f6d1e3c6", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-11-02 20:01 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
+<!-- release-journal-state {"dev": "3329c04488ec643aba217b76a96fc4febc7ada41", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-11-02 23:03 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.2.0 | `214ddfa` | 2026-10-21 11:15 UTC |
 | staging | — | `214ddfa` | 2026-10-21 11:12 UTC |
-| dev | — | `a0f7eec` | 2026-11-02 20:01 UTC |
+| dev | — | `3329c04` | 2026-11-02 23:03 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.2.0)
 
 #### Changements de comportement
-- Le retour affiché après la création d'un projet est désormais une alerte inline de la lib (`Alert`, fermable, rôle status/alert). Un `Toast` isolé hors `ToastProvider` n'est plus annoncé. Le board vide utilise `DataState`, et les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- L'en-tête, la barre latérale et le pied de page viennent de `@mairie360/lib-components/shell` (`AccessibleShell`). Les fichiers locaux `accessible-shell.tsx` et `desktop-navigation.tsx` sont supprimés. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La coque de l'application (barre latérale, barre supérieure, pied de page) vient désormais de `@mairie360/lib-components/shell`. Les fichiers locaux `desktop-navigation.tsx`, `accessible-shell.tsx` et `sidebar-preference.ts` sont supprimés. (MAIR-578, MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Les messages de retour de page utilisent désormais le `Alert` de la lib (rôle status/alert, fermable). Un `Toast` autonome placé hors d'un `ToastProvider` n'est plus annoncé. Le bouton `primary` retiré devient le `solid` par défaut ; les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. Le tableau de bord vide utilise `DataState`. La confirmation de création de projet passe par le composant `CreateProjectFeedback`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 #### Corrections
-- Stacks docker dev, sécurité (ZAP) et performance (k6) : `AUTH_RATE_LIMIT_ENABLED` était transmis avec des guillemets échappés. BFF User lisait le texte `\"false\"`, le rate limit de connexion restait actif et des connexions répétées pouvaient répondre 429. Maintenant la valeur est `"false"` et le rate limit est désactivé. (MAIR-769, [#321](https://github.com/mairie360/Projects_Web_Service/pull/321))
+- Dans les stacks docker de dev, ZAP et k6 (`docker-compose.yml`, `docker-compose-security.yml`, `docker-compose-performance.yml`), `AUTH_RATE_LIMIT_ENABLED` était transmis avec des antislashs. BFF User lisait le texte `\"false\"`, sa limite de tentatives de connexion restait active et les connexions répétées pouvaient répondre 429. Maintenant la valeur est `false` et la limite est bien désactivée. (MAIR-769, [#321](https://github.com/mairie360/Projects_Web_Service/pull/321))
 
 #### Technique
-- Installation : `postinstall`, `prebuild` et `pretest` n'interrogent plus le service d'avis npm. La vérification amont passe dans `npm run audit:upstream`, lancé chaque jour par `.github/workflows/upstream-advisories.yml`. (MAIR-744, [#326](https://github.com/mairie360/Projects_Web_Service/pull/326))
-- Dépendances : `follow-redirects` 1.16.2 dans le lock ([#323](https://github.com/mairie360/Projects_Web_Service/pull/323)) ; Next.js 16.4.2, Node 24.22.1 et images Docker épinglées par digest ([#314](https://github.com/mairie360/Projects_Web_Service/pull/314)) ; mises à jour TypeScript et de tests (`@testing-library/user-event`, `vitest`, `jsdom`, `playwright-core`) ([#313](https://github.com/mairie360/Projects_Web_Service/pull/313)) ; `@mairie360/lib-components` passe de 0.10.2 à 1.0.3 dans `package.json` ([#309](https://github.com/mairie360/Projects_Web_Service/pull/309)).
-- Workflows CI : mairie360/CICD est épinglé à `82eeb66` (v5.1.1) ; ajout de `ANTHROPIC_WORKSPACE_ID` dans `promote-prod.yml` ([#225](https://github.com/mairie360/Projects_Web_Service/pull/225)). Les bumps Renovate v4.5.0 et v4.12.0 sont antérieurs à ce pin ([#312](https://github.com/mairie360/Projects_Web_Service/pull/312), [#317](https://github.com/mairie360/Projects_Web_Service/pull/317)).
-- Accessibilité RGAA (MAIR-316) : `rgaa.yaml`, `accessibility_test.sh`, `docker-compose-accessibility.yml` et `init-accessibility.sql` ajoutent une stack de test qui joue les états RGAA et écrit `rgaa-report/` ([#225](https://github.com/mairie360/Projects_Web_Service/pull/225)).
-- Checklist RGPD des PR (MAIR-295) : workflow `gdpr-pr.yml` épinglé à mairie360/CICD `v4.12.2`, suivi par Renovate ([#235](https://github.com/mairie360/Projects_Web_Service/pull/235)).
-- Zod vendorisé (MAIR-744 et [#315](https://github.com/mairie360/Projects_Web_Service/pull/315)) : `vendor/zod` avec garde d'intégrité, provenance du bundle et baseline de performance. La description annonce une validation bornée des collections. Le diff visible ne montre pas son usage côté front, donc l'effet runtime reste à vérifier. `productionBrowserSourceMaps` n'est activé que dans la CI de mesure.
-- Refactor ProjectsWorkspace (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309)) : composants découpés en dossiers, avec convention d'arborescence et tests co-localisés. Le diff est tronqué, donc la liste n'est pas exhaustive.
+- CI : `cicd.yml`, `gdpr-pr.yml`, `promote-staging.yml`, `promote-prod.yml` et `dev-dependency-exception.yml` passent sur mairie360/CICD v5.2.2 (contrôles RGPD), avec des tests qui verrouillent ce pin. (MAIR-771, [#327](https://github.com/mairie360/Projects_Web_Service/pull/327))
+- `npm ci` n'interroge plus le service d'avis npm : `postinstall`, `prebuild` et `pretest` ne lancent que le contrôle local, et `npm run audit:upstream` tourne chaque jour dans `upstream-advisories.yml`. (MAIR-744, [#326](https://github.com/mairie360/Projects_Web_Service/pull/326))
+- Mise à jour de `follow-redirects` en 1.16.2 (GHSA-mrwp-f3q8-3g9p) dans le lock, avec un test qui le vérifie. ([#323](https://github.com/mairie360/Projects_Web_Service/pull/323))
+- Ajout de la checklist RGPD sur les PR (`gdpr-pr.yml`, appel de `gdpr-pr-cicd.yml` en v4.12.2) et de sa règle Renovate. (MAIR-295, [#235](https://github.com/mairie360/Projects_Web_Service/pull/235))
+- Mises à jour Renovate : mairie360/CICD v4.5.0 puis v4.12.0, dépendances TypeScript (`@testing-library/user-event`, `@types/node`, `@vitest/coverage-v8`, `jsdom`, `playwright-core`, `vitest`). ([#312](https://github.com/mairie360/Projects_Web_Service/pull/312), [#317](https://github.com/mairie360/Projects_Web_Service/pull/317), [#313](https://github.com/mairie360/Projects_Web_Service/pull/313))
+- Runtime Node.js 24.22.1 (Dockerfiles, CI, `contracts.yml`) et Next.js / eslint-config-next en 16.4.2. ([#314](https://github.com/mairie360/Projects_Web_Service/pull/314))
+- Verrouillages de dépendances réparés, copie vendored de Zod 3 avec validation bornée des collections, provenance des bundles et de la baseline de performance. ([#315](https://github.com/mairie360/Projects_Web_Service/pull/315))
+- Passage au moteur RGAA (`accessibility_test.sh`, `docker-compose-accessibility.yml`, `init-accessibility.sql`, `rgaa.yaml`) et au pin mairie360/CICD v5.1.1. (MAIR-316, [#225](https://github.com/mairie360/Projects_Web_Service/pull/225))
+- Découpage de `ProjectsWorkspace` en dossiers par composant, avec une convention et des tests qui la vérifient. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
 #### Changements de comportement
-- Le retour affiché après la création d'un projet est désormais une alerte inline de la lib (`Alert`, fermable, rôle status/alert). Un `Toast` isolé hors `ToastProvider` n'est plus annoncé. Le board vide utilise `DataState`, et les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
-- L'en-tête, la barre latérale et le pied de page viennent de `@mairie360/lib-components/shell` (`AccessibleShell`). Les fichiers locaux `accessible-shell.tsx` et `desktop-navigation.tsx` sont supprimés. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- La coque de l'application (barre latérale, barre supérieure, pied de page) vient désormais de `@mairie360/lib-components/shell`. Les fichiers locaux `desktop-navigation.tsx`, `accessible-shell.tsx` et `sidebar-preference.ts` sont supprimés. (MAIR-578, MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
+- Les messages de retour de page utilisent désormais le `Alert` de la lib (rôle status/alert, fermable). Un `Toast` autonome placé hors d'un `ToastProvider` n'est plus annoncé. Le bouton `primary` retiré devient le `solid` par défaut ; les anciens boutons secondaires gardent `variant="outline" tone="neutral"`. Le tableau de bord vide utilise `DataState`. La confirmation de création de projet passe par le composant `CreateProjectFeedback`. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 #### Corrections
-- Stacks docker dev, sécurité (ZAP) et performance (k6) : `AUTH_RATE_LIMIT_ENABLED` était transmis avec des guillemets échappés. BFF User lisait le texte `\"false\"`, le rate limit de connexion restait actif et des connexions répétées pouvaient répondre 429. Maintenant la valeur est `"false"` et le rate limit est désactivé. (MAIR-769, [#321](https://github.com/mairie360/Projects_Web_Service/pull/321))
+- Dans les stacks docker de dev, ZAP et k6 (`docker-compose.yml`, `docker-compose-security.yml`, `docker-compose-performance.yml`), `AUTH_RATE_LIMIT_ENABLED` était transmis avec des antislashs. BFF User lisait le texte `\"false\"`, sa limite de tentatives de connexion restait active et les connexions répétées pouvaient répondre 429. Maintenant la valeur est `false` et la limite est bien désactivée. (MAIR-769, [#321](https://github.com/mairie360/Projects_Web_Service/pull/321))
 
 #### Technique
-- Installation : `postinstall`, `prebuild` et `pretest` n'interrogent plus le service d'avis npm. La vérification amont passe dans `npm run audit:upstream`, lancé chaque jour par `.github/workflows/upstream-advisories.yml`. (MAIR-744, [#326](https://github.com/mairie360/Projects_Web_Service/pull/326))
-- Dépendances : `follow-redirects` 1.16.2 dans le lock ([#323](https://github.com/mairie360/Projects_Web_Service/pull/323)) ; Next.js 16.4.2, Node 24.22.1 et images Docker épinglées par digest ([#314](https://github.com/mairie360/Projects_Web_Service/pull/314)) ; mises à jour TypeScript et de tests (`@testing-library/user-event`, `vitest`, `jsdom`, `playwright-core`) ([#313](https://github.com/mairie360/Projects_Web_Service/pull/313)) ; `@mairie360/lib-components` passe de 0.10.2 à 1.0.3 dans `package.json` ([#309](https://github.com/mairie360/Projects_Web_Service/pull/309)).
-- Workflows CI : mairie360/CICD est épinglé à `82eeb66` (v5.1.1) ; ajout de `ANTHROPIC_WORKSPACE_ID` dans `promote-prod.yml` ([#225](https://github.com/mairie360/Projects_Web_Service/pull/225)). Les bumps Renovate v4.5.0 et v4.12.0 sont antérieurs à ce pin ([#312](https://github.com/mairie360/Projects_Web_Service/pull/312), [#317](https://github.com/mairie360/Projects_Web_Service/pull/317)).
-- Accessibilité RGAA (MAIR-316) : `rgaa.yaml`, `accessibility_test.sh`, `docker-compose-accessibility.yml` et `init-accessibility.sql` ajoutent une stack de test qui joue les états RGAA et écrit `rgaa-report/` ([#225](https://github.com/mairie360/Projects_Web_Service/pull/225)).
-- Checklist RGPD des PR (MAIR-295) : workflow `gdpr-pr.yml` épinglé à mairie360/CICD `v4.12.2`, suivi par Renovate ([#235](https://github.com/mairie360/Projects_Web_Service/pull/235)).
-- Zod vendorisé (MAIR-744 et [#315](https://github.com/mairie360/Projects_Web_Service/pull/315)) : `vendor/zod` avec garde d'intégrité, provenance du bundle et baseline de performance. La description annonce une validation bornée des collections. Le diff visible ne montre pas son usage côté front, donc l'effet runtime reste à vérifier. `productionBrowserSourceMaps` n'est activé que dans la CI de mesure.
-- Refactor ProjectsWorkspace (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309)) : composants découpés en dossiers, avec convention d'arborescence et tests co-localisés. Le diff est tronqué, donc la liste n'est pas exhaustive.
+- CI : `cicd.yml`, `gdpr-pr.yml`, `promote-staging.yml`, `promote-prod.yml` et `dev-dependency-exception.yml` passent sur mairie360/CICD v5.2.2 (contrôles RGPD), avec des tests qui verrouillent ce pin. (MAIR-771, [#327](https://github.com/mairie360/Projects_Web_Service/pull/327))
+- `npm ci` n'interroge plus le service d'avis npm : `postinstall`, `prebuild` et `pretest` ne lancent que le contrôle local, et `npm run audit:upstream` tourne chaque jour dans `upstream-advisories.yml`. (MAIR-744, [#326](https://github.com/mairie360/Projects_Web_Service/pull/326))
+- Mise à jour de `follow-redirects` en 1.16.2 (GHSA-mrwp-f3q8-3g9p) dans le lock, avec un test qui le vérifie. ([#323](https://github.com/mairie360/Projects_Web_Service/pull/323))
+- Ajout de la checklist RGPD sur les PR (`gdpr-pr.yml`, appel de `gdpr-pr-cicd.yml` en v4.12.2) et de sa règle Renovate. (MAIR-295, [#235](https://github.com/mairie360/Projects_Web_Service/pull/235))
+- Mises à jour Renovate : mairie360/CICD v4.5.0 puis v4.12.0, dépendances TypeScript (`@testing-library/user-event`, `@types/node`, `@vitest/coverage-v8`, `jsdom`, `playwright-core`, `vitest`). ([#312](https://github.com/mairie360/Projects_Web_Service/pull/312), [#317](https://github.com/mairie360/Projects_Web_Service/pull/317), [#313](https://github.com/mairie360/Projects_Web_Service/pull/313))
+- Runtime Node.js 24.22.1 (Dockerfiles, CI, `contracts.yml`) et Next.js / eslint-config-next en 16.4.2. ([#314](https://github.com/mairie360/Projects_Web_Service/pull/314))
+- Verrouillages de dépendances réparés, copie vendored de Zod 3 avec validation bornée des collections, provenance des bundles et de la baseline de performance. ([#315](https://github.com/mairie360/Projects_Web_Service/pull/315))
+- Passage au moteur RGAA (`accessibility_test.sh`, `docker-compose-accessibility.yml`, `init-accessibility.sql`, `rgaa.yaml`) et au pin mairie360/CICD v5.1.1. (MAIR-316, [#225](https://github.com/mairie360/Projects_Web_Service/pull/225))
+- Découpage de `ProjectsWorkspace` en dossiers par composant, avec une convention et des tests qui la vérifient. (MAIR-608, [#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
 ## Différence staging → prod (en staging, pas encore en prod)
 
@@ -54,6 +58,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-02 23:03 UTC | dev | — | `3329c04` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/41540174278) |
 | 2026-11-02 20:01 UTC | dev | — | `a0f7eec` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/41513031355) |
 | 2026-11-02 18:21 UTC | dev | — | `ecb0212` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/41470585937) |
 | 2026-10-23 13:12 UTC | dev | — | `ff7d225` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/39957552979) |
