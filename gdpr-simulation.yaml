@@ -1,0 +1,40 @@
+# GDPR usage simulation of the projects front (MAIR-497), played by mairie360/CICD
+# tests/gdpr/simulation on the test stack only (docker-compose-gdpr-simulation.yml,
+# gdpr_simulation_test.sh; format: CICD README, "GDPR simulation").
+#
+# Fictitious personas with unique values go through gdpr-journey.yaml on the front's origin: their
+# names, e-mails and phone numbers are written in projects, tasks, labels and comments, in query
+# strings and in deliberate errors. Their projects are then opened in the browser (board, table and
+# grid views, searches naming them): what the front prints in the browser console or keeps in
+# localStorage / sessionStorage, the requests and cookies of the pages, the logs of every container
+# (front, BFFs, APIs, Postgres, Redis), the Redis keys and the database after the purge are then
+# checked and reviewed (CICD analyze.mjs). The erased persona's task, project and copy are deleted
+# after its pages, the only deletion the front offers.
+version: 1
+journey: gdpr-journey.yaml
+personas: 4
+erased: 1
+erase:
+  - name: delete the persona's task
+    request: {method: DELETE, path: "/projects/{{project_id}}/tasks/{{task_id}}", headers: &session {Cookie: "accessToken={{env.ADMIN_JWT}}", Origin: "http://projects-front:5001"}}
+    expect: [204]
+  - name: delete the persona's project
+    request: {method: DELETE, path: "/projects/{{project_id}}", headers: *session}
+    expect: [204]
+  - name: delete the copy of the persona's project
+    request: {method: DELETE, path: "/projects/{{copy_id}}", headers: *session}
+    expect: [204]
+  - name: the persona's project is gone
+    request: {method: GET, path: "/projects/{{project_id}}", headers: *session}
+    expect: [404]
+browser:
+  target: http://projects-front:5001
+  # Session of the journey: the front relays it to bff-project as a Bearer token.
+  cookies: {accessToken: "{{env.ADMIN_JWT}}"}
+  pages:
+    - name: board searching the persona
+      path: "/?q={{marker.last_name}}"
+    - name: table searching the persona's e-mail
+      path: "/?view=table&q={{marker.email}}"
+    - name: grid of every project
+      path: "/?view=grid"
