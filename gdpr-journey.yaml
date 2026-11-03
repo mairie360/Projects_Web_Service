@@ -1,0 +1,112 @@
+# GDPR usage simulation journey of the projects front (MAIR-497), played by mairie360/CICD
+# tests/gdpr/simulation for every persona of gdpr-simulation.yaml (gdpr-marker.yaml format of
+# MAIR-290).
+#
+# The journey of BFF_Project's log marker test, sent to the front's own origin: the same-origin
+# proxy (src/lib/bff-proxy.ts) relays it to bff-project with the accessToken cookie as a Bearer
+# token, as for the browser, so the logs of the front see the persona's values in the bodies, the
+# query strings and the deliberate errors. The project and the task are kept: the pages of
+# gdpr-simulation.yaml display them, and only the erased personas' ones are deleted (erase steps).
+version: 1
+target: http://projects-front:5001
+wait: /
+# Session of the run (sub=1, the seeded admin), signed by gdpr_simulation_test.sh.
+env: [ADMIN_JWT]
+steps:
+  - name: create a project naming the marker
+    request:
+      method: POST
+      path: /projects
+      # The proxy forwards only same-origin requests (Origin of PROJECT_FRONT_URL) and turns the
+      # accessToken cookie into a Bearer token; the next steps reuse these headers (*session).
+      headers: &session {Cookie: "accessToken={{env.ADMIN_JWT}}", Origin: "http://projects-front:5001"}
+      json:
+        title: "Move of {{marker.first_name}} {{marker.last_name}}"
+        description: "Reach {{marker.last_name}} at {{marker.phone}} or {{marker.email}}"
+        status: todo
+        priority: high
+        responsibleId: user-1
+        assigneeIds: [user-1]
+        labels: ["{{marker.last_name}}"]
+        dueDate: "2030-12-31T00:00:00Z"
+    expect: [201]
+    capture:
+      project_id: body.project.id
+  - name: create a project with a refused title (deliberate error)
+    request:
+      method: POST
+      path: /projects
+      headers: *session
+      json: {title: "<{{marker.last_name}}>", description: "{{marker.email}}", status: todo, priority: high, responsibleId: user-1, assigneeIds: [], labels: [], dueDate: "2030-12-31T00:00:00Z"}
+    expect: [400]
+  - name: create a project with a responsible of the wrong form (deliberate error)
+    request:
+      method: POST
+      path: /projects
+      headers: *session
+      json: {title: "Project {{marker.first_name}}", description: "x", status: todo, priority: high, responsibleId: "{{marker.email}}", assigneeIds: [], labels: [], dueDate: "{{marker.phone}}"}
+    expect: [400]
+  - name: search the projects for the marker (query string)
+    request: {method: GET, path: "/projects-page?q={{marker.last_name}}&view=table&page=1&limit=20", headers: *session}
+  - name: search the projects with a refused status (deliberate error, query string)
+    request: {method: GET, path: "/projects-page?q={{marker.email}}&status={{marker.first_name}}", headers: *session}
+    expect: [400]
+  - name: add a task naming the marker
+    request:
+      method: POST
+      path: "/projects/{{project_id}}/tasks"
+      headers: *session
+      json: {title: "Call {{marker.first_name}} at {{marker.phone}}", status: todo, priority: medium, responsibleId: user-1, assigneeIds: [user-1], labels: ["{{marker.email}}"], dueDate: "2030-12-31T00:00:00Z"}
+    expect: [201]
+    capture:
+      task_id: body.id
+  - name: comment the task with the marker
+    request:
+      method: POST
+      path: "/projects/{{project_id}}/tasks/{{task_id}}/comments"
+      headers: *session
+      json: {message: "Done with {{marker.first_name}} {{marker.last_name}}, {{marker.email}}"}
+    expect: [201]
+  - name: comment the task with a refused message (deliberate error)
+    request:
+      method: POST
+      path: "/projects/{{project_id}}/tasks/{{task_id}}/comments"
+      headers: *session
+      json: {message: "<{{marker.phone}}>"}
+    expect: [400]
+  - name: read the task collaboration
+    request: {method: GET, path: "/projects/{{project_id}}/tasks/{{task_id}}/collaboration", headers: *session}
+  - name: update the task with the marker
+    request:
+      method: PATCH
+      path: "/projects/{{project_id}}/tasks/{{task_id}}"
+      headers: *session
+      json: {title: "Call {{marker.last_name}} at {{marker.phone}}"}
+  - name: set an unknown task status (deliberate error)
+    request:
+      method: PATCH
+      path: "/projects/{{project_id}}/tasks/{{task_id}}/status"
+      headers: *session
+      json: {status: "{{marker.last_name}}"}
+    expect: [400]
+  - name: update the project with the marker
+    request:
+      method: PATCH
+      path: "/projects/{{project_id}}"
+      headers: *session
+      json: {description: "New contact {{marker.email}}, {{marker.phone}}"}
+  - name: update a project that does not exist (deliberate error)
+    request:
+      method: PATCH
+      path: /projects/999999
+      headers: *session
+      json: {description: "Contact {{marker.email}}"}
+    expect: [400, 404]
+  - name: duplicate the project
+    request: {method: POST, path: "/projects/{{project_id}}/duplicate", headers: *session}
+    expect: [201]
+    capture:
+      copy_id: body.project.id
+  - name: read the projects with an invalid token (deliberate error)
+    request: {method: GET, path: "/projects-page?view=table", headers: {Cookie: "accessToken={{marker.password}}", Origin: "http://projects-front:5001"}}
+    expect: [401]
