@@ -160,7 +160,11 @@ services:
       - backend
 
   project-api:
-    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:1.2.0}
+    # Newest Project API build that still accepts the HS256 session of this stack (main before
+    # MAIR-680, mairie360_api_lib 4.2.0): its access log no longer writes the query string, which
+    # 1.2.0 did (`?search=<name>`, a blocking leak of the GDPR simulation). The MAIR-680 builds only
+    # accept Core's EdDSA tokens, which the rest of this stack does not sign yet.
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:dev-7979c87}
     container_name: projects-front-sim-project-api
     depends_on:
       liquibase:
