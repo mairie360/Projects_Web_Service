@@ -6,7 +6,7 @@ const yaml = require('js-yaml');
 
 const read = file => readFileSync(join(__dirname, '..', file), 'utf8');
 const cicdCommit = /frontend-cicd\.yml@([a-f0-9]{40})/.exec(read('.github/workflows/cicd.yml'))[1];
-const digest = '0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6';
+const digest = '55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205';
 
 test('production and development install the lock with a required ephemeral secret and readonly npm policy', () => {
   for (const file of ['Dockerfile', 'development.Dockerfile']) {
@@ -25,12 +25,12 @@ test('production and development install the lock with a required ephemeral secr
 test('production, development and both consumer workflows pin the same exact official Node LTS', () => {
   for (const file of ['Dockerfile', 'development.Dockerfile']) {
     const dockerfile = read(file);
-    assert.match(dockerfile, /^ARG NODE_VERSION=24\.21\.0$/m);
+    assert.match(dockerfile, /^ARG NODE_VERSION=24\.22\.1$/m);
     const images = [...dockerfile.matchAll(/^FROM node:\$\{NODE_VERSION\}-bookworm-slim@sha256:([a-f0-9]{64}) AS ([\w-]+)$/gm)];
     assert.deepEqual(images.map(([, sha]) => sha), file === 'Dockerfile' ? [digest, digest] : [digest]);
   }
-  assert.match(read('.github/workflows/cicd.yml'), /node_version: "24\.21\.0"/);
-  assert.match(read('.github/workflows/contracts.yml'), /node-version: '24\.21\.0'/);
+  assert.match(read('.github/workflows/cicd.yml'), /node_version: "24\.22\.1"/);
+  assert.match(read('.github/workflows/contracts.yml'), /node-version: '24\.22\.1'/);
 });
 
 test('production keeps the non-root standalone Node and curl runtime without unused package managers', () => {
@@ -51,7 +51,7 @@ test('production keeps the non-root standalone Node and curl runtime without unu
 
 test('Docker excludes local environments and artifacts while retaining tracked npm policy', () => {
   const patterns = read('.dockerignore').split(/\r?\n/).map(line => line.trim());
-  for (const item of ['node_modules', '.next', '.git', '.env*', '.npmrc.*', 'cicd-repo', 'coverage', 'test-results', 'playwright-report']) assert.ok(patterns.includes(item), item);
+  for (const item of ['node_modules', '.next', '.git', '.env*', '.npmrc.*', 'cicd-repo', 'rgaa-report', '.rgaa-ai-cache', 'rgaa.yaml', 'accessibility_test.sh', 'init-accessibility.sql', 'coverage', 'test-results', 'playwright-report']) assert.ok(patterns.includes(item), item);
   assert.ok(!patterns.includes('.npmrc') && !patterns.includes('.npmrc*'));
 });
 
@@ -82,7 +82,7 @@ test('consumer CI retains blocking security defaults and explicit named secrets'
 
 const workflow = () => yaml.load(read('.github/workflows/cicd.yml'));
 const checkout = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1';
-const scannerCommit = '5b7d127d46f95d8951935b6209ca7c2ca857a21d';
+const scannerCommit = '34889930cf42b20020d2e2f702a566ef7ebca1ec';
 
 test('the exact required legacy status executes both real blocking scanners without extra access', () => {
   assert.deepEqual(workflow().jobs.required_security_scan, {
@@ -97,13 +97,13 @@ test('the exact required legacy status executes both real blocking scanners with
         with: { repository: 'mairie360/CICD', ref: scannerCommit, path: 'cicd-repo', 'persist-credentials': false },
       },
       {
-        name: 'Run blocking Semgrep scan', uses: './cicd-repo/actions/frontend-semgrep-pypi',
+        name: 'Run blocking Semgrep scan', uses: './cicd-repo/actions/security/semgrep-pypi',
         with: {
           config: 'p/typescript p/react p/owasp-top-ten p/secrets p/dockerfile p/github-actions',
           fail_on_findings: 'true', artifact_name: 'semgrep-required-check-sarif',
         },
       },
-      { name: 'Run blocking redacted Gitleaks scan', uses: './cicd-repo/actions/frontend-gitleaks', with: { fail_on_findings: 'true' } },
+      { name: 'Run blocking redacted Gitleaks scan', uses: './cicd-repo/actions/security/gitleaks-binary', with: { fail_on_findings: 'true' } },
     ],
   });
 });
@@ -112,7 +112,7 @@ test('the existing reusable frontend workflow keeps its blocking defaults and on
   assert.deepEqual(workflow().jobs.CICD, {
     permissions: { contents: 'write', packages: 'write', 'id-token': 'write' },
     uses: `mairie360/CICD/.github/workflows/frontend-cicd.yml@${cicdCommit}`,
-    with: { package_name: 'projects-front', node_version: '24.21.0', cicd_version: cicdCommit },
+    with: { package_name: 'projects-front', node_version: '24.22.1', cicd_version: cicdCommit },
     secrets: {
       CODECOV_TOKEN: '${{ secrets.CODECOV_TOKEN }}',
       N8N_WEBHOOK_SECRET: '${{ secrets.N8N_WEBHOOK_SECRET }}',
@@ -130,3 +130,160 @@ test('the required scan runs for every existing workflow event with a read-only 
   assert.deepEqual(ci.permissions, { contents: 'read' });
   assert.deepEqual(Object.keys(ci.jobs).sort(), ['CICD', 'required_security_scan']);
 });
+
+test('MAIR-316: the RGAA stack runs the image under test and the script builds it with a secret only', () => {
+  const compose = read('docker-compose-accessibility.yml');
+  const frontend = compose.split('  projects-front:\n')[1]?.split('\n  a11y:')[0];
+  assert.ok(frontend, 'docker-compose-accessibility.yml must keep the frontend service');
+  // promote-prod.yml exports IMAGE_REF=<image>@<staging digest>: the stack never rebuilds it.
+  assert.match(frontend, /image: \$\{IMAGE_REF:\?/);
+  assert.doesNotMatch(frontend, /build:|args:|NODE_AUTH_TOKEN|\/run\/secrets/);
+  const code = compose.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
+  assert.doesNotMatch(code, /NODE_AUTH_TOKEN|\bbuild-arg\b/);
+  // The ZAP / k6 data stay as they are: the RGAA states get their own seed, loaded after it.
+  assert.match(compose, /- \.\/init-test\.sql:\/init-test\.sql:ro/);
+  assert.match(compose, /- \.\/init-accessibility\.sql:\/init-accessibility\.sql:ro/);
+  for (const file of ['docker-compose-security.yml', 'docker-compose-performance.yml']) {
+    assert.doesNotMatch(read(file), /init-accessibility\.sql|IMAGE_REF/, file);
+  }
+  const shell = read('accessibility_test.sh');
+  assert.match(shell, /docker build -t projects-front:local --secret id=node_auth_token,env=NODE_AUTH_TOKEN \./);
+  assert.doesNotMatch(shell, /--build-arg|up -d --build/);
+});
+
+test('MAIR-316: the RGAA seed users have no plaintext password (chk_users_password_hashed)', () => {
+  // Comments out, then every `INSERT INTO users (columns) VALUES (...), (...)`: the password column
+  // (wherever it sits) must be NULL or an argon2id hash.
+  const seed = read('init-accessibility.sql').replace(/--[^\n]*/g, '');
+  const inserts = [...seed.matchAll(/INSERT INTO users \(([^)]*)\)\s*VALUES([\s\S]*?)(?:ON CONFLICT|;)/g)];
+  assert.ok(inserts.length > 0, 'init-accessibility.sql must insert its users');
+  for (const [, columns, values] of inserts) {
+    const index = columns.split(',').map((column) => column.trim()).indexOf('password');
+    assert.ok(index >= 0, 'the users insert names the password column');
+    for (const [row] of values.matchAll(/\([^()]*\)/g)) {
+      const password = row.slice(1, -1).split(',')[index]?.trim();
+      assert.ok(password === 'NULL' || /^'\$argon2id\$/.test(password), `password must be NULL or an argon2id hash: ${row}`);
+    }
+  }
+});
+
+test('MAIR-316: accessibility_test.sh fetches the RGAA engine at a pinned commit SHA, not only a tag', () => {
+  const shell = read('accessibility_test.sh');
+  // `git clone --branch` refuses a SHA, and cicd.yml pins mairie360/CICD by SHA.
+  assert.doesNotMatch(shell, /git clone[^\n]*--branch/);
+  assert.match(shell, /git -C "\$CICD_DIR" fetch --quiet --depth 1 https:\/\/github\.com\/mairie360\/CICD "\$CICD_VERSION"/);
+  assert.match(shell, /checkout --quiet FETCH_HEAD/);
+});
+
+test('MAIR-316: promote-prod passes the secrets of the RGAA AI pre-audit by name', () => {
+  const workflow = read('.github/workflows/promote-prod.yml');
+  assert.doesNotMatch(workflow, /secrets:\s*inherit/);
+  assert.match(workflow, /^\s+stack: fronts\s*$/m);
+  for (const name of ['ANTHROPIC_API_KEY', 'ANTHROPIC_WORKSPACE_ID']) {
+    assert.match(workflow, new RegExp(`^ {6}${name}: \\$\\{\\{ secrets\\.${name} \\}\\}\\s*$`, 'm'), name);
+  }
+});
+
+test('MAIR-316: a local engine copy is fetched again when the cicd_version pin changes', () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: readAbs, existsSync, rmSync } = require('node:fs');
+  const { execFileSync } = require('node:child_process');
+  const { tmpdir } = require('node:os');
+  const shell = read('accessibility_test.sh');
+  const block = shell.slice(shell.indexOf('CICD_DIR="cicd-repo"'), shell.indexOf('A11Y_RUNNER_IMAGE="$(cat'));
+  const run = (setup, githubActions = '') => {
+    const dir = mkdtempSync(join(tmpdir(), 'rgaa-ref-'));
+    try {
+      mkdirSync(join(dir, '.github/workflows'), { recursive: true });
+      writeFileSync(join(dir, '.github/workflows/cicd.yml'), '      cicd_version: "new-sha" # v9.9.9\n');
+      mkdirSync(join(dir, 'bin'));
+      // Fake git: records the calls; `checkout` lays out the engine like a real fetch would.
+      writeFileSync(join(dir, 'bin/git'), '#!/bin/sh\necho "$*" >> "$LOG"\ncase "$*" in *checkout*) mkdir -p cicd-repo/tests/a11y && touch cicd-repo/tests/a11y/run.sh;; esac\n', { mode: 0o755 });
+      setup(dir);
+      execFileSync('bash', ['-c', block], { cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, LOG: join(dir, 'git.log'), CICD_VERSION: '', GITHUB_ACTIONS: githubActions } });
+      const log = existsSync(join(dir, 'git.log')) ? readAbs(join(dir, 'git.log'), 'utf8') : '';
+      const ref = existsSync(join(dir, 'cicd-repo/.rgaa-ref')) ? readAbs(join(dir, 'cicd-repo/.rgaa-ref'), 'utf8').trim() : null;
+      return { log, ref };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  const engine = (dir, ref) => {
+    mkdirSync(join(dir, 'cicd-repo/tests/a11y'), { recursive: true });
+    writeFileSync(join(dir, 'cicd-repo/tests/a11y/run.sh'), '');
+    if (ref) writeFileSync(join(dir, 'cicd-repo/.rgaa-ref'), `${ref}\n`);
+  };
+  // No copy: fetched at the pin, which is recorded.
+  assert.deepEqual(run(() => {}).ref, 'new-sha');
+  // A copy fetched for an older pin: fetched again.
+  const stale = run((dir) => engine(dir, 'old-sha'));
+  assert.match(stale.log, /fetch --quiet --depth 1 https:\/\/github\.com\/mairie360\/CICD new-sha/);
+  assert.equal(stale.ref, 'new-sha');
+  // Same pin: reused.
+  assert.equal(run((dir) => engine(dir, 'new-sha')).log, '');
+  // No marker: the CI's own checkout is reused in GitHub Actions; locally it is fetched again.
+  assert.equal(run((dir) => engine(dir, null), 'true').log, '');
+  assert.equal(run((dir) => engine(dir, null)).ref, 'new-sha');
+});
+
+test('MAIR-316: the RGAA stack has its own project name and bounded readiness loops', () => {
+  const compose = read('docker-compose-accessibility.yml');
+  // The default project name (the folder) is shared with docker-compose.yml: `down -v` would
+  // delete the dev stack's postgres-data / redis-data volumes.
+  assert.match(compose, /^name: projects-front-a11y$/m);
+  // An upstream that never starts must fail `up`, not hang it.
+  assert.doesNotMatch(compose, /sh -c 'until curl/);
+  for (const [, loop] of compose.matchAll(/sh -c '(i=0; until curl[\s\S]*?)'\n/g)) {
+    assert.match(loop, /if \[ \$\$i -ge \d+ \]; then echo "[^"]+"; exit 1; fi;/);
+  }
+});
+
+test('MAIR-316: each accessibility run starts from an empty report', () => {
+  const shell = read('accessibility_test.sh');
+  const clear = shell.indexOf('rm -rf rgaa-report\n');
+  assert.ok(clear >= 0, 'accessibility_test.sh clears rgaa-report/');
+  assert.ok(clear < shell.indexOf('docker compose -f "$COMPOSE_FILE" up'), 'before the stack starts');
+});
+
+test('MAIR-316: the RGAA stack passes plain values, never backslash-escaped quotes', () => {
+  // A plain YAML scalar keeps backslashes: `\"false\"` reached BFF User as the text \"false\",
+  // so its auth rate limit stayed on.
+  assert.doesNotMatch(read('docker-compose-accessibility.yml'), /: \\"/);
+});
+
+test('MAIR-769: no docker stack passes backslash-escaped quotes to a service', () => {
+  // `AUTH_RATE_LIMIT_ENABLED: \"false\"` in the dev, ZAP and k6 stacks reached BFF User as the
+  // text \"false\", so its login rate limit stayed on and repeated logins ended in 429.
+  const { readdirSync } = require('node:fs');
+  const stacks = readdirSync(join(__dirname, '..')).filter(file => /^docker-compose.*\.ya?ml$/.test(file));
+  // Compose accepts both `KEY: value` maps and `- KEY=value` lists.
+  const environment = env => Array.isArray(env)
+    ? Object.fromEntries(env.map(entry => { const at = String(entry).indexOf('='); return at < 0 ? [entry, undefined] : [entry.slice(0, at), entry.slice(at + 1)]; }))
+    : env ?? {};
+  for (const file of stacks) {
+    for (const [name, service] of Object.entries(yaml.load(read(file)).services ?? {})) {
+      for (const [key, value] of Object.entries(environment(service.environment))) {
+        assert.doesNotMatch(String(value ?? ''), /\\"/, `${file} ${name}.${key}`);
+      }
+    }
+  }
+  // BFF User defaults the limit to on: each stack must turn it off explicitly.
+  for (const file of ['docker-compose.yml', 'docker-compose-security.yml', 'docker-compose-performance.yml', 'docker-compose-accessibility.yml']) {
+    assert.ok(stacks.includes(file), file);
+    const bffUser = yaml.load(read(file)).services?.['bff-user'];
+    assert.ok(bffUser, `${file} runs bff-user`);
+    assert.equal(String(environment(bffUser.environment).AUTH_RATE_LIMIT_ENABLED), 'false', file);
+  }
+});
+
+test('GHSA-mrwp-f3q8-3g9p: the lock resolves follow-redirects to a patched release', () => {
+  // follow-redirects 1.16.0 - 1.16.1 (through axios) let custom credentials follow cross-origin
+  // redirects; npm audit --omit=dev fails on it.
+  const { packages } = JSON.parse(read('package-lock.json'));
+  const copies = Object.entries(packages).filter(([path]) => path.endsWith('node_modules/follow-redirects'));
+  assert.ok(copies.length > 0, 'follow-redirects is in the lock');
+  for (const [path, { version }] of copies) {
+    const [major, minor, patch] = version.split('.').map(Number);
+    assert.ok(major > 1 || (major === 1 && (minor > 16 || (minor === 16 && patch >= 2))), `${path} ${version}`);
+  }
+});
+

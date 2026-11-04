@@ -1,0 +1,338 @@
+# RGAA accessibility stack of the Projects front (MAIR-316), run by accessibility_test.sh and by the
+# rgaa job of mairie360/CICD promote-prod.yml (IMAGE_REF=<image>@<staging digest>).
+#
+# Same upstream chain as docker-compose-security.yml, plus init-accessibility.sql (seeder-a11y) for the RGAA states,
+# the front on ${IMAGE_REF} and the RGAA runner of mairie360/CICD (cicd-repo/tests/a11y) instead of
+# ZAP. It plays the states of rgaa.yaml with a JWT signed by the engine and writes rgaa-report/.
+
+# Own project name: the default one (the folder) is shared with docker-compose.yml, whose
+# postgres-data / redis-data volumes `down -v` would otherwise delete.
+name: projects-front-a11y
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  backend:
+
+x-db-env: &db-env
+  DB_TYPE: postgres
+  DB_NAME: mairie_360_database
+  DB_USER: postgres
+  DB_PASSWORD: password
+  DB_HOST: postgres
+  DB_PORT: 5432
+
+# JWT_SECRET identique sur toute la chaîne : le cookie accessToken du front est
+# relayé tel quel (Bearer) à BFF_Project, seul BFF de ce front, puis à BFF User et aux APIs.
+x-api-env: &api-env
+  <<: *db-env
+  HOST: "0.0.0.0"
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: b"secret"
+  JWT_TIMEOUT: 3600
+
+services:
+  postgres:
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:3.3.0}
+    container_name: projects-front-a11y-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mairie_360_database
+    expose:
+      - "5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  liquibase:
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:3.3.0}
+    container_name: projects-front-a11y-liquibase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://postgres:5432/mairie_360_database
+      LIQUIBASE_COMMAND_USERNAME: postgres
+      LIQUIBASE_COMMAND_PASSWORD: password
+      LIQUIBASE_SEARCH_PATH: /migrations
+    # Database >= MAIR-413 only seeds the template admin (users.id = 1) with -Dallow_template_admin=true;
+    # without it the migration fails on a fresh database. Test / dev stacks only.
+    command: >
+      --changelog-file=changelog.xml
+      update
+      -Dallow_template_admin=true
+    networks:
+      - backend
+
+  seeder:
+    image: postgres:18-alpine
+    container_name: projects-front-a11y-seeder
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+    volumes:
+      - ./init-test.sql:/init-test.sql:ro
+    environment:
+      PGPASSWORD: password
+    command: >
+      sh -c "psql -h postgres -U postgres -d mairie_360_database -f /init-test.sql"
+    networks:
+      - backend
+
+  seeder-a11y:
+    image: postgres:18-alpine
+    container_name: projects-front-a11y-seeder-a11y
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+    volumes:
+      - ./init-accessibility.sql:/init-accessibility.sql:ro
+    environment:
+      PGPASSWORD: password
+    command: >
+      sh -c "psql -v ON_ERROR_STOP=1 -h postgres -U postgres -d mairie_360_database -f /init-accessibility.sql"
+    networks:
+      - backend
+
+  redis:
+    image: redis:8.4.0-bookworm
+    container_name: projects-front-a11y-redis
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  core-api:
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:2.2.0}
+    container_name: projects-front-a11y-core-api
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      PORT: 3000
+      PUBLIC_URL: http://core-api:3000
+      # Core refuses to start without its Resend configuration (MAIR-522). No page of this front sends an
+      # e-mail through these stacks, so the key is fake and the URL never called.
+      RESEND_API_KEY: "re_fake_local"
+      RESEND_BASE_URL: "http://fake-resend.invalid"
+      EMAIL_DOMAIN: "mairie360.local"
+      # API >= api_lib 3.0 refuses the weak shared test secret unless this flag is set (MAIR-428),
+      # and rate-limits each account (MAIR-425): the scan / load test hammer it as one user.
+      JWT_ALLOW_WEAK_SECRET: "true"
+      RATE_LIMIT_ENABLED: "false"
+    expose:
+      - "3000"
+    networks:
+      - backend
+    # L'image publiée est "distroless" (ni shell ni curl) : la disponibilité est
+    # sondée depuis le conteneur core-api-ready ci-dessous.
+
+  core-api-ready:
+    image: curlimages/curl:latest
+    container_name: projects-front-a11y-core-api-ready
+    depends_on:
+      core-api:
+        condition: service_started
+    command: >
+      sh -c 'i=0; until curl -fsS http://core-api:3000/health >/dev/null; do
+      i=$$((i+1)); if [ $$i -ge 90 ]; then echo "core-api not ready after 3 min"; exit 1; fi;
+      echo "waiting for core-api..."; sleep 2; done; echo "core-api ready"'
+    networks:
+      - backend
+
+  project-api:
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:1.2.0}
+    container_name: projects-front-a11y-project-api
+    depends_on:
+      liquibase:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *api-env
+      PORT: 3001
+      PUBLIC_URL: http://project-api:3001
+      # API >= api_lib 3.0 refuses the weak shared test secret unless this flag is set (MAIR-428),
+      # and rate-limits each account (MAIR-425): the scan / load test hammer it as one user.
+      JWT_ALLOW_WEAK_SECRET: "true"
+      RATE_LIMIT_ENABLED: "false"
+    expose:
+      - "3001"
+    networks:
+      - backend
+    # L'image publiée est "distroless" (ni shell ni curl) : la disponibilité est
+    # sondée depuis le conteneur project-api-ready ci-dessous.
+
+  project-api-ready:
+    image: curlimages/curl:latest
+    container_name: projects-front-a11y-project-api-ready
+    depends_on:
+      project-api:
+        condition: service_started
+    command: >
+      sh -c 'i=0; until curl -fsS http://project-api:3001/health >/dev/null; do
+      i=$$((i+1)); if [ $$i -ge 90 ]; then echo "project-api not ready after 3 min"; exit 1; fi;
+      echo "waiting for project-api..."; sleep 2; done; echo "project-api ready"'
+    networks:
+      - backend
+
+  bff-user:
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.1.0}
+    container_name: projects-front-a11y-bff-user
+    depends_on:
+      seeder-a11y:
+        condition: service_completed_successfully
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 4000
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: 'b"secret"'
+      CORE_API_URL: http://core-api:3000
+      # The scanners replay the auth routes from one IP with invalid credentials on purpose: the
+      # auth rate limits of BFF User (MAIR-226) would answer 429 and hide the real responses.
+      AUTH_RATE_LIMIT_ENABLED: "false"
+    expose:
+      - "4000"
+    networks:
+      - backend
+
+  bff-user-ready:
+    image: curlimages/curl:latest
+    container_name: projects-front-a11y-bff-user-ready
+    depends_on:
+      bff-user:
+        condition: service_started
+    command: >
+      sh -c 'i=0; until curl -fsS http://bff-user:4000/health >/dev/null; do
+      i=$$((i+1)); if [ $$i -ge 90 ]; then echo "bff-user not ready after 3 min"; exit 1; fi;
+      echo "waiting for bff-user..."; sleep 2; done; echo "bff-user ready"'
+    networks:
+      - backend
+
+  bff-project:
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.1.0}
+    container_name: projects-front-a11y-bff-project
+    depends_on:
+      seeder-a11y:
+        condition: service_completed_successfully
+      seeder:
+        condition: service_completed_successfully
+      core-api-ready:
+        condition: service_completed_successfully
+      project-api-ready:
+        condition: service_completed_successfully
+      bff-user-ready:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      HOST: "0.0.0.0"
+      PORT: 4001
+      REDIS_URL: redis://redis:6379
+      CORE_API_URL: core-api
+      CORE_API_PORT: 3000
+      PROJECT_API_URL: project-api
+      PROJECT_API_PORT: 3001
+      PROJECT_API_BASE_PATH: http://project-api:3001
+      USER_BFF_URL: http://bff-user:4000
+      # Same secret as the APIs: BFF_Project verifies the session tokens with it and refuses to start without it.
+      JWT_SECRET: 'b"secret"'
+    expose:
+      - "4001"
+    networks:
+      - backend
+
+  bff-project-ready:
+    image: curlimages/curl:latest
+    container_name: projects-front-a11y-bff-project-ready
+    depends_on:
+      bff-project:
+        condition: service_started
+    command: >
+      sh -c 'i=0; until curl -fsS http://bff-project:4001/health >/dev/null; do
+      i=$$((i+1)); if [ $$i -ge 90 ]; then echo "bff-project not ready after 3 min"; exit 1; fi;
+      echo "waiting for bff-project..."; sleep 2; done; echo "bff-project ready"'
+    networks:
+      - backend
+
+  projects-front:
+    # The image under test: <image>@<staging digest> from promote-prod.yml, or the image
+    # accessibility_test.sh built locally. Never rebuilt here.
+    image: ${IMAGE_REF:?IMAGE_REF is set by accessibility_test.sh}
+    container_name: projects-front-a11y-front
+    depends_on:
+      bff-project-ready:
+        condition: service_completed_successfully
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: 5001
+      # Readiness resumes on this isolated frontend origin without following Login.
+      LOGIN_FRONT_URL: "${LOGIN_FRONT_URL:-http://login-front.invalid/}"
+      PROJECT_FRONT_URL: http://projects-front:5001/
+      BFF_PROJECT_BASE_URL: http://bff-project:4001
+      # Every module link of the shell, so the RGAA states capture the full sidebar.
+      DASHBOARD_FRONT_URL: http://dashboard-front.invalid/
+      CALENDAR_FRONT_URL: http://calendar-front.invalid/
+      MESSAGE_FRONT_URL: http://messages-front.invalid/
+      ELEARNING_FRONT_URL: http://elearning-front.invalid/
+      SETTINGS_FRONT_URL: http://settings-front.invalid/
+      ADMINISTRATION_FRONT_URL: http://administration-front.invalid/
+      COOKIE_DOMAIN: projects-front
+    expose:
+      - "5001"
+    networks:
+      - backend
+    # curl est installé dans l'image runner. Sans cookie, le middleware répond 307
+    # (reprise locale) : curl -f l'accepte, seul un statut >= 400 échoue.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:5001/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  a11y:
+    image: ${A11Y_RUNNER_IMAGE:?A11Y_RUNNER_IMAGE comes from cicd-repo/tests/a11y/runner-image}
+    # Run as the caller (accessibility_test.sh exports them), so that rgaa-report/ and
+    # .rgaa-ai-cache/ are not root-owned in the checkout.
+    user: "${RGAA_UID:-0}:${RGAA_GID:-0}"
+    container_name: projects-front-a11y-runner
+    depends_on:
+      projects-front:
+        condition: service_healthy
+    command: ["sh", "/engine/run.sh"]
+    environment:
+      RGAA_MIN_RATE: ${RGAA_MIN_RATE:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      RGAA_AI_MODEL: ${RGAA_AI_MODEL:-}
+    volumes:
+      - ./cicd-repo/tests/a11y:/engine:ro
+      - ./rgaa.yaml:/scope/rgaa.yaml:ro
+      - ./rgaa-report:/report
+      - ./.rgaa-ai-cache:/ai-cache
+    networks:
+      - backend

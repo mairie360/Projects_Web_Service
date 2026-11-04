@@ -204,7 +204,7 @@ services:
       CORE_API_URL: http://core-api:3000
       # The scanners replay the auth routes from one IP with invalid credentials on purpose: the
       # auth rate limits of BFF User (MAIR-226) would answer 429 and hide the real responses.
-      AUTH_RATE_LIMIT_ENABLED: \"false\"
+      AUTH_RATE_LIMIT_ENABLED: "false"
     expose:
       - "4000"
     networks:
