@@ -261,7 +261,7 @@ Avant un lancement Docker, vérifier les variables de service, les secrets de bu
 ### Parcours de bout en bout (MAIR-603)
 
 `./e2e_test.sh` démarre `docker-compose-e2e.yml` (la stack de performance avec un exécuteur
-Playwright à la place de k6) et lance les parcours de `e2e/` : création d'un projet, ajout d'une tâche, renommage et suppression en `Admin` ; refus (pas de « Nouveau projet », `403` sur `POST /projects`) en `User` ; redirection d'un visiteur sans session. La promotion prod lance
+Playwright à la place de k6) et lance les parcours de `e2e/` : en `Admin`, création d'un projet, ajout, modification et suppression d'une tâche, puis renommage et suppression du projet ; refus (pas de « Nouveau projet », `403` sur `POST /projects`) en `User` ; redirection d'un visiteur sans session. La promotion prod lance
 le même script sur l'image `staging-<sha>` vérifiée (job `e2e_tests`, action `actions/e2e/fronts`
 de mairie360/CICD, MAIR-602) et bloque la release si un parcours échoue ou si le dossier manque.
 Le rapport (HTML, traces et vidéos des parcours en échec) est conservé dans `e2e-report/`. Pour

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { cookieHeader, signInAs, users } from './support/session';
 
 // Critical journeys of the Projects front (MAIR-603), on the real stack of docker-compose-e2e.yml:
-// a user allowed to manage projects creates, edits and deletes a project and its tasks; a user
+// a user allowed to manage projects creates a project, adds a task, edits and deletes that task, renames and deletes the project; a user
 // with the "User" role only does not see the action and is refused by the BFF; no session is
 // sent back to Login. The texts asserted are the French ones displayed on screen.
 
@@ -10,6 +10,7 @@ const stamp = Date.now().toString(36);
 const projectTitle = `Parcours E2E ${stamp}`;
 const renamedTitle = `Parcours E2E ${stamp} (modifié)`;
 const taskTitle = `Tâche E2E ${stamp}`;
+const editedTaskTitle = `Tâche E2E ${stamp} (modifiée)`;
 
 function dueDateInputValue(daysFromNow: number) {
   return new Date(Date.now() + daysFromNow * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -54,6 +55,41 @@ test.describe('project manager', () => {
     await taskForm.getByRole('button', { name: 'Ajouter la tâche' }).click();
     // The task row offers its completion toggle: the task is listed, not only echoed in the form.
     await expect(details.getByRole('button', { name: `Marquer ${taskTitle} comme terminée` })).toBeVisible();
+  });
+
+  test('edits the task', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+
+    const details = page.getByRole('dialog').filter({ hasText: projectTitle });
+    const row = details.locator('article').filter({ has: page.getByRole('heading', { name: taskTitle, exact: true }) });
+    await row.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const editForm = details.getByRole('form', { name: 'Modifier une tâche' });
+    await expect(editForm.getByLabel('Titre de la tâche')).toHaveValue(taskTitle);
+    await editForm.getByLabel('Titre de la tâche').fill(editedTaskTitle);
+    await editForm.getByRole('button', { name: 'Enregistrer la tâche' }).click();
+
+    await expect(details.getByRole('button', { name: `Marquer ${editedTaskTitle} comme terminée` })).toBeVisible();
+    await expect(details.getByRole('heading', { name: taskTitle, exact: true })).toHaveCount(0);
+  });
+
+  test('deletes the task', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+
+    const details = page.getByRole('dialog').filter({ hasText: projectTitle });
+    await details.getByRole('button', { name: `Supprimer ${editedTaskTitle}` }).click();
+    // The confirmation opens in the task row, in place of its delete button.
+    const confirmation = details.getByText('Supprimer définitivement cette tâche ?', { exact: true }).locator('xpath=..');
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole('button', { name: 'Supprimer', exact: true }).click();
+
+    await expect(details.getByRole('heading', { name: editedTaskTitle, exact: true })).toHaveCount(0);
+    // Gone from the server too, not only from the open panel.
+    await page.reload();
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+    await expect(page.getByRole('dialog').filter({ hasText: projectTitle })).toBeVisible();
+    await expect(page.getByRole('heading', { name: editedTaskTitle, exact: true })).toHaveCount(0);
   });
 
   test('renames the project', async ({ page }) => {
