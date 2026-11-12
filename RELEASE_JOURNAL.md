@@ -1,12 +1,12 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "updated": {"dev": "2026-11-12 17:17 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-10-21 11:12 UTC"}} -->
+<!-- release-journal-state {"dev": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "updated": {"dev": "2026-11-12 17:17 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-11-12 20:50 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.2.0 | `214ddfa` | 2026-10-21 11:15 UTC |
-| staging | — | `214ddfa` | 2026-10-21 11:12 UTC |
+| staging | — | `86e8d05` | 2026-11-12 20:50 UTC |
 | dev | — | `86e8d05` | 2026-11-12 17:17 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.2.0)
@@ -31,6 +31,10 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+_Rien._
+
+## Différence staging → prod (en staging, pas encore en prod)
+
 - fix: MAIR-816 Release dev: align internal versions and deploy ([#337](https://github.com/mairie360/Projects_Web_Service/pull/337))
 - feat: MAIR-603 E2E - Parcours utilisateurs Playwright des fronts (#311) ([#311](https://github.com/mairie360/Projects_Web_Service/pull/311))
 - fix: MAIR-743 [Audit 30/10] Login, Calendars, Elearning, Projects: branch Gitleaks fingerprints invalid after squash, main likely red (N1) (#332) ([#332](https://github.com/mairie360/Projects_Web_Service/pull/332))
@@ -49,10 +53,6 @@
 - fix(security): patch Node.js runtime and toolchain (#314) ([#314](https://github.com/mairie360/Projects_Web_Service/pull/314))
 - feat: MAIR-608 Lib UI - Normaliser la charte, les tailles et les composants partagés des fronts ([#309](https://github.com/mairie360/Projects_Web_Service/pull/309))
 
-## Différence staging → prod (en staging, pas encore en prod)
-
-_Rien._
-
 > Résumé Claude indisponible pour ce passage : listes brutes des commits.
 
 ## Historique des passages
@@ -60,6 +60,7 @@ _Rien._
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-12 20:50 UTC | staging | — | `86e8d05` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43285891074) |
 | 2026-11-12 17:17 UTC | dev | — | `86e8d05` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43264697058) |
 | 2026-11-04 21:16 UTC | dev | — | `ed50141` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/41912316730) |
 | 2026-11-04 18:30 UTC | dev | — | `bd3b4e1` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/41884220039) |
