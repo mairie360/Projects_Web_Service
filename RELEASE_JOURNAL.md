@@ -1,16 +1,17 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "38f9cc87e137ba7efe327dec0534eb61d11a830e", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "updated": {"dev": "2026-11-13 05:28 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-11-12 20:50 UTC"}} -->
+<!-- release-journal-state {"dev": "34243359eb0636b83dcbb5435e82fc284b06864c", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "updated": {"dev": "2026-11-13 14:27 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-11-12 20:50 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.2.0 | `214ddfa` | 2026-10-21 11:15 UTC |
 | staging | — | `86e8d05` | 2026-11-12 20:50 UTC |
-| dev | — | `38f9cc8` | 2026-11-13 05:28 UTC |
+| dev | — | `3424335` | 2026-11-13 14:27 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.2.0)
 
+- chore(deps): update ghcr.io/mairie360/core-api docker tag to v2.3.0 (#340) ([#340](https://github.com/mairie360/Projects_Web_Service/pull/340))
 - chore(deps): update dependency mairie360/cicd to v5.6.0 (#334) ([#334](https://github.com/mairie360/Projects_Web_Service/pull/334))
 - fix: MAIR-816 Release dev: align internal versions and deploy ([#337](https://github.com/mairie360/Projects_Web_Service/pull/337))
 - feat: MAIR-603 E2E - Parcours utilisateurs Playwright des fronts (#311) ([#311](https://github.com/mairie360/Projects_Web_Service/pull/311))
@@ -32,6 +33,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- chore(deps): update ghcr.io/mairie360/core-api docker tag to v2.3.0 (#340) ([#340](https://github.com/mairie360/Projects_Web_Service/pull/340))
 - chore(deps): update dependency mairie360/cicd to v5.6.0 (#334) ([#334](https://github.com/mairie360/Projects_Web_Service/pull/334))
 
 ## Différence staging → prod (en staging, pas encore en prod)
@@ -61,6 +63,7 @@
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-13 14:27 UTC | dev | — | `3424335` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43440998271) |
 | 2026-11-13 05:28 UTC | dev | — | `38f9cc8` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43369964369) |
 | 2026-11-12 20:50 UTC | staging | — | `86e8d05` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43285891074) |
 | 2026-11-12 17:17 UTC | dev | — | `86e8d05` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43264697058) |
