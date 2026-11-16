@@ -35,7 +35,7 @@ x-api-env: &api-env
 
 services:
   postgres:
-    image: ${DB_IMAGE:-ghcr.io/mairie360/database:3.4.0}
+    image: ${DB_IMAGE:-ghcr.io/mairie360/database:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-db
     environment:
       POSTGRES_USER: postgres
@@ -54,7 +54,7 @@ services:
       retries: 10
 
   liquibase:
-    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:3.4.0}
+    image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-liquibase
     depends_on:
       postgres:
@@ -119,7 +119,7 @@ services:
       retries: 5
 
   core-api:
-    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:2.3.0}
+    image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-core-api
     depends_on:
       liquibase:
@@ -164,7 +164,7 @@ services:
     # MAIR-680, mairie360_api_lib 4.2.0): its access log no longer writes the query string, which
     # 1.2.0 did (`?search=<name>`, a blocking leak of the GDPR simulation). The MAIR-680 builds only
     # accept Core's EdDSA tokens, which the rest of this stack does not sign yet.
-    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:dev-7979c87}
+    image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-project-api
     depends_on:
       liquibase:
@@ -200,7 +200,7 @@ services:
       - backend
 
   bff-user:
-    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:1.1.0}
+    image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-bff-user
     depends_on:
       seeder-a11y:
@@ -238,7 +238,7 @@ services:
       - backend
 
   bff-project:
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.1.0}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:${UPSTREAM_TAG:-dev}}
     container_name: projects-front-sim-bff-project
     depends_on:
       seeder-a11y:
