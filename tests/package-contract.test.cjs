@@ -46,13 +46,12 @@ test('contracts/openapi.json est exactement le contrat reconstruit depuis le paq
   assert.deepEqual(snapshot, buildOrvalOpenApi(PACKAGE_NAME, ROOT));
 });
 
-test('chaque stack Docker démarre BFF_Project et BFF User dans les images construites depuis les commits des paquets épinglés', async () => {
-  const { imageTagForContractVersion } = await import('../scripts/contract-version.mjs');
-  const expectedProject = `ghcr.io/mairie360/bff-project:${imageTagForContractVersion(pinned)}`;
-  const expectedUser = `ghcr.io/mairie360/bff-user:${imageTagForContractVersion(manifest.devDependencies['@mairie360/bff-user-openapi'])}`;
+test('MAIR-998 every Docker stack starts BFF_Project and BFF User on the moving tag of the stage', () => {
+  const expectedProject = 'ghcr.io/mairie360/bff-project:${UPSTREAM_TAG:-dev}';
+  const expectedUser = 'ghcr.io/mairie360/bff-user:${UPSTREAM_TAG:-dev}';
   for (const file of composeFiles) {
     const services = composePolicy.compose(file);
-    const images = composePolicy.bffImages(services);
+    const images = composePolicy.bffImageRefs(services);
     assert.deepEqual(images.filter(image => image.startsWith('ghcr.io/mairie360/bff-project:')), [expectedProject], file);
     assert.deepEqual(images.filter(image => image.startsWith('ghcr.io/mairie360/bff-user:')), [expectedUser], file);
     for (const service of Object.values(services)) { const context = typeof service.build === 'string' ? service.build : service.build?.context; assert.equal(typeof context === 'string' && /(?:^|[\/])BFF_Project/.test(context), false, `${file} must not build BFF_Project from a checkout`); }
@@ -70,12 +69,9 @@ test('dans chaque stack, le service du front ne connaît que BFF_Project', () =>
   }
 });
 
-test('the contract version policy accepts releases, dev and staging packages and maps them to image tags', async () => {
-  const { isAcceptedContractVersion, imageTagForContractVersion } = await import('../scripts/contract-version.mjs');
-  assert.equal(imageTagForContractVersion('0.4.0'), '0.4.0');
-  assert.equal(imageTagForContractVersion('0.0.0-dev.68d15b9b3719a593289d8833da176bb555a2c991'), 'dev-68d15b9');
+test('the contract version policy accepts releases, dev and staging packages', async () => {
+  const { isAcceptedContractVersion } = await import('../scripts/contract-version.mjs');
   assert.equal(isAcceptedContractVersion('0.0.0-staging.68d15b9b3719a593289d8833da176bb555a2c991'), true);
-  assert.equal(imageTagForContractVersion('0.0.0-staging.68d15b9b3719a593289d8833da176bb555a2c991'), 'staging-68d15b9');
   for (const rejected of ['^0.4.0', '0.4', '0.0.0-staging.68d15b9', '0.0.0-dev.68d15b9', 'latest']) {
     assert.equal(isAcceptedContractVersion(rejected), false, rejected);
   }
