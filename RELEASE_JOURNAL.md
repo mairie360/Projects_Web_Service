@@ -1,16 +1,17 @@
 # Journal des releases — Projects_Web_Service
 
-<!-- release-journal-state {"dev": "5866294d54cf71ddede146283f210df8baa31790", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "updated": {"dev": "2026-11-14 09:35 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-11-12 20:50 UTC"}} -->
+<!-- release-journal-state {"dev": "ece54243314995595bf7f978a897d90586d245e3", "prod": "214ddfaa83c4ac1a4d35677e675f1e8b111a2ec4", "prod_tag": "v1.2.0", "staging": "86e8d0547d293d9afaac92723f94eeeec2e06c58", "updated": {"dev": "2026-11-17 09:29 UTC", "prod": "2026-10-21 11:15 UTC", "staging": "2026-11-12 20:50 UTC"}} -->
 > Tenu à jour par la CI (`mairie360/CICD`, action `release/release-journal`) à chaque passage en dev, staging et prod. Ne pas modifier à la main : le fichier est réécrit au passage suivant.
 
 | Environnement | Version | Commit | Mis à jour |
 | --- | --- | --- | --- |
 | prod | v1.2.0 | `214ddfa` | 2026-10-21 11:15 UTC |
 | staging | — | `86e8d05` | 2026-11-12 20:50 UTC |
-| dev | — | `5866294` | 2026-11-14 09:35 UTC |
+| dev | — | `ece5424` | 2026-11-17 09:29 UTC |
 
 ## Ajouté sur main depuis la dernière release prod (v1.2.0)
 
+- chore(deps): update dependency mairie360/cicd to v5.6.1 (#348) ([#348](https://github.com/mairie360/Projects_Web_Service/pull/348))
 - chore(deps): update mairie360 database schema to v3.4.0 (#342) ([#342](https://github.com/mairie360/Projects_Web_Service/pull/342))
 - chore(deps): update ghcr.io/mairie360/project-api docker tag to v1.3.0 (#341) ([#341](https://github.com/mairie360/Projects_Web_Service/pull/341))
 - chore(deps): update ghcr.io/mairie360/core-api docker tag to v2.3.0 (#340) ([#340](https://github.com/mairie360/Projects_Web_Service/pull/340))
@@ -35,6 +36,7 @@
 
 ## Différence dev → staging (en dev, pas encore en staging)
 
+- chore(deps): update dependency mairie360/cicd to v5.6.1 (#348) ([#348](https://github.com/mairie360/Projects_Web_Service/pull/348))
 - chore(deps): update mairie360 database schema to v3.4.0 (#342) ([#342](https://github.com/mairie360/Projects_Web_Service/pull/342))
 - chore(deps): update ghcr.io/mairie360/project-api docker tag to v1.3.0 (#341) ([#341](https://github.com/mairie360/Projects_Web_Service/pull/341))
 - chore(deps): update ghcr.io/mairie360/core-api docker tag to v2.3.0 (#340) ([#340](https://github.com/mairie360/Projects_Web_Service/pull/340))
@@ -67,6 +69,7 @@
 <!-- release-journal-history:start -->
 | Date | Environnement | Version | Commit | Run |
 | --- | --- | --- | --- | --- |
+| 2026-11-17 09:29 UTC | dev | — | `ece5424` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/44054053375) |
 | 2026-11-14 09:35 UTC | dev | — | `5866294` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43580477504) |
 | 2026-11-14 02:01 UTC | dev | — | `10e7cbe` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43542695785) |
 | 2026-11-13 14:27 UTC | dev | — | `3424335` | [run](https://github.com/mairie360/Projects_Web_Service/actions/runs/43440998271) |
