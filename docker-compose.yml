@@ -38,6 +38,7 @@ x-service: &service-template
 services:
   postgres:
     image: ${DB_IMAGE:-ghcr.io/mairie360/database:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     restart: always
     container_name: mairie360-db-projects-front #change front name
     environment:
@@ -58,6 +59,7 @@ services:
 
   liquibase:
     image: ${LIQUIBASE_IMAGE:-ghcr.io/mairie360/liquibase-migrations:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     container_name: mairie360-liquibase-projects-front #change front name
     depends_on:
       postgres:
@@ -96,6 +98,7 @@ services:
   core:
     container_name: core-projects-front-developpement
     image: ${CORE_API_IMAGE:-ghcr.io/mairie360/core-api:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     ports:
       - "3000:3000"
     networks:
@@ -134,6 +137,7 @@ services:
   project-api:
     container_name: project-api-front-projects-developpement
     image: ${PROJECT_API_IMAGE:-ghcr.io/mairie360/project-api:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     ports:
       - "3001:3001"
     networks:
@@ -169,6 +173,7 @@ services:
   bff-user:
     container_name: bff-user-projects-front
     image: ${BFF_USER_IMAGE:-ghcr.io/mairie360/bff-user:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     networks:
       - backend
     environment:
@@ -200,6 +205,7 @@ services:
     container_name: bff-project-projects-front
     # Seul BFF de ce front : même version que le contrat @mairie360/bff-project-openapi de package.json.
     image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:${UPSTREAM_TAG:-dev}}
+    pull_policy: ${UPSTREAM_PULL_POLICY:-always}
     ports:
       - "4001:4001"
     networks:
