@@ -42,13 +42,25 @@ if [ -z "${IMAGE_REF:-}" ]; then
 fi
 echo "==> Front under test: $IMAGE_REF"
 
-# Session of the run: an HS256 JWT {sub, role, exp} for the seeded user 1, signed with the
-# stack's JWT_SECRET (docker-compose-gdpr-simulation.yml), like the RGAA engine's sessions.
-JWT_SECRET='b"secret"'
+# Session of the run (MAIR-680): an EdDSA JWT {sub, role, exp, iss, aud} for the seeded user 1, signed
+# like Core signs the sessions. The Ed25519 key pair is generated for this run only: Core gets the
+# private key, every service of the stack only the public one (JWT_PUBLIC_KEY, kid = RFC 7638
+# thumbprint). Needs OpenSSL 3 (`pkeyutl -rawin`).
 b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
-jwt_header="$(printf '{"alg":"HS256","typ":"JWT"}' | b64url)"
-jwt_payload="$(printf '{"sub":"1","role":"admin","exp":%s}' "$(( $(date +%s) + 3600 ))" | b64url)"
-jwt_signature="$(printf '%s.%s' "$jwt_header" "$jwt_payload" | openssl dgst -sha256 -hmac "$JWT_SECRET" -binary | b64url)"
+KEY_DIR="$(mktemp -d)"
+openssl genpkey -algorithm ed25519 -out "$KEY_DIR/private.pem" 2>/dev/null \
+    && openssl pkey -in "$KEY_DIR/private.pem" -pubout -out "$KEY_DIR/public.pem" \
+    || { echo "Could not generate the session key pair (openssl 3 with ed25519)."; exit 1; }
+# PEM on one line (\n escaped), the form the services accept in an environment variable.
+JWT_PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' "$KEY_DIR/private.pem")"
+JWT_PUBLIC_KEY="$(awk '{printf "%s\\n", $0}' "$KEY_DIR/public.pem")"
+export JWT_PRIVATE_KEY JWT_PUBLIC_KEY
+jwt_x="$(openssl pkey -in "$KEY_DIR/private.pem" -pubout -outform DER | tail -c 32 | b64url)"
+jwt_kid="$(printf '{"crv":"Ed25519","kty":"OKP","x":"%s"}' "$jwt_x" | openssl dgst -sha256 -binary | b64url)"
+jwt_header="$(printf '{"alg":"EdDSA","typ":"JWT","kid":"%s"}' "$jwt_kid" | b64url)"
+jwt_payload="$(printf '{"sub":"1","role":"admin","exp":%s,"iss":"mairie360-core","aud":"mairie360"}' "$(( $(date +%s) + 3600 ))" | b64url)"
+printf '%s.%s' "$jwt_header" "$jwt_payload" > "$KEY_DIR/unsigned"
+jwt_signature="$(openssl pkeyutl -sign -inkey "$KEY_DIR/private.pem" -rawin -in "$KEY_DIR/unsigned" | b64url)"
 [ -n "$jwt_signature" ] || { echo "Could not sign the session of the run (openssl)."; exit 1; }
 export ADMIN_JWT="$jwt_header.$jwt_payload.$jwt_signature"
 
@@ -95,6 +107,7 @@ curl -fsSL "https://raw.githubusercontent.com/mairie360/Database/$INVENTORY_REF/
 # The logs are saved first when the run stops before step 4, so a failure can still be read.
 cleanup() {
     local status=$?
+    rm -rf "${KEY_DIR:-}"
     if [ ! -s "$RUN_DIR/containers.log" ]; then
         # The services are stopped first, so that the file holds every line they wrote.
         docker compose -f "$COMPOSE_FILE" stop >/dev/null 2>&1

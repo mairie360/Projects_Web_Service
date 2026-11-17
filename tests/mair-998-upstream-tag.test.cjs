@@ -59,3 +59,19 @@ test('MAIR-998 compose-policy resolves nested defaults and keeps the stage tag o
   assert.deepEqual(composePolicy.bffImages(services), ['ghcr.io/mairie360/bff-user:dev', 'ghcr.io/mairie360/bff-project:1.2.0']);
   assert.deepEqual(composePolicy.bffImageRefs(services), ['ghcr.io/mairie360/bff-user:${UPSTREAM_TAG:-dev}', 'ghcr.io/mairie360/bff-project:1.2.0']);
 });
+
+// MAIR-680: the GDPR simulation signs its session with a key pair generated for the run (EdDSA),
+// so it keeps working when a moving tag reaches a build that refuses HS256.
+test('MAIR-998 the GDPR simulation signs an EdDSA session, not HS256', () => {
+  const script = fs.readFileSync(path.join(ROOT, 'gdpr_simulation_test.sh'), 'utf8');
+  const compose = fs.readFileSync(path.join(ROOT, 'docker-compose-gdpr-simulation.yml'), 'utf8');
+  assert.match(script, /"alg":"EdDSA"/);
+  assert.doesNotMatch(script, /HS256|-hmac/);
+  assert.match(script, /openssl genpkey -algorithm ed25519/);
+  assert.match(compose, /JWT_PUBLIC_KEY: \$\{JWT_PUBLIC_KEY:\?/);
+  const privateKeyLines = compose.split('\n').filter((line) => line.includes('JWT_PRIVATE_KEY:'));
+  assert.equal(privateKeyLines.length, 1, 'only Core receives the private key');
+  const coreStart = compose.indexOf('  core-api:');
+  const coreEnd = compose.indexOf('\n  core-api-ready:');
+  assert.ok(compose.slice(coreStart, coreEnd).includes('JWT_PRIVATE_KEY:'));
+});
