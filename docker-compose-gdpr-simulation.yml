@@ -238,7 +238,7 @@ services:
       - backend
 
   bff-project:
-    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.1.0}
+    image: ${BFF_PROJECT_IMAGE:-ghcr.io/mairie360/bff-project:1.2.0}
     container_name: projects-front-sim-bff-project
     depends_on:
       seeder-a11y:
