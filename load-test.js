@@ -20,6 +20,8 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:5001';
 const JWT_SECRET = __ENV.JWT_SECRET || 'b"secret"';
 // User inserted by init-test.sql (token `sub`).
 const USER_ID = __ENV.PERF_USER_ID || '2';
+// Group seeded by init-test.sql for the test user: every project needs one.
+const GROUP_ID = __ENV.PERF_GROUP_ID || 'group-1';
 
 const STAGES = [
   { duration: '30s', target: 20 }, // ramp up
@@ -116,6 +118,7 @@ export function writes(data) {
         responsibleId: `user-${USER_ID}`,
         assigneeIds: [`user-${USER_ID}`],
         status: 'todo',
+        groupId: GROUP_ID,
       }),
       { headers, redirects: 0, tags: { endpoint: 'project-create' } },
     );
