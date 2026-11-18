@@ -29,6 +29,8 @@ steps:
         assigneeIds: [user-1]
         labels: ["{{marker.last_name}}"]
         dueDate: "2030-12-31T00:00:00Z"
+        # Group seeded by init-test.sql: every project needs one.
+        groupId: group-1
     expect: [201]
     capture:
       project_id: body.project.id
@@ -37,14 +39,14 @@ steps:
       method: POST
       path: /projects
       headers: *session
-      json: {title: "<{{marker.last_name}}>", description: "{{marker.email}}", status: todo, priority: high, responsibleId: user-1, assigneeIds: [], labels: [], dueDate: "2030-12-31T00:00:00Z"}
+      json: {title: "<{{marker.last_name}}>", description: "{{marker.email}}", status: todo, priority: high, responsibleId: user-1, assigneeIds: [], labels: [], dueDate: "2030-12-31T00:00:00Z", groupId: group-1}
     expect: [400]
   - name: create a project with a responsible of the wrong form (deliberate error)
     request:
       method: POST
       path: /projects
       headers: *session
-      json: {title: "Project {{marker.first_name}}", description: "x", status: todo, priority: high, responsibleId: "{{marker.email}}", assigneeIds: [], labels: [], dueDate: "{{marker.phone}}"}
+      json: {title: "Project {{marker.first_name}}", description: "x", status: todo, priority: high, responsibleId: "{{marker.email}}", assigneeIds: [], labels: [], dueDate: "{{marker.phone}}", groupId: group-1}
     expect: [400]
   - name: search the projects for the marker (query string)
     request: {method: GET, path: "/projects-page?q={{marker.last_name}}&view=table&page=1&limit=20", headers: *session}
