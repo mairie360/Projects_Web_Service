@@ -91,8 +91,8 @@ function isAbortError(error: unknown) {
 
 function validateProjectForm(form: ProjectFormState) {
   return Boolean(
+    // MAIR-836: the description is optional (BFF_Project and Project API accept an empty one).
     form.title.trim() &&
-      form.description.trim() &&
       form.dueDate &&
       (form.responsible.trim() || form.assignees.length > 0)
   );
@@ -1089,7 +1089,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       ? projectForm
       : { ...projectForm, groupId: projectGroups[0].id };
     if (!editingProjectId && !submittedForm.groupId) {
-      setProjectFormError('Choisissez le groupe du projet.');
+      setProjectFormError('Le groupe est obligatoire.');
       return;
     }
 
@@ -1128,15 +1128,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       if (editingProjectId) {
         updateSelectedProject(confirmed, selection);
       } else {
+        // MAIR-836 (Figma F3 3.5): the new card shows in its column of the unfiltered first page, no detail opens.
         resetProjectFilters();
-        beginDetailSelection(details.project.id);
-        setSelectedProjectDetails(details);
       }
       try {
         await refreshProjectsPage(editingProjectId
           ? { silent: true, throwOnError: true }
           : { search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true, throwOnError: true });
-        setAlert({ type: 'success', message: `Projet "${details.project.title}" ${editingProjectId ? 'modifié' : 'créé'}.` });
+        if (editingProjectId) setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+        else setFeedback({ title: 'Projet créé', message: `Projet « ${details.project.title} » créé.` });
       } catch (error) {
         setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
       }

@@ -445,7 +445,7 @@ test('a link to a missing task leaves the modal closed and explains the missing 
   assert.doesNotMatch(view.html, /data-linked-task=/);
 });
 
-test('creating a project posts the form, reloads the page and announces the success', async () => {
+test('MAIR-836: creating a project posts the form, reloads the page and announces « Projet créé »', async () => {
   await renderLoadedPage();
   const created = fixtures.projectListItem({ id: 'project-9', title: 'Fête de la musique', status: 'todo' });
   bffProject.on('post', '/projects', { status: 201, body: fixtures.projectDetails(created, []) });
@@ -457,13 +457,15 @@ test('creating a project posts the form, reloads the page and announces the succ
 
   await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Fête de la musique', description: 'Scène place de la mairie', dueDate: '2026-06-21', responsible: fixtures.people.marie.id }));
   await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
-  const html = await view.waitFor((current) => current.includes('Projet &quot;Fête de la musique&quot; créé.'));
+  // MAIR-836 (Figma F3 3.5): the « Projet créé » toast names the project; no sheet opens.
+  const html = await view.waitFor((current) => current.includes('Projet « Fête de la musique » créé.'));
 
   assert.equal(bffProject.calls('/projects', 'post').length, 1);
   assert.equal(pageCalls().length, 2, 'the page is reloaded after the creation');
   assert.equal(view.find('CreateProjectModal').length, 0);
   assert.match(view.text(), /Fête de la musique/);
-  assert.match(html, /Projet &quot;Fête de la musique&quot; créé\./);
+  assert.match(html, /Projet créé/);
+  assert.equal(view.find('ProjectDetailModal').length, 0);
 });
 
 test('same-tick nested task drafts keep independent states in the actual project-create payload', async () => {

@@ -74,7 +74,7 @@ test('MAIR-880: without a chosen group among several, the creation is refused be
   await openCreation();
   await submitCreation();
 
-  assert.match(view.text(), /Choisissez le groupe du projet\./);
+  assert.match(view.text(), /Le groupe est obligatoire\./);
   assert.equal(bffProject.calls('/projects', 'post').length, 0);
   assert.equal(view.find('CreateProjectModal').length, 1, 'the draft stays open');
 });

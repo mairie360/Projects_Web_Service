@@ -31,13 +31,16 @@ test.describe('project manager', () => {
     await expect(dialog).toBeVisible();
     // Required fields are labelled with a star on screen ("Titre*").
     await dialog.getByLabel('Titre*', { exact: true }).fill(projectTitle);
-    await dialog.getByLabel('Description*', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
+    // MAIR-836: the description is optional in the V2 dialog.
+    await dialog.getByLabel('Description', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
     await dialog.getByLabel('Échéance*', { exact: true }).fill(dueDateInputValue(30));
-    // A project needs a main assignee or at least one assignee: the manager picks themselves.
-    await dialog.getByLabel('Assigné principal').selectOption({ label: 'Perf Tester' });
+    // A project needs a responsible or at least one team member: the manager picks themselves (« Responsable », MAIR-836).
+    await dialog.getByLabel('Responsable').selectOption({ label: 'Perf Tester' });
     await dialog.getByRole('button', { name: 'Créer le projet' }).click();
 
     await expect(dialog).toBeHidden();
+    // MAIR-836: the « Projet créé » toast names the project and its card shows in the list.
+    await expect(page.getByText(`Projet « ${projectTitle} » créé.`)).toBeVisible();
     await expect(page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` })).toBeVisible();
   });
 
@@ -94,15 +97,18 @@ test.describe('project manager', () => {
 
   test('renames the project', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: `Actions pour ${projectTitle}` }).click();
-    await page.getByRole('menuitem', { name: 'Modifier' }).click();
+    // MAIR-829: the card menu has no « Modifier » any more; the project sheet edits the project.
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+    const details = page.getByRole('dialog').filter({ hasText: projectTitle });
+    await details.getByRole('button', { name: 'Modifier', exact: true }).click();
 
-    const dialog = page.getByRole('dialog', { name: 'Modifier le projet' });
-    await expect(dialog).toBeVisible();
-    await dialog.getByLabel('Titre*', { exact: true }).fill(renamedTitle);
-    await dialog.getByRole('button', { name: 'Enregistrer' }).click();
+    const form = details.getByRole('form', { name: 'Modifier le projet' });
+    await expect(form).toBeVisible();
+    await form.getByLabel('Titre*', { exact: true }).fill(renamedTitle);
+    await form.getByRole('button', { name: 'Enregistrer', exact: true }).click();
 
-    await expect(dialog).toBeHidden();
+    await expect(form).toBeHidden();
+    await page.getByRole('button', { name: 'Fermer la fiche projet' }).click();
     await expect(page.getByRole('button', { name: `Ouvrir la fiche du projet ${renamedTitle}` })).toBeVisible();
   });
 

@@ -180,7 +180,8 @@ test('a late duplicate cannot reuse the ID already confirmed by a different new-
     release(); await pending; await view.settle();
     assert.equal(view.props('ProjectsWorkspace').projects.find(project => project.id === created.id).title, created.title);
     assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor('duplicate')), true);
-    assert.equal(view.props('ProjectDetailModal').project.title, created.title);
+    // MAIR-836: a creation no longer opens the sheet; the list keeps the confirmed title.
+    assert.equal(view.find('ProjectDetailModal').length, 0);
     await view.act(() => perform('duplicate'));
     assert.equal(writes().length, 2);
   } finally { release(); await pending; await view.settle(); }
