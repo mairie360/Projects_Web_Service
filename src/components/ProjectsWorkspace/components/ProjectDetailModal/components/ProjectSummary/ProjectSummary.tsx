@@ -33,6 +33,7 @@ export const ProjectSummary = ({ project }: { project: Project }) => (
           <span className="truncate">{project.responsible.name}</span>
         </span>
       </Fact>
+      <Fact label="Groupe"><span className="truncate font-medium text-[var(--mairie-text)]">{project.group?.name ?? 'Aucun groupe'}</span></Fact>
       <Fact label="Échéance"><span className="font-medium text-[#24292f]">{formatProjectDate(project.dueDate)}</span></Fact>
     </div>
 

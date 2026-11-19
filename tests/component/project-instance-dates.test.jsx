@@ -10,7 +10,7 @@ import { createProjectFormState } from '@/lib/projectPageState';
 import { getTaskCollaboration } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
 
-vi.mock('@/lib/bffProjectClient', async original => ({ ...await original(), getTaskCollaboration: vi.fn() }));
+vi.mock('@/lib/bffProjectClient', async original => ({ ...await original(), getTaskCollaboration: vi.fn(), getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]) }));
 
 const instance = children => <InstanceProvider timeZone="Indian/Reunion">{children}</InstanceProvider>;
 beforeEach(() => { vi.stubEnv('TZ', 'Pacific/Honolulu'); vi.stubEnv('INSTANCE_TIMEZONE', 'Indian/Reunion'); });

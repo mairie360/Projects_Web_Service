@@ -15,4 +15,22 @@ describe('ProjectSideFields', () => {
     expect(screen.getByText('Terminées').nextSibling.textContent).toContain('1');
     expect(screen.getByText('Total').nextSibling.textContent).toContain('4');
   });
+
+  it('MAIR-880: offers the linkable groups, reports the chosen one and shows a group read error', () => {
+    const onChange = vi.fn();
+    const groupOptions = [{ value: 'group-1', label: 'Services techniques' }, { value: 'group-7', label: 'Urbanisme' }];
+    const props = { statusOptions, priorityOptions, responsibleOptions: memberOptions, memberOptions, labelOptions: [], onChange };
+    const { rerender } = render(<ProjectSideFields form={createProjectFormState()} groupOptions={groupOptions} {...props} />);
+    const group = document.getElementById('project-group');
+    expect(group.required).toBe(true);
+    expect([...group.options].map((option) => option.textContent)).toEqual(['Choisir un groupe', 'Services techniques', 'Urbanisme']);
+    fireEvent.change(group, { target: { value: 'group-7' } });
+    fireEvent.change(document.getElementById('project-status'), { target: { value: 'done' } });
+    fireEvent.change(document.getElementById('project-priority'), { target: { value: 'high' } });
+    expect(onChange.mock.calls.map(([patch]) => patch)).toEqual([{ groupId: 'group-7' }, { status: 'done' }, { priority: 'high' }]);
+
+    rerender(<ProjectSideFields form={createProjectFormState()} groupOptions={[]} groupsError="Groupes indisponibles" groupRequired={false} {...props} />);
+    expect(document.getElementById('project-group').required).toBe(false);
+    expect(screen.getByText('Groupes indisponibles')).toBeTruthy();
+  });
 });

@@ -176,6 +176,7 @@ function createFrontHarness() {
       bffProject.on('get', '/projects/{projectId}/statuses', { body: fixtures.projectTaskStatuses() });
       bffProject.on('get', '/projects/{projectId}/archived-tasks', { body: fixtures.archivedTasks() });
       bffProject.on('get', '/project-templates', { body: { templates: [] } });
+      bffProject.on('get', '/project-groups', { body: fixtures.projectGroups() });
       for (const call of ownerCalls) {
         const value = new NextRequest(call.url, call.init).cookies.get('refreshToken')?.value;
         if (value) forgetUserSession(bffUser.url, value);

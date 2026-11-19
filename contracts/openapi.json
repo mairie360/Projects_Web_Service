@@ -292,6 +292,10 @@
           "dueDate": {
             "type": "string"
           },
+          "groupId": {
+            "pattern": "^group-\\d{1,15}$",
+            "type": "string"
+          },
           "labels": {
             "items": {
               "pattern": "^[^<>]*$",
@@ -332,7 +336,8 @@
           "responsibleId",
           "assigneeIds",
           "labels",
-          "dueDate"
+          "dueDate",
+          "groupId"
         ],
         "type": "object"
       },
@@ -630,6 +635,71 @@
         },
         "required": [
           "message"
+        ],
+        "type": "object"
+      },
+      "GetProjectGroups200": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GetProjectGroups200GroupsItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "type": "object"
+      },
+      "GetProjectGroups200GroupsItem": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "GetProjectGroupsProjectsWithoutGroup200": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/GetProjectGroupsProjectsWithoutGroup200ProjectsItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "type": "object"
+      },
+      "GetProjectGroupsProjectsWithoutGroup200ProjectsItem": {
+        "properties": {
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -1217,16 +1287,14 @@
             "type": "string"
           },
           "limit": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "maximum": 500,
+            "minimum": 1,
+            "type": "number"
           },
           "page": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "number"
           },
           "priority": {
             "$ref": "#/components/schemas/GetProjectsPagePriority"
@@ -1307,6 +1375,9 @@
           "dueDate": {
             "type": "string"
           },
+          "group": {
+            "$ref": "#/components/schemas/GetProjectsProjectId200ProjectGroup"
+          },
           "id": {
             "type": "string"
           },
@@ -1361,7 +1432,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -1386,6 +1458,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "GetProjectsProjectId200ProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "GetProjectsProjectId200ProjectPermissions": {
         "properties": {
@@ -1901,6 +1995,9 @@
           "dueDate": {
             "type": "string"
           },
+          "group": {
+            "$ref": "#/components/schemas/PatchProjectsProjectId200ProjectGroup"
+          },
           "id": {
             "type": "string"
           },
@@ -1955,7 +2052,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -1980,6 +2078,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "PatchProjectsProjectId200ProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "PatchProjectsProjectId200ProjectPermissions": {
         "properties": {
@@ -2256,6 +2376,10 @@
           "dueDate": {
             "type": "string"
           },
+          "groupId": {
+            "pattern": "^group-\\d{1,15}$",
+            "type": "string"
+          },
           "labels": {
             "items": {
               "pattern": "^[^<>]*$",
@@ -2396,6 +2520,9 @@
           "dueDate": {
             "type": "string"
           },
+          "group": {
+            "$ref": "#/components/schemas/PatchProjectsProjectIdClose200ProjectGroup"
+          },
           "id": {
             "type": "string"
           },
@@ -2450,7 +2577,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -2475,6 +2603,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "PatchProjectsProjectIdClose200ProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "PatchProjectsProjectIdClose200ProjectPermissions": {
         "properties": {
@@ -3292,6 +3442,9 @@
           "dueDate": {
             "type": "string"
           },
+          "group": {
+            "$ref": "#/components/schemas/PostProjects201ProjectGroup"
+          },
           "id": {
             "type": "string"
           },
@@ -3346,7 +3499,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -3371,6 +3525,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "PostProjects201ProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "PostProjects201ProjectPermissions": {
         "properties": {
@@ -3647,6 +3823,10 @@
           "dueDate": {
             "type": "string"
           },
+          "groupId": {
+            "pattern": "^group-\\d{1,15}$",
+            "type": "string"
+          },
           "labels": {
             "items": {
               "pattern": "^[^<>]*$",
@@ -3687,7 +3867,8 @@
           "responsibleId",
           "assigneeIds",
           "labels",
-          "dueDate"
+          "dueDate",
+          "groupId"
         ],
         "type": "object"
       },
@@ -3800,6 +3981,9 @@
           "dueDate": {
             "type": "string"
           },
+          "group": {
+            "$ref": "#/components/schemas/PostProjectsProjectIdDuplicate201ProjectGroup"
+          },
           "id": {
             "type": "string"
           },
@@ -3854,7 +4038,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -3879,6 +4064,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "PostProjectsProjectIdDuplicate201ProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "PostProjectsProjectIdDuplicate201ProjectPermissions": {
         "properties": {
@@ -4451,6 +4658,226 @@
         ],
         "type": "object"
       },
+      "ProjectDetail": {
+        "properties": {
+          "assignees": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectDetailAssigneesItem"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "group": {
+            "$ref": "#/components/schemas/ProjectDetailGroup"
+          },
+          "id": {
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/ProjectDetailPermissions"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/ProjectDetailPriority"
+          },
+          "priorityLabel": {
+            "type": "string"
+          },
+          "progress": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "responsible": {
+            "$ref": "#/components/schemas/ProjectDetailResponsible"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProjectDetailStatus"
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "tasks": {
+            "$ref": "#/components/schemas/ProjectDetailTasks"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "statusLabel",
+          "priority",
+          "priorityLabel",
+          "responsible",
+          "assignees",
+          "labels",
+          "progress",
+          "dueDate",
+          "createdAt",
+          "tasks",
+          "permissions",
+          "group"
+        ],
+        "type": "object"
+      },
+      "ProjectDetailAssigneesItem": {
+        "properties": {
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "type": "object"
+      },
+      "ProjectDetailGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "ProjectDetailPermissions": {
+        "properties": {
+          "canAssignMembers": {
+            "type": "boolean"
+          },
+          "canClose": {
+            "type": "boolean"
+          },
+          "canCreateTask": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          },
+          "canDuplicate": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canView": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canView",
+          "canEdit",
+          "canDuplicate",
+          "canDelete",
+          "canCreateTask",
+          "canAssignMembers",
+          "canClose"
+        ],
+        "type": "object"
+      },
+      "ProjectDetailPriority": {
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "type": "string"
+      },
+      "ProjectDetailResponsible": {
+        "properties": {
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatarUrl"
+        ],
+        "type": "object"
+      },
+      "ProjectDetailStatus": {
+        "enum": [
+          "todo",
+          "in-progress",
+          "review",
+          "done"
+        ],
+        "type": "string"
+      },
+      "ProjectDetailTasks": {
+        "properties": {
+          "active": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "number"
+          },
+          "completed": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "completed",
+          "active",
+          "archived"
+        ],
+        "type": "object"
+      },
       "ProjectDetailsResponse": {
         "properties": {
           "project": {
@@ -4485,6 +4912,9 @@
           },
           "dueDate": {
             "type": "string"
+          },
+          "group": {
+            "$ref": "#/components/schemas/ProjectDetailsResponseProjectGroup"
           },
           "id": {
             "type": "string"
@@ -4540,7 +4970,8 @@
           "dueDate",
           "createdAt",
           "tasks",
-          "permissions"
+          "permissions",
+          "group"
         ],
         "type": "object"
       },
@@ -4565,6 +4996,28 @@
           "avatarUrl"
         ],
         "type": "object"
+      },
+      "ProjectDetailsResponseProjectGroup": {
+        "anyOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "ProjectDetailsResponseProjectPermissions": {
         "properties": {
@@ -4824,6 +5277,50 @@
           "done"
         ],
         "type": "string"
+      },
+      "ProjectGroup": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ProjectGroups": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectGroupsGroupsItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "type": "object"
+      },
+      "ProjectGroupsGroupsItem": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
       },
       "ProjectIdParams": {
         "properties": {
@@ -5386,16 +5883,14 @@
             "type": "string"
           },
           "limit": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "maximum": 500,
+            "minimum": 1,
+            "type": "number"
           },
           "page": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "number"
           },
           "priority": {
             "$ref": "#/components/schemas/ProjectsPageQueryPriority"
@@ -6016,6 +6511,42 @@
         "required": [],
         "type": "object"
       },
+      "ProjectsWithoutGroup": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectsWithoutGroupProjectsItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "type": "object"
+      },
+      "ProjectsWithoutGroupProjectsItem": {
+        "properties": {
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "createdAt"
+        ],
+        "type": "object"
+      },
       "TaskCollaborationResponse": {
         "properties": {
           "comments": {
@@ -6272,6 +6803,10 @@
             "type": "string"
           },
           "dueDate": {
+            "type": "string"
+          },
+          "groupId": {
+            "pattern": "^group-\\d{1,15}$",
             "type": "string"
           },
           "labels": {
@@ -6549,7 +7084,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@1.1.0"
+    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.db5bf904195ca656740b704bf57b1009539251fc"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6577,6 +7112,42 @@
         "parameters": [],
         "responses": {
           "2XX": {
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/project-groups": {
+      "get": {
+        "operationId": "getProjectGroups",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProjectGroups200"
+                }
+              }
+            },
+            "description": "Succès (seul statut typé par orval)"
+          }
+        }
+      }
+    },
+    "/project-groups/projects-without-group": {
+      "get": {
+        "operationId": "getProjectGroupsProjectsWithoutGroup",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetProjectGroupsProjectsWithoutGroup200"
+                }
+              }
+            },
             "description": "Succès (seul statut typé par orval)"
           }
         }
@@ -6767,10 +7338,9 @@
             "name": "page",
             "required": false,
             "schema": {
-              "type": [
-                "number",
-                "null"
-              ]
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "number"
             }
           },
           {
@@ -6778,10 +7348,9 @@
             "name": "limit",
             "required": false,
             "schema": {
-              "type": [
-                "number",
-                "null"
-              ]
+              "maximum": 500,
+              "minimum": 1,
+              "type": "number"
             }
           }
         ],

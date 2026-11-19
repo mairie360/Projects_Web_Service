@@ -61,8 +61,10 @@ function projectListItem(overrides = {}) {
   };
 }
 
+// MAIR-880: the detail names the project's group (`null` for a project created before groups).
+const DEFAULT_GROUP = { id: 'group-1', name: 'Services techniques' };
 function projectDetails(project = projectListItem(), taskItems = [projectTask(), projectTask({ id: 'task-2', status: 'done' })]) {
-  return { project, taskItems };
+  return { project: { group: DEFAULT_GROUP, ...project }, taskItems };
 }
 
 function projectsPage(projects = [projectListItem()], overrides = {}) {
@@ -148,4 +150,7 @@ function projectTaskStatuses() {
 }
 const archivedTasks = (tasks = []) => ({ tasks, pagination: { page: 1, limit: 100, total: tasks.length, hasNextPage: false } });
 
-module.exports = { projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };
+// MAIR-880: groups the caller may link a project to (`GET /project-groups`); one group by default.
+const projectGroups = (groups = [{ id: 'group-1', name: 'Services techniques' }]) => ({ groups });
+
+module.exports = { projectGroups, projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };

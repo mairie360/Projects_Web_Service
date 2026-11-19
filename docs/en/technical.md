@@ -186,6 +186,7 @@ These data paths are exposed at the same origin through the proxy; Next.js pages
 | GET | `/check_apis` | — | 2XX |
 | GET | `/health` | — | 2XX |
 | POST | `/projects` | application/json | 400, 2XX |
+| GET | `/project-groups` | — | 2XX |
 | GET | `/projects-page` | — | 500, 2XX |
 | DELETE | `/projects/{projectId}` | — | 404, 2XX |
 | GET | `/projects/{projectId}` | — | 404, 2XX |

@@ -39,7 +39,7 @@ test('dates de formulaire et progression', () => {
 
 test('formulaires vides et formulaire d’édition depuis un projet du BFF', () => {
   assert.deepEqual(state.createProjectFormState(), {
-    title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '',
+    title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '', groupId: '',
     progress: 0, totalTasks: 0, completedTasks: 0, archivedTasks: 0, taskItems: [],
   });
   assert.equal(state.createProjectFormState('review').status, 'review');
@@ -52,7 +52,7 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
   const form = state.projectToFormState({ ...project, taskItems: tasks });
   assert.deepEqual({ ...form, taskItems: form.taskItems.length }, {
     title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: 'user-3',
-    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
+    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', groupId: '', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
   });
 });
 

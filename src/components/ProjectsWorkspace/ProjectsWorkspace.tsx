@@ -78,6 +78,8 @@ export function ProjectsWorkspace({
   duplicatingProjectIds,
   session,
   memberOptions,
+  groupOptions,
+  projectGroupsError,
   labelOptions,
   statusFilterOptions,
   priorityFilterOptions,
@@ -138,6 +140,8 @@ export function ProjectsWorkspace({
           highlightTaskId={linkedTaskId}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
+          groupOptions={groupOptions}
+          groupsError={projectGroupsError}
           statusOptions={projectStatusOptions}
           priorityOptions={projectPriorityOptions}
           onClose={closeProjectDetails}
@@ -180,6 +184,8 @@ export function ProjectsWorkspace({
           onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : verifyNewProjectReceipt('create')}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
+          groupOptions={groupOptions}
+          groupsError={projectGroupsError}
           statusOptions={projectStatusOptions}
           priorityOptions={projectPriorityOptions}
           onChange={updateProjectForm}

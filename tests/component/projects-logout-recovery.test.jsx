@@ -7,7 +7,7 @@ import { logoutAndReload } from '@/lib/auth-session';
 import { returnToLogin } from '@/lib/auth-token';
 import fixtures from '../support/bff-fixtures.cjs';
 
-vi.mock('@/lib/bffProjectClient', async original => ({ ...(await original()), getProjectsPage: vi.fn() }));
+vi.mock('@/lib/bffProjectClient', async original => ({ ...(await original()), getProjectsPage: vi.fn(), getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]) }));
 vi.mock('@/lib/auth-session', async original => ({ ...(await original()), logoutAndReload: vi.fn() }));
 vi.mock('@/lib/auth-token', async original => ({ ...(await original()), returnToLogin: vi.fn() }));
 

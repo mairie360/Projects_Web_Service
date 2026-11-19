@@ -356,6 +356,7 @@ export function createProjectBodyFromForm(form: ProjectFormState): CreateProject
     assigneeIds: uniquePreservingOrder([responsibleId, ...assigneeIds]),
     labels: uniquePreservingOrder(form.labels),
     dueDate: form.dueDate,
+    groupId: form.groupId,
     taskItems: form.taskItems.map((task) => ({
       title: task.title.trim(),
       status: task.status,
@@ -368,7 +369,22 @@ export function createProjectBodyFromForm(form: ProjectFormState): CreateProject
 }
 
 export function updateProjectBodyFromForm(form: ProjectFormState): UpdateProjectBody {
-  return createProjectBodyFromForm(form);
+  // The contract refuses `groupId: null`; a project without a group keeps it unchanged by omitting the field.
+  const { groupId, ...body } = createProjectBodyFromForm(form);
+  return groupId ? { ...body, groupId } : body;
+}
+
+export type ProjectGroup = { id: string; name: string };
+
+/** Groups the caller may link a project to (MAIR-880). */
+export async function getProjectGroups(signal?: AbortSignal): Promise<ProjectGroup[]> {
+  try {
+    const { data } = await bffProject.getProjectGroups({ signal });
+    return data.groups.map(({ id, name }) => ({ id, name }));
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw error;
+  }
 }
 
 export function taskBodyFromDraft(task: ProjectTaskDraft): CreateTaskBody {

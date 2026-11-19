@@ -10,6 +10,11 @@ export interface ProjectSideFieldsProps {
   responsibleOptions: FilterOption[];
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  /** Groups the project can be linked to (MAIR-880). */
+  groupOptions?: FilterOption[];
+  groupsError?: string;
+  /** The group is required to create a project, optional to edit one created before groups. */
+  groupRequired?: boolean;
   onChange: (patch: Partial<ProjectFormState>) => void;
 }
 
@@ -20,14 +25,25 @@ const TaskCount = ({ label, value }: { label: string; value: number }) => (
   </div>
 );
 
-/** "Champs du projet": status, priority, people, labels, due date, progress and task counts. */
-export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, onChange }: ProjectSideFieldsProps) => (
+/** "Champs du projet": group, status, priority, people, labels, due date, progress and task counts. */
+export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, groupOptions = [], groupsError, groupRequired = true, onChange }: ProjectSideFieldsProps) => (
   <>
     <div>
       <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
       <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
     </div>
 
+    <SelectField
+      id="project-group"
+      label="Groupe"
+      required={groupRequired}
+      value={form.groupId}
+      options={groupOptions}
+      placeholder="Choisir un groupe"
+      hint="Les membres du groupe voient le projet."
+      error={groupsError || undefined}
+      onChange={(groupId) => onChange({ groupId })}
+    />
     <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
     <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
     <SelectField id="project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} placeholder={null} onChange={(responsible) => onChange({ responsible })} />

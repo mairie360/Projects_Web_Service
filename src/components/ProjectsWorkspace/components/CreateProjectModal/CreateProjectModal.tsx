@@ -29,6 +29,8 @@ export function CreateProjectModal({
   onVerify,
   memberOptions,
   labelOptions,
+  groupOptions,
+  groupsError,
   statusOptions,
   priorityOptions,
   onChange,
@@ -52,6 +54,8 @@ export function CreateProjectModal({
   onVerify?: () => void | Promise<void>;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  groupOptions?: FilterOption[];
+  groupsError?: string;
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
   onChange: (patch: Partial<ProjectFormState>) => void;
@@ -195,6 +199,9 @@ export function CreateProjectModal({
                 responsibleOptions={responsibleOptions}
                 memberOptions={memberOptions}
                 labelOptions={labelOptions}
+                groupOptions={groupOptions}
+                groupsError={groupsError}
+                groupRequired={!isEditMode}
                 onChange={onChange}
               />
             </aside>

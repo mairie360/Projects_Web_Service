@@ -1,5 +1,19 @@
 # Projects_Web_Service — Présentation du module
 
+## Groupes de projet (MAIR-880)
+
+Chaque nouveau projet appartient à un **groupe** dont les membres actuels et futurs le
+voient (BFF_Project `GET /project-groups`, `groupId` obligatoire sur `POST /projects`).
+
+- Le formulaire de création a un champ « Groupe » obligatoire listant les groupes que
+  l’agent peut lier. Un groupe unique est présélectionné ; avec plusieurs, l’agent doit
+  choisir (« Choisissez le groupe du projet. ») ; sans aucun, le champ explique « Aucun
+  groupe disponible » et rien n’est envoyé. Une lecture refusée s’affiche sur le champ.
+- La modification en ligne peut déplacer le projet dans un autre groupe. Un projet créé
+  avant les groupes (détail `group: null`) reste sans groupe : la modification omet alors
+  `groupId`, car le contrat refuse `null`.
+- Le détail affiche « Groupe » (ou « Aucun groupe »).
+
 ## Projets V2 sur lib-components 2 (MAIR-828)
 
 La page épingle désormais `@mairie360/lib-components@2.1.0` et prend chaque
