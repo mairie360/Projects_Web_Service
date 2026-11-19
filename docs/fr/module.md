@@ -12,6 +12,9 @@ voient (BFF_Project `GET /project-groups`, `groupId` obligatoire sur `POST /proj
 - La modification en ligne peut déplacer le projet dans un autre groupe. Un projet créé
   avant les groupes (détail `group: null`) reste sans groupe : la modification omet alors
   `groupId`, car le contrat refuse `null`.
+- Quand le nouveau groupe retire l’accès de l’agent, BFF_Project enregistre le changement et
+  répond `204` : le projet quitte la page, sa fiche se ferme et un message indique qu’il
+  appartient désormais à un groupe dont l’agent n’est pas membre.
 - Le détail affiche « Groupe » (ou « Aucun groupe »).
 
 ## Projets V2 sur lib-components 2 (MAIR-828)

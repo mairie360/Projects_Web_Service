@@ -12,6 +12,9 @@ Every new project belongs to a **group** whose current and future members see it
 - The inline edit can move the project to another group. A project created before
   groups (detail `group: null`) keeps no group: the edit then omits `groupId`, since the
   contract refuses `null`.
+- When the new group removes the agent's access, BFF_Project saves the change and answers
+  `204`: the project leaves the page, its detail closes and a message says it now belongs
+  to a group the agent is not a member of.
 - The detail shows « Groupe » (or « Aucun groupe »).
 
 ## Projects V2 on lib-components 2 (MAIR-828)

@@ -991,6 +991,19 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!projectFormPendingRef.current) projectFormOpeningRef.current = null;
   };
 
+  // MAIR-880: a saved update that moved the project out of the caller's groups (204) removes it from the page.
+  const forgetMovedProject = async (projectId: string, title: string) => {
+    ++pageRevisionRef.current;
+    setProjects((current) => current.filter((value) => value.id !== projectId));
+    if (detailSelectionRef.current?.projectId === projectId) closeProjectDetails();
+    try {
+      await refreshProjectsPage({ silent: true, throwOnError: true });
+    } catch {
+      // The write is confirmed: a failed refresh must not invite a second PATCH.
+    }
+    setAlert({ type: 'info', message: `Projet "${title}" enregistré dans un groupe dont vous n’êtes pas membre : il ne fait plus partie de vos projets.` });
+  };
+
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
     setAlert(null);
     requireVerifiedProject(projectId);
@@ -1002,12 +1015,16 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       throw error;
     }
 
-    let details: ProjectDetailsResponse;
+    let details: ProjectDetailsResponse | null;
     try {
       details = await updateProject(projectId, updateProjectBodyFromForm(form));
     } catch (error) {
       showError(error);
       throw error;
+    }
+    if (!details) {
+      await forgetMovedProject(projectId, form.title.trim());
+      return;
     }
     requireProjectReceipt(projectId, details);
     const confirmed = applyConfirmedProject(details, false, taskRevision);
@@ -1030,6 +1047,10 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     try {
       requireVerifiedProject(project.id);
       const details = await updateProject(project.id, { status });
+      if (!details) {
+        await forgetMovedProject(project.id, project.title);
+        return;
+      }
       requireProjectReceipt(project.id, details);
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
@@ -1076,6 +1097,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
             return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(submittedForm));
           })()
           : await createProject(createProjectBodyFromForm(submittedForm));
+      if (!details) {
+        // Only an update answers without a body (204): the project left the caller's groups.
+        setCreateProjectOpen(false);
+        setEditingProjectId(null);
+        setProjectForm(createProjectFormState());
+        await forgetMovedProject(editingProjectId ?? '', projectForm.title.trim());
+        return;
+      }
       if (editingProjectId) requireProjectReceipt(editingProjectId, details);
       else requireNewProjectReceipt(details, 'create', { kind: 'create', title: projectForm.title }, knownAtDispatch);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);

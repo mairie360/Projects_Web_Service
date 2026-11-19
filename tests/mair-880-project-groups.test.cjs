@@ -141,3 +141,23 @@ test('MAIR-880: a project created before groups shows « Aucun groupe » and its
 
   assert.equal('groupId' in bffProject.calls('/projects/{projectId}', 'patch')[0].body, false);
 });
+
+test('MAIR-880: an edit that moves the project out of the agent\'s groups (204) removes it from the page', async () => {
+  bffProject.on('get', '/project-groups', { body: f.projectGroups(groups) });
+  view = mount(React.createElement(Page));
+  await view.waitFor(html => !html.includes('Chargement des projets'));
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
+  await view.waitFor(() => view.find('ProjectSummary').length === 1 && bffProject.calls('/projects/{projectId}', 'get').length === 1);
+  await view.settle();
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  await groupField('detail-project-group').onChange('group-7');
+  // Orval only types the 200 body; the 204 is documented in the operation description of the published contract.
+  bffProject.on('patch', '/projects/{projectId}', { status: 204, outOfContract: true });
+  bffProject.on('get', '/projects-page', { body: f.projectsPage([]) });
+  await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
+  await view.waitFor(html => html.includes('ne fait plus partie de vos projets'));
+
+  assert.equal(view.find('ProjectDetailModal').length, 0, 'the detail of a project the agent no longer sees is closed');
+  assert.equal(view.props('ProjectsWorkspace').projects.some(row => row.id === project.id), false);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1, 'the saved update is not replayed');
+});

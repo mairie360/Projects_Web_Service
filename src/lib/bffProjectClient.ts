@@ -280,10 +280,14 @@ export async function createProject(body: CreateProjectBody) {
   return normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
-export async function updateProject(projectId: string, body: UpdateProjectBody) {
+/**
+ * `null` when the update is saved but the caller no longer sees the project: BFF_Project answers 204 without a
+ * body after a group change that removes the caller's only access (MAIR-880).
+ */
+export async function updateProject(projectId: string, body: UpdateProjectBody): Promise<ProjectDetailsResponse | null> {
   const { data } = await bffProject.patchProjectsProjectId(encodeURIComponent(projectId), body);
 
-  return normalizeProjectDetails(data as ProjectDetailsResponse);
+  return data === undefined || data === null ? null : normalizeProjectDetails(data as ProjectDetailsResponse);
 }
 
 export async function duplicateProject(projectId: string) {

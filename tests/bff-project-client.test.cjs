@@ -220,6 +220,13 @@ describe('écritures sur les projets', () => {
     assert.equal('groupId' in onlyCall('/projects/{projectId}', 'patch').body, false);
   });
 
+  test('MAIR-880: a PATCH answered 204 (project moved out of the caller\'s groups) resolves to null', async () => {
+    // Orval only types the 200 body; the 204 is documented in the operation description of the published contract.
+    bffProject.on('patch', '/projects/{projectId}', { status: 204, outOfContract: true });
+
+    assert.equal(await client.updateProject('project-1', { groupId: 'group-7' }), null);
+  });
+
   test('MAIR-880: GET /project-groups lists the groups a project can be linked to', async () => {
     bffProject.on('get', '/project-groups', { body: fixtures.projectGroups([{ id: 'group-1', name: 'Services techniques' }, { id: 'group-7', name: 'Urbanisme' }]) });
 
