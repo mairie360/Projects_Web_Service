@@ -26,13 +26,14 @@ it('server display uses its validated role, instance timezone and public fronten
   expect(html).not.toContain(request.cookies.accessToken);
   expect(fetch).not.toHaveBeenCalled();
 });
-it('SSR immediately uses the confirmed public appearance and falls back safely when absent', async () => {
+it('SSR keeps the light theme (MAIR-828, lib-components 2) and the confirmed density, with a safe fallback', async () => {
   let html = renderToStaticMarkup(await RootLayout({ children: <p>Retained project</p> }));
-  expect(html).toContain('data-theme="system"');
+  expect(html).toContain('data-theme="light"');
   expect(html).toContain('data-density="normal"');
   request.cookies.mairie360_appearance = encodeURIComponent(JSON.stringify({ v: 1, theme: 'dark', density: 'compact', font_family: 'Arial' }));
   html = renderToStaticMarkup(await RootLayout({ children: <p>Retained project</p> }));
-  expect(html).toContain('data-theme="dark"');
+  expect(html).toContain('data-theme="light"');
+  expect(html).not.toContain('data-theme="dark"');
   expect(html).toContain('data-density="compact"');
   expect(html).toContain('Retained project');
 });

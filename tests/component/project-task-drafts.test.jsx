@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
 import { TaskComposer } from '@/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer';
 import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
+import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
@@ -69,15 +70,13 @@ describe("Project task save confirmation", () => {
     await user.selectOptions(dialog.getByLabelText("Statut", { exact: true }), "review");
     await user.selectOptions(dialog.getByLabelText("Priorité", { exact: true }), "low");
     fireEvent.change(dialog.getByLabelText("Échéance", { exact: true }), { target: { value: "2026-11-17" } });
-    await user.click(dialog.getByLabelText("Assignés", { exact: true }));
-    await user.click(dialog.getByRole("option", { name: "Admin Mairie" }));
-    await user.click(dialog.getByLabelText("Étiquettes", { exact: true }));
-    if (mode === "create") await user.click(dialog.getByRole("option", { name: "voirie" }));
+    await toggleOption(user, dialog, 'Assignés', 'Admin Mairie');
+    if (mode === "create") await toggleOption(user, dialog, 'Étiquettes', 'voirie');
     await user.click(title);
     const before = {
       title: title.value,
-      assignees: dialog.getByLabelText("Assignés", { exact: true }).textContent,
-      labels: dialog.getByLabelText("Étiquettes", { exact: true }).textContent,
+      assignees: checkedOptions(dialog, 'Assignés'),
+      labels: checkedOptions(dialog, 'Étiquettes'),
     };
     await user.click(dialog.getByRole("button", { name: mode === "edit" ? "Enregistrer la tâche" : "Ajouter la tâche", exact: true }));
     expect(await dialog.findByRole("alert")).toHaveProperty("textContent", "Enregistrement refusé");
@@ -85,8 +84,8 @@ describe("Project task save confirmation", () => {
     expect(dialog.getByLabelText("Statut", { exact: true }).value).toBe("review");
     expect(dialog.getByLabelText("Priorité", { exact: true }).value).toBe("low");
     expect(dialog.getByLabelText("Échéance", { exact: true }).value).toBe("2026-11-17");
-    expect(dialog.getByLabelText("Assignés", { exact: true }).textContent).toBe(before.assignees);
-    expect(dialog.getByLabelText("Étiquettes", { exact: true }).textContent).toBe(before.labels);
+    expect(checkedOptions(dialog, 'Assignés')).toEqual(before.assignees);
+    expect(checkedOptions(dialog, 'Étiquettes')).toEqual(before.labels);
     if (mode === "edit") expect(dialog.getByRole("button", { name: "Enregistrer la tâche", exact: true })).toBeTruthy();
     rerender(<ProjectDetailModal {...values} project={{ ...values.project, priority: "high" }} tasks={values.tasks.map(task => ({ ...task }))} />);
     expect(title.value).toBe(before.title);
@@ -144,8 +143,7 @@ describe("Project task save confirmation", () => {
     fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "review" } });
     fireEvent.change(screen.getAllByRole("combobox")[1], { target: { value: "low" } });
     fireEvent.change(title.closest("form").querySelector('input[type="date"]'), { target: { value: "2026-11-17" } });
-    await user.click(screen.getByRole("button", { name: "Étiquettes", exact: true }));
-    await user.click(screen.getByRole("option", { name: "voirie" }));
+    await toggleOption(user, screen, 'Étiquettes', 'voirie');
     await user.click(screen.getByRole("button", { name: "Ajouter", exact: true }));
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Carte refusée");
     rerender(<TaskComposer {...values} project={{ ...values.project, responsible: { ...values.project.responsible }, status: "done", priority: "high", dueDate: "2027-01-01" }} />);
@@ -173,7 +171,7 @@ it('requires an explicit assignee when the authenticated agent is unavailable, w
   fireEvent.submit(title.closest('form'));
   expect(await scope.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
   expect(values.onAddTask).not.toHaveBeenCalled();
-  await user.click(scope.getByLabelText('Assignés',{exact:true}));await user.click(scope.getByRole('option',{name:'Admin Mairie'}));await user.click(title);
+  await toggleOption(user, scope, 'Assignés', 'Admin Mairie');await user.click(title);
   fireEvent.submit(title.closest('form'));
   await waitFor(()=>expect(values.onAddTask).toHaveBeenCalledOnce());
   expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('user-1');
@@ -184,8 +182,7 @@ it('prefills the fresh selectable identity, rereads after a save and does not ov
   const read = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
   render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
   const dialog = within(screen.getByRole('dialog')), title = dialog.getByLabelText('Titre de la tâche', { exact:true });
-  const assignees = dialog.getByLabelText('Assignés', {exact:true});
-  expect(assignees.textContent).toContain('Choisir un ou plusieurs assignés');
+  expect(checkedOptions(dialog, 'Assignés')).toEqual([]);
   await act(async () => first.resolve('user-1'));
   expect(dialog.getByRole('button',{name:'Retirer Admin Mairie'})).toBeTruthy();
   await user.type(title, 'Tâche confirmée');
@@ -193,7 +190,7 @@ it('prefills the fresh selectable identity, rereads after a save and does not ov
   await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
   expect(values.onAddTask.mock.calls[0][1].responsible.id).toBe('user-1');
   await user.type(title, 'Brouillon saisi avant la réponse');
-  await user.click(assignees); await user.click(dialog.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(title);
+  await toggleOption(user, dialog, 'Assignés', 'Marie Durand'); await user.click(title);
   await act(async () => second.resolve('user-1'));
   expect(read.mock.calls[1][0].aborted).toBe(true);
   expect(dialog.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
@@ -208,7 +205,7 @@ it('aborts a closed detail and reads the account again on reopening', async () =
   view.unmount(); expect(read.mock.calls[0][0].aborted).toBe(true);
   render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
   await act(async()=>old.resolve('user-1'));
-  expect(screen.getByLabelText('Assignés',{exact:true}).textContent).toContain('Choisir un ou plusieurs assignés');
+  expect(checkedOptions(screen, 'Assignés')).toEqual([]);
   await act(async()=>fresh.resolve('user-3'));
   expect(screen.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
 });

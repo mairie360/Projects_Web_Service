@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
@@ -30,10 +31,8 @@ describe("Inline project edit confirmation", () => {
     await user.selectOptions(form.getByLabelText("Statut", { exact: true }), "review");
     await user.selectOptions(form.getByLabelText("Priorité", { exact: true }), "low");
     await user.selectOptions(form.getByLabelText("Assigné principal", { exact: true }), "user-1");
-    await user.click(form.getByLabelText("Assignés", { exact: true }));
-    await user.click(within(form.getByRole("listbox")).getByRole("option", { name: "Admin Mairie" }));
-    await user.click(form.getByLabelText("Étiquettes", { exact: true }));
-    await user.click(form.getByRole("option", { name: "voirie" }));
+    await toggleOption(user, form, 'Assignés', 'Admin Mairie');
+    await toggleOption(user, form, 'Étiquettes', 'voirie');
     await user.click(form.getByLabelText(/^Titre/));
     fireEvent.change(form.getByLabelText(/^Échéance/), { target: { value: "2026-11-17" } });
     await user.click(form.getByRole("button", { name: "Enregistrer", exact: true }));
@@ -45,8 +44,8 @@ describe("Inline project edit confirmation", () => {
       expect(form.getByLabelText("Statut", { exact: true }).value).toBe("review");
       expect(form.getByLabelText("Priorité", { exact: true }).value).toBe("low");
       expect(form.getByLabelText("Assigné principal", { exact: true }).value).toBe("user-1");
-      expect(form.getByLabelText("Assignés", { exact: true }).textContent).toBe("3 sélectionné(s)");
-      expect(form.getByLabelText("Étiquettes", { exact: true }).textContent).not.toMatch(/voirie/);
+      expect(checkedOptions(form, 'Assignés')).toHaveLength(3);
+      expect(checkedOptions(form, 'Étiquettes')).not.toContain('voirie');
       expect(form.getByLabelText(/^Échéance/).value).toBe("2026-11-17");
     };
     assertDraft();
@@ -54,8 +53,7 @@ describe("Inline project edit confirmation", () => {
     expect(draft.labels).toEqual(["énergie"]);
     rerender(<ProjectDetailModal {...values} project={{ ...values.project, title: "Titre officiel rafraîchi" }} />);
     assertDraft();
-    await user.click(form.getByLabelText("Assignés", { exact: true }));
-    expect(within(form.getByRole("listbox")).getByRole("option", { name: "Admin Mairie" }).getAttribute("aria-selected")).toBe("true");
+    expect(checkedOptions(form, 'Assignés')).toContain('Admin Mairie');
     await user.click(form.getByLabelText(/^Titre/));
     expect(form.getByRole("alert").textContent).toBe("Projet refusé");
     await user.click(form.getByRole("button", { name: "Enregistrer", exact: true }));

@@ -18,6 +18,6 @@ describe('ProjectsWorkspace', () => {
     vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(item, []));
     render(<ProjectsPage />);
     expect(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${item.title}` })).toBeTruthy();
-    expect(screen.getByRole('tablist', { name: 'Vue des projets' })).toBeTruthy();
+    expect(screen.getByRole('radiogroup', { name: 'Vue des projets' })).toBeTruthy();
   });
 });

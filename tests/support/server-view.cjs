@@ -31,6 +31,11 @@ const MAX_RENDER_PHASE_UPDATES = 25;
 
 let current = null;
 
+// An element, or an array holding one at any depth: `[cond && rows.map(...), ...]` nests arrays (lib DataTable).
+function holdsElement(value) {
+  return real.isValidElement(value) || (Array.isArray(value) && value.some(holdsElement));
+}
+
 function depsChanged(previous, next) {
   return !previous || !next || previous.length !== next.length || previous.some((value, index) => !Object.is(value, next[index]));
 }
@@ -413,7 +418,7 @@ class ServerView {
     let changed = false;
     const next = {};
     for (const [name, value] of Object.entries(props)) {
-      const wrapped = real.isValidElement(value) || (Array.isArray(value) && value.some(real.isValidElement)) ? this.wrap(value, name === 'children' ? `${path}>` : `${path}.${name}`) : value;
+      const wrapped = holdsElement(value) ? this.wrap(value, name === 'children' ? `${path}>` : `${path}.${name}`) : value;
       if (wrapped !== value) changed = true;
       next[name] = wrapped;
     }

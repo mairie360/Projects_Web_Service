@@ -194,14 +194,14 @@ for (const mode of ['kanban', 'grid', 'table']) {
     await view.act(() => view.props('ProjectsWorkspace').setViewMode(mode));
     await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
     await view.click(props => props['aria-label'] === `Actions pour ${first.title}`);
-    const blocked = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && text === 'Copie à vérifier');
+    const blocked = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Copie à vérifier');
     assert.equal(blocked.length, 1);
     assert.equal(blocked[0].props.disabled, true);
     assert.equal(blocked[0].props['aria-busy'], undefined, 'uncertainty is not a still-running request');
     assert.equal(view.props('ProjectsWorkspace').projects[0].permissions.canDuplicate, first.permissions.canDuplicate);
     await view.click(props => props['aria-label'] === `Actions pour ${first.title}`);
     await view.click(props => props['aria-label'] === `Actions pour ${second.title}`);
-    const available = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && text === 'Dupliquer');
+    const available = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer');
     assert.equal(available.length, 1);
     assert.equal(available[0].props.disabled, false);
     assert.equal(writes().length, 1);

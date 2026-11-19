@@ -87,7 +87,7 @@ test('the project form inputs carry the contract constraints with a French hint'
   const taskTitle = view.hostElements((props, _text, tag) => tag === 'input' && props['aria-label'] === 'Nouvelle tâche')[0].props;
   assert.equal(taskTitle.pattern, constraints.NO_MARKUP_PATTERN);
   assert.equal(taskTitle.title, constraints.NO_MARKUP_HINT);
-  assert.match(view.html, /<input id="project-title"[^>]*pattern="\[\^&lt;&gt;\]\*"[^>]*title="Les caractères &lt; et &gt; ne sont pas autorisés\."/);
+  assert.match(view.html, /<input[^>]*pattern="\[\^&lt;&gt;\]\*" title="Les caractères &lt; et &gt; ne sont pas autorisés\." id="project-title"/);
 
   // The description textarea reports the rule through the constraint validation API when the browser offers it.
   const validity = [];

@@ -1,14 +1,9 @@
 import React from 'react';
-import { Button } from '@mairie360/lib-components/primitives';
+import { Button, DateField, MultiSelect, SelectField, TextArea, TextField } from '@mairie360/lib-components/primitives';
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '@/lib/text-constraints';
 
 import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
-import { FieldLabel } from '@/components/ProjectsWorkspace/components/FieldLabel';
-import { FormField } from '@/components/ProjectsWorkspace/components/FormField';
-import { MultiSelectField } from '@/components/ProjectsWorkspace/components/MultiSelectField';
-import { SelectField } from '@/components/ProjectsWorkspace/components/SelectField';
-import { TextAreaField } from '@/components/ProjectsWorkspace/components/TextAreaField';
-import { fieldClassName } from '@/components/ProjectsWorkspace/field-style';
 
 export interface ProjectEditFormProps {
   form: ProjectFormState;
@@ -45,24 +40,17 @@ export const ProjectEditForm = ({
     )}
     {saving && <p role="status" className="text-xs text-[#57606a]">Enregistrement du projet…</p>}
     <fieldset disabled={disabled} className="min-w-0 space-y-4 border-0 p-0">
-      <FormField id="detail-project-title" label="Titre" value={form.title} required placeholder="Ajouter un titre..." onChange={(title) => onChange({ title })} />
-      <TextAreaField id="detail-project-description" label="Description" value={form.description} required placeholder="Ajouter une description..." onChange={(description) => onChange({ description })} />
-      <SelectField id="detail-project-status" label="Statut" value={form.status} options={statusOptions} onChange={(status) => onChange({ status: status as Project['status'] })} />
-      <SelectField id="detail-project-priority" label="Priorité" value={form.priority} options={priorityOptions} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
-      <SelectField id="detail-project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} onChange={(responsible) => onChange({ responsible })} />
-      <MultiSelectField id="detail-project-assignees" label="Assignés" values={form.assignees} options={memberOptions} placeholder="Choisir un ou plusieurs assignés" onChange={(assignees) => onChange({ assignees })} />
-      <MultiSelectField id="detail-project-labels" label="Étiquettes" values={form.labels} options={labelOptions} placeholder="Choisir une ou plusieurs étiquettes" onChange={(labels) => onChange({ labels })} />
-      <div>
-        <FieldLabel htmlFor="detail-project-due-date" label="Échéance" required />
-        <input
-          id="detail-project-due-date"
-          type="date"
+      <TextField id="detail-project-title" label="Titre" value={form.title} required placeholder="Ajouter un titre..." pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} onChange={(event) => onChange({ title: event.target.value })} />
+      <TextArea id="detail-project-description" label="Description" value={form.description} required placeholder="Ajouter une description..." rows={8} title={NO_MARKUP_HINT} onChange={(event) => { reportMarkupValidity(event.target); onChange({ description: event.target.value }); }} />
+      <SelectField id="detail-project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
+      <SelectField id="detail-project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
+      <SelectField id="detail-project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} placeholder={null} onChange={(responsible) => onChange({ responsible })} />
+      <MultiSelect id="detail-project-assignees" label="Assignés" value={form.assignees} options={memberOptions} onChange={(assignees) => onChange({ assignees })} />
+      <MultiSelect id="detail-project-labels" label="Étiquettes" value={form.labels} options={labelOptions} onChange={(labels) => onChange({ labels })} />
+      <DateField id="detail-project-due-date" label="Échéance"
           value={form.dueDate}
           required
-          className={fieldClassName}
-          onChange={(event) => onChange({ dueDate: event.target.value })}
-        />
-      </div>
+          onChange={(event) => onChange({ dueDate: event.target.value })} />
 
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="outline" tone="neutral"

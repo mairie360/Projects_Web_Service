@@ -1,15 +1,10 @@
 'use client';
 
+import { Avatar, AvatarStack, PriorityPill, ProgressMeter, StatusBadge, TagList } from '@mairie360/lib-components/primitives';
+
 import { CalendarDays, CircleDot, ListChecks, Tag, Users } from 'lucide-react';
-import { AvatarStack } from './components/AvatarStack';
-import { PersonAvatar } from '../PersonAvatar';
-import { PriorityLabel } from '../PriorityLabel';
-import { PriorityPill } from '../PriorityPill';
-import { ProgressMeter } from '../ProgressMeter';
-import { ProjectLabels } from './components/ProjectLabels';
 import { RecentTasks } from './components/RecentTasks';
-import { StatusPill } from '../StatusPill';
-import { formatProjectDate, getProjectNumber, statusMeta } from '../../project-card-meta';
+import { formatProjectDate, getProjectNumber, projectStatusBadge, projectStatusLabel } from '../../project-card-meta';
 import { ProjectActionsMenu } from './components/ProjectActionsMenu';
 import { TaskComposer } from './components/TaskComposer';
 import type { ProjectCardProps } from './project-card-types';
@@ -59,11 +54,11 @@ function KanbanProjectCard({
       <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-[#57606a]">{project.description}</p>
 
       <div className="mb-4">
-        <ProjectLabels labels={project.labels} />
+        <TagList label="Étiquettes du projet" items={project.labels.slice(0, 2)} size="s" />
       </div>
 
       <div className="mb-3" aria-label={`Progression ${project.progress}%`}>
-        <ProgressMeter value={project.progress} compact />
+        <ProgressMeter label="Progression" value={project.progress} size="s" />
       </div>
 
       <RecentTasks tasks={project.taskItems} />
@@ -71,9 +66,9 @@ function KanbanProjectCard({
       <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-[#57606a]">
         <span className="inline-flex min-w-0 items-center gap-1 truncate">
           <Tag className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
-          {statusMeta[project.status].label}
+          {projectStatusLabel(project.status)}
         </span>
-        <PriorityLabel priority={project.priority} />
+        <PriorityPill level={project.priority} />
         <span className="inline-flex min-w-0 items-center gap-1 truncate">
           <ListChecks className="h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
           {project.tasks.completed}/{project.tasks.total}
@@ -85,7 +80,7 @@ function KanbanProjectCard({
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <AvatarStack project={project} />
+        <AvatarStack label="Membres du projet" people={project.assignees.map((assignee) => ({ name: assignee.name }))} max={3} size="s" />
         <span className="inline-flex items-center gap-1 text-xs text-[#57606a]">
           <Users className="h-3.5 w-3.5" strokeWidth={1.8} />
           {project.assignees.length}
@@ -144,18 +139,18 @@ function GridProjectCard({
       <p className="mb-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-[#57606a]">{project.description}</p>
 
       <div className="mb-4">
-        <ProjectLabels labels={project.labels} />
+        <TagList label="Étiquettes du projet" items={project.labels.slice(0, 2)} size="s" />
       </div>
 
       <div className="mb-4">
-        <ProgressMeter value={project.progress} />
+        <ProgressMeter label="Progression" value={project.progress} />
       </div>
 
       <RecentTasks tasks={project.taskItems} />
 
       <div className="mb-4 grid grid-cols-2 gap-2 text-xs text-[#57606a]">
-        <StatusPill status={project.status} />
-        <PriorityPill priority={project.priority} />
+        <StatusBadge status={projectStatusBadge[project.status]} />
+        <PriorityPill level={project.priority} />
         <span className="inline-flex items-center gap-1">
           <ListChecks className="h-3.5 w-3.5" strokeWidth={1.8} />
           {project.tasks.completed}/{project.tasks.total} tâches
@@ -168,7 +163,7 @@ function GridProjectCard({
 
       <div className="flex items-center justify-between gap-4 text-sm text-[#57606a]">
         <span className="inline-flex min-w-0 items-center gap-2">
-          <PersonAvatar name={project.responsible.name} className="shrink-0" />
+          <Avatar alt={project.responsible.name} size="xs" className="shrink-0" />
           <span className="truncate">{project.responsible.name}</span>
         </span>
         <span className="inline-flex shrink-0 items-center gap-1 text-[#4c5258]">

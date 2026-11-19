@@ -5,6 +5,7 @@ import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectsPage from "@/app/projects-client";
 import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, getProjectDetails, getProjectsPage, updateProject, updateProjectTask, updateProjectTaskStatus } from "@/lib/bffProjectClient";
+import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
@@ -44,7 +45,7 @@ describe("Projects page", () => {
     await user.click(opener);
     const dialog = within(screen.getByRole('dialog')), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
     await user.type(input, 'Brouillon collision conservé');
-    await user.click(dialog.getByLabelText('Assignés',{exact:true})); await user.click(dialog.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(input);
+    await toggleOption(user, dialog, 'Assignés', 'Marie Durand'); await user.click(input);
     await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
     fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
@@ -142,7 +143,7 @@ describe("Projects page", () => {
     await user.click(await screen.findByRole('button',{name:`Actions pour ${project.title}`}));
     await user.click(screen.getByRole('menuitem',{name:'Modifier',exact:true}));
     const dialog=await screen.findByRole('dialog',{name:'Modifier le projet'}), form=within(dialog);
-    const title=form.getByRole('textbox',{name:'Titre*',exact:true});
+    const title=form.getByRole('textbox',{name:'Titre',exact:true});
     await user.clear(title);await user.type(title,'Brouillon qui reste à moi');
     const nested=form.getByPlaceholderText('Ajouter une tâche...');await user.type(nested,'Tâche non ajoutée');
     await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
@@ -219,7 +220,7 @@ describe("Projects page", () => {
     await user.click(opener);
     await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
     const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
-    const title = within(dialog).getByRole('textbox', { name: 'Titre*', exact: true });
+    const title = within(dialog).getByRole('textbox', { name: 'Titre', exact: true });
     expect(title.value).toBe(second.title);
     await user.clear(title); await user.type(title, 'Brouillon du projet choisi ensuite');
     await act(async () => refused ? earlier.reject(new Error('Ancienne lecture refusée')) : earlier.resolve(fixtures.projectDetails(first)));
@@ -243,11 +244,11 @@ describe("Projects page", () => {
     const opener = screen.getByRole('button', { name: 'Nouveau projet', exact: true });
     await user.click(opener);
     const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
-    await user.type(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }), 'Brouillon de création');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }), 'Brouillon de création');
     await user.type(within(dialog).getByPlaceholderText('Ajouter une tâche...'), 'Tâche non envoyée');
     await act(async () => earlier.resolve(fixtures.projectDetails(project)));
     expect(screen.getByRole('dialog', { name: 'Nouveau projet' })).toBe(dialog);
-    expect(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Brouillon de création');
+    expect(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Brouillon de création');
     expect(within(dialog).getByPlaceholderText('Ajouter une tâche...').value).toBe('Tâche non envoyée');
     expect(getProjectDetails).toHaveBeenCalledTimes(1);
     const close = within(dialog).getByRole('button', { name: 'Fermer la création de projet' });
@@ -265,7 +266,7 @@ describe("Projects page", () => {
     await user.click(await screen.findByRole('button', { name: `Actions pour ${project.title}` }));
     await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
     const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
-    expect(within(dialog).getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe(project.title);
+    expect(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }).value).toBe(project.title);
     expect(within(dialog).getByRole('alert').textContent).toContain('Chargement récent indisponible');
     expect(within(dialog).getByRole('alert').textContent).toContain('projet déjà affiché');
     await user.keyboard('{Escape}');
@@ -480,7 +481,7 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
-    await user.click(screen.getByLabelText('Assignés',{exact:true})); await user.click(screen.getByRole('option',{name:'Marie Durand',exact:true})); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
+    await toggleOption(user, screen, 'Assignés', 'Marie Durand'); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
@@ -541,16 +542,16 @@ describe("Projects page", () => {
     await user.click(await screen.findByRole("button", { name: `Actions pour ${project.title}` }));
     await user.click(screen.getByRole("menuitem", { name: "Dupliquer" }));
     expect(await screen.findByText("Duplication du projet en cours…")).toBeTruthy();
-    await user.click(screen.getByRole("tab", { name: "Grille" }));
+    await user.click(screen.getByRole("radio", { name: "Grille" }));
     await user.type(screen.getByPlaceholderText("Rechercher des projets..."), "éclairage");
     await waitFor(() => {
       const query = getProjectsPage.mock.calls.at(-1)[0];
       expect(query.view).toBe("grid");
       expect(query.q).toBe("éclairage");
-      expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(false);
+      expect(screen.getByRole("button", { name: "Suivant" }).disabled).toBe(false);
     });
-    await user.click(screen.getByRole("button", { name: "Page suivante" }));
-    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Suivant" }));
+    expect(await screen.findByText("51 – 85 sur 85 projets")).toBeTruthy();
     vi.mocked(getProjectsPage).mockImplementation(async query => {
       if (refusedRefresh) throw new Error("Lecture après copie refusée");
       return pageBody(query, [project, copy]);
@@ -560,15 +561,15 @@ describe("Projects page", () => {
     const expectedQuery = { q: undefined, status: "all", priority: "all", dueBefore: undefined, view: "grid", page: 1, limit: 50 };
     expect(getProjectsPage.mock.calls.at(-1)[0]).toEqual(expectedQuery);
     expect(screen.getByPlaceholderText("Rechercher des projets...").value).toBe("");
-    expect(screen.getByRole("tab", { name: "Grille" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Grille" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${copy.title}` })).toBeTruthy();
     if (refusedRefresh) {
       expect(await screen.findByText("Lecture après copie refusée")).toBeTruthy();
-      expect(screen.getByText("Page 2 · 85 projets")).toBeTruthy();
+      expect(screen.getByText("51 – 85 sur 85 projets")).toBeTruthy();
       vi.mocked(getProjectsPage).mockImplementation(async query => pageBody(query, [project, copy]));
       screen.getByRole("button", { name: "Réessayer" }).focus();
       await user.keyboard("{Enter}");
-      expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+      expect(await screen.findByText("1 – 50 sur 85 projets")).toBeTruthy();
       expect(screen.queryByText("Lecture après copie refusée")).toBeNull();
       expect(getProjectsPage.mock.calls.at(-1)[0]).toEqual(expectedQuery);
     }
@@ -581,17 +582,17 @@ describe("Projects page", () => {
       fixtures.projectListItem({ id: `project-${page}`, title: `Projet page ${page}` }),
     ], { pagination: { page, limit: 50, total: 85, hasNextPage: page === 1 } }));
     render(<ProjectsPage />);
-    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Page précédente" }).disabled).toBe(true);
-    screen.getByRole("button", { name: "Page suivante" }).focus();
+    expect(await screen.findByText("1 – 50 sur 85 projets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Précédent" }).disabled).toBe(true);
+    screen.getByRole("button", { name: "Suivant" }).focus();
     await user.keyboard("{Enter}");
-    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Page précédente" }).disabled).toBe(false);
+    expect(await screen.findByText("51 – 85 sur 85 projets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Suivant" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Précédent" }).disabled).toBe(false);
     expect(screen.queryByText("Projet page 1")).toBeNull();
     expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2]);
-    await user.click(screen.getByRole("button", { name: "Page précédente" }));
-    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Précédent" }));
+    expect(await screen.findByText("1 – 50 sur 85 projets")).toBeTruthy();
     expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2, 1]);
   });
 
@@ -604,19 +605,19 @@ describe("Projects page", () => {
       }))
       .mockImplementationOnce(() => new Promise((resolve, reject) => { rejectRead = reject; }));
     render(<ProjectsPage />);
-    expect(await screen.findByText("Page 1 · 85 projets")).toBeTruthy();
-    await user.dblClick(screen.getByRole("button", { name: "Page suivante" }));
+    expect(await screen.findByText("1 – 50 sur 85 projets")).toBeTruthy();
+    await user.dblClick(screen.getByRole("button", { name: "Suivant" }));
     await waitFor(() => expect(getProjectsPage).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole("button", { name: "Page suivante" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Suivant" }).disabled).toBe(true);
     rejectRead(new Error("Page suivante indisponible"));
     expect(await screen.findByText("Page suivante indisponible")).toBeTruthy();
-    expect(screen.getByText("Page 1 · 85 projets")).toBeTruthy();
+    expect(screen.getByText("1 – 50 sur 85 projets")).toBeTruthy();
     expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${fixtures.projectListItem().title}` })).toBeTruthy();
     vi.mocked(getProjectsPage).mockResolvedValueOnce(fixtures.projectsPage([], {
       pagination: { page: 2, limit: 50, total: 85, hasNextPage: false },
     }));
     await user.click(screen.getByRole("button", { name: "Réessayer" }));
-    expect(await screen.findByText("Page 2 · 85 projets")).toBeTruthy();
+    expect(await screen.findByText("51 – 85 sur 85 projets")).toBeTruthy();
     expect(getProjectsPage.mock.calls.map(([query]) => query.page)).toEqual([1, 2, 2]);
     expect(screen.queryByText("Page suivante indisponible")).toBeNull();
   });
@@ -635,7 +636,7 @@ describe("Projects page", () => {
     expect(screen.queryByRole("navigation", { name: "Pagination des projets" })).toBeNull();
     vi.mocked(getProjectsPage).mockResolvedValueOnce(fixtures.projectsPage([]));
     await user.click(screen.getByRole("button", { name: "Réessayer" }));
-    expect(await screen.findByText("Page 1 · 0 projets")).toBeTruthy();
+    expect(await screen.findByText("0 projets")).toBeTruthy();
   });
 
   it("shows loading and then an empty BFF-backed board without inventing a project", async () => {
@@ -660,11 +661,12 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
 
-    const search = screen.getByPlaceholderText("Rechercher des projets...");
-    const searchContainer = search.parentElement.parentElement;
-    const controls = search.parentElement.parentElement.parentElement;
-    const toolbar = controls.parentElement;
+    // MAIR-828: the toolbar holds lib controls; its responsive layout stays in the front.
+    const toolbar = screen.getByRole("region", { name: "Filtres des projets" }).firstElementChild;
+    const controls = toolbar.firstElementChild;
+    const searchContainer = controls.firstElementChild;
 
+    expect(searchContainer.contains(screen.getByRole("searchbox", { name: "Rechercher un projet" }))).toBe(true);
     expect(controls.classList.contains("w-full")).toBe(true);
     expect(controls.classList.contains("xl:flex-row")).toBe(true);
     expect(controls.classList.contains("md:flex-row")).toBe(false);
@@ -676,7 +678,7 @@ describe("Projects page", () => {
     expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
     expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
     expect(searchContainer.classList.contains("md:flex-1")).toBe(true);
-    expect(screen.getByRole("tablist", { name: "Vue des projets" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Vue des projets" })).toBeTruthy();
   });
 
   it("opens the requested BFF-backed project and highlights its task", async () => {
@@ -790,7 +792,7 @@ it('hydrates a confirmed server page under StrictMode and reads the next page ex
   expect(screen.getByText(project.title, { exact: true })).toBeTruthy();
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)); });
   expect(getProjectsPage).not.toHaveBeenCalled();
-  await user.click(screen.getByRole('button', { name: 'Page suivante' }));
+  await user.click(screen.getByRole('button', { name: 'Suivant' }));
   await screen.findByText(next.title, { exact: true });
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)); });
   expect(getProjectsPage).toHaveBeenCalledOnce();

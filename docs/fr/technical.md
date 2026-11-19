@@ -53,12 +53,11 @@ compatible `1.1.21`, avec l’intégrité vérifiée sur le registre, conformém
 [l’avis amont](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 Aucun seuil d’audit, workflow ou contrôle de sécurité n’est assoupli.
 
-Le paquet est épinglé à `@mairie360/lib-components@0.6.8`, publié par
-[la publication réussie de 0.6.8](https://github.com/mairie360/lib-components/actions/runs/36836970818), qui inclut la correction du pied de page #388.
-L’AppShell affiche désormais le copyright dans la sidebar sombre, hors de la
-navigation défilante. Le tiroir mobile conserve sa gestion du focus. Aucun bandeau
-de pied de page ne réduit la zone de contenu ; seules les informations fournies
-par le service sont affichées (pas de version fictive).
+Le paquet est épinglé à `@mairie360/lib-components@2.1.0` (MAIR-828, listé dans
+`tests/fixtures/shared-ui-releases.json`). Son `AccessibleShell` dessine un bandeau
+de navigation desktop, garde la sidebar pour le seul tiroir mobile, affiche un pied
+de page pleine largeur (`app-shell-footer`) et confirme la déconnexion dans une
+boîte de dialogue ; le layout racine fixe toujours `data-theme="light"`.
 Les contrats, les API/BFF et les approbations de déploiement sont inchangés.
 Le suivi de l’adoption reste dans [l’issue partagée #387](https://github.com/mairie360/lib-components/issues/387).
 

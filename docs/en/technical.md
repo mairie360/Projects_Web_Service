@@ -52,11 +52,11 @@ The unchanged CI audit exposed the transitive tooling dependency
 [the upstream advisory](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 No audit threshold, workflow or security policy is relaxed.
 
-The package is pinned to published `@mairie360/lib-components@0.6.8` from
-[the successful 0.6.8 publication](https://github.com/mairie360/lib-components/actions/runs/36836970818), including the sidebar-footer correction #388.
-AppShell now places copyright in the dark sidebar, outside scrolling navigation.
-The mobile drawer retains focus management. No content-footer band reduces the
-main viewport; only supplied information is shown, with no invented version.
+The package is pinned to published `@mairie360/lib-components@2.1.0` (MAIR-828,
+listed in `tests/fixtures/shared-ui-releases.json`). Its `AccessibleShell` draws a
+desktop navigation band, keeps the sidebar for the mobile drawer only, renders a
+full-width footer (`app-shell-footer`) and confirms logout in a dialog; the root
+layout always sets `data-theme="light"`.
 Contracts, APIs/BFFs and deployment approvals are unchanged. Consumer adoption
 is tracked in [shared issue #387](https://github.com/mairie360/lib-components/issues/387).
 

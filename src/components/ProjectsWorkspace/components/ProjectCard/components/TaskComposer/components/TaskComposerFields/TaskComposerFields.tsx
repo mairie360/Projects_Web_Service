@@ -44,7 +44,7 @@ export function TaskComposerFields({
         <select aria-label="Statut" value={status} className={compactFieldClassName} onChange={(event) => onChange({ status: event.target.value as Project['status'] })}>
           <option value="todo">À faire</option>
           <option value="in-progress">En cours</option>
-          <option value="review">En révision</option>
+          <option value="review">En revue</option>
           <option value="done">Terminé</option>
         </select>
       )}

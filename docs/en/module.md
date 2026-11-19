@@ -1,5 +1,33 @@
 # Projects_Web_Service — Module overview
 
+## Projects V2 on lib-components 2 (MAIR-828)
+
+The page now pins `@mairie360/lib-components@2.1.0` and draws every reusable
+piece from it instead of local copies:
+
+- **Frame:** the lib 2 `AccessibleShell` (desktop navigation band, sidebar only in
+  the mobile drawer, full-width footer, logout confirmed in « Se déconnecter ? »).
+  The theme is always light (lib MAIR-933): the appearance cookie only keeps the density.
+- **Statuses and priorities:** `StatusBadge` / `PriorityPill` with the lib colours
+  and labels. The `review` status now reads « En revue » (was « En révision »).
+  `project-card-meta.ts` maps project statuses to lib ones (`projectStatusBadge`,
+  `projectStatusLabel`); the local colour tables (`statusConfig`, `priorityConfig`,
+  `labelColors`, `statusMeta`…) are gone.
+- **People and progress:** `Avatar`, `AvatarStack`, `ProgressMeter`, `TagList`.
+- **Fields:** `TextField`, `TextArea`, `SelectField`, `MultiSelect` (an always
+  visible checkbox list with chips, no more popup) and `DateField`. The text
+  constraints (`NO_MARKUP_PATTERN`, `reportMarkupValidity`) are still applied.
+- **Page:** `PageHeader` (with `CreateButton`), the toolbar's `SearchField`,
+  `FilterSelect` (status, priority), `DateField` and `SegmentedControl`
+  (Kanban / grid / table, a radio group), the table view on `DataTable`, the
+  pagination on `Pagination` (« 1 – 50 sur 85 projets », « Précédent » / « Suivant »),
+  the card menu on `DropdownMenu`, the first paint on `Skeleton` columns.
+- **Feedback:** project and task deletions are confirmed in `ConfirmModal`. A write
+  whose receipt is unconfirmed stays an `ErrorAlert` with its verification button
+  (it lasts until the verification answers, so it is not a toast).
+
+No BFF call or contract changes.
+
 ## Security scan scope (ZAP rule 10031)
 
 ZAP rule 10031 flags a URL parameter value found in an HTML attribute. `view`,

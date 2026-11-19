@@ -42,7 +42,7 @@ describe('project form dialogs', () => {
     expect(form.getByRole('status').textContent).toContain('Titre officiel vérifié');
     expect(document.activeElement).toBe(form.getByRole('status'));
     expect(nested.value).toBe('Tâche non ajoutée encore présente');
-    expect(form.getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Saisie locale conservée');
+    expect(form.getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Saisie locale conservée');
     expect(form.getByRole('button', { name: 'Création vérifiée', exact: true }).disabled).toBe(true);
     await user.click(form.getByRole('button', { name: 'Création vérifiée', exact: true }));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('project form dialogs', () => {
     rerender(<CreateProjectModal {...props} verificationError="Lecture du catalogue refusée" />);
     expect(form.getByRole('alert').textContent).toContain('Lecture du catalogue refusée');
     expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
-    expect(form.getByRole('textbox', { name: 'Titre*', exact: true }).value).toBe('Création incertaine conservée');
+    expect(form.getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Création incertaine conservée');
     expect(nested.value).toBe('Tâche locale non envoyée');
     const results = await axe(dialog);
     expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
@@ -187,19 +187,14 @@ describe('project form dialogs', () => {
     }
   );
 
-  it('Escape first closes a nested assignee list and returns focus to its trigger without losing the selected value', async () => {
+  it('MAIR-828 the lib MultiSelect keeps a chosen assignee and Escape still closes the dialog to its opener', async () => {
     const user = userEvent.setup();
     render(<FormHarness mode="create" onSubmit={vi.fn()} />);
     const opener = screen.getByRole('button', { name: 'Ouvrir le formulaire' });
     await user.click(opener);
     const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
-    const trigger = within(dialog).getAllByRole('button', { name: 'Assignés', exact: true })[0];
-    await user.click(trigger);
-    await user.click(within(screen.getByRole('listbox', { name: 'Assignés' })).getByRole('option', { name: 'Alice Martin' }));
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('listbox')).toBeNull();
-    expect(screen.getByRole('dialog')).toBe(dialog);
-    expect(document.activeElement).toBe(trigger);
+    const [assignees] = within(dialog).getAllByRole('group', { name: 'Options : Assignés' });
+    await user.click(within(assignees).getByRole('checkbox', { name: 'Alice Martin' }));
     expect(within(dialog).getByRole('button', { name: 'Retirer Alice Martin' })).toBeTruthy();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();

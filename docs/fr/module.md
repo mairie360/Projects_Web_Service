@@ -1,5 +1,35 @@
 # Projects_Web_Service — Présentation du module
 
+## Projets V2 sur lib-components 2 (MAIR-828)
+
+La page épingle désormais `@mairie360/lib-components@2.1.0` et prend chaque
+élément réutilisable dans la bibliothèque au lieu de copies locales :
+
+- **Cadre :** l’`AccessibleShell` de la lib 2 (bandeau de navigation desktop,
+  sidebar uniquement dans le tiroir mobile, pied de page pleine largeur,
+  déconnexion confirmée dans « Se déconnecter ? »). Le thème est toujours clair
+  (lib MAIR-933) : le cookie d’apparence ne garde que la densité.
+- **Statuts et priorités :** `StatusBadge` / `PriorityPill` avec les couleurs et
+  libellés de la lib. Le statut `review` s’affiche « En revue » (avant « En révision »).
+  `project-card-meta.ts` fait la correspondance avec les statuts de la lib
+  (`projectStatusBadge`, `projectStatusLabel`) ; les tables de couleurs locales
+  (`statusConfig`, `priorityConfig`, `labelColors`, `statusMeta`…) sont supprimées.
+- **Personnes et progression :** `Avatar`, `AvatarStack`, `ProgressMeter`, `TagList`.
+- **Champs :** `TextField`, `TextArea`, `SelectField`, `MultiSelect` (liste de
+  cases toujours visible avec des puces, plus de liste déroulante) et `DateField`.
+  Les contraintes de texte (`NO_MARKUP_PATTERN`, `reportMarkupValidity`) restent appliquées.
+- **Page :** `PageHeader` (avec `CreateButton`), dans la barre d’outils `SearchField`,
+  `FilterSelect` (statut, priorité), `DateField` et `SegmentedControl` (Kanban /
+  grille / tableau, un groupe radio), la vue tableau sur `DataTable`, la pagination
+  sur `Pagination` (« 1 – 50 sur 85 projets », « Précédent » / « Suivant »), le menu
+  des cartes sur `DropdownMenu`, le premier affichage en colonnes de `Skeleton`.
+- **Retours :** les suppressions de projet et de tâche sont confirmées dans
+  `ConfirmModal`. Une écriture dont la réception n’est pas confirmée reste une
+  `ErrorAlert` avec son bouton de vérification (elle dure jusqu’à la réponse de la
+  vérification, ce n’est donc pas un toast).
+
+Aucun appel ni contrat BFF ne change.
+
 ## Périmètre du scan de sécurité (règle ZAP 10031)
 
 La règle ZAP 10031 signale une valeur de paramètre d’URL retrouvée dans un

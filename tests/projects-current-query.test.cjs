@@ -50,14 +50,14 @@ for (const [operation, refusedRefresh] of [
       pagination: pagination(Number(request.url.searchParams.get('page'))),
     }) }));
     await view.act(() => {
-      view.props('SearchInput').onChange('éclairage');
-      view.props('FilterSelect', 0).onChange('review');
-      view.props('FilterSelect', 1).onChange('high');
-      view.props('ViewToggle').onChange('grid');
+      view.props('ProjectFiltersBar').onSearchChange('éclairage');
+      view.props('ProjectFiltersBar').onStatusChange('review');
+      view.props('ProjectFiltersBar').onPriorityChange('high');
+      view.props('SegmentedControl').onChange('grid');
     });
     await view.fire(props => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-20' } });
     await view.waitFor(() => reads().length >= 2 && view.props('ProjectPagination').pagination?.page === 1 && !view.props('ProjectPagination').pending);
-    await view.click(props => props['aria-label'] === 'Page suivante');
+    await view.click(props => props['aria-label'] === 'Suivant');
     await view.waitFor(() => view.props('ProjectPagination').pagination?.page === 2);
     const currentQuery = query(reads().at(-1));
     assert.deepEqual(currentQuery, { q: 'éclairage', status: 'review', priority: 'high', dueBefore: '2026-12-20', view: 'grid', page: '2', limit: '50' });
@@ -70,8 +70,8 @@ for (const [operation, refusedRefresh] of [
     await pending;
     await view.settle();
     assert.deepEqual(query(reads().at(-1)), intendedQuery, 'post-write GET must use the current view and intended filters');
-    assert.equal(view.props('SearchInput').value, operation === 'duplicate' ? '' : 'éclairage');
-    assert.equal(view.props('ViewToggle').value, 'grid');
+    assert.equal(view.props('ProjectFiltersBar').search, operation === 'duplicate' ? '' : 'éclairage');
+    assert.equal(view.props('ProjectFiltersBar').viewMode, 'grid');
     assert.equal(view.props('GridView').projects[0].title, confirmed.title);
     assert.equal(view.props('ProjectPagination').pagination.page, operation === 'duplicate' && !refusedRefresh ? 1 : 2);
     if (refusedRefresh) {
