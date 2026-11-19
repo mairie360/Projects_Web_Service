@@ -208,7 +208,8 @@ test('a creation ID confirmed earlier stays protected even when its task later d
 
 test('a never-opened card reads a coherent task baseline before sending its POST and rejects an existing receipt ID', async () => {
   await loaded(false); await collide();
-  assert.deepEqual(harness.bffProject.requests.map(({ method, path }) => [method, path]), [
+  // The page also reads the linkable groups once (MAIR-880), outside the task creation.
+  assert.deepEqual(harness.bffProject.requests.filter(({ path }) => path !== '/project-groups').map(({ method, path }) => [method, path]), [
     ['GET', '/projects-page'], ['GET', '/projects/project-1'], ['POST', '/projects/project-1/tasks'],
   ]);
   assert.equal(workspace().taskCreationStates.get(project.id).uncertainTitle, draft.title);

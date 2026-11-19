@@ -44,6 +44,7 @@ function projectForm(overrides = {}) {
     assignees: ['user-3', ' user-2 ', 'user-3', ''],
     labels: ['voirie', ' voirie', 'énergie'],
     dueDate: '2026-12-15',
+    groupId: 'group-1',
     progress: 0,
     totalTasks: 1,
     completedTasks: 0,
@@ -192,6 +193,7 @@ describe('écritures sur les projets', () => {
       assigneeIds: ['user-3', 'user-2'],
       labels: ['voirie', 'énergie'],
       dueDate: '2026-12-15',
+      groupId: 'group-1',
       taskItems: [{ title: 'Relevé', status: 'todo', priority: 'medium', assigneeIds: ['user-2'], labels: ['voirie'], dueDate: '2026-10-01T00:00:00.000Z' }],
     });
     assert.equal(details.project.dueDate, '2026-12-15');
@@ -206,6 +208,30 @@ describe('écritures sur les projets', () => {
     assert.equal(body.responsibleId, 'user-1');
     assert.deepEqual(body.assigneeIds, ['user-1', 'user-2']);
     assert.deepEqual(body.taskItems, []);
+    assert.equal(body.groupId, 'group-1');
+  });
+
+  test('MAIR-880: PATCH /projects/{projectId} omits the group of a project created without one', async () => {
+    bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails() });
+
+    await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ groupId: '', taskItems: [] })));
+
+    // The contract refuses `groupId: null`: an empty group keeps the stored one unchanged.
+    assert.equal('groupId' in onlyCall('/projects/{projectId}', 'patch').body, false);
+  });
+
+  test('MAIR-880: a PATCH answered 204 (project moved out of the caller\'s groups) resolves to null', async () => {
+    // Orval only types the 200 body; the 204 is documented in the operation description of the published contract.
+    bffProject.on('patch', '/projects/{projectId}', { status: 204, outOfContract: true });
+
+    assert.equal(await client.updateProject('project-1', { groupId: 'group-7' }), null);
+  });
+
+  test('MAIR-880: GET /project-groups lists the groups a project can be linked to', async () => {
+    bffProject.on('get', '/project-groups', { body: fixtures.projectGroups([{ id: 'group-1', name: 'Services techniques' }, { id: 'group-7', name: 'Urbanisme' }]) });
+
+    assert.deepEqual(await client.getProjectGroups(), [{ id: 'group-1', name: 'Services techniques' }, { id: 'group-7', name: 'Urbanisme' }]);
+    onlyCall('/project-groups', 'get');
   });
 
   test('POST /projects/{projectId}/duplicate part sans corps', async () => {

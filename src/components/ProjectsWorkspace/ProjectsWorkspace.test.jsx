@@ -6,6 +6,8 @@ import { getProjectDetails, getProjectsPage } from '@/lib/bffProjectClient';
 
 vi.mock('@/lib/bffProjectClient', async (importOriginal) => ({
   ...(await importOriginal()),
+  // MAIR-880: the creation form reads the linkable groups once.
+  getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
   getProjectDetails: vi.fn(),
   getProjectsPage: vi.fn(),
 }));

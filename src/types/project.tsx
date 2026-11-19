@@ -71,6 +71,8 @@ export interface Project {
   priority: ProjectPriority;
   priorityLabel?: string;
   labels: string[];
+  /** Group whose members see the project (MAIR-880); `null` for a project created before groups or whose group was deleted. */
+  group?: { id: string; name: string } | null;
   taskItems?: ProjectTask[];
   /** BFF task counts: `total` and `completed` include the archived (done) tasks, `taskItems` only lists the `active` ones. */
   tasks: {

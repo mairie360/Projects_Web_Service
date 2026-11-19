@@ -1,5 +1,22 @@
 # Projects_Web_Service — Module overview
 
+## Project groups (MAIR-880)
+
+Every new project belongs to a **group** whose current and future members see it
+(BFF_Project `GET /project-groups`, `groupId` required on `POST /projects`).
+
+- The creation form has a required « Groupe » field listing the groups the agent may
+  link. A single group is preselected; with several, the agent must choose
+  (« Choisissez le groupe du projet. »); with none, the field explains « Aucun groupe
+  disponible » and nothing is sent. A refused read is shown on the field.
+- The inline edit can move the project to another group. A project created before
+  groups (detail `group: null`) keeps no group: the edit then omits `groupId`, since the
+  contract refuses `null`.
+- When the new group removes the agent's access, BFF_Project saves the change and answers
+  `204`: the project leaves the page, its detail closes and a message says it now belongs
+  to a group the agent is not a member of.
+- The detail shows « Groupe » (or « Aucun groupe »).
+
 ## Projects V2 on lib-components 2 (MAIR-828)
 
 The page now pins `@mairie360/lib-components@2.1.0` and draws every reusable

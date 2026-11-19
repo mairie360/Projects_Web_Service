@@ -32,6 +32,8 @@ export function ProjectDetailModal({
   highlightTaskId,
   memberOptions,
   labelOptions,
+  groupOptions,
+  groupsError,
   statusOptions,
   priorityOptions,
   onClose,
@@ -65,6 +67,8 @@ export function ProjectDetailModal({
   highlightTaskId?: string | null;
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  groupOptions?: FilterOption[];
+  groupsError?: string;
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
   onClose: () => void;
@@ -219,6 +223,8 @@ export function ProjectDetailModal({
                   responsibleOptions={responsibleOptions}
                   memberOptions={memberOptions}
                   labelOptions={labelOptions}
+                  groupOptions={groupOptions}
+                  groupsError={groupsError}
                   onChange={projectEdit.update}
                   onCancel={projectEdit.cancel}
                   onSubmit={projectEdit.submit}

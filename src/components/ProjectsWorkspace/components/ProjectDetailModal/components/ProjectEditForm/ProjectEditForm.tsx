@@ -17,6 +17,9 @@ export interface ProjectEditFormProps {
   responsibleOptions: FilterOption[];
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  /** Groups the project can be moved to (MAIR-880). */
+  groupOptions?: FilterOption[];
+  groupsError?: string;
   onChange: (patch: Partial<ProjectFormState>) => void;
   onCancel: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -25,7 +28,7 @@ export interface ProjectEditFormProps {
 /** Inline project edition in the side column; the tasks stay visible. */
 export const ProjectEditForm = ({
   form, saving, error, disabled, saveDisabled, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions,
-  onChange, onCancel, onSubmit,
+  groupOptions = [], groupsError, onChange, onCancel, onSubmit,
 }: ProjectEditFormProps) => (
   <form className="space-y-4" aria-label="Modifier le projet" aria-busy={saving} onSubmit={onSubmit}>
     <div>
@@ -42,6 +45,17 @@ export const ProjectEditForm = ({
     <fieldset disabled={disabled} className="min-w-0 space-y-4 border-0 p-0">
       <TextField id="detail-project-title" label="Titre" value={form.title} required placeholder="Ajouter un titre..." pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} onChange={(event) => onChange({ title: event.target.value })} />
       <TextArea id="detail-project-description" label="Description" value={form.description} required placeholder="Ajouter une description..." rows={8} title={NO_MARKUP_HINT} onChange={(event) => { reportMarkupValidity(event.target); onChange({ description: event.target.value }); }} />
+      <SelectField
+        id="detail-project-group"
+        label="Groupe"
+        required={false}
+        value={form.groupId}
+        options={groupOptions}
+        placeholder="Choisir un groupe"
+        hint="Les membres du groupe voient le projet."
+        error={groupsError || undefined}
+        onChange={(groupId) => onChange({ groupId })}
+      />
       <SelectField id="detail-project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
       <SelectField id="detail-project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
       <SelectField id="detail-project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} placeholder={null} onChange={(responsible) => onChange({ responsible })} />

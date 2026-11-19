@@ -18,6 +18,8 @@ export type ProjectFormState = {
   assignees: string[];
   labels: string[];
   dueDate: string;
+  /** Group of the project (`GET /project-groups`, MAIR-880); required to create, kept empty for a project created before groups. */
+  groupId: string;
   progress: number;
   totalTasks: number;
   completedTasks: number;
@@ -80,6 +82,7 @@ export function createProjectFormState(status: Project['status'] = 'todo'): Proj
     assignees: [],
     labels: [],
     dueDate: '',
+    groupId: '',
     progress: 0,
     totalTasks: 0,
     completedTasks: 0,
@@ -129,6 +132,7 @@ export function projectToFormState(project: Project): ProjectFormState {
     assignees: participantValues,
     labels: project.labels,
     dueDate: project.dueDate,
+    groupId: project.group?.id ?? '',
     progress: project.progress,
     totalTasks: project.tasks.total,
     completedTasks: project.tasks.completed,

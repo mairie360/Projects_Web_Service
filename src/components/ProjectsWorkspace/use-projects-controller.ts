@@ -20,6 +20,7 @@ import {
   duplicateProject as duplicateBffProject,
   getBffProjectErrorMessage,
   getProjectDetails,
+  getProjectGroups,
   getProjectsPage,
   mergeProjectDetails,
   taskBodyFromDraft,
@@ -202,6 +203,27 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       projectsPage?.options.labels ??
       createSelectOptions(projects.flatMap((project) => project.labels)),
     [projects, projectsPage?.options.labels]
+  );
+
+  // MAIR-880: the groups a project can be linked to, read once; a refused read leaves the list empty and
+  // the creation form explains it instead of inventing a group.
+  const [projectGroups, setProjectGroups] = useState<{ id: string; name: string }[] | null>(null);
+  const [projectGroupsError, setProjectGroupsError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    getProjectGroups(controller.signal).then(
+      (groups) => {
+        if (controller.signal.aborted) return;
+        setProjectGroups(groups);
+        setProjectGroupsError(groups.length ? '' : 'Aucun groupe disponible : demandez à un administrateur de vous ajouter à un groupe.');
+      },
+      (error) => { if (!controller.signal.aborted) { setProjectGroups([]); setProjectGroupsError(getBffProjectErrorMessage(error)); } },
+    );
+    return () => controller.abort();
+  }, []);
+  const groupOptions = useMemo<FilterOption[]>(
+    () => (projectGroups ?? []).map((group) => ({ value: group.id, label: group.name })),
+    [projectGroups]
   );
 
   const statusOptionsFromBff = projectsPage?.filters.statuses;
@@ -864,7 +886,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const openCreateProject = (status: Project['status'] = 'todo') => {
     if (projectFormPendingRef.current) return;
     projectFormOpeningRef.current = null;
-    setProjectForm(uncertainCreationDraftRef.current ?? createProjectFormState(status));
+    // A single linkable group is the only possible choice, so it starts selected.
+    const onlyGroup = projectGroups?.length === 1 ? projectGroups[0].id : '';
+    setProjectForm(uncertainCreationDraftRef.current ?? { ...createProjectFormState(status), groupId: onlyGroup });
     setEditingProjectId(null);
     setProjectFormError('');
     setCreateProjectOpen(true);
@@ -967,6 +991,19 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!projectFormPendingRef.current) projectFormOpeningRef.current = null;
   };
 
+  // MAIR-880: a saved update that moved the project out of the caller's groups (204) removes it from the page.
+  const forgetMovedProject = async (projectId: string, title: string) => {
+    ++pageRevisionRef.current;
+    setProjects((current) => current.filter((value) => value.id !== projectId));
+    if (detailSelectionRef.current?.projectId === projectId) closeProjectDetails();
+    try {
+      await refreshProjectsPage({ silent: true, throwOnError: true });
+    } catch {
+      // The write is confirmed: a failed refresh must not invite a second PATCH.
+    }
+    setAlert({ type: 'info', message: `Projet "${title}" enregistré dans un groupe dont vous n’êtes pas membre : il ne fait plus partie de vos projets.` });
+  };
+
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
     setAlert(null);
     requireVerifiedProject(projectId);
@@ -978,12 +1015,16 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       throw error;
     }
 
-    let details: ProjectDetailsResponse;
+    let details: ProjectDetailsResponse | null;
     try {
       details = await updateProject(projectId, updateProjectBodyFromForm(form));
     } catch (error) {
       showError(error);
       throw error;
+    }
+    if (!details) {
+      await forgetMovedProject(projectId, form.title.trim());
+      return;
     }
     requireProjectReceipt(projectId, details);
     const confirmed = applyConfirmedProject(details, false, taskRevision);
@@ -1006,6 +1047,10 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     try {
       requireVerifiedProject(project.id);
       const details = await updateProject(project.id, { status });
+      if (!details) {
+        await forgetMovedProject(project.id, project.title);
+        return;
+      }
       requireProjectReceipt(project.id, details);
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
@@ -1027,6 +1072,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
       return;
     }
+    // A single linkable group is the only possible choice: it is sent even when the field was left empty.
+    const submittedForm = editingProjectId || projectForm.groupId || projectGroups?.length !== 1
+      ? projectForm
+      : { ...projectForm, groupId: projectGroups[0].id };
+    if (!editingProjectId && !submittedForm.groupId) {
+      setProjectFormError('Choisissez le groupe du projet.');
+      return;
+    }
 
     projectFormPendingRef.current = true;
     const selection = detailSelectionRef.current;
@@ -1041,9 +1094,17 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
         : template
           ? await (() => {
             if (!workflowPort?.createProjectFromTemplate) throw new Error('La création depuis un modèle est indisponible.');
-            return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(projectForm));
+            return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(submittedForm));
           })()
-          : await createProject(createProjectBodyFromForm(projectForm));
+          : await createProject(createProjectBodyFromForm(submittedForm));
+      if (!details) {
+        // Only an update answers without a body (204): the project left the caller's groups.
+        setCreateProjectOpen(false);
+        setEditingProjectId(null);
+        setProjectForm(createProjectFormState());
+        await forgetMovedProject(editingProjectId ?? '', projectForm.title.trim());
+        return;
+      }
       if (editingProjectId) requireProjectReceipt(editingProjectId, details);
       else requireNewProjectReceipt(details, 'create', { kind: 'create', title: projectForm.title }, knownAtDispatch);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
@@ -1522,6 +1583,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     session,
     memberOptions,
     labelOptions,
+    groupOptions,
+    projectGroupsError,
     statusFilterOptions,
     priorityFilterOptions,
     projectStatusOptions,

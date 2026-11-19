@@ -8,7 +8,7 @@ import { getProjectDetails, getProjectsPage } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
 
 vi.mock('@/lib/bffProjectClient', async importOriginal => ({
-  ...(await importOriginal()), getProjectDetails: vi.fn(), getProjectsPage: vi.fn(),
+  ...(await importOriginal()), getProjectDetails: vi.fn(), getProjectsPage: vi.fn(), getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
 }));
 
 beforeEach(() => {
