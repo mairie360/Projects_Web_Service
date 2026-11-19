@@ -1,11 +1,7 @@
+import { DateField, MultiSelect, ProgressMeter, SelectField } from '@mairie360/lib-components/primitives';
 import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
 
-import { FieldLabel } from '@/components/ProjectsWorkspace/components/FieldLabel';
-import { MultiSelectField } from '@/components/ProjectsWorkspace/components/MultiSelectField';
-import { SelectField } from '@/components/ProjectsWorkspace/components/SelectField';
-import { fieldClassName } from '@/components/ProjectsWorkspace/field-style';
-import { ProgressMeter } from '../../../ProgressMeter';
 
 export interface ProjectSideFieldsProps {
   form: ProjectFormState;
@@ -32,20 +28,17 @@ export const ProjectSideFields = ({ form, statusOptions, priorityOptions, respon
       <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
     </div>
 
-    <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} onChange={(status) => onChange({ status: status as Project['status'] })} />
-    <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
-    <SelectField id="project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} onChange={(responsible) => onChange({ responsible })} />
-    <MultiSelectField id="project-assignees" label="Assignés" values={form.assignees} options={memberOptions} placeholder="Choisir un ou plusieurs assignés" onChange={(assignees) => onChange({ assignees })} />
-    <MultiSelectField id="project-labels" label="Étiquettes" values={form.labels} options={labelOptions} placeholder="Choisir une ou plusieurs étiquettes" onChange={(labels) => onChange({ labels })} />
+    <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
+    <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
+    <SelectField id="project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} placeholder={null} onChange={(responsible) => onChange({ responsible })} />
+    <MultiSelect id="project-assignees" label="Assignés" value={form.assignees} options={memberOptions} onChange={(assignees) => onChange({ assignees })} />
+    <MultiSelect id="project-labels" label="Étiquettes" value={form.labels} options={labelOptions} onChange={(labels) => onChange({ labels })} />
 
-    <div>
-      <FieldLabel htmlFor="project-due-date" label="Échéance" required />
-      <input id="project-due-date" type="date" value={form.dueDate} required className={fieldClassName} onChange={(event) => onChange({ dueDate: event.target.value })} />
-    </div>
+    <DateField id="project-due-date" label="Échéance" value={form.dueDate} required onChange={(event) => onChange({ dueDate: event.target.value })} />
 
     <div>
       <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
-      <ProgressMeter value={form.progress} />
+      <ProgressMeter label="Progression" value={form.progress} />
     </div>
 
     <div className="grid grid-cols-2 gap-3">

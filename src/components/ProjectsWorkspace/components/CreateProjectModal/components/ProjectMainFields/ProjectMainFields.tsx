@@ -1,6 +1,6 @@
+import { TextArea, TextField } from '@mairie360/lib-components/primitives';
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '@/lib/text-constraints';
 import type { ProjectFormState } from '@/lib/projectPageState';
-import { FormField } from '@/components/ProjectsWorkspace/components/FormField';
-import { TextAreaField } from '@/components/ProjectsWorkspace/components/TextAreaField';
 
 export interface ProjectMainFieldsProps {
   form: ProjectFormState;
@@ -11,7 +11,7 @@ export interface ProjectMainFieldsProps {
 export const ProjectMainFields = ({ form, onChange }: ProjectMainFieldsProps) => (
   <>
     <div className="rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-      <FormField id="project-title" label="Titre" value={form.title} required placeholder="Ajouter un titre..." onChange={(title) => onChange({ title })} />
+      <TextField id="project-title" label="Titre" value={form.title} required placeholder="Ajouter un titre..." pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} onChange={(event) => onChange({ title: event.target.value })} />
     </div>
 
     <div className="overflow-hidden rounded-md border border-[#d9d5d0] bg-[#fbfaf8]">
@@ -19,14 +19,12 @@ export const ProjectMainFields = ({ form, onChange }: ProjectMainFieldsProps) =>
         <span className="rounded-md border border-[#d0d7de] bg-white px-3 py-1 text-xs font-semibold text-[#24292f]">Écrire</span>
       </div>
       <div className="p-4">
-        <TextAreaField
+        <TextArea
           id="project-description"
           label="Description"
           value={form.description}
           required
-          placeholder="Ajouter une description, des critères d'acceptation ou des notes..."
-          onChange={(description) => onChange({ description })}
-        />
+          placeholder="Ajouter une description, des critères d'acceptation ou des notes..." rows={8} title={NO_MARKUP_HINT} onChange={(event) => { reportMarkupValidity(event.target); onChange({ description: event.target.value }); }} />
       </div>
     </div>
   </>

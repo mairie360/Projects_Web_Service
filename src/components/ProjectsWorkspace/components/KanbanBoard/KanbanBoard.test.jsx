@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import fixtures from '@tests/support/bff-fixtures.cjs';
-import { statusConfig } from '@/types/project';
+import { projectStatusBadge, projectStatusLabel } from '@/components/ProjectsWorkspace/project-card-meta';
 import { KanbanBoard } from './KanbanBoard';
 
-const columns = Object.entries(statusConfig).map(([status, presentation]) => ({ status, label: presentation.label }));
+const columns = Object.keys(projectStatusBadge).map((status) => ({ status, label: projectStatusLabel(status) }));
 
 describe('KanbanBoard', () => {
   it('lays the projects out in one region per status', () => {

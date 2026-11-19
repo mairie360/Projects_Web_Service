@@ -3,7 +3,7 @@
 import { AccessibleShell } from "@mairie360/lib-components/shell";
 
 import React from 'react';
-import { Alert, Skeleton } from '@mairie360/lib-components/primitives';
+import { Alert, ConfirmModal, Skeleton } from '@mairie360/lib-components/primitives';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
@@ -63,8 +63,6 @@ export function ProjectsWorkspace({
   setDueBeforeFilter,
   searchTerm,
   setSearchTerm,
-  openFilter,
-  setOpenFilter,
   alert,
   logoutError,
   setAlert,
@@ -117,24 +115,16 @@ export function ProjectsWorkspace({
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
   return (
     <>
-      {projectPendingDeletion && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
-          <div className="w-full max-w-md overflow-hidden rounded-md border border-[#d0d7de] bg-[#fbfaf8] shadow-[0_18px_50px_rgba(27,31,36,0.28)]">
-            <div className="border-b border-[#dedbd6] bg-[#2b2b2b] px-5 py-4">
-              <h2 id="delete-project-title" className="text-base font-semibold text-white">Supprimer le projet</h2>
-            </div>
-            <div className="p-5">
-              <p className="text-sm leading-relaxed text-[#57606a]">
-                Le projet <strong className="text-[#24292f]">{projectPendingDeletion.title}</strong> et ses tâches seront supprimés définitivement.
-              </p>
-              <div className="mt-5 flex justify-end gap-2">
-                <button type="button" className="h-9 rounded-md border border-[#d0d7de] bg-white px-4 text-sm font-semibold text-[#24292f] hover:bg-[#f1eee9]" onClick={() => setProjectPendingDeletion(null)}>Annuler</button>
-                <button type="button" className="h-9 rounded-md bg-[#cf222e] px-4 text-sm font-semibold text-white hover:bg-[#a40e26]" onClick={() => void confirmProjectDeletion()}>Supprimer</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={Boolean(projectPendingDeletion)}
+        title="Supprimer le projet"
+        message={projectPendingDeletion && <>Le projet <strong>{projectPendingDeletion.title}</strong> et ses tâches seront supprimés définitivement.</>}
+        confirmLabel="Supprimer"
+        destructive
+        initialFocus="cancel"
+        onCancel={() => setProjectPendingDeletion(null)}
+        onConfirm={() => void confirmProjectDeletion()}
+      />
 
       {selectedProject && (
         <ProjectDetailModal
@@ -265,14 +255,12 @@ export function ProjectsWorkspace({
                 dueBefore={dueBeforeFilter}
                 statusOptions={statusFilterOptions}
                 priorityOptions={priorityFilterOptions}
-                openFilter={openFilter}
                 viewMode={viewMode}
                 views={projectsPage?.page.views ?? []}
                 onSearchChange={setSearchTerm}
                 onStatusChange={setStatusFilter}
                 onPriorityChange={setPriorityFilter}
                 onDueBeforeChange={setDueBeforeFilter}
-                onOpenFilterChange={setOpenFilter}
                 onViewModeChange={setViewMode}
               />
 

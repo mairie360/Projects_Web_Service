@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ProjectTasksEditor } from '@/components/ProjectsWorkspace/components/ProjectTasksEditor';
 import { createProjectFormState } from '@/lib/projectPageState';
+import { toggleOption } from './units/multi-select';
 import fixtures from '../support/bff-fixtures.cjs';
 
 const memberOptions = [
@@ -90,8 +91,7 @@ describe('ProjectTasksEditor task assignees', () => {
     render(<Editor responsible="user-3" />);
 
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Vérifier le dossier');
-    await user.click(screen.getByRole('button', { name: 'Assignés' }));
-    await user.click(screen.getByRole('option', { name: 'Alice Martin' }));
+    await toggleOption(user, screen, 'Assignés', 'Alice Martin');
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
 
     const [task] = JSON.parse(screen.getByTestId('tasks').textContent);
@@ -146,9 +146,8 @@ describe('ProjectTasksEditor primary assignee ownership', () => {
     const user = userEvent.setup();
     render(<Editor responsible="user-1" />);
     await user.type(screen.getByPlaceholderText('Ajouter une tâche...'), 'Marie puis Alice');
-    await user.click(screen.getByRole('button', { name: 'Assignés' }));
-    await user.click(screen.getByRole('option', { name: 'Marie Durand' }));
-    await user.click(screen.getByRole('option', { name: 'Alice Martin' }));
+    await toggleOption(user, screen, 'Assignés', 'Marie Durand');
+    await toggleOption(user, screen, 'Assignés', 'Alice Martin');
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche' }));
     expectMembers(tasks()[0], ['user-3', 'user-2']);
   });
@@ -157,8 +156,7 @@ describe('ProjectTasksEditor primary assignee ownership', () => {
     const user = userEvent.setup();
     render(<Editor responsible="user-1" taskItems={[existingTask()]} />);
     await edit(user);
-    await user.click(screen.getByRole('button', { name: 'Assignés' }));
-    await user.click(screen.getByRole('option', { name: 'Admin Mairie' }));
+    await toggleOption(user, screen, 'Assignés', 'Admin Mairie');
     await save(user);
     expectMembers(tasks()[0], ['user-3', 'user-2', 'user-1']);
   });

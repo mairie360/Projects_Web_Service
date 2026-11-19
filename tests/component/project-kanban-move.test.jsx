@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { KanbanBoard } from '@/components/ProjectsWorkspace/components/KanbanBoard';
-import { statusConfig, priorityConfig } from '@/types/project';
+import { priorities } from '@mairie360/lib-components/primitives';
+import { projectStatusBadge, projectStatusLabel } from '@/components/ProjectsWorkspace/project-card-meta';
 import fixtures from '../support/bff-fixtures.cjs';
 
-const columns = Object.entries(statusConfig).map(([status, presentation]) => ({ status, label: presentation.label }));
+const columns = Object.keys(projectStatusBadge).map((status) => ({ status, label: projectStatusLabel(status) }));
 function transfer() {
   const values = new Map();
   return { setData: (name, value) => values.set(name, value), getData: name => values.get(name) ?? '', effectAllowed: '', dropEffect: '' };
@@ -59,8 +60,8 @@ it('an interactive card control cannot become a drag and a foreign payload canno
 });
 it('the add command keeps its selected status and the public status and priority labels stay readable', () => {
   const add = vi.fn(); board({ onAddProject: add });
-  fireEvent.click(screen.getByRole('button', { name: 'Ajouter un projet En révision' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter un projet En revue' }));
   expect(add).toHaveBeenCalledWith('review');
   expect(screen.getByRole('region', { name: 'Terminé' })).toBeTruthy();
-  expect(priorityConfig.high.label).toBe('Haute');
+  expect(priorities.high.label).toBe('Haute');
 });

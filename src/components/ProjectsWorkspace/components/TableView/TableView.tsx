@@ -1,13 +1,11 @@
 'use client';
 
-import { formatProjectDate } from '../../project-card-meta';
+import { Avatar, DataTable, PriorityPill, ProgressMeter, StatusBadge } from '@mairie360/lib-components/primitives';
+import type { DataTableColumn } from '@mairie360/lib-components/primitives';
+import { formatProjectDate, projectStatusBadge } from '../../project-card-meta';
 import { ProjectActionsMenu } from '../ProjectCard/components/ProjectActionsMenu';
 import type { Project } from '@/types/project';
 import { ProjectsEmptyState as EmptyState } from '../ProjectsEmptyState';
-import { PersonAvatar } from '../PersonAvatar';
-import { PriorityPill } from '../PriorityPill';
-import { ProgressMeter } from '../ProgressMeter';
-import { StatusPill } from '../StatusPill';
 
 export function TableView({
   projects,
@@ -28,77 +26,78 @@ export function TableView({
 }) {
   if (projects.length === 0) return <EmptyState />;
 
+  const canView = (project: Project) => project.permissions?.canView !== false;
+  const columns: DataTableColumn<Project>[] = [
+    {
+      key: 'title',
+      header: 'Projet',
+      kind: 'content',
+      width: '30%',
+      cell: (project) => (
+        <div className="max-w-[360px]">
+          <button
+            type="button"
+            aria-label={`Ouvrir la fiche du projet ${project.title}`}
+            aria-haspopup="dialog"
+            disabled={!canView(project)}
+            className="block w-full truncate text-left font-semibold text-[var(--mairie-text)] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mairie-focus)] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={(event) => { event.stopPropagation(); onProjectOpen(project); }}
+          >
+            {project.title}
+          </button>
+          <div className="truncate text-sm text-[var(--mairie-text-muted)]">{project.description}</div>
+        </div>
+      ),
+    },
+    { key: 'status', header: 'Statut', kind: 'content', cell: (project) => <StatusBadge status={projectStatusBadge[project.status]} /> },
+    {
+      key: 'responsible',
+      header: 'Responsable',
+      kind: 'content',
+      cell: (project) => (
+        <span className="flex items-center gap-2 text-sm">
+          <Avatar alt={project.responsible.name} size="xs" />
+          <span>{project.responsible.name}</span>
+        </span>
+      ),
+    },
+    { key: 'priority', header: 'Priorité', kind: 'content', cell: (project) => <PriorityPill level={project.priority} /> },
+    {
+      key: 'progress',
+      header: 'Progression',
+      kind: 'content',
+      cell: (project) => <div className="w-36"><ProgressMeter label="Progression" value={project.progress} size="s" /></div>,
+    },
+    { key: 'dueDate', header: 'Échéance', cell: (project) => formatProjectDate(project.dueDate) },
+    {
+      key: 'actions',
+      header: 'Actions',
+      kind: 'actions',
+      cell: (project) => (
+        <ProjectActionsMenu
+          project={project}
+          duplicationPending={duplicatingProjectIds.includes(project.id)}
+          duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
+          onEdit={onProjectEdit}
+          onDuplicate={onProjectDuplicate}
+          onDelete={onProjectDelete}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div className="overflow-hidden rounded-lg border border-[#d9d5d0] bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1060px] text-left">
-          <thead className="border-b border-[#d9d5d0] bg-[#fbfaf8] text-base font-semibold text-[#2f3438]">
-            <tr>
-              <th className="px-5 py-4">Projet</th>
-              <th className="px-5 py-4">Statut</th>
-              <th className="px-5 py-4">Responsable</th>
-              <th className="px-5 py-4">Priorité</th>
-              <th className="px-5 py-4">Progression</th>
-              <th className="px-5 py-4">Échéance</th>
-              <th className="px-5 py-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#e4e1dc]">
-            {projects.map((project) => (
-              <tr
-                key={project.id}
-                className={`${project.permissions?.canView === false ? '' : 'cursor-pointer '}transition hover:bg-[#f8f6f3]`}
-                onClick={() => { if (project.permissions?.canView !== false) onProjectOpen(project); }}
-              >
-                <td className="max-w-[360px] px-5 py-4">
-                  <button
-                    type="button"
-                    aria-label={`Ouvrir la fiche du projet ${project.title}`}
-                    aria-haspopup="dialog"
-                    disabled={project.permissions?.canView === false}
-                    className="block w-full truncate text-left text-base font-semibold text-[#172033] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0969da] disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={(event) => { event.stopPropagation(); onProjectOpen(project); }}
-                  >
-                    {project.title}
-                  </button>
-                  <div className="truncate text-sm text-[#5e6873]">{project.description}</div>
-                </td>
-                <td className="px-5 py-4">
-                  <StatusPill status={project.status} />
-                </td>
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-2 text-sm text-[#2f3438]">
-                    <PersonAvatar name={project.responsible.name} />
-                    <span>{project.responsible.name}</span>
-                  </div>
-                </td>
-                <td className="px-5 py-4">
-                  <PriorityPill priority={project.priority} />
-                </td>
-                <td className="px-5 py-4">
-                  <div className="flex w-36 items-center gap-3">
-                    <div className="w-20">
-                      <ProgressMeter value={project.progress} showLabel={false} compact />
-                    </div>
-                    <span className="text-sm font-semibold text-[#2f3438]">{project.progress}%</span>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-sm text-[#5e6873]">{formatProjectDate(project.dueDate)}</td>
-                <td className="px-5 py-4">
-                  <ProjectActionsMenu
-                    project={project}
-                    duplicationPending={duplicatingProjectIds.includes(project.id)}
-                    duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
-                    onEdit={onProjectEdit}
-                    onDuplicate={onProjectDuplicate}
-                    onDelete={onProjectDelete}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      label="Projets"
+      columns={columns}
+      rows={projects}
+      rowKey={(project) => project.id}
+      className="min-w-[1060px]"
+      // The title button is the keyboard entry; a pointer click on the rest of the row opens the same detail.
+      rowProps={(project) => ({
+        className: canView(project) ? 'cursor-pointer' : undefined,
+        onClick: () => { if (canView(project)) onProjectOpen(project); },
+      })}
+    />
   );
 }

@@ -1,13 +1,9 @@
 import React from 'react';
-import { Button } from '@mairie360/lib-components/primitives';
+import { Button, DateField, MultiSelect, SelectField } from '@mairie360/lib-components/primitives';
 import { CircleDot } from 'lucide-react';
 
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import type { FilterOption, TaskFormState } from '@/lib/projectPageState';
-import { FieldLabel } from '@/components/ProjectsWorkspace/components/FieldLabel';
-import { MultiSelectField } from '@/components/ProjectsWorkspace/components/MultiSelectField';
-import { SelectField } from '@/components/ProjectsWorkspace/components/SelectField';
-import { fieldClassName } from '@/components/ProjectsWorkspace/field-style';
 
 export interface TaskFormPanelProps {
   form: TaskFormState;
@@ -57,41 +53,32 @@ export const TaskFormPanel = ({
         {saving && <p role="status" className="text-xs text-[#57606a]">Enregistrement de la tâche…</p>}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <SelectField id="detail-task-status" label="Statut" value={statusValue} options={statusOptions} onChange={onStatusChange} />
+          <SelectField id="detail-task-status" label="Statut" value={statusValue} options={statusOptions} placeholder={null} onChange={onStatusChange} />
           <SelectField
             id="detail-task-priority"
             label="Priorité"
             value={form.priority}
-            options={priorityOptions}
+            options={priorityOptions} placeholder={null}
             onChange={(priority) => onChange({ priority: priority as TaskFormState['priority'] })}
           />
-          <div>
-            <FieldLabel htmlFor="detail-task-due-date" label="Échéance" />
-            <input
-              id="detail-task-due-date"
-              type="date"
+          <DateField id="detail-task-due-date" label="Échéance"
               value={form.dueDate}
-              className={fieldClassName}
-              onChange={(event) => onChange({ dueDate: event.target.value })}
-            />
-          </div>
+              onChange={(event) => onChange({ dueDate: event.target.value })} />
         </div>
 
-        <MultiSelectField
+        <MultiSelect
           id="detail-task-assignees"
           label="Assignés"
-          values={form.assignees}
+          value={form.assignees}
           options={memberOptions}
-          placeholder="Choisir un ou plusieurs assignés"
           onChange={(assignees) => onChange({ assignees })}
         />
 
-        <MultiSelectField
+        <MultiSelect
           id="detail-task-labels"
           label="Étiquettes"
-          values={form.labels}
+          value={form.labels}
           options={labelOptions}
-          placeholder="Choisir une ou plusieurs étiquettes"
           onChange={(labels) => onChange({ labels })}
         />
 

@@ -101,7 +101,7 @@ test('MAIR-567: a task added from the sheet without a status choice takes the pr
   await openSheet();
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: f.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await view.fire((props, _text, tag) => tag === 'input' && props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Poser les lanternes' } });
-  await view.act(() => view.find('MultiSelectField').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
+  await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
   await view.fire((props, _text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks', 'post').length === 1);
 

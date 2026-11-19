@@ -4,7 +4,7 @@ import React from 'react';
 import { CircleDot } from 'lucide-react';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import { TaskCreationNotice } from '../../../TaskCreationNotice';
-import { CompactMultiSelect } from './components/CompactMultiSelect';
+import { MultiSelect } from '@mairie360/lib-components/primitives';
 import { TaskComposerFields } from './components/TaskComposerFields';
 import { TaskComposerTrigger } from './components/TaskComposerTrigger';
 import { useTaskComposer, type TaskComposerProps } from './use-task-composer';
@@ -74,11 +74,11 @@ function TaskComposerForm(props: TaskComposerProps) {
       />
 
       <div className="mt-2">
-        <CompactMultiSelect label="Assignés" values={composer.assignees} options={composer.availableMembers} onChange={(assignees) => composer.update({ assignees })} />
+        <MultiSelect id={`task-composer-assignees-${project.id}`} label="Assignés" size="s" visibleOptions={4} value={composer.assignees} options={composer.availableMembers} onChange={(assignees) => composer.update({ assignees })} />
       </div>
 
       <div className="mt-2">
-        <CompactMultiSelect label="Étiquettes" values={composer.labels} options={composer.availableLabels} onChange={(labels) => composer.update({ labels })} />
+        <MultiSelect id={`task-composer-labels-${project.id}`} label="Étiquettes" size="s" visibleOptions={4} value={composer.labels} options={composer.availableLabels} onChange={(labels) => composer.update({ labels })} />
       </div>
 
       <div className="mt-2 flex items-center justify-end gap-2">

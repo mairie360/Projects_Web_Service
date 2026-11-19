@@ -157,7 +157,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [searchTerm, setSearchTerm] = useState(initialReceipt?.query.q ?? '');
   const pageUrl = usePageUrlState(projectUrlSchema);
   const urlInitialized = useRef(Boolean(initialReceipt));
-  const [openFilter, setOpenFilter] = useState<'status' | 'priority' | null>(null);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const logoutPendingRef = useRef(false);
@@ -383,7 +382,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     const nextPage = pagination.page + (direction === 'previous' ? -1 : 1);
     requestedPageRef.current = nextPage;
     pageUrl.update({ page: String(nextPage) });
-    setOpenFilter(null);
     const controller = new AbortController();
     navigationReadRef.current = controller;
     // The event owns this read: changing the requested page must not schedule another GET.
@@ -869,12 +867,10 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     setProjectForm(uncertainCreationDraftRef.current ?? createProjectFormState(status));
     setEditingProjectId(null);
     setProjectFormError('');
-    setOpenFilter(null);
     setCreateProjectOpen(true);
   };
 
   const openProjectDetails = async (project: Project) => {
-    setOpenFilter(null);
     const selection = beginDetailSelection(project.id);
     const revision = ++selection.readRevision;
 
@@ -893,7 +889,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     const verification = projectVerificationsRef.current.get(project.id);
     const isCurrent = () => projectFormOpeningRef.current === opening && !projectFormPendingRef.current &&
       projectVerificationsRef.current.get(project.id) === verification;
-    setOpenFilter(null);
     let form = projectToFormState(project);
     let formError = '';
     let verifiedDetail = false;
@@ -1511,8 +1506,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     setDueBeforeFilter: changeDueBeforeFilter,
     searchTerm,
     setSearchTerm: changeSearchTerm,
-    openFilter,
-    setOpenFilter,
     alert,
     logoutError,
     setAlert,

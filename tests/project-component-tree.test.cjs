@@ -15,7 +15,7 @@ test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     [`${workspace}/components/ProjectDetailModal/ProjectDetailModal.tsx`]: ['DetailHeader', 'DetailRefreshAlert', 'DetailTaskList', 'ProjectEditForm', 'ProjectLifecycle', 'ProjectSummary', 'ProjectWorkflow', 'TaskFormPanel'],
     [`${workspace}/components/ProjectDetailModal/components/DetailTaskList/DetailTaskList.tsx`]: ['TaskFilters', 'TaskRow', 'TaskDeleteConfirm', 'TaskFollowUp'],
-    [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu', 'TaskComposer', 'ProjectLabels', 'AvatarStack', 'RecentTasks'],
+    [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu', 'TaskComposer', 'RecentTasks'],
     [`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`]: ['TaskDraftForm', 'DraftTaskRow'],
   };
   for (const [file, parts] of Object.entries(tree)) {
@@ -43,6 +43,29 @@ test('MAIR-608 the large dialogs keep their state in hooks beside them', () => {
 
 test('MAIR-608 the page feedback is the lib Alert, never a standalone lib Toast', () => {
   const page = read(`${workspace}/ProjectsWorkspace.tsx`);
-  assert.match(page, /import \{ Alert, Skeleton \} from '@mairie360\/lib-components\/primitives'/);
+  assert.match(page, /import \{ Alert, ConfirmModal, Skeleton \} from '@mairie360\/lib-components\/primitives'/);
   assert.doesNotMatch(page, /<Toast\b/);
+});
+
+// MAIR-828: the page uses the lib-components 2 primitives, never a local copy of one.
+test('MAIR-828 no local copy of a lib-components primitive comes back', () => {
+  const components = `${workspace}/components`;
+  for (const copy of ['StatusPill', 'PriorityPill', 'PriorityLabel', 'ProgressMeter', 'PersonAvatar', 'FieldLabel', 'FormField',
+    'TextAreaField', 'SelectField', 'MultiSelectField', 'ProjectCard/components/AvatarStack', 'ProjectCard/components/ProjectLabels',
+    'ProjectCard/components/TaskComposer/components/CompactMultiSelect', 'ProjectFiltersBar/components', 'WorkspaceHeader/components']) {
+    assert.equal(fs.existsSync(path.join(root, components, copy)), false, `${copy} is a lib-components primitive`);
+  }
+  assert.equal(fs.existsSync(path.join(root, workspace, 'field-style.ts')), false);
+  const types = read('src/types/project.tsx');
+  assert.doesNotMatch(types, /statusConfig|priorityConfig|labelColors/, 'no local colour table for statuses, priorities or labels');
+  const lib = (file) => read(file).match(/from '@mairie360\/lib-components\/primitives'/) !== null;
+  for (const file of [`${components}/TableView/TableView.tsx`, `${components}/ProjectPagination/ProjectPagination.tsx`,
+    `${components}/WorkspaceHeader/WorkspaceHeader.tsx`, `${components}/ProjectFiltersBar/ProjectFiltersBar.tsx`,
+    `${components}/ProjectCard/components/ProjectActionsMenu/ProjectActionsMenu.tsx`, `${components}/VerificationNotice/VerificationNotice.tsx`,
+    `${components}/ProjectDetailModal/components/DetailTaskList/components/TaskDeleteConfirm/TaskDeleteConfirm.tsx`]) {
+    assert.ok(lib(file), `${file} composes lib-components primitives`);
+  }
+  assert.match(read(`${components}/TableView/TableView.tsx`), /<DataTable\b/);
+  assert.match(read(`${components}/ProjectPagination/ProjectPagination.tsx`), /<Pagination\b/);
+  assert.match(read(`${workspace}/ProjectsWorkspace.tsx`), /<ConfirmModal\b/);
 });

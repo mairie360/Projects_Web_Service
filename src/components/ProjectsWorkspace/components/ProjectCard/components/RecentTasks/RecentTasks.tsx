@@ -1,7 +1,7 @@
+import { Avatar } from '@mairie360/lib-components/primitives';
 import { CheckSquare2, ListChecks, Square } from 'lucide-react';
 import type { ProjectTask } from '@/types/project';
-import { statusMeta } from '@/components/ProjectsWorkspace/project-card-meta';
-import { PersonAvatar } from '../../../PersonAvatar';
+import { projectStatusLabel } from '@/components/ProjectsWorkspace/project-card-meta';
 
 export function RecentTasks({ tasks }: { tasks?: ProjectTask[] }) {
   if (!tasks || tasks.length === 0) return null;
@@ -27,11 +27,11 @@ export function RecentTasks({ tasks }: { tasks?: ProjectTask[] }) {
               <span className="min-w-0 flex-1 truncate text-[#24292f]">{task.title}</span>
               <span className="flex shrink-0 -space-x-1">
                 {(task.assignees?.length ? task.assignees : [task.responsible]).slice(0, 2).map((assignee) => (
-                  <PersonAvatar key={assignee.name} name={assignee.name} />
+                  <Avatar key={assignee.name} alt={assignee.name} size="xs" />
                 ))}
               </span>
               <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#57606a]">
-                {statusMeta[task.status].label}
+                {projectStatusLabel(task.status)}
               </span>
             </div>
           );

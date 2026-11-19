@@ -111,9 +111,7 @@ test('active shell destinations reject credential-bearing and non-web URLs', () 
 
 test('métadonnées des cartes projet : initiales, dates et numéro affiché', () => {
   const meta = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
-  assert.deepEqual(Object.keys(meta.statusMeta), ['todo', 'in-progress', 'review', 'done']);
-  assert.deepEqual(Object.keys(meta.priorityMeta), ['high', 'medium', 'low']);
-  assert.equal(meta.getInitials('marie  anne durand'), 'MA');
+  assert.deepEqual(Object.keys(meta.projectStatusBadge), ['todo', 'in-progress', 'review', 'done']);
   assert.equal(meta.formatProjectDate('2026-12-15'), '15/12/2026');
   assert.equal(meta.formatProjectDate('2026-12-15', false), '15/12');
   assert.equal(meta.getProjectNumber({ id: '42' }), '#42');

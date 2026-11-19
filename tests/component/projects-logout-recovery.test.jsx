@@ -22,8 +22,10 @@ it('retains the workspace after refused logout and returns only on the explicit 
   vi.mocked(logoutAndReload).mockRejectedValue(new Error('La déconnexion n’a pas été confirmée.'));
   render(<ProjectsPage />);
   await screen.findByRole('heading', { name: 'Projets', exact: true });
-  await user.click(await within(screen.getByRole('banner')).findByRole('button', { name: /Administrateur|Responsable|Agent|Maire/ }));
+  await user.click((await screen.findAllByRole('button', { name: /Administrateur|Responsable|Agent|Maire/ }))[0]);
   await user.click(screen.getByText('Déconnexion', { exact: true }));
+  // MAIR-828: lib-components 2 asks for a confirmation before logging out.
+  await user.click(await screen.findByRole('button', { name: 'Se déconnecter' }));
   const recovery = await screen.findByRole('button', { name: 'Retour à la connexion', exact: true });
   expect(screen.getByRole('heading', { name: 'Projets', exact: true })).toBeTruthy();
   expect(screen.getByText('La déconnexion n’a pas été confirmée.')).toBeTruthy();

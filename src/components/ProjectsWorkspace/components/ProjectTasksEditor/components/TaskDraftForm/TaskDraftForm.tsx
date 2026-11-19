@@ -1,13 +1,9 @@
 'use client';
 
-import { Button } from '@mairie360/lib-components/primitives';
+import { Button, DateField, MultiSelect, SelectField } from '@mairie360/lib-components/primitives';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import type { FilterOption, TaskFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
-import { fieldClassName } from '../../../../field-style';
-import { FieldLabel } from '../../../FieldLabel';
-import { MultiSelectField } from '../../../MultiSelectField';
-import { SelectField } from '../../../SelectField';
 
 export function TaskDraftForm({
   form,
@@ -62,34 +58,26 @@ export function TaskDraftForm({
             id="project-form-task-status"
             label="Statut"
             value={form.status}
-            options={statusOptions}
+            options={statusOptions} placeholder={null}
             onChange={(status) => onChange({ status: status as Project['status'] })}
           />
           <SelectField
             id="project-form-task-priority"
             label="Priorité"
             value={form.priority}
-            options={priorityOptions}
+            options={priorityOptions} placeholder={null}
             onChange={(priority) => onChange({ priority: priority as Project['priority'] })}
           />
-          <div>
-            <FieldLabel htmlFor="project-form-task-due-date" label="Échéance" />
-            <input
-              id="project-form-task-due-date"
-              type="date"
+          <DateField id="project-form-task-due-date" label="Échéance"
               value={dueDate}
-              className={fieldClassName}
-              onChange={(event) => onChange({ dueDate: event.target.value })}
-            />
-          </div>
+              onChange={(event) => onChange({ dueDate: event.target.value })} />
         </div>
 
-        <MultiSelectField
+        <MultiSelect
           id="project-form-task-assignees"
           label="Assignés"
-          values={form.assignees}
+          value={form.assignees}
           options={memberOptions}
-          placeholder="Choisir un ou plusieurs assignés"
           onChange={(assignees) => onChange({ assignees })}
         />
 
@@ -99,12 +87,11 @@ export function TaskDraftForm({
           </p>
         )}
 
-        <MultiSelectField
+        <MultiSelect
           id="project-form-task-labels"
           label="Étiquettes"
-          values={form.labels}
+          value={form.labels}
           options={labelOptions}
-          placeholder="Choisir une ou plusieurs étiquettes"
           onChange={(labels) => onChange({ labels })}
         />
 
