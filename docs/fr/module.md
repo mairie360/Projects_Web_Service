@@ -1,5 +1,27 @@
 # Projects_Web_Service — Présentation du module
 
+## Création de projet V2 (MAIR-836)
+
+Maquette Projets, écrans F3 3.1 à 3.6.
+
+- « Nouveau projet » est une fenêtre sur une colonne : Titre*, Description, Statut / Priorité /
+  Groupe*, Responsable / Échéance*, Équipe / Étiquettes. Une étiquette pas encore proposée se
+  saisit dans « Nouvelle étiquette » et s’ajoute avec Entrée (qui n’envoie jamais la fenêtre).
+- « Créer le projet » vérifie d’abord les champs : « Le titre est obligatoire. », « Le groupe est
+  obligatoire. », « La date d’échéance est obligatoire. » et, sans responsable ni membre de
+  l’équipe, « Choisissez un responsable ou un membre de l’équipe. » s’affichent sous leur champ, le premier
+  champ en erreur prend le focus et rien n’est envoyé. Les balises (`<`, `>`) dans le titre ou la
+  description sont refusées de la même façon. Échap, le bouton de fermeture et « Annuler »
+  ferment sans rien créer.
+- L’aide du groupe indique « Tous les membres du groupe verront le projet. Seuls vos groupes sont
+  proposés. ». Un refus du BFF (un groupe supprimé entre-temps répond 404) affiche l’erreur dans
+  la fenêtre, qui reste ouverte avec tous ses champs.
+- Le « + » d’une colonne Kanban ouvre la fenêtre avec ce statut (MAIR-829).
+- Après la création, la première page sans filtre est rechargée, la carte apparaît dans sa colonne
+  et le toast « Projet créé » la nomme ; la fiche du projet ne s’ouvre plus d’elle-même.
+- Point ouvert (C5 du ticket) : la maquette n’a ni choix de modèle ni tâches initiales ; les deux
+  restent après les champs de la maquette en attendant la décision.
+
 ## Sélection et suppression groupée dans le tableau (MAIR-833)
 
 Maquette Projets, écrans F1 1.2 à 1.5.
@@ -51,7 +73,7 @@ voient (BFF_Project `GET /project-groups`, `groupId` obligatoire sur `POST /proj
 
 - Le formulaire de création a un champ « Groupe » obligatoire listant les groupes que
   l’agent peut lier. Un groupe unique est présélectionné ; avec plusieurs, l’agent doit
-  choisir (« Choisissez le groupe du projet. ») ; sans aucun, le champ explique « Aucun
+  choisir (« Le groupe est obligatoire. ») ; sans aucun, le champ explique « Aucun
   groupe disponible » et rien n’est envoyé. Une lecture refusée s’affiche sur le champ.
 - La modification en ligne peut déplacer le projet dans un autre groupe. Un projet créé
   avant les groupes (détail `group: null`) reste sans groupe : la modification omet alors

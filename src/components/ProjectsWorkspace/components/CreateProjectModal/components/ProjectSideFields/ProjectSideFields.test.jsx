@@ -5,15 +5,38 @@ import { createProjectFormState } from '@/lib/projectPageState';
 import { ProjectSideFields } from './ProjectSideFields';
 
 describe('ProjectSideFields', () => {
-  it('reports the dates and people, and sums the tasks', () => {
+  it('reports the dates and people', () => {
     const onChange = vi.fn();
-    const form = { ...createProjectFormState(), completedTasks: 1, totalTasks: 4, progress: 25 };
-    render(<ProjectSideFields form={form} statusOptions={statusOptions} priorityOptions={priorityOptions} responsibleOptions={[{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions]} memberOptions={memberOptions} labelOptions={[]} onChange={onChange} />);
+    render(<ProjectSideFields form={createProjectFormState()} statusOptions={statusOptions} priorityOptions={priorityOptions} responsibleOptions={[{ label: 'Choisir un responsable', value: '' }, ...memberOptions]} memberOptions={memberOptions} labelOptions={[]} onChange={onChange} />);
     fireEvent.change(document.getElementById('project-due-date'), { target: { value: '2026-12-01' } });
     fireEvent.change(document.getElementById('project-responsible'), { target: { value: 'user-3' } });
     expect(onChange.mock.calls.map(([patch]) => patch)).toEqual([{ dueDate: '2026-12-01' }, { responsible: 'user-3' }]);
-    expect(screen.getByText('Terminées').nextSibling.textContent).toContain('1');
-    expect(screen.getByText('Total').nextSibling.textContent).toContain('4');
+  });
+
+  it('MAIR-836: lays the fields out in the F3 order, without progress nor task counts', () => {
+    render(<ProjectSideFields form={createProjectFormState()} statusOptions={statusOptions} priorityOptions={priorityOptions} responsibleOptions={memberOptions} memberOptions={memberOptions} labelOptions={[]} onChange={vi.fn()} />);
+    const ids = [...document.querySelectorAll('select[id], input[id]')].map((field) => field.id).filter((id) => id.startsWith('project-'));
+    expect(ids.slice(0, 5)).toEqual(['project-status', 'project-priority', 'project-group', 'project-responsible', 'project-due-date']);
+    expect(screen.getByText('Tous les membres du groupe verront le projet. Seuls vos groupes sont proposés.')).toBeTruthy();
+    expect(screen.queryByText('Terminées')).toBeNull();
+    expect(screen.queryByText('Progression')).toBeNull();
+  });
+
+  it('MAIR-836: adds a new label on Entrée without submitting, and refuses markup', () => {
+    const onChange = vi.fn();
+    const form = { ...createProjectFormState(), labels: ['Voirie'] };
+    render(<form onSubmit={() => { throw new Error('submitted'); }}><ProjectSideFields form={form} statusOptions={statusOptions} priorityOptions={priorityOptions} responsibleOptions={memberOptions} memberOptions={memberOptions} labelOptions={[]} onChange={onChange} /></form>);
+    const input = screen.getByLabelText('Nouvelle étiquette');
+    fireEvent.change(input, { target: { value: '  Sport ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenLastCalledWith({ labels: ['Voirie', 'Sport'] });
+    expect(input.value).toBe('');
+    fireEvent.change(input, { target: { value: '<b>' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Une étiquette ne doit pas contenir les caractères < ou >.')).toBeTruthy();
+    // A label typed earlier stays a removable chip although the page does not propose it.
+    expect(screen.getAllByText('Voirie').length).toBeGreaterThan(0);
   });
 
   it('MAIR-880: offers the linkable groups, reports the chosen one and shows a group read error', () => {

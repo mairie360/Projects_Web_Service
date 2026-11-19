@@ -1,5 +1,27 @@
 # Projects_Web_Service — Module overview
 
+## Project creation V2 (MAIR-836)
+
+Figma F3 3.1 to 3.6 of the Projects mockup.
+
+- « Nouveau projet » is a single-column dialog: Titre*, Description, Statut / Priorité /
+  Groupe*, Responsable / Échéance*, Équipe / Étiquettes. A label that is not proposed yet is
+  typed in « Nouvelle étiquette » and added with Entrée (it never submits the dialog).
+- « Créer le projet » checks the fields first: « Le titre est obligatoire. », « Le groupe est
+  obligatoire. », « La date d’échéance est obligatoire. » and, without responsible nor team member,
+  « Choisissez un responsable ou un membre de l’équipe. » show under their field, the first
+  field in error gets the focus and nothing is sent. Markup (`<`, `>`) in the title or the
+  description is refused the same way. Échap, the close button and « Annuler » close without
+  creating anything.
+- The group hint reads « Tous les membres du groupe verront le projet. Seuls vos groupes sont
+  proposés. ». A BFF refusal (a group deleted meanwhile answers 404) shows the error in the
+  dialog, which stays open with every field.
+- The « + » of a Kanban column opens the dialog with that status (MAIR-829).
+- After the creation the first unfiltered page is reloaded, the card shows in its column and the
+  toast « Projet créé » names it; the project sheet no longer opens by itself.
+- Open point (ticket C5): the mockup has no template picker nor initial tasks; both stay after the
+  mockup fields until decided.
+
 ## Table selection and bulk deletion (MAIR-833)
 
 Figma F1 1.2 to 1.5 of the Projects mockup.
@@ -49,7 +71,7 @@ Every new project belongs to a **group** whose current and future members see it
 
 - The creation form has a required « Groupe » field listing the groups the agent may
   link. A single group is preselected; with several, the agent must choose
-  (« Choisissez le groupe du projet. »); with none, the field explains « Aucun groupe
+  (« Le groupe est obligatoire. »); with none, the field explains « Aucun groupe
   disponible » and nothing is sent. A refused read is shown on the field.
 - The inline edit can move the project to another group. A project created before
   groups (detail `group: null`) keeps no group: the edit then omits `groupId`, since the

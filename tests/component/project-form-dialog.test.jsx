@@ -69,7 +69,6 @@ describe('project form dialogs', () => {
     const nested = form.getByPlaceholderText('Ajouter une tâche...');
     await user.type(nested, 'Tâche locale non envoyée');
     expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
-    expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).className).toContain('!bg-[#a5bca9]');
     const verify = form.getByRole('button', { name: 'Actualiser le catalogue', exact: true });
     verify.focus(); await user.keyboard('{Enter}');
     expect(onVerify).toHaveBeenCalledOnce(); expect(onSubmit).not.toHaveBeenCalled();

@@ -40,7 +40,7 @@ describe('workflow adoption by existing project forms', () => {
   it('carries the selected template from the project creation form to the submit boundary', async () => {
     function Creation() {
       const [selection, setSelection] = React.useState();
-      return <><CreateProjectModal mode="create" workflowPort={port} form={projectToFormState(project)} error="" memberOptions={page.options.members} labelOptions={[]} statusOptions={page.filters.statuses} priorityOptions={page.filters.priorities} onChange={() => undefined} onClose={() => undefined} onSubmit={(event, selected) => { event.preventDefault(); setSelection(selected); }} /><output data-testid="selection">{JSON.stringify(selection)}</output></>;
+      return <><CreateProjectModal mode="create" workflowPort={port} form={projectToFormState(project)} error="" memberOptions={page.options.members} labelOptions={[]} groupOptions={[{ value: 'group-1', label: 'Services techniques' }]} statusOptions={page.filters.statuses} priorityOptions={page.filters.priorities} onChange={() => undefined} onClose={() => undefined} onSubmit={(event, selected) => { event.preventDefault(); setSelection(selected); }} /><output data-testid="selection">{JSON.stringify(selection)}</output></>;
     }
     render(<Creation />);
     await screen.findByRole('option', { name: 'Instruction municipale' });

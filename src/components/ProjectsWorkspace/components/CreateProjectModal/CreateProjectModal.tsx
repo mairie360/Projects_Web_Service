@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { X } from 'lucide-react';
 import { type FilterOption, type ProjectFormState } from '@/lib/projectPageState';
 import { CreateProjectFeedback } from './components/CreateProjectFeedback';
 import { CreateProjectFooter } from './components/CreateProjectFooter';
@@ -11,6 +10,8 @@ import { ProjectTasksEditor } from '../ProjectTasksEditor';
 import { ProjectTemplatePicker } from './components/ProjectTemplatePicker';
 import type { ProjectTemplate, ProjectWorkflowPort } from '@/lib/projectWorkflow';
 import { PROJECT_VERIFICATION_MESSAGE } from '@/lib/projectReceiptVerification';
+import { IconButton } from '@mairie360/lib-components/primitives';
+import { PROJECT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from './project-form-validation';
 
 export function CreateProjectModal({
   mode,
@@ -64,6 +65,7 @@ export function CreateProjectModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>, template?: ProjectTemplate) => void;
 }) {
   const [template, setTemplate] = React.useState<ProjectTemplate | undefined>();
+  const [fieldErrors, setFieldErrors] = React.useState<ProjectFieldErrors>({});
   const isEditMode = mode === 'edit';
   const creationConfirmed = !isEditMode && confirmedCreationTitle !== undefined;
   const submitBlocked = pending || verificationRequired || verificationPending || creationConfirmed || !canSave;
@@ -72,7 +74,34 @@ export function CreateProjectModal({
   const verificationFeedbackRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
   const feedbackId = React.useId();
-  const responsibleOptions = [{ label: 'Sélectionner un assigné', value: '' }, ...memberOptions];
+  const responsibleOptions = [{ label: 'Choisir un responsable', value: '' }, ...memberOptions];
+
+  // A corrected field loses its message at once; the others keep theirs until the next submit.
+  const changeForm = (patch: Partial<ProjectFormState>) => {
+    setFieldErrors((current) => {
+      // A team member satisfies the « Responsable » rule as well.
+      const touched = [...Object.keys(patch), ...('assignees' in patch ? ['responsible'] : [])].filter((key) => key in current);
+      if (touched.length === 0) return current;
+      const next = { ...current };
+      for (const key of touched) delete next[key as keyof ProjectFieldErrors];
+      return next;
+    });
+    onChange(patch);
+  };
+
+  // MAIR-836 (Figma F3 3.3): the messages under Titre, Groupe and Échéance replace the browser bubbles; the
+  // first field in error gets the focus and nothing is sent.
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    const errors = validateProjectForm(form, { creating: !isEditMode, groupCount: groupOptions?.length ?? 0 });
+    const first = (Object.keys(PROJECT_FIELD_IDS) as (keyof ProjectFieldErrors)[]).find((key) => errors[key]);
+    setFieldErrors(errors);
+    if (first) {
+      event.preventDefault();
+      document.getElementById(PROJECT_FIELD_IDS[first])?.focus();
+      return;
+    }
+    onSubmit(event, template);
+  };
 
   React.useLayoutEffect(() => {
     if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') return;
@@ -129,7 +158,7 @@ export function CreateProjectModal({
   };
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
+    <div ref={overlayRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--mairie-overlay-background)]/35 p-4">
       <form
         ref={dialogRef}
         role="dialog"
@@ -142,25 +171,24 @@ export function CreateProjectModal({
         onKeyDownCapture={onInteract}
         onPointerDownCapture={onInteract}
         onChangeCapture={onInteract}
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-md bg-[#f6f4f1] shadow-[0_18px_50px_rgba(27,31,36,0.28)]"
-        onSubmit={event => onSubmit(event, template)}
+        noValidate
+        className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[var(--mairie-radius-l)] bg-[var(--mairie-surface)] shadow-[var(--mairie-shadow)]"
+        onSubmit={submit}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-[#1f1f1f] bg-[#2b2b2b] px-5 py-3">
-          <h2 id={titleId} className="truncate text-base font-semibold text-white">
+        <div className="flex items-center justify-between gap-4 border-b border-[var(--mairie-border)] px-5 py-3">
+          <h2 id={titleId} className="truncate text-base font-semibold text-[var(--mairie-text)]">
             {isEditMode ? 'Modifier le projet' : 'Nouveau projet'}
           </h2>
-          <button
-            type="button"
+          <IconButton
+            preset="close"
+            size="s"
             disabled={pending}
-            aria-label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#d7e3e7] transition hover:bg-[#3a3a3a] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6aada9]/45"
+            label={isEditMode ? 'Fermer la modification de projet' : 'Fermer la création de projet'}
             onClick={onClose}
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
+          />
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-[#f6f4f1] p-5">
+        <div className="min-h-0 overflow-y-auto p-5">
           <CreateProjectFeedback
             feedbackId={feedbackId}
             feedbackRef={verificationFeedbackRef}
@@ -176,35 +204,31 @@ export function CreateProjectModal({
             onVerify={() => void onVerify?.()}
           />
 
-          <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-5 border-0 p-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="space-y-4">
-              <ProjectMainFields form={form} onChange={onChange} />
-
-              <ProjectTasksEditor
-                form={form}
-                memberOptions={memberOptions}
-                labelOptions={labelOptions}
-                statusOptions={statusOptions}
-                priorityOptions={priorityOptions}
-                onChange={onChange}
-              />
-            </section>
-
-            <aside className="space-y-4 rounded-md border border-[#d9d5d0] bg-[#fbfaf8] p-4">
-              {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
-              <ProjectSideFields
-                form={form}
-                statusOptions={statusOptions}
-                priorityOptions={priorityOptions}
-                responsibleOptions={responsibleOptions}
-                memberOptions={memberOptions}
-                labelOptions={labelOptions}
-                groupOptions={groupOptions}
-                groupsError={groupsError}
-                groupRequired={!isEditMode}
-                onChange={onChange}
-              />
-            </aside>
+          <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-4 border-0 p-0">
+            <ProjectMainFields form={form} errors={fieldErrors} onChange={changeForm} />
+            <ProjectSideFields
+              form={form}
+              statusOptions={statusOptions}
+              priorityOptions={priorityOptions}
+              responsibleOptions={responsibleOptions}
+              memberOptions={memberOptions}
+              labelOptions={labelOptions}
+              groupOptions={groupOptions}
+              groupsError={groupsError}
+              groupRequired={!isEditMode}
+              errors={fieldErrors}
+              onChange={changeForm}
+            />
+            {/* Not in the F3 mockup (MAIR-836 C5, open point): the template and the initial tasks stay after its fields. */}
+            {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
+            <ProjectTasksEditor
+              form={form}
+              memberOptions={memberOptions}
+              labelOptions={labelOptions}
+              statusOptions={statusOptions}
+              priorityOptions={priorityOptions}
+              onChange={onChange}
+            />
           </fieldset>
         </div>
 
