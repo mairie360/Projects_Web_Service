@@ -1,41 +1,128 @@
 'use client';
 
-import { Avatar, DataTable, PriorityPill, ProgressMeter, StatusBadge } from '@mairie360/lib-components/primitives';
-import type { DataTableColumn } from '@mairie360/lib-components/primitives';
-import { formatProjectDate, projectStatusBadge } from '../../project-card-meta';
+import { useEffect, useRef, useState } from 'react';
+import { Checkbox, DataTable, PriorityPill, ProgressMeter, StatusBadge, StatusPill, TagList, UserIdentity } from '@mairie360/lib-components/primitives';
+import type { DataTableColumn, SortDirection } from '@mairie360/lib-components/primitives';
+import { CalendarDays } from 'lucide-react';
+import { formatProjectDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
 import { ProjectActionsMenu } from '../ProjectCard/components/ProjectActionsMenu';
 import type { Project } from '@/types/project';
 import { ProjectsEmptyState as EmptyState } from '../ProjectsEmptyState';
+import { SelectionBar } from './components/SelectionBar';
+
+type SortKey = 'key' | 'title' | 'status' | 'priority' | 'responsible' | 'dueDate' | 'progress';
+
+const STATUS_ORDER: Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
+const PRIORITY_ORDER: Project['priority'][] = ['high', 'medium', 'low'];
+const collator = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' });
+
+const sortValue: Record<SortKey, (project: Project) => string | number> = {
+  key: (project) => getProjectNumber(project),
+  title: (project) => project.title,
+  status: (project) => STATUS_ORDER.indexOf(project.status),
+  priority: (project) => PRIORITY_ORDER.indexOf(project.priority),
+  responsible: (project) => project.responsible.name,
+  // Projects without a valid due date go last in both directions.
+  dueDate: (project) => (/^\d{4}-\d{2}-\d{2}/.test(project.dueDate) ? project.dueDate.slice(0, 10) : ''),
+  progress: (project) => project.progress,
+};
+
+/** Client-side sort of the loaded page (MAIR-833): the contract has no sort parameter. */
+export function sortProjects(projects: Project[], sort: { key: SortKey; direction: SortDirection } | null) {
+  if (!sort) return projects;
+  const value = sortValue[sort.key];
+  const factor = sort.direction === 'asc' ? 1 : -1;
+  return [...projects].sort((left, right) => {
+    const a = value(left);
+    const b = value(right);
+    if (a === '' || b === '') return a === b ? 0 : a === '' ? 1 : -1;
+    return factor * (typeof a === 'number' && typeof b === 'number' ? a - b : collator.compare(String(a), String(b)));
+  });
+}
+
+function SelectAll({ projects, selectedIds, onChange }: { projects: Project[]; selectedIds: ReadonlySet<string>; onChange: (ids: string[], selected: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const selectable = projects.filter(canSelect);
+  const count = selectable.filter((project) => selectedIds.has(project.id)).length;
+  const all = selectable.length > 0 && count === selectable.length;
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = count > 0 && !all;
+  }, [count, all]);
+  return (
+    <Checkbox
+      ref={ref}
+      size="s"
+      label={<span className="sr-only">Tout sélectionner</span>}
+      checked={all}
+      disabled={selectable.length === 0}
+      onChange={() => onChange(selectable.map((project) => project.id), !all)}
+    />
+  );
+}
+
+const canSelect = (project: Project) => project.permissions?.canDelete !== false;
 
 export function TableView({
   projects,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
+  selectedProjectIds,
   onProjectOpen,
   onProjectStatusChange,
   onProjectDuplicate,
   onProjectDelete,
+  onSelectionChange,
+  onClearSelection,
+  onDeleteSelection,
   onResetFilters,
 }: {
   projects: Project[];
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
+  /** MAIR-833: rows checked for a bulk action; without `onSelectionChange` the table has no selection column. */
+  selectedProjectIds?: ReadonlySet<string>;
   onProjectOpen: (project: Project) => void;
   onProjectStatusChange?: (project: Project, status: Project['status']) => void | Promise<void>;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  onSelectionChange?: (projectIds: string[], selected: boolean) => void;
+  onClearSelection?: () => void;
+  onDeleteSelection?: () => void;
   /** Shown in the empty state when a search or a filter hides every project (MAIR-829). */
   onResetFilters?: () => void;
 }) {
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   if (projects.length === 0) return <EmptyState onReset={onResetFilters} />;
 
+  const selected = selectedProjectIds ?? new Set<string>();
   const canView = (project: Project) => project.permissions?.canView !== false;
+  const selection: DataTableColumn<Project>[] = onSelectionChange ? [{
+    key: 'select',
+    header: <SelectAll projects={projects} selectedIds={selected} onChange={onSelectionChange} />,
+    kind: 'content',
+    width: '48px',
+    cell: (project) => (
+      // The row opens the project on click: the checkbox keeps its own click.
+      <div onClick={(event) => event.stopPropagation()}>
+        <Checkbox
+          size="s"
+          label={<span className="sr-only">{`Sélectionner ${project.title}`}</span>}
+          checked={selected.has(project.id)}
+          disabled={!canSelect(project)}
+          onChange={(event) => onSelectionChange([project.id], event.target.checked)}
+        />
+      </div>
+    ),
+  }] : [];
   const columns: DataTableColumn<Project>[] = [
+    ...selection,
+    { key: 'key', header: 'Clé', sortable: true, width: '72px', cell: (project) => <span className="text-[var(--mairie-text-muted)]">{getProjectNumber(project)}</span> },
     {
       key: 'title',
       header: 'Projet',
       kind: 'content',
-      width: '30%',
+      sortable: true,
+      width: '28%',
       cell: (project) => (
         <div className="max-w-[360px]">
           <button
@@ -49,33 +136,51 @@ export function TableView({
             {project.title}
           </button>
           <div className="truncate text-sm text-[var(--mairie-text-muted)]">{project.description}</div>
+          <TagList label="Étiquettes du projet" items={project.labels} size="s" className="mt-1" />
         </div>
       ),
     },
-    { key: 'status', header: 'Statut', kind: 'content', cell: (project) => <StatusBadge status={projectStatusBadge[project.status]} /> },
+    { key: 'status', header: 'Statut', kind: 'content', sortable: true, cell: (project) => <StatusBadge status={projectStatusBadge[project.status]} /> },
+    { key: 'priority', header: 'Priorité', kind: 'content', sortable: true, cell: (project) => <PriorityPill level={project.priority} /> },
     {
       key: 'responsible',
       header: 'Responsable',
       kind: 'content',
-      cell: (project) => (
-        <span className="flex items-center gap-2 text-sm">
-          <Avatar alt={project.responsible.name} size="xs" />
-          <span>{project.responsible.name}</span>
-        </span>
-      ),
+      sortable: true,
+      cell: (project) => <UserIdentity name={project.responsible.name} variant="nameOnly" size="s" />,
     },
-    { key: 'priority', header: 'Priorité', kind: 'content', cell: (project) => <PriorityPill level={project.priority} /> },
+    {
+      key: 'dueDate',
+      header: 'Échéance',
+      kind: 'content',
+      sortable: true,
+      cell: (project) => isProjectOverdue(project)
+        ? (
+          // The pill replaces the date (Figma F1 1.2); the date stays available on hover and to screen readers.
+          <span title={`Échéance : ${formatProjectDate(project.dueDate)}`}>
+            <StatusPill label="En retard" tone="danger" dot />
+            <span className="sr-only">{`, échéance ${formatProjectDate(project.dueDate)}`}</span>
+          </span>
+        )
+        : (
+          <span className="inline-flex items-center gap-1.5 text-sm">
+            <CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-[var(--mairie-text-muted)]" strokeWidth={1.8} />
+            {formatProjectDate(project.dueDate)}
+          </span>
+        ),
+    },
     {
       key: 'progress',
       header: 'Progression',
       kind: 'content',
-      cell: (project) => <div className="w-36"><ProgressMeter label="Progression" value={project.progress} size="s" /></div>,
+      sortable: true,
+      cell: (project) => <div className="w-36"><ProgressMeter label="Progression" value={project.progress} size="s" showValue /></div>,
     },
-    { key: 'dueDate', header: 'Échéance', cell: (project) => formatProjectDate(project.dueDate) },
     {
       key: 'actions',
       header: 'Actions',
       kind: 'actions',
+      hideHeader: true,
       cell: (project) => (
         <ProjectActionsMenu
           project={project}
@@ -91,17 +196,28 @@ export function TableView({
   ];
 
   return (
-    <DataTable
-      label="Projets"
-      columns={columns}
-      rows={projects}
-      rowKey={(project) => project.id}
-      className="min-w-[1060px]"
-      // The title button is the keyboard entry; a pointer click on the rest of the row opens the same detail.
-      rowProps={(project) => ({
-        className: canView(project) ? 'cursor-pointer' : undefined,
-        onClick: () => { if (canView(project)) onProjectOpen(project); },
-      })}
-    />
+    <>
+      {onClearSelection && onDeleteSelection && (
+        <SelectionBar count={projects.filter((project) => selected.has(project.id)).length} onClear={onClearSelection} onDelete={onDeleteSelection} />
+      )}
+      <DataTable
+        label="Projets"
+        columns={columns}
+        rows={sortProjects(projects, sort)}
+        rowKey={(project) => project.id}
+        className="min-w-[1060px]"
+        sort={sort ?? undefined}
+        onSort={(key, direction) => setSort({ key: key as SortKey, direction })}
+        // The title button is the keyboard entry; a pointer click on the rest of the row opens the same detail.
+        rowProps={(project) => ({
+          className: [
+            canView(project) ? 'cursor-pointer' : '',
+            selected.has(project.id) ? 'bg-[var(--mairie-accent-surface)]' : '',
+          ].join(' ').trim() || undefined,
+          'data-selected': selected.has(project.id) ? 'true' : undefined,
+          onClick: () => { if (canView(project)) onProjectOpen(project); },
+        } as React.HTMLAttributes<HTMLTableRowElement>)}
+      />
+    </>
   );
 }

@@ -382,7 +382,9 @@ for (const [dueDate, expected, short] of [
       const count = pageCalls().length;
       await view.act(() => view.props('SegmentedControl').onChange(value));
       await view.waitFor(() => pageCalls().length === count + 1 && view.find(component).length === 1);
-      assert.ok(view.text().includes(value === 'kanban' ? short : expected));
+      // MAIR-833: the table shows « En retard » instead of a past due date (Figma F1 1.2).
+      const late = value === 'table' && dueDate.startsWith('2024-');
+      assert.ok(view.text().includes(late ? 'En retard' : value === 'kanban' ? short : expected));
       assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
     }
 

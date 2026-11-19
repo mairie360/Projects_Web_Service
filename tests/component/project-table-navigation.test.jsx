@@ -25,7 +25,10 @@ describe('Project Table detail entry', () => {
     const user = userEvent.setup(), project = fixtures.projectListItem(), props = handlers();
     render(<TableView projects={[project]} {...props} />);
     const opener = screen.getByRole('button', { name: openerName(project), exact: true });
+    // MAIR-833: the sortable « Clé » header now comes first in the tab order; the title stays the row's keyboard entry.
     await user.tab();
+    expect(document.activeElement.textContent).toMatch(/^Clé/);
+    opener.focus();
     expect(document.activeElement).toBe(opener);
     expect(opener.getAttribute('aria-haspopup')).toBe('dialog');
     expect(opener.className).toMatch(/focus-visible:outline/);

@@ -23,6 +23,7 @@ import { WorkspaceLoading } from './components/WorkspaceLoading';
 import { navigateToPage } from '../../lib/navigation';
 import { returnToLogin } from '../../lib/auth-token';
 import type { ProjectsController } from './use-projects-controller';
+import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
 export function ProjectsWorkspace({
@@ -105,6 +106,14 @@ export function ProjectsWorkspace({
   duplicateProject,
   deleteProject,
   confirmProjectDeletion,
+  selectedProjects,
+  changeProjectSelection,
+  clearProjectSelection,
+  bulkDeletionOpen,
+  bulkDeletionPending,
+  requestBulkProjectDeletion,
+  cancelBulkProjectDeletion,
+  confirmBulkProjectDeletion,
   addProjectTask,
   updateProjectTask,
   changeProjectTaskStatus,
@@ -132,6 +141,19 @@ export function ProjectsWorkspace({
         initialFocus="cancel"
         onCancel={() => setProjectPendingDeletion(null)}
         onConfirm={() => void confirmProjectDeletion()}
+      />
+
+      {/* MAIR-833 (Figma F1 1.4): bulk deletion of the table selection. */}
+      <ConfirmModal
+        open={bulkDeletionOpen}
+        title="Supprimer les projets"
+        message={bulkDeletionMessage(selectedProjects)}
+        confirmLabel="Confirmer la suppression"
+        destructive
+        busy={bulkDeletionPending}
+        initialFocus="cancel"
+        onCancel={cancelBulkProjectDeletion}
+        onConfirm={() => void confirmBulkProjectDeletion()}
       />
 
       {selectedProject && (
@@ -329,6 +351,10 @@ export function ProjectsWorkspace({
                     onProjectDelete={deleteProject}
                     onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                     onResetFilters={filtersActive ? resetProjectFilters : undefined}
+                    selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
+                    onSelectionChange={changeProjectSelection}
+                    onClearSelection={clearProjectSelection}
+                    onDeleteSelection={requestBulkProjectDeletion}
                   />
                 )}
                 {projectsPage && (
@@ -339,4 +365,14 @@ export function ProjectsWorkspace({
       </AccessibleShell>
     </ToastProvider>
   );
+}
+
+/** « Les 2 projets sélectionnés et leurs 12 tâches seront supprimés. Cette action est irréversible. » */
+export function bulkDeletionMessage(projects: Project[]) {
+  const tasks = projects.reduce((total, project) => total + (project.tasks?.total ?? 0), 0);
+  const taskText = `${tasks} tâche${tasks > 1 ? 's' : ''}`;
+  const subject = projects.length > 1
+    ? `Les ${projects.length} projets sélectionnés et leurs ${taskText} seront supprimés.`
+    : `Le projet sélectionné et ses ${taskText} seront supprimés.`;
+  return `${subject} Cette action est irréversible.`;
 }

@@ -1,5 +1,25 @@
 # Projects_Web_Service — Présentation du module
 
+## Sélection et suppression groupée dans le tableau (MAIR-833)
+
+Maquette Projets, écrans F1 1.2 à 1.5.
+
+- Colonnes : Clé, Projet (avec ses étiquettes), Statut, Priorité, Responsable, Échéance
+  (« En retard » remplace une échéance passée, qui reste lisible au survol et par les lecteurs
+  d’écran), Progression, actions. Chaque colonne sauf les actions trie la page chargée, dans les
+  deux sens (le contrat n’a pas de paramètre de tri ; les projets sans échéance restent à la fin).
+- Une case à cocher par ligne et « Tout sélectionner » dans l’en-tête (état mixte pour une
+  sélection partielle). Les projets que l’agent ne peut pas supprimer ne sont pas sélectionnables.
+  Une ligne sélectionnée prend la surface d’accent ; cocher une ligne ne l’ouvre jamais.
+- Tant que des projets sont sélectionnés, une barre annonce « n projets sélectionnés » avec
+  « Désélectionner » et « Supprimer ». La sélection ne porte que sur la page chargée et est
+  réinitialisée au changement de page, de filtre, de recherche ou de vue.
+- « Supprimer » demande « Les n projets sélectionnés et leurs x tâches seront supprimés. Cette
+  action est irréversible. » (« Confirmer la suppression »). Le front envoie alors un
+  `DELETE /projects/{projectId}` par projet (pas de route groupée dans le contrat), affiche le
+  toast « n projets supprimés » qui les nomme et recharge la page. Un projet refusé reste sur la
+  page et sélectionné, avec une erreur qui le nomme et donne la raison du BFF.
+
 ## Liste des projets V2 (MAIR-829)
 
 Maquette Projets, écrans F1 (Kanban), F2 (grille), F4 (menu de carte).

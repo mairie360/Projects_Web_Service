@@ -46,5 +46,7 @@ export function instanceToday(now = new Date()) {
 
 /** MAIR-829: « En retard » — the due date is past in the instance time zone and the project is not done. */
 export function isProjectOverdue(project: Pick<Project, 'dueDate' | 'status'>, now = new Date()) {
-  return project.status !== 'done' && /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && project.dueDate < instanceToday(now);
+  // An absent or impossible date (« Sans échéance », « Échéance invalide ») is never late.
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && formatProjectDate(project.dueDate) !== 'Échéance invalide';
+  return project.status !== 'done' && valid && project.dueDate < instanceToday(now);
 }
