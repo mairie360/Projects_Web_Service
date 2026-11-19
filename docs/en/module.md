@@ -1,5 +1,25 @@
 # Projects_Web_Service — Module overview
 
+## Table selection and bulk deletion (MAIR-833)
+
+Figma F1 1.2 to 1.5 of the Projects mockup.
+
+- Columns: Clé, Projet (with its labels), Statut, Priorité, Responsable, Échéance (« En retard »
+  replaces a past due date, which stays readable on hover and by screen readers), Progression,
+  actions. Every column but the actions sorts the loaded page, both directions (the contract has
+  no sort parameter; projects without a due date stay last).
+- A checkbox per row and « Tout sélectionner » in the header (mixed state for a partial
+  selection). Projects the agent cannot delete cannot be selected. A selected row gets the
+  accent surface; checking a row never opens it.
+- While projects are selected, a bar announces « n projets sélectionnés » with « Désélectionner »
+  and « Supprimer ». The selection only covers the loaded page and is reset when the page, a
+  filter, the search or the view changes.
+- « Supprimer » asks « Les n projets sélectionnés et leurs x tâches seront supprimés. Cette action
+  est irréversible. » (« Confirmer la suppression »). The front then sends one
+  `DELETE /projects/{projectId}` per project (no bulk route in the contract), shows the toast
+  « n projets supprimés » naming them and reloads the page. A refused project stays on the page
+  and selected, with an error naming it and the BFF reason.
+
 ## Project list V2 (MAIR-829)
 
 Figma F1 (Kanban), F2 (grid), F4 (card menu) of the Projects mockup.

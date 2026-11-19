@@ -177,6 +177,11 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
+  // MAIR-833: table selection. Only the projects of the loaded page can be selected; a page, filter or
+  // view change resets it explicitly.
+  const [selectedProjectIds, setSelectedProjectIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkDeletionOpen, setBulkDeletionOpen] = useState(false);
+  const [bulkDeletionPending, setBulkDeletionPending] = useState(false);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
   // MAIR-829: confirmation shown as a lib toast (« Statut mis à jour »).
@@ -406,6 +411,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (pageLoading || pageReadPendingRef.current || pageError || !pagination) return;
     if (direction === 'previous' ? pagination.page <= 1 : !pagination.hasNextPage) return;
     const nextPage = pagination.page + (direction === 'previous' ? -1 : 1);
+    setSelectedProjectIds(new Set());
     requestedPageRef.current = nextPage;
     pageUrl.update({ page: String(nextPage) });
     const controller = new AbortController();
@@ -415,6 +421,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const prepareQueryChange = (firstPage: boolean) => {
+    setSelectedProjectIds(new Set());
     ++pageRevisionRef.current;
     navigationReadRef.current?.abort();
     if (firstPage) requestedPageRef.current = 1;
@@ -459,6 +466,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const resetProjectFilters = () => {
+    setSelectedProjectIds(new Set());
     pageUrl.update({ q: '', status: 'all', priority: 'all', dueBefore: '', page: '1' });
     requestedPageRef.current = 1;
     queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '' };
@@ -1194,6 +1202,68 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     }
   };
 
+  const selectedProjects = projects.filter((project) => selectedProjectIds.has(project.id));
+
+  const changeProjectSelection = (projectIds: string[], selected: boolean) => {
+    setSelectedProjectIds((current) => {
+      const next = new Set(current);
+      for (const id of projectIds) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const clearProjectSelection = () => setSelectedProjectIds(new Set());
+
+  const requestBulkProjectDeletion = () => {
+    if (selectedProjects.length > 0) setBulkDeletionOpen(true);
+  };
+
+  const cancelBulkProjectDeletion = () => {
+    if (!bulkDeletionPending) setBulkDeletionOpen(false);
+  };
+
+  // MAIR-833: the contract has no bulk route, so each selected project gets its own DELETE. Deleted projects
+  // leave the page and the selection; refused ones stay selected and are reported with their reason.
+  const confirmBulkProjectDeletion = async () => {
+    const targets = selectedProjects;
+    if (targets.length === 0 || bulkDeletionPending) return;
+    setAlert(null);
+    setBulkDeletionPending(true);
+    try {
+      const results = await Promise.allSettled(targets.map((project) => deleteBffProject(project.id)));
+      const deleted = targets.filter((_, index) => results[index].status === 'fulfilled');
+      const refused = targets.flatMap((project, index) => {
+        const result = results[index];
+        return result.status === 'rejected' ? [{ project, message: getBffProjectErrorMessage(result.reason) }] : [];
+      });
+      setBulkDeletionOpen(false);
+      if (deleted.length > 0) {
+        const deletedIds = new Set(deleted.map((project) => project.id));
+        ++pageRevisionRef.current;
+        setProjects((current) => current.filter((project) => !deletedIds.has(project.id)));
+        setSelectedProjectIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        if (detailSelectionRef.current && deletedIds.has(detailSelectionRef.current.projectId)) closeProjectDetails();
+        if (editingProjectId && deletedIds.has(editingProjectId)) closeCreateProject();
+        setFeedback(bulkDeletionFeedback(deleted.map((project) => project.title)));
+        await refreshProjectsPage({ silent: true });
+      }
+      if (refused.length > 0) {
+        const plural = refused.length > 1;
+        setAlert({
+          type: 'error',
+          message: `${refused.length} projet${plural ? 's' : ''} n’${plural ? 'ont' : 'a'} pas pu être supprimé${plural ? 's' : ''} : ${
+            refused.map(({ project, message }) => `« ${project.title} » (${message})`).join(', ')
+          }. ${plural ? 'Ils restent sélectionnés' : 'Il reste sélectionné'}.`,
+        });
+      }
+    } finally {
+      setBulkDeletionPending(false);
+    }
+  };
+
   const addProjectTask = async (project: Project, taskDraft: ProjectTaskDraft) => {
     const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
@@ -1612,6 +1682,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     duplicateProject,
     deleteProject,
     confirmProjectDeletion,
+    selectedProjects,
+    changeProjectSelection,
+    clearProjectSelection,
+    bulkDeletionOpen,
+    bulkDeletionPending,
+    requestBulkProjectDeletion,
+    cancelBulkProjectDeletion,
+    confirmBulkProjectDeletion,
     addProjectTask,
     updateProjectTask,
     changeProjectTaskStatus,
@@ -1628,3 +1706,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 }
 
 export type ProjectsController = ReturnType<typeof useProjectsController>;
+
+/** « 2 projets supprimés » / « « A » et « B » ont été supprimés. » (Figma F1 1.5). */
+export function bulkDeletionFeedback(titles: string[]) {
+  const quoted = titles.map((title) => `« ${title} »`);
+  const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} et ${quoted.at(-1)}` : quoted[0];
+  const plural = titles.length > 1;
+  return {
+    title: `${titles.length} projet${plural ? 's' : ''} supprimé${plural ? 's' : ''}`,
+    message: `${list} ${plural ? 'ont' : 'a'} été supprimé${plural ? 's' : ''}.`,
+  };
+}
