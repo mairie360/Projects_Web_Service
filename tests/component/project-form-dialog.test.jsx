@@ -141,20 +141,6 @@ describe('project form dialogs', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('returns to the still-present card actions trigger after editing from a dismissed menu', async () => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn();
-    render(<FormHarness mode="edit" onSubmit={onSubmit} fromMenu />);
-    const opener = screen.getByRole('button', { name: 'Actions pour Projet clavier' });
-    await user.click(opener);
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier' }));
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Modifier le projet' }));
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-    expect(onSubmit).not.toHaveBeenCalled();
-  });
 
   it.each([['create', 'Nouveau projet'], ['edit', 'Modifier le projet']])(
     'names and contains focus in the %s form, closes without saving and restores the opener', async (mode, name) => {

@@ -3,7 +3,7 @@
 import { AccessibleShell } from "@mairie360/lib-components/shell";
 
 import React from 'react';
-import { Alert, ConfirmModal, Skeleton } from '@mairie360/lib-components/primitives';
+import { Alert, ConfirmModal, Skeleton, ToastProvider } from '@mairie360/lib-components/primitives';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ProjectDetailModal } from './components/ProjectDetailModal';
@@ -12,6 +12,8 @@ import { ProjectPagination } from './components/ProjectPagination';
 import { TaskCreationNotice } from './components/TaskCreationNotice';
 import { GridView } from './components/GridView';
 import { TableView } from './components/TableView';
+import { ProjectsEmptyState } from './components/ProjectsEmptyState';
+import { FeedbackToast } from './components/FeedbackToast';
 import { ProjectFiltersBar } from './components/ProjectFiltersBar';
 import { WorkspaceHeader } from './components/WorkspaceHeader';
 import { LogoutErrorNotice } from './components/LogoutErrorNotice';
@@ -86,11 +88,14 @@ export function ProjectsWorkspace({
   projectStatusOptions,
   projectPriorityOptions,
   filteredProjects,
+  feedback,
+  clearFeedback,
+  resetProjectFilters,
+  filtersActive,
   retryProjectsPage,
   changeProjectPage,
   openCreateProject,
   openProjectDetails,
-  openEditProject,
   closeCreateProject,
   keepProjectFormCurrent,
   updateProjectForm,
@@ -116,7 +121,8 @@ export function ProjectsWorkspace({
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
   return (
-    <>
+    <ToastProvider regionLabel="Notifications des projets">
+      <FeedbackToast feedback={feedback} onShown={clearFeedback} />
       <ConfirmModal
         open={Boolean(projectPendingDeletion)}
         title="Supprimer le projet"
@@ -282,23 +288,19 @@ export function ProjectsWorkspace({
 
                 {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
-                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && (
+                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
+                  <ProjectsEmptyState onReset={resetProjectFilters} />
+                )}
+
+                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && !(filtersActive && filteredProjects.length === 0) && viewMode === 'kanban' && (
                   <KanbanBoard
-                    workflowPort={workflowPort}
                     projects={filteredProjects}
-                    taskCreationStates={taskCreationStates}
-                    onInspectTaskCreation={inspectTaskCreation}
-                    onPreserveTaskDraft={preserveUncertainTaskDraft}
                     unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     columns={projectsPage?.kanban.columns ?? []}
-                    memberOptions={memberOptions}
-                    labelOptions={labelOptions}
                     onProjectOpen={openProjectDetails}
-                    onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
-                    onProjectTaskAdd={addProjectTask}
                     onAddProject={canCreateProject ? openCreateProject : undefined}
                     onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                   />
@@ -306,20 +308,14 @@ export function ProjectsWorkspace({
 
                 {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
                   <GridView
-                    workflowPort={workflowPort}
                     projects={filteredProjects}
-                    taskCreationStates={taskCreationStates}
-                    onInspectTaskCreation={inspectTaskCreation}
-                    onPreserveTaskDraft={preserveUncertainTaskDraft}
                     unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
-                    memberOptions={memberOptions}
-                    labelOptions={labelOptions}
                     onProjectOpen={openProjectDetails}
-                    onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
-                    onProjectTaskAdd={addProjectTask}
+                    onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                    onResetFilters={filtersActive ? resetProjectFilters : undefined}
                   />
                 )}
 
@@ -329,9 +325,10 @@ export function ProjectsWorkspace({
                     unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
                     duplicatingProjectIds={duplicatingProjectIds}
                     onProjectOpen={openProjectDetails}
-                    onProjectEdit={openEditProject}
                     onProjectDuplicate={duplicateProject}
                     onProjectDelete={deleteProject}
+                    onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                    onResetFilters={filtersActive ? resetProjectFilters : undefined}
                   />
                 )}
                 {projectsPage && (
@@ -340,6 +337,6 @@ export function ProjectsWorkspace({
               </section>
             </div>
       </AccessibleShell>
-    </>
+    </ToastProvider>
   );
 }

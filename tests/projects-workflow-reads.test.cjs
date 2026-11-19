@@ -7,7 +7,6 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { TaskComposer } = requireTs('src/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer/TaskComposer.tsx');
 const { createPublishedProjectWorkflowPort } = requireTs('src/lib/publishedProjectWorkflow.ts');
 
 // MAIR-567 reads stay minimal (MAIR-526): the detail already loaded by the project sheet is not read
@@ -36,25 +35,6 @@ test('MAIR-567: opening a project reads its detail once, then its statuses and a
   assert.equal(bffProject.calls('/projects/{projectId}/statuses', 'get').length, 1);
   assert.equal(bffProject.calls('/projects/{projectId}/archived-tasks', 'get').length, 1);
   assert.doesNotMatch(view.text(), /n’a pas pu être vérifiée/);
-});
-
-test('MAIR-567: the card task form reads the project statuses alone', async () => {
-  const calls = { statuses: 0, project: 0 };
-  const statuses = [
-    { id: 'status-a', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
-    { id: 'status-b', name: 'Dossiers clos', color: '#267845', category: 'done' },
-  ];
-  const workflowPort = {
-    readStatuses: async () => { calls.statuses += 1; return statuses; },
-    readProject: async () => { calls.project += 1; throw new Error('not expected'); },
-    readTemplates: async () => [],
-  };
-  view = mount(React.createElement(TaskComposer, { project, workflowPort, onAddTask: async () => {} }));
-  await view.waitFor(html => html.includes('Ajouter une tâche'));
-  await view.fire((_props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'), 'onClick', { stopPropagation() {} });
-  await view.waitFor(() => view.hostElements((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Statut' && props.value !== undefined).length > 0 && view.html.includes('Demandes reçues'));
-
-  assert.deepEqual(calls, { statuses: 1, project: 0 });
 });
 
 test('MAIR-567: the published port reuses loaded tasks but write checks read the current detail', async () => {
@@ -117,32 +97,4 @@ test('MAIR-567: completing a task from the sheet moves it to the first "Terminé
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length === 1);
 
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch')[0].body, { statusId: 'status-4' });
-});
-
-test('MAIR-567: a status chosen in a cancelled card form does not survive its reopening', async () => {
-  const statuses = [
-    { id: 'status-a', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
-    { id: 'status-b', name: 'En instruction', color: '#4b908d', category: 'inprogress' },
-    { id: 'status-c', name: 'Dossiers clos', color: '#267845', category: 'done' },
-  ];
-  const saved = [];
-  const workflowPort = { readStatuses: async () => statuses, readProject: async () => { throw new Error('not expected'); }, readTemplates: async () => [] };
-  view = mount(React.createElement(TaskComposer, { project, workflowPort, onAddTask: async (_project, draft) => { saved.push(draft); } }));
-  await view.waitFor(html => html.includes('Ajouter une tâche'));
-  const openForm = () => view.fire((_props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'), 'onClick', { stopPropagation() {} });
-  const statusSelect = () => view.hostElements((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Statut')[0];
-  await openForm();
-  await view.waitFor(html => html.includes('Dossiers clos'));
-  await view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Statut', 'onChange', { target: { value: 'status-c' } });
-  await view.click((_props, text, tag) => tag === 'button' && text === 'Annuler');
-  await openForm();
-  await view.waitFor(html => html.includes('Dossiers clos'));
-
-  // The project default status is 'in-progress' (fixtures), so its first "En cours" status is offered again.
-  assert.equal(statusSelect().props.value, 'status-b');
-  await view.fire((props, _text, tag) => tag === 'input' && props['aria-label'] === 'Titre de la tâche', 'onChange', { target: { value: 'Nouvelle demande' } });
-  await view.fire((_props, _text, tag) => tag === 'form', 'onSubmit', { preventDefault() {} });
-  await view.waitFor(() => saved.length === 1);
-  assert.equal(saved[0].statusId, 'status-b');
-  assert.equal(saved[0].status, 'in-progress');
 });

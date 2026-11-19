@@ -56,7 +56,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
         });
         // A card opens by GET before its write; let that opening complete normally.
         if (projectOperation === 'card') {
-          await view.act(() => view.props('KanbanBoard').onProjectEdit(project));
+          await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
           await view.act(() => view.props('CreateProjectModal').onChange({ ...projectToFormState(project), title: 'Projet demandé' }));
         }
         const confirmed = f.projectTask({ id: taskOperation === 'create' ? 'task-new' : task.id, title: 'Tâche récemment confirmée', status: 'done' });

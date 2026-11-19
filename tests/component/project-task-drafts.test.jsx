@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
-import { TaskComposer } from '@/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer';
 import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
 import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
@@ -30,32 +29,6 @@ function deferred() {
 }
 
 describe("Project task save confirmation", () => {
-  it('retains a card draft on uncertain acceptance and disables both native and programmatic submissions after inspection', async () => {
-    const user = userEvent.setup(), values = props();
-    const onInspect = vi.fn(), onPreserveDraft = vi.fn();
-    values.onAddTask.mockRejectedValue(new NewTaskReceiptVerificationRequiredError());
-    const { rerender } = render(<TaskComposer {...values} onInspect={onInspect} onPreserveDraft={onPreserveDraft} />);
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
-    const input = screen.getByLabelText('Titre de la tâche', { exact: true });
-    await user.type(input, 'Brouillon carte accepté');
-    await user.click(screen.getByRole('button', { name: 'Ajouter', exact: true }));
-    const state = { uncertainTitle: 'Brouillon carte accepté', draft: { title: 'Brouillon carte accepté', status: 'review', priority: 'low', assignees: ['user-1'], labels: ['voirie'], dueDate: '2026-11-17' } };
-    rerender(<TaskComposer {...values} creationState={state} onInspect={onInspect} onPreserveDraft={onPreserveDraft} />);
-    expect(screen.getByRole('button', { name: 'Ajouter', exact: true }).disabled).toBe(true);
-    expect(input.value).toBe('Brouillon carte accepté');
-    expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
-    await user.type(input, ' gardé');
-    expect(onPreserveDraft).toHaveBeenLastCalledWith(values.project.id, { title: 'Brouillon carte accepté gardé' });
-    fireEvent.submit(input.closest('form'));
-    expect(values.onAddTask).toHaveBeenCalledOnce();
-    const inspect = screen.getByRole('button', { name: 'Inspecter les tâches du projet' });
-    inspect.focus(); await user.keyboard('{Enter}');
-    expect(onInspect).toHaveBeenCalledWith(values.project.id);
-    await user.click(screen.getByRole('button', { name: 'Annuler', exact: true }));
-    await user.click(screen.getByRole('button', { name: 'Création à inspecter', exact: true }));
-    expect(screen.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon carte accepté gardé');
-    expect(values.onAddTask).toHaveBeenCalledOnce();
-  });
   it.each(["create", "edit"])("preserves every detail %s field and edit mode on refusal, then resets only after confirmed retry", async (mode) => {
     const user = userEvent.setup();
     const values = props();
@@ -131,36 +104,6 @@ describe("Project task save confirmation", () => {
     expect(scope.queryByRole("alert")).toBeNull();
   });
 
-  it("preserves the inline card draft on refusal and same-project refresh, then prevents duplicate retry while pending", async () => {
-    const user = userEvent.setup();
-    const values = props();
-    const pending = deferred();
-    values.onAddTask.mockRejectedValueOnce(new Error("Carte refusée")).mockReturnValueOnce(pending.promise);
-    const { rerender } = render(<TaskComposer {...values} />);
-    await user.click(screen.getByRole("button", { name: "Ajouter une tâche" }));
-    const title = screen.getByPlaceholderText("Ajouter une tâche...");
-    await user.type(title, "Tâche carte à conserver");
-    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "review" } });
-    fireEvent.change(screen.getAllByRole("combobox")[1], { target: { value: "low" } });
-    fireEvent.change(title.closest("form").querySelector('input[type="date"]'), { target: { value: "2026-11-17" } });
-    await toggleOption(user, screen, 'Étiquettes', 'voirie');
-    await user.click(screen.getByRole("button", { name: "Ajouter", exact: true }));
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Carte refusée");
-    rerender(<TaskComposer {...values} project={{ ...values.project, responsible: { ...values.project.responsible }, status: "done", priority: "high", dueDate: "2027-01-01" }} />);
-    expect(title.value).toBe("Tâche carte à conserver");
-    expect(screen.getAllByRole("combobox").map(x => x.value)).toEqual(["review", "low"]);
-    fireEvent.submit(title.closest("form"));
-    fireEvent.submit(title.closest("form"));
-    expect(values.onAddTask).toHaveBeenCalledTimes(2);
-    expect(values.onAddTask.mock.calls[1][1]).toEqual(values.onAddTask.mock.calls[0][1]);
-    expect(title.matches(":disabled")).toBe(true);
-    expect(screen.getByRole("button", { name: "Annuler", exact: true }).matches(":disabled")).toBe(true);
-    await act(async () => pending.resolve());
-    expect(screen.queryByPlaceholderText("Ajouter une tâche...")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Ajouter une tâche" }));
-    expect(screen.getByPlaceholderText("Ajouter une tâche...").value).toBe("");
-    expect(screen.getAllByRole("combobox").map(x => x.value)).toEqual(["done", "high"]);
-  });
 });
 
 it('requires an explicit assignee when the authenticated agent is unavailable, without substituting the project owner', async () => {

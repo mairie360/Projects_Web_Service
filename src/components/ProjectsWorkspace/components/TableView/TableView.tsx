@@ -12,19 +12,22 @@ export function TableView({
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
   onProjectOpen,
-  onProjectEdit,
+  onProjectStatusChange,
   onProjectDuplicate,
   onProjectDelete,
+  onResetFilters,
 }: {
   projects: Project[];
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
   onProjectOpen: (project: Project) => void;
-  onProjectEdit: (project: Project) => void;
+  onProjectStatusChange?: (project: Project, status: Project['status']) => void | Promise<void>;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  /** Shown in the empty state when a search or a filter hides every project (MAIR-829). */
+  onResetFilters?: () => void;
 }) {
-  if (projects.length === 0) return <EmptyState />;
+  if (projects.length === 0) return <EmptyState onReset={onResetFilters} />;
 
   const canView = (project: Project) => project.permissions?.canView !== false;
   const columns: DataTableColumn<Project>[] = [
@@ -78,7 +81,8 @@ export function TableView({
           project={project}
           duplicationPending={duplicatingProjectIds.includes(project.id)}
           duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
-          onEdit={onProjectEdit}
+          onOpen={onProjectOpen}
+          onChangeStatus={onProjectStatusChange}
           onDuplicate={onProjectDuplicate}
           onDelete={onProjectDelete}
         />
