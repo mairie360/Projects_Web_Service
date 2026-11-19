@@ -11,11 +11,11 @@ const workspace = 'src/components/ProjectsWorkspace';
 // through their folder (`./components/<Name>`), never a sub-sub-component.
 test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-components through their folders', () => {
   const tree = {
-    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectDetailModal', 'ProjectTemplateManager', 'TaskCreationNotice'],
+    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectDetailModal', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     [`${workspace}/components/ProjectDetailModal/ProjectDetailModal.tsx`]: ['DetailHeader', 'DetailRefreshAlert', 'DetailTaskList', 'ProjectEditForm', 'ProjectLifecycle', 'ProjectSummary', 'ProjectWorkflow', 'TaskFormPanel'],
     [`${workspace}/components/ProjectDetailModal/components/DetailTaskList/DetailTaskList.tsx`]: ['TaskFilters', 'TaskRow', 'TaskDeleteConfirm', 'TaskFollowUp'],
-    [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu', 'TaskComposer', 'RecentTasks'],
+    [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu'],
     [`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`]: ['TaskDraftForm', 'DraftTaskRow'],
   };
   for (const [file, parts] of Object.entries(tree)) {
@@ -34,17 +34,26 @@ test('MAIR-608 the large dialogs keep their state in hooks beside them', () => {
     assert.ok(fs.existsSync(path.join(root, detail, `${hook}.ts`)), `${hook}.ts exists`);
     assert.ok(read(`${detail}/ProjectDetailModal.tsx`).includes(`'./${hook}'`), `ProjectDetailModal uses ${hook}`);
   }
-  assert.ok(read(`${workspace}/components/ProjectCard/components/TaskComposer/TaskComposer.tsx`).includes("'./use-task-composer'"));
   assert.ok(read(`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`).includes("'./use-task-drafts'"));
-  for (const file of ['ProjectsWorkspace.tsx', 'components/ProjectDetailModal/ProjectDetailModal.tsx', 'components/CreateProjectModal/CreateProjectModal.tsx', 'components/ProjectCard/components/TaskComposer/TaskComposer.tsx', 'components/ProjectTasksEditor/ProjectTasksEditor.tsx']) {
+  for (const file of ['ProjectsWorkspace.tsx', 'components/ProjectDetailModal/ProjectDetailModal.tsx', 'components/CreateProjectModal/CreateProjectModal.tsx', 'components/ProjectTasksEditor/ProjectTasksEditor.tsx']) {
     assert.ok(read(`${workspace}/${file}`).split('\n').length <= 400, `${file} stays under 400 lines`);
   }
 });
 
-test('MAIR-608 the page feedback is the lib Alert, never a standalone lib Toast', () => {
+test('MAIR-608 / MAIR-829 the page feedback is the lib Alert, confirmations go through the lib ToastProvider', () => {
   const page = read(`${workspace}/ProjectsWorkspace.tsx`);
-  assert.match(page, /import \{ Alert, ConfirmModal, Skeleton \} from '@mairie360\/lib-components\/primitives'/);
+  assert.match(page, /import \{ Alert, ConfirmModal, Skeleton, ToastProvider \} from '@mairie360\/lib-components\/primitives'/);
+  // A standalone Toast is not announced: toasts only come from useToast under the provider's live regions.
   assert.doesNotMatch(page, /<Toast\b/);
+  assert.match(page, /<ToastProvider regionLabel=/);
+});
+
+// MAIR-829: the card no longer adds tasks nor lists recent ones (they live in the project sheet).
+test('MAIR-829 the project card has no task composer nor recent tasks', () => {
+  for (const removed of ['TaskComposer', 'RecentTasks']) {
+    assert.equal(fs.existsSync(path.join(root, workspace, 'components/ProjectCard/components', removed)), false, `${removed} is gone`);
+  }
+  assert.doesNotMatch(read(`${workspace}/components/ProjectCard/ProjectCard.tsx`), /TaskComposer|RecentTasks|onAddTask/);
 });
 
 // MAIR-828: the page uses the lib-components 2 primitives, never a local copy of one.

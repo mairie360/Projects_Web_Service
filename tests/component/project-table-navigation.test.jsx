@@ -32,7 +32,7 @@ describe('Project Table detail entry', () => {
     await user.keyboard(key);
     expect(props.onProjectOpen).toHaveBeenCalledOnce();
     expect(props.onProjectOpen).toHaveBeenCalledWith(project);
-    expect(props.onProjectEdit).not.toHaveBeenCalled();
+    expect(props.onProjectDuplicate).not.toHaveBeenCalled();
   });
 
   it('retains pointer row opening and an independent action menu', async () => {
@@ -42,8 +42,9 @@ describe('Project Table detail entry', () => {
     expect(props.onProjectOpen).toHaveBeenCalledOnce();
     props.onProjectOpen.mockClear();
     await user.click(screen.getByRole('button', { name: `Actions pour ${project.title}`, exact: true }));
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
-    expect(props.onProjectEdit).toHaveBeenCalledOnce();
+    // MAIR-829: the menu duplicates without opening the row.
+    await user.click(screen.getByRole('menuitem', { name: 'Dupliquer', exact: true }));
+    expect(props.onProjectDuplicate).toHaveBeenCalledOnce();
     expect(props.onProjectOpen).not.toHaveBeenCalled();
   });
 

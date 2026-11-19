@@ -1,4 +1,5 @@
 import { statuses, type Status } from '@mairie360/lib-components/primitives';
+import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import type { Project } from '../../types/project';
 
 export function formatProjectDate(date: string, withYear = true) {
@@ -37,3 +38,13 @@ export const projectStatusBadge = {
 
 /** French label of a project or task status, the one the lib `StatusBadge` shows (« En revue »). */
 export const projectStatusLabel = (status: Project['status']) => statuses[projectStatusBadge[status]].label;
+
+/** Day of `now` in the instance time zone, as `YYYY-MM-DD` (the format of the BFF due dates). */
+export function instanceToday(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: getInstanceTimeZone(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/** MAIR-829: « En retard » — the due date is past in the instance time zone and the project is not done. */
+export function isProjectOverdue(project: Pick<Project, 'dueDate' | 'status'>, now = new Date()) {
+  return project.status !== 'done' && /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && project.dueDate < instanceToday(now);
+}

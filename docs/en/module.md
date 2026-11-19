@@ -1,5 +1,27 @@
 # Projects_Web_Service — Module overview
 
+## Project list V2 (MAIR-829)
+
+Figma F1 (Kanban), F2 (grid), F4 (card menu) of the Projects mockup.
+
+- **Card**: project key (`#14`), « … » menu, title (opens the project sheet), two-line
+  description, labels, priority, « En retard » when the due date is past in the instance
+  time zone and the project is not done, due date, progress, team avatars and
+  « x/y tâches ». The grid card also shows the status. The card no longer adds tasks nor
+  lists recent ones: tasks are managed from the project sheet.
+- **Kanban columns**: the header shows the status, the project count and a « + » that
+  opens the creation form with that status. Dropping a card highlights the target column
+  and dims the dragged card.
+- **Card menu** (« … »): Ouvrir le projet, Dupliquer, « Changer le statut » (single choice
+  among À faire / En cours / En revue / Terminé, same PATCH as a drop), Supprimer (with
+  confirmation). « Modifier » is gone: the project sheet edits the project. The mockup's
+  « Suspendu » status is not in the BFF_Project contract and is not offered.
+- A successful status change is confirmed by the lib toast « Statut mis à jour »; a refusal
+  keeps the card in place and shows the error.
+- A search or a filter without result shows « Aucun projet à afficher » with
+  « Réinitialiser les filtres », which reloads the unfiltered page. An empty page without
+  filter keeps the empty Kanban columns.
+
 ## Project groups (MAIR-880)
 
 Every new project belongs to a **group** whose current and future members see it
@@ -59,8 +81,7 @@ is out of scope for that rule in `.zap/rules.tsv`. Every other URL and parameter
 
 Each project has its own task statuses (name, colour, category To do / In
 progress / Done, order), read from `GET /projects/{projectId}/statuses`. The
-project sheet shows the Kanban columns and status selectors built from them, and
-the card task form offers them. Managers (Responsable) and administrators can add,
+project sheet shows the Kanban columns and status selectors built from them. Managers (Responsable) and administrators can add,
 rename, recolour, recategorise, reorder or delete a status (deletion asks for the
 target status of its tasks), and manage project templates; creating a project can
 start from a template whose statuses are previewed first. Every write waits for a
@@ -69,7 +90,7 @@ a fresh read.
 
 Reads stay minimal (MAIR-526): the sheet passes the tasks of the detail it already
 loaded, so opening a project reads `GET /projects/{projectId}` once, then the
-statuses and archived tasks once; the card task form reads the statuses alone.
+statuses and archived tasks once.
 Write preflights and confirmations always read the current detail.
 
 Workflow writes go through the page controller (MAIR-570) and share the task

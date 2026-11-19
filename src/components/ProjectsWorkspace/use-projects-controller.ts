@@ -2,6 +2,7 @@
 import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow';
 import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '../../lib/page-return';
+import { projectStatusLabel } from './project-card-meta';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -178,6 +179,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+  // MAIR-829: confirmation shown as a lib toast (« Statut mis à jour »).
+  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
+  const clearFeedback = useCallback(() => setFeedback(null), []);
   const [projectFormPending, setProjectFormPending] = useState(false);
   const projectFormPendingRef = useRef(false);
   const projectFormOpeningRef = useRef<symbol | null>(null);
@@ -1055,7 +1059,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
+      setFeedback({ title: 'Statut mis à jour', message: `« ${project.title} » est maintenant « ${projectStatusLabel(status)} ».` });
     } catch (error) {
       showError(error);
     }
@@ -1590,6 +1594,10 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     projectStatusOptions,
     projectPriorityOptions,
     filteredProjects,
+    feedback,
+    clearFeedback,
+    resetProjectFilters,
+    filtersActive: Boolean(searchTerm.trim()) || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueBeforeFilter),
     retryProjectsPage,
     changeProjectPage,
     openCreateProject,

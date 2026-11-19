@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
 import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
-import { TaskComposer } from '@/components/ProjectsWorkspace/components/ProjectCard/components/TaskComposer';
 import { projectToFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
 const statuses = [
@@ -37,18 +36,6 @@ describe('workflow adoption by existing project forms', () => {
     expect(saved.status).toBe('in-progress');
   });
 
-  it('uses project statuses in the card composer and keeps the rejected draft', async () => {
-    const user = userEvent.setup();
-    render(<TaskComposer project={project} workflowPort={port} memberOptions={page.options.members} onAddTask={async () => { throw new Error('Création refusée'); }} />);
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche' }));
-    await screen.findByRole('option', { name: 'Conseil municipal' });
-    fireEvent.change(screen.getByLabelText('Titre de la tâche'), { target: { value: 'Brouillon communal' } });
-    fireEvent.change(screen.getByLabelText('Statut', { exact: true }), { target: { value: 'status-2' } });
-    await user.click(screen.getByRole('button', { name: 'Ajouter', exact: true }));
-    await screen.findByText('Création refusée');
-    expect(screen.getByLabelText('Titre de la tâche').value).toBe('Brouillon communal');
-    expect(screen.getByLabelText('Statut', { exact: true }).value).toBe('status-2');
-  });
 
   it('carries the selected template from the project creation form to the submit boundary', async () => {
     function Creation() {

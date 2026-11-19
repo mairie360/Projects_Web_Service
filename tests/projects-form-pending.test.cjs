@@ -28,7 +28,7 @@ async function openForm(mode) {
   view = mount(React.createElement(Page));
   await view.waitFor((html) => !html.includes('Chargement des projets'));
   if (mode === 'create') await view.click('Nouveau projet');
-  else await view.act(() => view.props('KanbanBoard').onProjectEdit(view.props('KanbanBoard').projects[0]));
+  else await view.act(() => view.props('ProjectsWorkspace').openEditProject(view.props('KanbanBoard').projects[0]));
   await view.act(() => view.props('CreateProjectModal').onChange(draft()));
 }
 function delayWrite(method) {

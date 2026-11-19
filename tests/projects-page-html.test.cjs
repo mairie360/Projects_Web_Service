@@ -171,8 +171,9 @@ test('dragging a project changes only its status and reloads the Kanban from the
   await view.fire((props) => props['data-project-status'] === 'review', 'onDrop', { dataTransfer });
   // The canonical PATCH can update the card before the following GET settles.
   // A recorded read is not completion of the detached onDrop callback.
-  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review' &&
-    alertText() === `Statut du projet "${project.title}" mis à jour.`);
+  // MAIR-829: the confirmation is the lib toast « Statut mis à jour ».
+  const toast = `« ${project.title} » est maintenant « En revue ».`;
+  await view.waitFor(() => pageCalls().length === 2 && view.props('KanbanBoard').projects[0].status === 'review' && view.text().includes(toast));
 
   assert.equal(dataTransfer.effectAllowed, 'move');
   assert.equal(dataTransfer.dropEffect, 'move');
@@ -180,7 +181,8 @@ test('dragging a project changes only its status and reloads the Kanban from the
   assert.equal(bffProject.calls('/projects/{projectId}', 'patch')[0].pathParams.projectId, project.id);
   assert.equal(pageCalls().length, 2);
   assert.equal(view.props('KanbanBoard').projects[0].status, 'review');
-  assert.equal(alertText(), `Statut du projet "${project.title}" mis à jour.`);
+  assert.match(view.text(), /Statut mis à jour/);
+  assert.equal(alertText(), undefined, 'no in-page alert duplicates the toast');
 });
 
 test('a failed status change keeps the project in its original column and reports the error', async () => {
@@ -392,8 +394,7 @@ for (const [dueDate, expected, short] of [
       dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate);
     await view.act(() => view.props('ProjectDetailModal').onClose());
 
-    await view.click((props) => props['aria-label'] === `Actions pour ${project.title}`);
-    await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Modifier');
+    await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
     await view.waitFor(() => view.find('CreateProjectModal').length === 1 && view.find('ProjectTasksEditor').length === 1);
     assert.ok(view.text().includes(expected));
     assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
@@ -875,7 +876,7 @@ test('filter controls do not duplicate all when the BFF already supplies it', as
   assert.match(view.text(), /Toutes les priorités/);
 });
 
-test('the card menu duplicates, edits and deletes a project through the BFF and announces each result', async () => {
+test('MAIR-829: the card menu duplicates, opens, changes the status and deletes a project through the BFF', async () => {
   await renderLoadedPage();
   const title = 'Rénovation de l’éclairage public';
 
@@ -892,17 +893,24 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   await view.click(props => props['aria-label'] === 'Fermer le message');
   assert.equal(alertText(), undefined);
 
+  // MAIR-829: « Ouvrir le projet » opens the project sheet.
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
-  await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Modifier');
-  await view.waitFor(() => view.find('CreateProjectModal').length === 1 && view.props('CreateProjectModal').form.title === title);
-  assert.equal(view.props('CreateProjectModal').mode, 'edit');
-  bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem({ title: 'Éclairage public rénové' })) });
-  await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Éclairage public rénové' }));
-  await view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
-  await view.waitFor(() => alertText() === 'Projet "Éclairage public rénové" modifié.');
-  assert.equal(bffProject.calls('/projects/{projectId}', 'patch')[0].body.title, 'Éclairage public rénové');
-  assert.equal(view.find('CreateProjectModal').length, 0);
+  assert.doesNotMatch(view.text(), /Modifier/, 'the V2 menu has no « Modifier » (the sheet edits the project)');
+  await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Ouvrir le projet');
+  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  assert.equal(view.props('ProjectDetailModal').project.id, 'project-1');
+  await view.act(() => view.props('ProjectDetailModal').onClose());
+
+  // MAIR-829: « Changer le statut » is a single choice that PATCHes the status and confirms with a toast.
+  bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ status: body.status })) }));
+  await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
+  assert.match(view.text(), /Changer le statut/);
+  const radios = view.find('DropdownMenuRadioGroup');
+  assert.equal(radios.at(-1).props.value, 'in-progress');
+  await view.act(() => radios.at(-1).props.onValueChange('done'));
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'patch').length === 1 && view.text().includes(`« ${title} » est maintenant « Terminé ».`));
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { status: 'done' });
 
   await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
   await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Supprimer');
@@ -921,32 +929,6 @@ test('the card menu duplicates, edits and deletes a project through the BFF and 
   assert.equal(bffProject.calls('/projects/{projectId}', 'delete')[0].pathParams.projectId, 'project-1');
   assert.doesNotMatch(view.html, /role="dialog"/);
   assert.equal(view.props('KanbanBoard').projects.length, 0);
-});
-
-test('the task composer of a card refuses an empty title, then posts the task and refreshes the project', async () => {
-  await renderLoadedPage();
-
-  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
-  await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
-  assert.match(view.text(), /Le titre de la tâche est obligatoire\./);
-  assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 0);
-
-  bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' }) });
-  bffProject.on('get', '/projects/{projectId}', () => ({ body: fixtures.projectDetails(fixtures.projectListItem(), [
-    fixtures.projectTask(),
-    ...(bffProject.calls('/projects/{projectId}/tasks', 'post').length ? [fixtures.projectTask({ id: 'task-3', title: 'Commander les mâts' })] : []),
-  ]) }));
-  await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Commander les mâts' } });
-  assert.doesNotMatch(view.text(), /Le titre de la tâche est obligatoire\./);
-  await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
-  await view.waitFor(() => alertText() === 'Tâche "Commander les mâts" ajoutée à "Rénovation de l’éclairage public".');
-
-  const [call] = bffProject.calls('/projects/{projectId}/tasks', 'post');
-  assert.equal(call.pathParams.projectId, 'project-1');
-  assert.equal(call.body.title, 'Commander les mâts');
-  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'an unconsulted card establishes its baseline, then refreshes after confirmation');
-  assert.equal(pageCalls().length, 2, 'the page is reloaded silently');
-  assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/, 'the composer closes');
 });
 
 for (const mode of ['create', 'edit']) {
@@ -1015,27 +997,6 @@ for (const mode of ['create', 'edit']) {
     assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 2);
   });
 }
-
-test('a confirmed inline task creation is not offered for retry when the following detail refresh fails', async () => {
-  await renderLoadedPage();
-  bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-confirmed', title: 'Tâche enregistrée' }) });
-  bffProject.on('get', '/projects/{projectId}', () => bffProject.calls('/projects/{projectId}/tasks', 'post').length
-    ? harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Actualisation refusée'))
-    : { body: fixtures.projectDetails() });
-  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
-  // The card form first reads the project statuses (MAIR-567).
-  await view.waitFor(html => !html.includes('Chargement des statuts du projet'));
-  await view.fire((props) => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Tâche enregistrée' } });
-  await view.fire((props, text, tag) => tag === 'form' && props.className.includes('mt-3'), 'onSubmit');
-  await view.waitFor(() => alertText()?.includes('Actualisation impossible'));
-  assert.match(view.text(), /Tâche "Tâche enregistrée" enregistrée\. Actualisation impossible : Actualisation refusée/);
-  assert.doesNotMatch(view.html, /placeholder="Ajouter une tâche\.\.\."/);
-  assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
-  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 2, 'only the post-confirmation read fails, not the pre-dispatch baseline');
-  await view.click((props, text, tag) => tag === 'button' && text.includes('Ajouter une tâche'));
-  assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value=""/);
-  assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
-});
 
 test('task headings stack above mobile actions without changing permission-gated controls or data', async () => {
   const title = 'ValiderLePlanDesNouveauxEspaces'.repeat(3);

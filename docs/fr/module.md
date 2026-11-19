@@ -1,5 +1,29 @@
 # Projects_Web_Service — Présentation du module
 
+## Liste des projets V2 (MAIR-829)
+
+Maquette Projets, écrans F1 (Kanban), F2 (grille), F4 (menu de carte).
+
+- **Carte** : clé du projet (`#14`), menu « … », titre (ouvre la fiche du projet),
+  description sur deux lignes, étiquettes, priorité, « En retard » quand l’échéance est
+  passée dans le fuseau de l’instance et que le projet n’est pas terminé, échéance,
+  progression, avatars de l’équipe et « x/y tâches ». La carte de la grille affiche aussi le
+  statut. La carte n’ajoute plus de tâche et ne liste plus les tâches récentes : les tâches
+  se gèrent depuis la fiche du projet.
+- **Colonnes Kanban** : l’en-tête affiche le statut, le nombre de projets et un « + » qui
+  ouvre la création avec ce statut. Le glisser-déposer met en évidence la colonne cible et
+  estompe la carte déplacée.
+- **Menu de carte** (« … ») : Ouvrir le projet, Dupliquer, « Changer le statut » (choix
+  unique parmi À faire / En cours / En revue / Terminé, même PATCH qu’un dépôt), Supprimer
+  (avec confirmation). « Modifier » disparaît : la fiche du projet sert à le modifier. Le
+  statut « Suspendu » de la maquette n’existe pas dans le contrat de BFF_Project et n’est pas
+  proposé.
+- Un changement de statut réussi est confirmé par le toast de la lib « Statut mis à jour » ;
+  un refus laisse la carte en place et affiche l’erreur.
+- Une recherche ou un filtre sans résultat affiche « Aucun projet à afficher » avec
+  « Réinitialiser les filtres », qui recharge la page sans filtre. Une page vide sans filtre
+  garde les colonnes Kanban vides.
+
 ## Groupes de projet (MAIR-880)
 
 Chaque nouveau projet appartient à un **groupe** dont les membres actuels et futurs le
@@ -63,8 +87,8 @@ par 10031 ; `tests/zap-rules.test.cjs` fige ce périmètre et échoue si les
 
 Chaque projet a ses propres statuts de tâche (nom, couleur, catégorie À faire /
 En cours / Terminé, ordre), lus via `GET /projects/{projectId}/statuses`. La fiche
-projet affiche les colonnes Kanban et les sélecteurs construits à partir d’eux, et
-le formulaire de tâche des cartes les propose. Responsables et administrateurs
+projet affiche les colonnes Kanban et les sélecteurs construits à partir d’eux.
+Responsables et administrateurs
 peuvent ajouter, renommer, recolorer, changer de catégorie, réordonner ou supprimer
 un statut (la suppression demande le statut de destination de ses tâches), et gérer
 les modèles de projet ; la création d’un projet peut partir d’un modèle dont les
@@ -73,8 +97,7 @@ relecture ; une écriture non vérifiée conserve le brouillon et demande une re
 
 Les lectures restent minimales (MAIR-526) : la fiche transmet les tâches du détail
 qu’elle a déjà chargé, donc ouvrir un projet lit `GET /projects/{projectId}` une
-seule fois, puis les statuts et les tâches archivées une fois ; le formulaire de
-tâche des cartes ne lit que les statuts. Les vérifications avant et après une
+seule fois, puis les statuts et les tâches archivées une fois. Les vérifications avant et après une
 écriture relisent toujours le détail courant.
 
 Les écritures des statuts passent par le contrôleur de la page (MAIR-570) et

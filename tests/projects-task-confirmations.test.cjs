@@ -175,7 +175,7 @@ for (const oldStatus of [200, 503, 401, 403]) {
       return response;
     });
     let creating, opening;
-    await view.act(() => { creating = view.props('KanbanBoard').onProjectTaskAdd(project, draft); });
+    await view.act(() => { creating = view.props('ProjectsWorkspace').addProjectTask(project, draft); });
     await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks', 'post').length === 1);
     if (oldStatus !== 200) bffProject.on('get', '/projects/{projectId}', harness.errorReply(oldStatus, f.apiError('OLD_READ', 'Ancienne fiche refusée')));
     await view.act(() => { opening = view.props('KanbanBoard').onProjectOpen(project); });
