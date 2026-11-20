@@ -286,17 +286,18 @@ test('Table exposes a named detail button, stops row bubbling and uses only the 
   const name = `Ouvrir la fiche du projet ${project.title}`;
   const openers = view.hostElements((props, text, tag) => tag === 'button' && props['aria-label'] === name);
   assert.equal(openers.length, 1);
-  assert.equal(openers[0].props['aria-haspopup'], 'dialog');
+  // MAIR-846: the project opens as a page, no longer a dialog.
+  assert.equal(openers[0].props['aria-haspopup'], undefined);
   assert.match(openers[0].props.className, /focus-visible:outline/);
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
   let stopped = 0;
   await view.act(() => openers[0].props.onClick({ stopPropagation() { stopped++; } }));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
   assert.equal(stopped, 1);
-  assert.equal(view.props('ProjectDetailModal').project.id, project.id);
+  assert.equal(view.props('ProjectPage').project.id, project.id);
   assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
-  await view.act(() => view.props('ProjectDetailModal').onClose());
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  await view.act(() => view.props('ProjectPage').onClose());
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
 });
 
@@ -311,28 +312,31 @@ test('Table preserves a received view refusal without sending a detail GET from 
   const row = view.hostElements((props, text, tag) => tag === 'tr' && !!props.onClick)[0];
   await view.act(() => row.props.onClick());
   assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 0);
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
 });
 
-test('opening a project loads its details and renders them in the modal', async () => {
+test('opening a project loads its details and renders them as the project page (MAIR-846)', async () => {
   await renderLoadedPage();
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   const [project] = view.props('KanbanBoard').projects;
 
   await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
 
   assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'project-1');
-  const modal = view.props('ProjectDetailModal');
+  const modal = view.props('ProjectPage');
   assert.equal(modal.project.id, 'project-1');
   assert.deepEqual(modal.tasks.map((task) => task.id), ['task-1', 'task-2']);
   assert.match(view.text(), /Relevé des candélabres/);
-  assert.match(view.html, /role="dialog" aria-modal="true" aria-labelledby="[^"]+"/);
-  assert.match(view.html, /aria-label="Ouvrir la fiche du projet Rénovation de l’éclairage public"/);
+  assert.match(view.html, /<section[^>]*aria-labelledby="[^"]+"[^>]*>/);
+  assert.doesNotMatch(view.html, /aria-modal="true"/);
+  assert.match(view.html, /<h1[^>]*>Rénovation de l’éclairage public<\/h1>/);
+  // The list stays mounted behind the page, hidden.
+  assert.match(view.html, /<div hidden=""[^>]*>[^]*aria-label="Ouvrir la fiche du projet Rénovation de l’éclairage public"/);
 
   await view.act(() => modal.onClose());
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
 });
 
 test('MAIR-569: the project detail says how many archived (done) tasks its counter includes but does not list', async () => {
@@ -343,12 +347,12 @@ test('MAIR-569: the project detail says how many archived (done) tasks its count
   }));
 
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
 
-  assert.deepEqual(view.props('ProjectDetailModal').project.tasks, counts);
-  assert.deepEqual(view.props('ProjectDetailModal').tasks.map((task) => task.id), ['task-1']);
+  assert.deepEqual(view.props('ProjectPage').project.tasks, counts);
+  assert.deepEqual(view.props('ProjectPage').tasks.map((task) => task.id), ['task-1']);
   assert.match(view.text(), /3\/4 · 3 tâches archivées/);
-  await view.act(() => view.props('ProjectDetailModal').onClose());
+  await view.act(() => view.props('ProjectPage').onClose());
 });
 
 test('a project deep link loads the authorized detail even when absent from the first project page', async () => {
@@ -357,11 +361,11 @@ test('a project deep link loads the authorized detail even when absent from the 
     body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })),
   }));
   await renderLoadedPage();
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
 
   assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'project-99');
-  assert.equal(view.props('ProjectDetailModal').project.id, 'project-99');
-  assert.equal(view.props('ProjectDetailModal').highlightTaskId, null);
+  assert.equal(view.props('ProjectPage').project.id, 'project-99');
+  assert.equal(view.props('ProjectPage').highlightTaskId, null);
 });
 
 for (const [dueDate, expected, short] of [
@@ -389,12 +393,12 @@ for (const [dueDate, expected, short] of [
     }
 
     await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-    await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+    await view.waitFor(() => view.find('ProjectPage').length === 1);
     assert.ok(view.text().includes(expected));
     assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
-    assert.equal(view.props('ProjectDetailModal').tasks[0].dueDate,
+    assert.equal(view.props('ProjectPage').tasks[0].dueDate,
       dueDate.includes('T') ? dueDate.slice(0, 10) : dueDate);
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
 
     await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
     await view.waitFor(() => view.find('CreateProjectModal').length === 1 && view.find('ProjectTasksEditor').length === 1);
@@ -409,7 +413,7 @@ test('a task deep link makes the selected BFF task visible and identifiable', as
   harness.location.search = '?project=project-1&task=task-2';
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
   await renderLoadedPage();
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1 && view.props('ProjectDetailModal').highlightTaskId === 'task-2');
+  await view.waitFor(() => view.find('ProjectPage').length === 1 && view.props('ProjectPage').highlightTaskId === 'task-2');
 
   assert.match(view.html, /data-linked-task="task-2"/);
   assert.match(view.html, /aria-current="true"/);
@@ -420,7 +424,7 @@ test('invalid, missing and unauthorized deep-link targets never create a fake de
   harness.location.search = '?task=task-2';
   await renderLoadedPage();
   assert.match(view.text(), /Lien de projet invalide/);
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 0);
   view.unmount();
 
@@ -431,7 +435,7 @@ test('invalid, missing and unauthorized deep-link targets never create a fake de
   bffProject.on('get', '/projects/{projectId}', harness.errorReply(403, fixtures.apiError('FORBIDDEN', 'Projet inaccessible')));
   view = mount(React.createElement(ProjectsPage));
   await view.waitFor((html) => html.includes('Projet inaccessible'));
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'private-project');
 });
 
@@ -441,7 +445,7 @@ test('a link to a missing task leaves the modal closed and explains the missing 
   await renderLoadedPage();
   await view.waitFor((html) => html.includes('La tâche demandée est introuvable'));
 
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.doesNotMatch(view.html, /data-linked-task=/);
 });
 
@@ -465,7 +469,7 @@ test('MAIR-836: creating a project posts the form, reloads the page and announce
   assert.equal(view.find('CreateProjectModal').length, 0);
   assert.match(view.text(), /Fête de la musique/);
   assert.match(html, /Projet créé/);
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
 });
 
 test('same-tick nested task drafts keep independent states in the actual project-create payload', async () => {
@@ -618,7 +622,7 @@ test('module boundaries retain detail task search and comment drafts through und
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
   bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
   await view.fire(props => props.placeholder === 'Rechercher une tâche', 'onChange', { target: { value: 'candélabres' } });
   await view.click((props, text, tag) => tag === 'button' && text === 'Suivi');
   await view.waitFor(html => html.includes('Devis reçu.'));
@@ -627,7 +631,7 @@ test('module boundaries retain detail task search and comment drafts through und
     const reads = pageCalls().length;
     await view.act(() => view.props('SegmentedControl').onChange(value));
     await view.waitFor(() => pageCalls().length === reads + 1);
-    assert.equal(view.find('ProjectDetailModal').length, 1);
+    assert.equal(view.find('ProjectPage').length, 1);
     assert.match(view.html, /placeholder="Rechercher une tâche"[^>]*value="candélabres"/);
     const comment = view.hostElements(props => props.placeholder === 'Ajouter un commentaire...');
     assert.equal(comment.length, 1);
@@ -806,7 +810,7 @@ test('a confirmed duplicate from page two retries page one after a refused refre
 const openDetails = async () => {
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
 };
 
 test('search, filters and the grid view reload the page with the declared query parameters', async () => {
@@ -902,9 +906,9 @@ test('MAIR-829: the card menu duplicates, opens, changes the status and deletes 
   await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
   assert.doesNotMatch(view.text(), /Modifier/, 'the V2 menu has no « Modifier » (the sheet edits the project)');
   await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Ouvrir le projet');
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
-  assert.equal(view.props('ProjectDetailModal').project.id, 'project-1');
-  await view.act(() => view.props('ProjectDetailModal').onClose());
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
+  assert.equal(view.props('ProjectPage').project.id, 'project-1');
+  await view.act(() => view.props('ProjectPage').onClose());
 
   // MAIR-829: « Changer le statut » is a single choice that PATCHes the status and confirms with a toast.
   bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ status: body.status })) }));
@@ -952,8 +956,8 @@ for (const mode of ['create', 'edit']) {
     if (mode === 'create') await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
     assert.match(view.html, /placeholder="Ajouter une tâche\.\.\."[^>]*value="Saisie à conserver"/);
-    const dialog = view.html.match(/<section[^>]*role="dialog"[^]*?<\/main>/)?.[0];
-    assert.match(dialog, /role="alert"[^>]*>Sauvegarde temporairement refusée/);
+    // MAIR-846: the task form is in the « Tâches » panel of the project page.
+    assert.match(view.html, /role="tabpanel"[^]*role="alert"[^>]*>Sauvegarde temporairement refusée/);
     assert.match(view.text(), mode === 'edit' ? /Enregistrer la tâche/ : /Ajouter la tâche/);
     assert.equal(bffProject.calls(route, method).length, 1);
     assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1, 'no refresh before confirmation');
@@ -997,7 +1001,7 @@ for (const mode of ['create', 'edit']) {
     await view.fire((props, text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
     assert.equal(bffProject.calls(route, method).length, 2);
     assert.deepEqual(bffProject.calls(route, method)[1].body, first.body);
-    assert.equal(view.props('ProjectDetailModal').tasks.find(task => task.id === official.id).responsible.id, 'user-3');
+    assert.equal(view.props('ProjectPage').tasks.find(task => task.id === official.id).responsible.id, 'user-3');
     assert.equal(bffProject.requests.filter(x => x.method.toLowerCase() !== 'get').length, 2);
   });
 }
@@ -1013,7 +1017,7 @@ test('task headings stack above mobile actions without changing permission-gated
   await renderLoadedPage(fixtures.projectsPage([project]));
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project, [editable, restricted]) });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
 
   const articles = view.html.match(/<article\b[^>]*>[\s\S]*?<\/article>/g);
   const taskHtml = articles.find(html => html.includes(`>${title}</h3>`));
@@ -1296,7 +1300,7 @@ test('read-only task follow-up keeps comments and history without exposing a com
   const task = fixtures.projectTask();
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(undefined, [{ ...task, permissions: { ...task.permissions, canComment: false } }]) });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(view.props('KanbanBoard').projects[0]));
-  await view.waitFor(() => view.find('ProjectDetailModal').length === 1);
+  await view.waitFor(() => view.find('ProjectPage').length === 1);
   bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
   await view.click((props, text, tag) => tag === 'button' && text.includes('Suivi'));
   await view.waitFor((html) => html.includes('Devis reçu.'));
@@ -1343,17 +1347,19 @@ test('a confirmed inline project edit closes even when the later page refresh fa
   assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1);
 });
 
-test('the detail modal edits the project inline, adds a task from its form and closes the project', async () => {
+test('the project page edits the project in its modal, adds a task from its form and goes back to the list (MAIR-846)', async () => {
   await renderLoadedPage();
   await openDetails();
 
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
-  assert.match(view.text(), /Les tâches restent visibles pendant l’édition\./);
+  const editModal = view.find('Modal').map(modal => modal.props).find(props => props.open);
+  assert.equal(editModal?.title, 'Modifier le projet · #1');
   bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ title: body.title })) }));
   await view.fire((props) => props.id === 'detail-project-title', 'onChange', { target: { value: 'Éclairage LED' } });
-  await view.fire((props, text, tag) => tag === 'form' && text.includes('Modifier le projet'), 'onSubmit');
-  await view.waitFor(() => alertText() === 'Projet "Éclairage LED" modifié.');
-  assert.equal(bffProject.calls('/projects/{projectId}', 'patch')[0].body.title, 'Éclairage LED');
+  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier le projet', 'onSubmit');
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'patch').length === 1 && !view.find('ProjectEditForm').length);
+  await view.waitFor(() => view.text().includes('Modifications enregistrées') && view.text().includes('Projet « Éclairage LED » modifié.'));
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { title: 'Éclairage LED' }, 'only the changed field is sent');
 
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await view.fire((props, text, tag) => tag === 'input' && props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Poser les lanternes' } });
@@ -1370,8 +1376,8 @@ test('the detail modal edits the project inline, adds a task from its form and c
   await view.waitFor(() => alertText() === 'Projet "Rénovation de l’éclairage public" clôturé.');
   assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[1].body, { status: 'done' });
 
-  await view.click((props) => props['aria-label'] === 'Fermer la fiche projet');
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  await view.click((props, text, tag) => tag === 'button' && text === 'Projets' && !props['aria-label']);
+  assert.equal(view.find('ProjectPage').length, 0);
 });
 
 test('an unavailable logout stays visible in the existing alert and an explicit retry can close the session', async () => {

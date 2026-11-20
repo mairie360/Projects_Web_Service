@@ -11,7 +11,7 @@ import { ProjectTemplatePicker } from './components/ProjectTemplatePicker';
 import type { ProjectTemplate, ProjectWorkflowPort } from '@/lib/projectWorkflow';
 import { PROJECT_VERIFICATION_MESSAGE } from '@/lib/projectReceiptVerification';
 import { IconButton } from '@mairie360/lib-components/primitives';
-import { PROJECT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from './project-form-validation';
+import { PROJECT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from '../../project-form-validation';
 
 export function CreateProjectModal({
   mode,

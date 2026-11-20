@@ -1,0 +1,81 @@
+import React from 'react';
+import { Button, DateField, MultiSelect, SelectField, TextArea, TextField } from '@mairie360/lib-components/primitives';
+import { Check } from 'lucide-react';
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '@/lib/text-constraints';
+
+import type { ProjectFieldErrors } from '../../../../project-form-validation';
+import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
+import type { Project } from '@/types/project';
+
+export interface ProjectEditFormProps {
+  form: ProjectFormState;
+  saving: boolean;
+  /** Error to show, already filtered by the caller. */
+  error?: string;
+  /** Messages under the fields (MAIR-846). */
+  fieldErrors?: ProjectFieldErrors;
+  disabled: boolean;
+  saveDisabled: boolean;
+  statusOptions: FilterOption[];
+  priorityOptions: FilterOption[];
+  responsibleOptions: FilterOption[];
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
+  /** Groups the project can be moved to (MAIR-880), its current group included. */
+  groupOptions?: FilterOption[];
+  groupsError?: string;
+  onChange: (patch: Partial<ProjectFormState>) => void;
+  onCancel: () => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}
+
+/**
+ * MAIR-846 (C7, Figma F5 5.6): the project fields only, in the « Modifier le projet » modal of the page — Titre,
+ * Description, Statut / Priorité / Groupe, Responsable / Échéance, Équipe / Étiquettes. The group is required
+ * and cannot be removed: once one is chosen, the select offers no empty choice.
+ */
+export const ProjectEditForm = ({
+  form, saving, error, fieldErrors = {}, disabled, saveDisabled, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions,
+  groupOptions = [], groupsError, onChange, onCancel, onSubmit,
+}: ProjectEditFormProps) => (
+  <form className="space-y-4" aria-label="Modifier le projet" aria-busy={saving} noValidate onSubmit={onSubmit}>
+    {error && (
+      <div role="alert" className="rounded-[var(--mairie-radius-m,8px)] border border-[var(--mairie-danger-border,#ffcecb)] bg-[var(--mairie-danger-surface,#ffebe9)] px-3 py-2 text-sm font-medium text-[var(--mairie-danger,#cf222e)]">
+        {error}
+      </div>
+    )}
+    {saving && <p role="status" className="text-sm text-[var(--mairie-text-muted)]">Enregistrement du projet…</p>}
+    <fieldset disabled={disabled} className="min-w-0 space-y-4 border-0 p-0">
+      <TextField id="detail-project-title" label="Titre" value={form.title} required pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} error={fieldErrors.title} onChange={(event) => onChange({ title: event.target.value })} />
+      <TextArea id="detail-project-description" label="Description" value={form.description} rows={4} title={NO_MARKUP_HINT} error={fieldErrors.description} onChange={(event) => { reportMarkupValidity(event.target); onChange({ description: event.target.value }); }} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <SelectField id="detail-project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
+        <SelectField id="detail-project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
+        <SelectField
+          id="detail-project-group"
+          label="Groupe"
+          required
+          value={form.groupId}
+          options={groupOptions}
+          placeholder={form.groupId ? null : 'Choisir un groupe'}
+          hint="Tous les membres du groupe verront le projet. Seuls vos groupes sont proposés."
+          error={fieldErrors.groupId || groupsError || undefined}
+          onChange={(groupId) => onChange({ groupId })}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <SelectField id="detail-project-responsible" label="Responsable" value={form.responsible} options={responsibleOptions} placeholder={null} error={fieldErrors.responsible} onChange={(responsible) => onChange({ responsible })} />
+        <DateField id="detail-project-due-date" label="Échéance" value={form.dueDate} required error={fieldErrors.dueDate} onChange={(event) => onChange({ dueDate: event.target.value })} />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <MultiSelect id="detail-project-assignees" label="Équipe" value={form.assignees} options={memberOptions} onChange={(assignees) => onChange({ assignees })} />
+        <MultiSelect id="detail-project-labels" label="Étiquettes" value={form.labels} options={labelOptions} onChange={(labels) => onChange({ labels })} />
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-[var(--mairie-border)] pt-4">
+        <Button variant="outline" tone="neutral" label="Annuler" type="button" onClick={onCancel} />
+        <Button variant="solid" tone="primary" icon={Check} label="Enregistrer" type="submit" loading={saving} disabled={saveDisabled} />
+      </div>
+    </fieldset>
+  </form>
+);

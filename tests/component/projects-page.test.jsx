@@ -8,6 +8,18 @@ import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, g
 import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
 
+// MAIR-846: a project opens as a page on « Vue d’ensemble »; the task journeys continue in its « Tâches » tab,
+// and « ← Projets » brings the list back (the page is no dialog any more: no Escape, no close button).
+async function tasksTab(user) {
+  await user.click(await screen.findByRole('tab', { name: /^Tâches/ }));
+  return within(screen.getByRole('tabpanel'));
+}
+const projectHeading = (name) => screen.queryByRole('heading', { level: 1, ...(name ? { name } : {}) });
+async function leaveProject(user) {
+  await user.click(within(projectHeading().closest('section')).getByRole('button', { name: 'Projets', exact: true }));
+  await waitFor(() => expect(screen.queryByRole('tablist', { name: 'Sections du projet' })).toBeNull());
+}
+
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   ...(await importOriginal()),
   // MAIR-880: the creation form reads the linkable groups once.
@@ -45,7 +57,7 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     const opener = await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` });
     await user.click(opener);
-    const dialog = within(screen.getByRole('dialog')), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
+    const dialog = await tasksTab(user), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
     await user.type(input, 'Brouillon collision conservé');
     await toggleOption(user, dialog, 'Assignés', 'Marie Durand'); await user.click(input);
     await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
@@ -69,9 +81,9 @@ describe("Projects page", () => {
     expect(input.value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
-    await user.click(dialog.getByRole('button', { name: 'Fermer la fiche projet' }));
+    await leaveProject(user);
     await user.click(opener);
-    const reopened = within(screen.getByRole('dialog'));
+    const reopened = await tasksTab(user);
     expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
     expect(reopened.getByLabelText('Priorité', { exact: true }).value).toBe('low');
     expect(reopened.getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
@@ -144,7 +156,7 @@ describe("Projects page", () => {
     vi.mocked(updateProject).mockResolvedValueOnce(fixtures.projectDetails({...project,id:'project-2'},[]));
     render(<ProjectsPage/>);
     await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
-    const dialog=await screen.findByRole('dialog'),detail=within(dialog);
+    await screen.findByRole('heading',{level:1,name:project.title});const detail=screen;
     await user.click(detail.getByRole('button',{name:'Modifier',exact:true}));
     const form=within(detail.getByRole('form',{name:'Modifier le projet'})),title=form.getByLabelText(/^Titre/);
     await user.clear(title);await user.type(title,'Brouillon inline retenu');
@@ -166,10 +178,9 @@ describe("Projects page", () => {
     vi.mocked(closeProject).mockResolvedValueOnce(fixtures.projectDetails({...other,title:'Titre étranger ne pas afficher'},[]));
     render(<ProjectsPage/>);
     await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
-    const detail=within(await screen.findByRole('dialog'));await user.click(detail.getByRole('button',{name:'Clôturer',exact:true}));
+    await screen.findByRole('heading',{level:1,name:project.title});const detail=screen;await user.click(detail.getByRole('button',{name:'Clôturer',exact:true}));
     await waitFor(()=>expect(detail.getByRole('button',{name:'Clôturer',exact:true}).disabled).toBe(true));
-    detail.getByRole('button',{name:'Fermer la fiche projet',exact:true}).focus();
-    await user.keyboard('{Escape}');expect(screen.queryByRole('dialog')).toBeNull();
+    await leaveProject(user);
     const read=Promise.withResolvers();vi.mocked(getProjectDetails).mockImplementationOnce(()=>read.promise);
     const verify=screen.getByRole('button',{name:`Vérifier le projet ${project.title}`,exact:true});
     verify.focus();await user.keyboard('{Enter}');await user.click(verify);
@@ -195,6 +206,7 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await user.click(screen.getByRole('button', { name: 'Suspendre', exact: true }));
+    await tasksTab(user);
     expect(closeProject).toHaveBeenCalledTimes(1);
     const row = screen.getByRole('heading', { name: task.title }).closest('article');
     await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
@@ -210,23 +222,21 @@ describe("Projects page", () => {
     const expected = successfulRead ? verified.title : confirmed.title;
     expect(await screen.findByRole('heading', { name: expected })).toBeTruthy();
     await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2, active: 9, archived: 0 } }, [task, other])));
-    expect(await screen.findByRole('dialog', { name: 'Projet confirmé tardivement' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Projet confirmé tardivement' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: expected })).toBeTruthy();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
     expect(title.value).toBe('Brouillon à conserver');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('2/9');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('2/9 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', tasks: { total: 2, completed: 1, active: 2, archived: 0 }, progress: 50 }, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(screen.getByRole('heading', { name: verified.title })).toBeTruthy();
     expect(title.value).toBe('Brouillon à conserver');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/2 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(closeProject).toHaveBeenCalledTimes(1);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
-    screen.getByRole('button', { name: 'Fermer la fiche projet' }).focus();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await leaveProject(user);
   });
 
   it("retains a submitted edit after an accepted mismatched receipt and permits only GET recovery", async () => {
@@ -239,6 +249,7 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTask).mockResolvedValueOnce({ ...other, title: 'Mauvaise confirmation éditée' });
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await tasksTab(user);
     const row = screen.getByRole('heading', { name: task.title }).closest('article');
     await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
     const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
@@ -273,6 +284,7 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce({ ...other, title: 'Mauvaise confirmation reçue' });
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await tasksTab(user);
     const row = screen.getByRole('heading', { name: task.title }).closest('article');
     await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
     const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
@@ -311,6 +323,7 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTaskStatus).mockImplementationOnce(() => write.promise);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await tasksTab(user);
     const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
     const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
     await user.click(within(firstRow).getByRole('button', { name: 'Modifier', exact: true }));
@@ -355,6 +368,7 @@ describe("Projects page", () => {
     vi.mocked(deleteProjectTask).mockImplementationOnce(() => write.promise);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await tasksTab(user);
     const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
     await user.click(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
     await user.click(within(firstRow).getByRole('button', { name: 'Supprimer', exact: true }));
@@ -374,7 +388,7 @@ describe("Projects page", () => {
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(deleteProjectTask).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('0/1');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('0/1 tâches terminées'); // MAIR-846: « Avancement » metric
   });
 
   it("keeps a canonical created task on detail failure and retries GET only by keyboard", async () => {
@@ -390,13 +404,14 @@ describe("Projects page", () => {
     vi.mocked(createProjectTask).mockResolvedValueOnce(confirmed);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
+    await tasksTab(user);
     await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
     await toggleOption(user, screen, 'Assignés', 'Marie Durand'); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/2 tâches terminées'); // MAIR-846: « Avancement » metric
     const retry = screen.getByRole('button', { name: 'Réessayer la fiche' });
     retry.focus();
     await user.keyboard('{Enter}');
@@ -408,7 +423,7 @@ describe("Projects page", () => {
     await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1, active: 3, archived: 0 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(screen.getByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/3');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/3 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(createProjectTask).toHaveBeenCalledTimes(1);
     expect(createProjectTask.mock.calls[0][1].title).toBe('Brouillon soumis');
   });
@@ -425,17 +440,18 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${first.title}` }));
     await user.click(screen.getByRole('button', { name: `Ouvrir la fiche du projet ${second.title}` }));
-    expect(await screen.findByRole('dialog', { name: second.title })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: second.title })).toBeTruthy();
     await act(async () => {
       if (refused) rejectFirst(new Error('Erreur ancienne hors contexte'));
       else resolveFirst(fixtures.projectDetails(first));
     });
-    expect(screen.getByRole('dialog', { name: second.title })).toBeTruthy();
-    expect(screen.queryByRole('dialog', { name: first.title })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: second.title })).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 1, name: first.title })).toBeNull();
     expect(screen.queryByText('Erreur ancienne hors contexte')).toBeNull();
     expect(getProjectDetails.mock.calls.map(([id]) => id)).toEqual([first.id, second.id]);
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    // MAIR-846: the URL names the project shown, the last one chosen.
+    expect(new URLSearchParams(window.location.search).get('project')).toBe(second.id);
+    await leaveProject(user);
   });
 
   it.each([false, true])("keeps the current view after pending duplication and GET-only recovery (refused refresh: %s)", async (refusedRefresh) => {
@@ -600,74 +616,58 @@ describe("Projects page", () => {
 
     const { container } = render(<ProjectsPage />);
 
-    expect(await screen.findByRole("heading", { name: project.title, level: 2 })).toBeTruthy();
+    // MAIR-846: the link opens the project page on its « Tâches » tab.
+    expect(await screen.findByRole("heading", { name: project.title, level: 1 })).toBeTruthy();
     expect(getProjectDetails).toHaveBeenCalledExactlyOnceWith(project.id);
+    expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
-    expect(screen.getByText(task.title)).toBeTruthy();
-    expect(screen.getByRole("dialog", { name: project.title })).toBeTruthy();
+    expect(within(screen.getByRole("tabpanel")).getByText(task.title)).toBeTruthy();
     await waitFor(() => {
       expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
     });
   });
 
-  it("keeps keyboard focus inside a named project dialog and returns it to the opener", async () => {
+  it("opens a project as an addressable page, follows the browser history and returns the focus to the opener (MAIR-846)", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project));
+    window.history.replaceState({}, "", "/?view=kanban");
     render(<ProjectsPage />);
 
     const opener = await screen.findByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` });
     await user.click(opener);
-    const dialog = await screen.findByRole("dialog", { name: project.title });
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(document.activeElement).toBe(dialog);
+    const title = await screen.findByRole("heading", { level: 1, name: project.title });
+    const page = title.closest("section");
+    expect(page.getAttribute("role")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(title);
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}`);
+    expect(screen.queryByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` })).toBeNull();
 
-    const focusable = Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])"))
-      .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true");
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    expect(first).toBeTruthy();
-    expect(last).toBeTruthy();
-    await user.tab({ shift: true });
-    expect(document.activeElement).toBe(last);
-    await user.tab();
-    expect(document.activeElement).toBe(first);
+    // The tab is kept in the URL so that a reload comes back to it.
+    await user.click(screen.getByRole("tab", { name: "Planning" }));
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}&tab=planning`);
+    await user.click(screen.getByRole("tab", { name: "Vue d’ensemble" }));
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}`);
 
-    const results = await axe(dialog);
+    const results = await axe(page);
     expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
 
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
+    await user.click(within(page).getByRole("button", { name: "Projets" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: project.title })).toBeNull());
+    expect(window.location.search).toBe("?view=kanban");
     expect(document.activeElement).toBe(opener);
 
-    await user.click(opener);
-    expect(await screen.findByRole("dialog", { name: project.title })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Fermer la fiche projet" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
-    expect(document.activeElement).toBe(opener);
+    // Back / Forward of the browser follow the page.
+    await act(async () => { window.history.back(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    expect(await screen.findByRole("heading", { level: 1, name: project.title })).toBeTruthy();
+    expect(getProjectDetails).toHaveBeenCalledTimes(2);
+    await act(async () => { window.history.forward(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: project.title })).toBeNull());
+    expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` })).toBeTruthy();
   });
 
-  it("rejects an incomplete task link without requesting a project detail", async () => {
-    window.history.replaceState({}, "", "/?task=task-1");
-    render(<ProjectsPage />);
-
-    expect(await screen.findByText("Lien de projet invalide.")).toBeTruthy();
-    expect(getProjectDetails).not.toHaveBeenCalled();
-  });
-
-  it("keeps controls keyboard reachable and has no serious or critical axe violation", async () => {
-    const user = userEvent.setup();
-    render(<ProjectsPage />);
-    await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
-
-    await user.tab();
-    expect(document.activeElement?.matches("button, input, a")).toBe(true);
-    expect(screen.getByRole("main")).toBeTruthy();
-
-    const results = await axe(document.body);
-    expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
-  });
 });
 
 it('wires the existing Login identity to a received Project member only when the detail is opened', async () => {
@@ -681,6 +681,7 @@ it('wires the existing Login identity to a received Project member only when the
     render(<ProjectsPage />);
     const opener=await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`});
     expect(fetch).not.toHaveBeenCalled();await user.click(opener);
+    await tasksTab(user);
     await screen.findByRole('button',{name:'Retirer Admin Mairie'});
     // Besides the Login identity, opening reads only the project statuses and archived tasks (MAIR-567).
     const urls=fetch.mock.calls.map(([input])=>String(input instanceof Request?input.url:input));

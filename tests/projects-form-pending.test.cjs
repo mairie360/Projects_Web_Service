@@ -118,7 +118,7 @@ for (const mode of ['create', 'edit']) {
     const receipt = view.hostElements(props => props['data-tone'] !== undefined && props.role === 'status')[0];
     assert.ok(receipt, 'the confirmed write must have a polite receipt rather than a refusal alert');
     assert.match(view.text(), /enregistré\. Actualisation impossible/); // the lib Alert renders its title in a nested Text
-    assert.equal(view.find('ProjectDetailModal').length, 0, 'MAIR-836: a creation no longer opens the sheet');
+    assert.equal(view.find('ProjectPage').length, 0, 'MAIR-836: a creation no longer opens the sheet');
     const received = view.props('KanbanBoard').projects;
     assert.equal(received.filter(project => project.id === official.id).length, 1);
     assert.equal(received.find(project => project.id === official.id).title, official.title);

@@ -116,7 +116,7 @@ test('MAIR-880: the detail names the group, and an edit sends the new group', as
 
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
   assert.equal(groupField('detail-project-group').value, 'group-1');
-  assert.equal(groupField('detail-project-group').required, false);
+  assert.equal(groupField('detail-project-group').required, true, 'MAIR-846 (C7): the group is required in the page edit');
   await groupField('detail-project-group').onChange('group-7');
   bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails({ ...project, group: groups[1] }) });
   await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
@@ -125,21 +125,44 @@ test('MAIR-880: the detail names the group, and an edit sends the new group', as
   assert.equal(bffProject.calls('/projects/{projectId}', 'patch')[0].body.groupId, 'group-7');
 });
 
-test('MAIR-880: a project created before groups shows « Aucun groupe » and its edit keeps the group unchanged', async () => {
+test('MAIR-846: a project created before groups shows « Sans groupe » and its edit requires a group', async () => {
   bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...project, group: null }) });
+  bffProject.on('get', '/project-groups', { body: f.projectGroups(groups) });
   view = mount(React.createElement(Page));
   await view.waitFor(html => !html.includes('Chargement des projets'));
   await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
   await view.waitFor(() => view.find('ProjectSummary').length === 1 && bffProject.calls('/projects/{projectId}', 'get').length === 1);
   await view.settle();
-  assert.match(view.text(), /Groupe\s*Aucun groupe/);
+  assert.match(view.text(), /Groupe\s*Sans groupe\s*Choisissez un groupe dans « Modifier »/);
 
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
-  bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails({ ...project, group: null }) });
+  await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
+  assert.equal(view.props('ProjectEditForm').fieldErrors.groupId, 'Le groupe est obligatoire.');
+  assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 0, 'nothing is sent without a group');
+
+  await groupField('detail-project-group').onChange('group-7');
+  assert.equal(view.props('ProjectEditForm').fieldErrors.groupId, undefined);
+  bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails({ ...project, group: groups[1] }) });
+  await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
+  await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'patch').length === 1);
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { groupId: 'group-7' }, 'only the chosen group is sent');
+});
+
+test('MAIR-880: without any linkable group, the edit of a project without group leaves the group out', async () => {
+  bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...project, group: null }) });
+  bffProject.on('get', '/project-groups', { body: f.projectGroups([]) });
+  view = mount(React.createElement(Page));
+  await view.waitFor(html => !html.includes('Chargement des projets'));
+  await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
+  await view.waitFor(() => view.find('ProjectSummary').length === 1 && bffProject.calls('/projects/{projectId}', 'get').length === 1);
+  await view.settle();
+  await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
+  await view.act(() => view.props('ProjectEditForm').onChange({ title: 'Titre corrigé' }));
+  bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails({ ...project, title: 'Titre corrigé', group: null }) });
   await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
   await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'patch').length === 1);
 
-  assert.equal('groupId' in bffProject.calls('/projects/{projectId}', 'patch')[0].body, false);
+  assert.deepEqual(bffProject.calls('/projects/{projectId}', 'patch')[0].body, { title: 'Titre corrigé' });
 });
 
 test('MAIR-880: an edit that moves the project out of the agent\'s groups (204) removes it from the page', async () => {
@@ -157,7 +180,7 @@ test('MAIR-880: an edit that moves the project out of the agent\'s groups (204) 
   await view.act(() => view.props('ProjectEditForm').onSubmit({ preventDefault() {} }));
   await view.waitFor(html => html.includes('ne fait plus partie de vos projets'));
 
-  assert.equal(view.find('ProjectDetailModal').length, 0, 'the detail of a project the agent no longer sees is closed');
+  assert.equal(view.find('ProjectPage').length, 0, 'the detail of a project the agent no longer sees is closed');
   assert.equal(view.props('ProjectsWorkspace').projects.some(row => row.id === project.id), false);
   assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1, 'the saved update is not replayed');
 });

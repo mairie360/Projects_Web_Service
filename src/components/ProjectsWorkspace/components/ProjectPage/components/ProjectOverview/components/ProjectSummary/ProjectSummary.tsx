@@ -1,0 +1,44 @@
+import { AvatarStack, DescriptionList, PriorityPill, ProgressMeter, StatusPill, UserIdentity } from '@mairie360/lib-components/primitives';
+import { CalendarDays } from 'lucide-react';
+import type React from 'react';
+
+import { formatLongDate } from '../../../ProjectMetrics';
+import type { Project } from '@/types/project';
+
+const Day = ({ date }: { date: string }) => (
+  <span className="inline-flex items-center gap-1.5"><CalendarDays aria-hidden className="h-4 w-4 text-[var(--mairie-text-muted)]" />{formatLongDate(date)}</span>
+);
+
+/**
+ * MAIR-846 (C6, Figma F5 5.2 / 5.11) « Informations »: responsible, dates, priority, team, group and budget.
+ * A project without group (created before groups, or whose group was deleted) gets the « Sans groupe » warning.
+ */
+export const ProjectSummary = ({ project }: { project: Project }) => {
+  const team = [project.responsible, ...project.assignees].filter((person, index, people) => person.name && people.findIndex((other) => (other.id ?? other.name) === (person.id ?? person.name)) === index);
+  const items: { id: string; label: string; value: React.ReactNode }[] = [
+    { id: 'responsible', label: 'Responsable', value: project.responsible.name ? <UserIdentity name={project.responsible.name} variant="nameOnly" size="s" /> : 'Non renseigné' },
+    { id: 'start', label: 'Début', value: <Day date={(project.createdAt ?? '').slice(0, 10)} /> },
+    { id: 'due', label: 'Échéance', value: <Day date={project.dueDate} /> },
+    { id: 'priority', label: 'Priorité', value: <PriorityPill level={project.priority} /> },
+    { id: 'team', label: 'Équipe', value: team.length ? <AvatarStack label="Équipe du projet" people={team.map((person) => ({ name: person.name }))} max={3} size="s" /> : 'Aucun membre' },
+    {
+      id: 'group',
+      label: 'Groupe',
+      value: project.group
+        ? <span className="font-medium text-[var(--mairie-text)]">{project.group.name}</span>
+        : (
+          <span className="flex flex-col items-start gap-1">
+            <StatusPill label="Sans groupe" tone="warning" dot />
+            <span className="text-xs text-[var(--mairie-text-muted)]">Choisissez un groupe dans « Modifier »</span>
+          </span>
+        ),
+    },
+    { id: 'budget', label: 'Budget', value: <span className="text-[var(--mairie-text-muted)]">Non renseigné</span> },
+  ];
+  return (
+    <div className="space-y-4">
+      <DescriptionList items={items} labelWidth={110} />
+      <ProgressMeter label="Avancement" value={project.progress} />
+    </div>
+  );
+};

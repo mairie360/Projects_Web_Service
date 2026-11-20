@@ -29,10 +29,10 @@ test('the workspace renders controller props without duplicating business state 
   assert.equal(names(source).some(name => ['useState', 'useEffect', 'useRef', 'useProjectsController', 'getProjectsPage'].includes(name)), false);
   assert.equal(imports(source).some(name => /bffProjectClient|ProjectModals/.test(name)), false);
   assert.ok(imports(source).includes('./components/CreateProjectModal'));
-  assert.ok(imports(source).includes('./components/ProjectDetailModal'));
+  assert.ok(imports(source).includes('./components/ProjectPage'));
 });
 test('creation and detail dialogs have separate stable top-level components', () => {
-  for (const name of ['CreateProjectModal', 'ProjectDetailModal']) {
+  for (const name of ['CreateProjectModal', 'ProjectPage']) {
     const source = parse(`src/components/ProjectsWorkspace/components/${name}/${name}.tsx`);
     assert.ok(exportedCallable(source, name));
   }

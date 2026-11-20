@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
 import { projectToFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
@@ -16,13 +16,13 @@ const port = { readProject: async projectId => ({ projectId, statuses, tasks: []
 const page = fixtures.projectsPage();
 const project = fixtures.projectListItem();
 // The sheet shows its statuses once the project detail (with its tasks) is loaded (MAIR-567).
-const props = { project: { ...project, taskItems: [] }, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
+const props = { initialTab: 'tasks', project: { ...project, taskItems: [] }, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
 
 describe('workflow adoption by existing project forms', () => {
   it('submits a custom project task status ID with its category from the detailed task form', async () => {
     function Detail() {
       const [saved, setSaved] = React.useState();
-      return <><ProjectDetailModal {...props} workflowPort={port} workflowRole="User" onAddTask={(_project, draft) => setSaved(draft)} /><output data-testid="saved">{JSON.stringify(saved)}</output></>;
+      return <><ProjectPage {...props} workflowPort={port} workflowRole="User" onAddTask={(_project, draft) => setSaved(draft)} /><output data-testid="saved">{JSON.stringify(saved)}</output></>;
     }
     render(<Detail />);
     await screen.findByRole('region', { name: 'Conseil municipal' });

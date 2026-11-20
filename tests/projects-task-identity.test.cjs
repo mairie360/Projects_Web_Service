@@ -30,18 +30,18 @@ for (const operation of ['status', 'edit']) {
     const route = operation === 'status' ? '/projects/{projectId}/tasks/{taskId}/status' : '/projects/{projectId}/tasks/{taskId}';
     harness.bffProject.on('patch', route, { body: f.projectTask({ id: other.id, title: 'Ne doit pas remplacer cette ligne', status: 'done', completed: true }) });
     harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Vérification indisponible')));
-    const props = view.props('ProjectDetailModal');
+    const props = view.props('ProjectPage');
     await view.act(() => (operation === 'status'
       ? props.onUpdateTaskStatus(project.id, task.id, 'done')
       : props.onUpdateTask(project.id, task.id, { ...task, title: 'Brouillon envoyé' })).catch(() => undefined));
-    assert.deepEqual(view.props('ProjectDetailModal').tasks.map(t => t.title), [task.title, other.title]);
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.has(task.id), true);
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.has(other.id), false);
-    assert.match(view.props('ProjectDetailModal').taskWriteErrors.get(task.id), /acceptée.*confirmation.*incohérente/);
-    assert.equal(view.props('ProjectDetailModal').refreshError, 'Vérification indisponible');
+    assert.deepEqual(view.props('ProjectPage').tasks.map(t => t.title), [task.title, other.title]);
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.has(task.id), true);
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.has(other.id), false);
+    assert.match(view.props('ProjectPage').taskWriteErrors.get(task.id), /acceptée.*confirmation.*incohérente/);
+    assert.equal(view.props('ProjectPage').refreshError, 'Vérification indisponible');
     assert.equal(harness.bffProject.calls('/projects/{projectId}', 'get').length, 2);
     await view.act(async () => {
-      const current = view.props('ProjectDetailModal');
+      const current = view.props('ProjectPage');
       await current.onUpdateTaskStatus(project.id, task.id, 'review');
       await current.onDeleteTask(project.id, task.id, task.title);
       await current.onUpdateTask(project.id, task.id, task).catch(() => undefined);
@@ -49,11 +49,11 @@ for (const operation of ['status', 'edit']) {
     assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
     const verified = f.projectTask({ title: 'Valeur vérifiée par lecture', status: 'done', completed: true });
     harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [verified, other]) });
-    await view.act(() => view.props('ProjectDetailModal').onRetry());
-    assert.equal(view.props('ProjectDetailModal').tasks[0].title, verified.title);
-    assert.equal(view.props('ProjectDetailModal').tasks[1].title, other.title);
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.size, 0);
-    assert.equal(view.props('ProjectDetailModal').taskWriteErrors.has(task.id), false);
+    await view.act(() => view.props('ProjectPage').onRetry());
+    assert.equal(view.props('ProjectPage').tasks[0].title, verified.title);
+    assert.equal(view.props('ProjectPage').tasks[1].title, other.title);
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.size, 0);
+    assert.equal(view.props('ProjectPage').taskWriteErrors.has(task.id), false);
     assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
   });
 }
@@ -66,17 +66,17 @@ for (const inconsistent of ['project', 'duplicate-task']) {
       ? f.projectDetails({ ...project, id: 'project-2', title: 'Autre projet reçu' }, [task, other])
       : f.projectDetails(project, [task, f.projectTask({ id: task.id, title: 'ID répété' })]);
     harness.bffProject.on('get', '/projects/{projectId}', { body: details });
-    await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
-    assert.equal(view.props('ProjectDetailModal').project.id, project.id);
-    assert.deepEqual(view.props('ProjectDetailModal').tasks.map(t => t.title), [task.title, other.title]);
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.has(task.id), true);
-    assert.match(view.props('ProjectDetailModal').refreshError, /incohérent/);
-    await view.act(() => view.props('ProjectDetailModal').onRetry());
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.has(task.id), true);
+    await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
+    assert.equal(view.props('ProjectPage').project.id, project.id);
+    assert.deepEqual(view.props('ProjectPage').tasks.map(t => t.title), [task.title, other.title]);
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.has(task.id), true);
+    assert.match(view.props('ProjectPage').refreshError, /incohérent/);
+    await view.act(() => view.props('ProjectPage').onRetry());
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.has(task.id), true);
     assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
     harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [task, other]) });
-    await view.act(() => view.props('ProjectDetailModal').onRetry());
-    assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.size, 0);
+    await view.act(() => view.props('ProjectPage').onRetry());
+    assert.equal(view.props('ProjectPage').unverifiedTaskIds.size, 0);
   });
   test(`opening a ${inconsistent} detail does not display the inconsistent result`, async () => {
     await loaded(false);
@@ -84,7 +84,7 @@ for (const inconsistent of ['project', 'duplicate-task']) {
       ? f.projectDetails({ ...project, id: 'project-2', title: 'Autre projet reçu' }, [task, other])
       : f.projectDetails(project, [task, f.projectTask({ id: task.id, title: 'ID répété' })]) });
     await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
-    assert.equal(view.find('ProjectDetailModal').length, 0);
+    assert.equal(view.find('ProjectPage').length, 0);
     assert.match(view.text(), /incohérent/);
     assert.doesNotMatch(view.text(), /Autre projet reçu|ID répété/);
   });
@@ -95,9 +95,9 @@ test('a coherent immediate verification replaces only read data and does not rep
   harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}', { body: f.projectTask({ id: other.id, title: 'Mauvaise réception' }) });
   const verified = f.projectTask({ title: 'Titre officiel après lecture' });
   harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [verified, other]) });
-  await view.act(() => view.props('ProjectDetailModal').onUpdateTask(project.id, task.id, { ...task, title: 'Brouillon envoyé' }));
-  assert.deepEqual(view.props('ProjectDetailModal').tasks.map(t => t.title), [verified.title, other.title]);
-  assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.size, 0);
+  await view.act(() => view.props('ProjectPage').onUpdateTask(project.id, task.id, { ...task, title: 'Brouillon envoyé' }));
+  assert.deepEqual(view.props('ProjectPage').tasks.map(t => t.title), [verified.title, other.title]);
+  assert.equal(view.props('ProjectPage').unverifiedTaskIds.size, 0);
   assert.match(view.text(), /fiche a été vérifiée par lecture/);
   assert.doesNotMatch(view.text(), /Mauvaise réception|Tâche .*modifiée/);
   assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
@@ -115,15 +115,15 @@ test('a detail GET started before an uncertain confirmation cannot unlock that t
   });
   let pending;
   try {
-    await view.act(() => { pending = view.props('ProjectDetailModal').onRetry(); });
+    await view.act(() => { pending = view.props('ProjectPage').onRetry(); });
     await view.waitFor(() => held > 0);
     harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: other });
     harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Vérification récente refusée')));
-    await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
+    await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
   } finally { release(); await pending; await view.settle(); }
-  assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.has(task.id), true);
-  assert.equal(view.props('ProjectDetailModal').refreshError, 'Vérification récente refusée');
-  assert.deepEqual(view.props('ProjectDetailModal').tasks.map(t => t.title), [task.title, other.title]);
+  assert.equal(view.props('ProjectPage').unverifiedTaskIds.has(task.id), true);
+  assert.equal(view.props('ProjectPage').refreshError, 'Vérification récente refusée');
+  assert.deepEqual(view.props('ProjectPage').tasks.map(t => t.title), [task.title, other.title]);
   assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
 });
 
@@ -131,14 +131,14 @@ test('closing and reopening does not bypass uncertainty; only its coherent proje
   await loaded();
   harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: other });
   harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Vérification refusée')));
-  await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
-  await view.act(() => view.props('ProjectDetailModal').onClose());
+  await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
+  await view.act(() => view.props('ProjectPage').onClose());
   harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...project, id: 'project-2' }, [task, other]) });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [task, other]) });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
-  assert.equal(view.props('ProjectDetailModal').unverifiedTaskIds.size, 0);
-  assert.equal(view.props('ProjectDetailModal').taskWriteErrors.has(task.id), false);
+  assert.equal(view.props('ProjectPage').unverifiedTaskIds.size, 0);
+  assert.equal(view.props('ProjectPage').taskWriteErrors.has(task.id), false);
   assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 1);
 });

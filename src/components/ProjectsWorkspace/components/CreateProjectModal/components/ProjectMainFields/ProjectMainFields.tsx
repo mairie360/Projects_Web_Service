@@ -1,7 +1,7 @@
 import { TextArea, TextField } from '@mairie360/lib-components/primitives';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '@/lib/text-constraints';
 import type { ProjectFormState } from '@/lib/projectPageState';
-import type { ProjectFieldErrors } from '../../project-form-validation';
+import type { ProjectFieldErrors } from '../../../../project-form-validation';
 
 export interface ProjectMainFieldsProps {
   form: ProjectFormState;

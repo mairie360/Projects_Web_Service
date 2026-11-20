@@ -11,7 +11,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { validateProjectForm } = requireTs('src/components/ProjectsWorkspace/components/CreateProjectModal/project-form-validation.ts');
+const { validateProjectForm } = requireTs('src/components/ProjectsWorkspace/project-form-validation.ts');
 const { createProjectFormState } = requireTs('src/lib/projectPageState.ts');
 
 const harness = createFrontHarness();
@@ -70,7 +70,7 @@ test('MAIR-836: a created project lands in its column with the « Projet créé 
   const body = bffProject.calls('/projects', 'post')[0].body;
   assert.equal(body.status, 'in-progress');
   assert.deepEqual(body.labels, ['Bâtiments', 'Sport'], 'labels typed on the fly are sent');
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.ok(view.props('KanbanBoard').projects.some((project) => project.id === 'project-16' && project.status === 'in-progress'));
 });
 

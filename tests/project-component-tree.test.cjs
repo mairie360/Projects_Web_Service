@@ -11,10 +11,13 @@ const workspace = 'src/components/ProjectsWorkspace';
 // through their folder (`./components/<Name>`), never a sub-sub-component.
 test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-components through their folders', () => {
   const tree = {
-    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectDetailModal', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
+    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectPage', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
-    [`${workspace}/components/ProjectDetailModal/ProjectDetailModal.tsx`]: ['DetailHeader', 'DetailRefreshAlert', 'DetailTaskList', 'ProjectEditForm', 'ProjectLifecycle', 'ProjectSummary', 'ProjectWorkflow', 'TaskFormPanel'],
-    [`${workspace}/components/ProjectDetailModal/components/DetailTaskList/DetailTaskList.tsx`]: ['TaskFilters', 'TaskRow', 'TaskDeleteConfirm', 'TaskFollowUp'],
+    // MAIR-846: the project page — header, metrics, tabs (overview, tasks) and the edit modal.
+    [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'DetailTaskList', 'ProjectEditForm', 'ProjectWorkflow', 'TaskFormPanel'],
+    [`${workspace}/components/ProjectPage/components/ProjectPageHeader/ProjectPageHeader.tsx`]: ['ProjectStatusMenu', 'ProjectMoreMenu'],
+    [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'ProjectLifecycle', 'ProjectSummary'],
+    [`${workspace}/components/ProjectPage/components/DetailTaskList/DetailTaskList.tsx`]: ['TaskFilters', 'TaskRow', 'TaskDeleteConfirm', 'TaskFollowUp'],
     [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu'],
     [`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`]: ['TaskDraftForm', 'DraftTaskRow'],
   };
@@ -29,13 +32,13 @@ test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-
 });
 
 test('MAIR-608 the large dialogs keep their state in hooks beside them', () => {
-  const detail = `${workspace}/components/ProjectDetailModal`;
-  for (const hook of ['use-project-edit', 'use-detail-task-form', 'use-task-collaboration', 'use-task-filters', 'use-linked-task-scroll', 'use-dialog-focus']) {
+  const detail = `${workspace}/components/ProjectPage`;
+  for (const hook of ['use-project-edit', 'use-detail-task-form', 'use-task-collaboration', 'use-task-filters', 'use-linked-task-scroll']) {
     assert.ok(fs.existsSync(path.join(root, detail, `${hook}.ts`)), `${hook}.ts exists`);
-    assert.ok(read(`${detail}/ProjectDetailModal.tsx`).includes(`'./${hook}'`), `ProjectDetailModal uses ${hook}`);
+    assert.ok(read(`${detail}/ProjectPage.tsx`).includes(`'./${hook}'`), `ProjectPage uses ${hook}`);
   }
   assert.ok(read(`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`).includes("'./use-task-drafts'"));
-  for (const file of ['ProjectsWorkspace.tsx', 'components/ProjectDetailModal/ProjectDetailModal.tsx', 'components/CreateProjectModal/CreateProjectModal.tsx', 'components/ProjectTasksEditor/ProjectTasksEditor.tsx']) {
+  for (const file of ['ProjectsWorkspace.tsx', 'components/ProjectPage/ProjectPage.tsx', 'components/CreateProjectModal/CreateProjectModal.tsx', 'components/ProjectTasksEditor/ProjectTasksEditor.tsx']) {
     assert.ok(read(`${workspace}/${file}`).split('\n').length <= 400, `${file} stays under 400 lines`);
   }
 });
@@ -71,7 +74,7 @@ test('MAIR-828 no local copy of a lib-components primitive comes back', () => {
   for (const file of [`${components}/TableView/TableView.tsx`, `${components}/ProjectPagination/ProjectPagination.tsx`,
     `${components}/WorkspaceHeader/WorkspaceHeader.tsx`, `${components}/ProjectFiltersBar/ProjectFiltersBar.tsx`,
     `${components}/ProjectCard/components/ProjectActionsMenu/ProjectActionsMenu.tsx`, `${components}/VerificationNotice/VerificationNotice.tsx`,
-    `${components}/ProjectDetailModal/components/DetailTaskList/components/TaskDeleteConfirm/TaskDeleteConfirm.tsx`]) {
+    `${components}/ProjectPage/components/DetailTaskList/components/TaskDeleteConfirm/TaskDeleteConfirm.tsx`]) {
     assert.ok(lib(file), `${file} composes lib-components primitives`);
   }
   assert.match(read(`${components}/TableView/TableView.tsx`), /<DataTable\b/);

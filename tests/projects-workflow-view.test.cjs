@@ -4,7 +4,7 @@ const { requireTs } = require('./support/typescript.cjs');
 const { installReactRuntime, mount } = require('./support/server-view.cjs');
 installReactRuntime();
 const React = require('react');
-const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow/ProjectWorkflow.tsx');
+const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow/ProjectWorkflow.tsx');
 const { ProjectTemplatePicker } = requireTs('src/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker/ProjectTemplatePicker.tsx');
 const { ProjectTemplateManager } = requireTs('src/components/ProjectsWorkspace/components/ProjectTemplateManager/ProjectTemplateManager.tsx');
 const statuses = [

@@ -1,5 +1,32 @@
 # Projects_Web_Service — Module overview
 
+## Project page (MAIR-846)
+
+Opening a project (card, row, « Ouvrir le projet ») shows a **project page** in place of the list, no longer the
+project dialog (Figma F5 5.1 to 5.11). The page is addressable: `?project=<id>` (and `&tab=<tab>` past the first
+tab) is written into the browser history, so a reload or a shared link comes back to it and Back / Forward
+follow it; the list stays mounted behind it, with its filters, view and page.
+
+- **Breadcrumb** « ← Projets / #12 » brings the list back and gives the focus to the opener.
+- **Header**: status pill opening the status choice (when the project may be managed), priority, labels, title,
+  description; « Modifier », « Nouvelle tâche » (opens « Tâches » on the task title) and « … » (Dupliquer;
+  Supprimer with the confirmation, then back to the list). A duplication of a project without group shows the
+  BFF error (400).
+- **Indicators**: Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » or the delay, in the
+  instance time zone), Budget engagé (« Budget non renseigné »: not in the contract yet), Tâches en retard.
+- **Tabs**: Vue d’ensemble, Tâches (count), Planning, Équipe (count), Documents, Activité. The tasks stay mounted
+  on every tab, so drafts and pending writes survive a tab change; Planning, Équipe, Documents and Activité have
+  their own tickets and show a notice meanwhile. A task link (`&task=<id>`) opens « Tâches » and centres the task.
+- **Overview**: « Prochaines tâches » (the three open tasks closest to their due date; checking one marks it
+  done), « Jalons » and « Activité récente » (not provided by the contract yet: they say so), « Informations »
+  (responsible, start, due date, priority, team, group, budget; a project without group shows « Sans groupe » and
+  « Choisissez un groupe dans « Modifier » »), with the lifecycle actions (Suspendre, Clôturer).
+- **Edit** (C7): « Modifier » opens the project fields in a size m modal (« Modifier le projet · #12 »); the group
+  is required as soon as one can be chosen and cannot be removed. Messages show under the fields before anything
+  is sent; only the changed fields are sent (`PATCH`), nothing when nothing changed. The success is the toast
+  « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
+  saved edit too: back to the list with the same toast.
+
 ## Project creation V2 (MAIR-836)
 
 Figma F3 3.1 to 3.6 of the Projects mockup.
@@ -584,6 +611,8 @@ no API/BFF, dependency or environment changes are required.
 
 ## Linked task visibility
 
+Since MAIR-846 the project is a page: the linked task opens « Tâches » and is centred with `scrollIntoView`.
+
 A project/task URL highlights and focuses the selected authorized task. Only
 the detail body scrolls to the task; the header and Close control stay in place
 on desktop and mobile. Later task arrival is handled without pulling the reader
@@ -592,6 +621,8 @@ Invalid or missing targets keep the existing explicit error without a fake detai
 This is a frontend-only change; deployed Dashboard/role acceptance remains separate.
 
 ## Detail form scrolling
+
+Superseded by MAIR-846 (the project is a page, its edit a lib `Modal`); kept for history.
 
 The project detail's outer panel clips overflow without becoming a scroll
 container. Only its body scrolls when a field receives focus, including during
