@@ -1,28 +1,16 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import fixtures from "../support/bff-fixtures.cjs";
 
-let ancestorScroll;
+let scrollIntoView;
 let previousScrollIntoView;
-let taskHeight;
 
 beforeEach(() => {
-  taskHeight = 100;
-  ancestorScroll = vi.fn();
+  scrollIntoView = vi.fn();
   previousScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
-  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: ancestorScroll });
-  // jsdom has no layout. Supply only the geometry needed by the actual modal;
-  // the native desktop/mobile recipe separately verifies the resulting pixels.
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function () {
-    if (this.matches("[data-linked-task]")) return { top: 800, height: taskHeight };
-    if (this.classList.contains("overflow-y-auto")) return { top: 100, height: 600 };
-    return { top: 0, height: 0 };
-  });
-  vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(function () {
-    return this.classList.contains("overflow-y-auto") ? 600 : 0;
-  });
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
 });
 
 afterEach(() => {
@@ -31,7 +19,7 @@ afterEach(() => {
   else delete HTMLElement.prototype.scrollIntoView;
 });
 
-function modalProps() {
+function pageProps() {
   const page = fixtures.projectsPage();
   return {
     project: fixtures.projectListItem(),
@@ -51,22 +39,48 @@ function modalProps() {
   };
 }
 
-describe("Project linked task scrolling", () => {
-  it.each([null, "task-1"])("prevents outer focus scrolling while preserving edit and keyboard navigation (linked task %s)", async (highlightTaskId) => {
-    const user = userEvent.setup();
-    const props = modalProps();
-    render(<ProjectDetailModal {...props} highlightTaskId={highlightTaskId} />);
-    const dialog = screen.getByRole("dialog");
-    const content = dialog.querySelector(".overflow-y-auto");
-    // overflow:hidden still permits native focus to scroll the outer dialog.
-    // jsdom cannot reproduce that layout; pin the containment strategy here
-    // and verify real desktop/mobile header geometry separately.
-    expect(dialog.classList.contains("overflow-clip")).toBe(true);
-    expect(dialog.classList.contains("overflow-hidden")).toBe(false);
-    expect(content.classList.contains("min-h-0")).toBe(true);
-    expect(dialog.querySelector("header").classList.contains("shrink-0")).toBe(true);
+// MAIR-846: the project is a page; a linked task (`?project=…&task=…`) opens « Tâches » and is centred once.
+describe("Project page linked task", () => {
+  it("opens the tasks tab, centres and focuses the linked task once", () => {
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    render(<ProjectPage {...pageProps()} />);
+    expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
+    const task = document.querySelector('[data-linked-task="task-1"]');
+    expect(task.getAttribute("aria-current")).toBe("true");
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    expect(document.activeElement).toBe(task);
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+  });
 
-    await user.click(within(dialog.querySelector("header")).getByRole("button", { name: "Modifier", exact: true }));
+  it("waits for the linked task to arrive and does not jump back on unrelated task refreshes", () => {
+    const props = pageProps();
+    const { rerender } = render(<ProjectPage {...props} tasks={[]} />);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+
+    rerender(<ProjectPage {...props} />);
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(document.querySelector("[data-linked-task]"));
+
+    rerender(<ProjectPage {...props} tasks={props.tasks.map(task => ({ ...task }))} />);
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+  });
+
+  it("opens an ordinary project on its overview with the focus on its title", () => {
+    render(<ProjectPage {...pageProps()} highlightTaskId={null} />);
+    expect(screen.getByRole("tab", { name: "Vue d’ensemble" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("[data-linked-task]")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("keeps keyboard navigation in the edit modal and goes back to the list from the breadcrumb", async () => {
+    const user = userEvent.setup();
+    const props = pageProps();
+    render(<ProjectPage {...props} highlightTaskId={null} />);
+    await user.click(screen.getByRole("button", { name: "Modifier", exact: true }));
+    const dialog = screen.getByRole("dialog", { name: /^Modifier le projet/ });
     const form = within(screen.getByRole("form", { name: "Modifier le projet" }));
     for (const name of [/^Titre/, /^Description/, /^Échéance/]) {
       const field = form.getByLabelText(name);
@@ -77,64 +91,11 @@ describe("Project linked task scrolling", () => {
       await user.tab({ shift: true });
       expect(document.activeElement).toBe(field);
     }
-    const close = screen.getByRole("button", { name: "Fermer la fiche projet" });
     await user.click(form.getByRole("button", { name: "Annuler", exact: true }));
-    expect(screen.queryByRole("form", { name: "Modifier le projet" })).toBeNull();
-    expect(document.activeElement).toBe(dialog);
+    expect(screen.queryByRole("dialog")).toBeNull();
     await user.keyboard("{Escape}");
+    expect(props.onClose).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Projets" }));
     expect(props.onClose).toHaveBeenCalledOnce();
-    expect(close.disabled).toBe(false);
-    expect(dialog.scrollTop).toBe(0);
-    expect(ancestorScroll).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { height: 100, expectedScroll: 450 },
-    { height: 700, expectedScroll: 700 },
-  ])("scrolls only inner content for a $height-pixel task, preserving header and focus", ({ height, expectedScroll }) => {
-    taskHeight = height;
-    const focus = vi.spyOn(HTMLElement.prototype, "focus");
-    render(<ProjectDetailModal {...modalProps()} />);
-
-    const dialog = screen.getByRole("dialog");
-    const content = dialog.querySelector(".overflow-y-auto");
-    const task = dialog.querySelector('[data-linked-task="task-1"]');
-    expect(content.scrollTop).toBe(expectedScroll);
-    expect(dialog.scrollTop).toBe(0);
-    expect(ancestorScroll).not.toHaveBeenCalled();
-    expect(dialog.querySelector("header").classList.contains("shrink-0")).toBe(true);
-    expect(task.getAttribute("aria-current")).toBe("true");
-    expect(document.activeElement).toBe(task);
-    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
-    expect(screen.getByRole("button", { name: "Fermer la fiche projet" })).toBeTruthy();
-  });
-
-  it("waits for the linked task to arrive and does not jump back on unrelated task refreshes", () => {
-    const props = modalProps();
-    const { rerender } = render(<ProjectDetailModal {...props} tasks={[]} />);
-    const dialog = screen.getByRole("dialog");
-    const content = dialog.querySelector(".overflow-y-auto");
-    expect(content.scrollTop).toBe(0);
-    expect(document.activeElement).toBe(dialog);
-
-    rerender(<ProjectDetailModal {...props} />);
-    expect(content.scrollTop).toBe(450);
-    expect(document.activeElement).toBe(dialog.querySelector("[data-linked-task]"));
-
-    content.scrollTop = 123;
-    rerender(<ProjectDetailModal {...props} tasks={props.tasks.map(task => ({ ...task }))} />);
-    expect(content.scrollTop).toBe(123);
-    expect(dialog.scrollTop).toBe(0);
-    expect(ancestorScroll).not.toHaveBeenCalled();
-  });
-
-  it("leaves ordinary project navigation at the top with initial dialog focus", () => {
-    render(<ProjectDetailModal {...modalProps()} highlightTaskId={null} />);
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector(".overflow-y-auto").scrollTop).toBe(0);
-    expect(dialog.scrollTop).toBe(0);
-    expect(dialog.querySelector("[data-linked-task]")).toBeNull();
-    expect(document.activeElement).toBe(dialog);
-    expect(ancestorScroll).not.toHaveBeenCalled();
   });
 });

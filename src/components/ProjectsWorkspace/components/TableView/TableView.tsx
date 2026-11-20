@@ -128,7 +128,6 @@ export function TableView({
           <button
             type="button"
             aria-label={`Ouvrir la fiche du projet ${project.title}`}
-            aria-haspopup="dialog"
             disabled={!canView(project)}
             className="block w-full truncate text-left font-semibold text-[var(--mairie-text)] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mairie-focus)] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={(event) => { event.stopPropagation(); onProjectOpen(project); }}

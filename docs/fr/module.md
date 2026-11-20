@@ -1,5 +1,35 @@
 # Projects_Web_Service — Présentation du module
 
+## Page projet (MAIR-846)
+
+Ouvrir un projet (carte, ligne, « Ouvrir le projet ») affiche une **page projet** à la place de la liste, et non
+plus la fiche en boîte de dialogue (Figma F5 5.1 à 5.11). La page a son adresse : `?project=<id>` (et
+`&tab=<onglet>` au-delà du premier onglet) est écrit dans l’historique du navigateur ; un rechargement ou un lien
+partagé y revient, et Précédent / Suivant la suivent. La liste reste montée derrière, avec ses filtres, sa vue et
+sa page.
+
+- **Fil d’Ariane** « ← Projets / #12 » : retour à la liste, le focus revient sur le bouton qui a ouvert le projet.
+- **En-tête** : pastille de statut ouvrant le choix du statut (si le projet peut être géré), priorité, étiquettes,
+  titre, description ; « Modifier », « Nouvelle tâche » (ouvre « Tâches » sur le titre de la tâche) et « … »
+  (Dupliquer ; Supprimer avec confirmation, puis retour à la liste). Dupliquer un projet sans groupe affiche
+  l’erreur du BFF (400).
+- **Indicateurs** : Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » ou le retard, dans le fuseau
+  de l’instance), Budget engagé (« Budget non renseigné » : absent du contrat pour l’instant), Tâches en retard.
+- **Onglets** : Vue d’ensemble, Tâches (compteur), Planning, Équipe (compteur), Documents, Activité. Les tâches
+  restent montées sur tous les onglets : brouillons et écritures en attente survivent à un changement d’onglet ;
+  Planning, Équipe, Documents et Activité ont leurs propres tickets et affichent un avis en attendant. Un lien de
+  tâche (`&task=<id>`) ouvre « Tâches » et centre la tâche.
+- **Vue d’ensemble** : « Prochaines tâches » (les trois tâches ouvertes les plus proches de leur échéance ; la
+  cocher la termine), « Jalons » et « Activité récente » (pas encore fournis par le contrat : ils le disent),
+  « Informations » (responsable, début, échéance, priorité, équipe, groupe, budget ; un projet sans groupe affiche
+  « Sans groupe » et « Choisissez un groupe dans « Modifier » »), avec les actions Suspendre et Clôturer.
+- **Modification** (C7) : « Modifier » ouvre les seuls champs du projet dans une modale de taille m (« Modifier le
+  projet · #12 ») ; le groupe est obligatoire dès qu’un groupe peut être choisi et ne peut pas être retiré. Les
+  messages s’affichent sous les champs avant tout envoi ; seuls les champs modifiés sont envoyés (`PATCH`), rien
+  si rien n’a changé. Le succès est la notification « Modifications enregistrées ». Un `204` (l’appelant ne voyait
+  le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
+  liste avec la même notification.
+
 ## Création de projet V2 (MAIR-836)
 
 Maquette Projets, écrans F3 3.1 à 3.6.
@@ -602,6 +632,8 @@ de dépendance ou d’environnement n’est nécessaire.
 
 ## Visibilité d’une tâche liée
 
+Depuis MAIR-846 le projet est une page : la tâche liée ouvre « Tâches » et est centrée par `scrollIntoView`.
+
 Une URL projet/tâche met en évidence la tâche autorisée et lui donne le focus.
 Seul le contenu de la fiche défile : son en-tête et Fermer restent en place sur
 ordinateur et mobile. Une tâche arrivée plus tard est ciblée sans ramener la
@@ -611,6 +643,8 @@ existante sans fausse fiche. Correction uniquement frontend ; la recette déploy
 Dashboard/multi-rôles reste distincte.
 
 ## Défilement des formulaires de fiche
+
+Remplacé par MAIR-846 (le projet est une page, sa modification une `Modal` de la lib) ; conservé pour l’historique.
 
 Le panneau extérieur de la fiche projet masque son débordement sans devenir un
 conteneur défilant. Seul son corps défile lorsqu’un champ reçoit le focus, y

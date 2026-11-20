@@ -3,20 +3,25 @@ import { getBffProjectErrorMessage } from '@/lib/bffProjectClient';
 import { projectToFormState, type ProjectFormState } from '@/lib/projectPageState';
 import { ProjectReceiptVerificationRequiredError } from '@/lib/projectReceiptVerification';
 import type { Project } from '@/types/project';
+import { PROJECT_EDIT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from '../../project-form-validation';
 
 // One project write at a time: the project form and the task form share this lockRef.
 export type MutationLock = React.MutableRefObject<{ project: boolean; task: boolean }>;
 
-export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocked, onUpdateProject }: {
+export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocked, groupCount = 0, onUpdateProject }: {
   project: Project;
   lockRef: MutationLock;
+  /** Element focused once the edit closes (the page title since MAIR-846). */
   dialogRef: React.RefObject<HTMLElement | null>;
+  /** Groups the project may be linked to: with at least one, the group is required (MAIR-846, C7). */
+  groupCount?: number;
   verificationBlocked: boolean;
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
 }) {
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [error, setError] = React.useState('');
+  const [fieldErrors, setFieldErrors] = React.useState<ProjectFieldErrors>({});
   const [verificationError, setVerificationError] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const projectIdRef = React.useRef(project.id);
@@ -30,6 +35,7 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
       editingRef.current = false;
       setForm(projectToFormState(next));
       setError('');
+      setFieldErrors({});
       setEditing(false);
     }
   };
@@ -38,6 +44,11 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     if (lockRef.current.project) return;
     setForm((current) => ({ ...current, ...patch }));
     if (error) setError('');
+    // A corrected field loses its message at once; a team member satisfies « Responsable » as well.
+    const touched = [...Object.keys(patch), ...('assignees' in patch ? ['responsible'] : [])];
+    setFieldErrors((current) => touched.some((key) => key in current)
+      ? Object.fromEntries(Object.entries(current).filter(([key]) => !touched.includes(key)))
+      : current);
   };
 
   const cancel = () => {
@@ -46,6 +57,7 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     dialogRef.current?.focus({ preventScroll: true });
     setForm(projectToFormState(project));
     setError('');
+    setFieldErrors({});
     editingRef.current = false;
     setEditing(false);
   };
@@ -57,6 +69,7 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     } else {
       setForm(projectToFormState(project));
       setError('');
+      setFieldErrors({});
       editingRef.current = true;
       setEditing(true);
     }
@@ -67,12 +80,12 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     if (busy() || verificationBlocked) return;
     setVerificationError(false);
 
-    const title = form.title.trim();
-    const description = form.description.trim();
-    const dueDate = form.dueDate;
-
-    if (!title || !description || !dueDate) {
-      setError('Les champs obligatoires doivent être renseignés.');
+    // MAIR-846 (C7): messages under the fields, focus on the first one in error, nothing sent.
+    const errors = validateProjectForm(form, { creating: false, groupCount, groupRequired: true });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const first = (Object.keys(PROJECT_EDIT_FIELD_IDS) as (keyof ProjectFieldErrors)[]).find((key) => errors[key]);
+      if (first && typeof document !== 'undefined') document.getElementById(PROJECT_EDIT_FIELD_IDS[first])?.focus();
       return;
     }
 
@@ -93,5 +106,5 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     }
   };
 
-  return { editing, form, error, verificationError, saving, syncProject, update, cancel, toggle, submit };
+  return { editing, form, error, fieldErrors, verificationError, saving, syncProject, update, cancel, toggle, submit };
 }

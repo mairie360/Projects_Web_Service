@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ProjectWorkflow } from '@/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow';
+import { ProjectWorkflow } from '@/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow';
 import { ProjectTemplateManager } from '@/components/ProjectsWorkspace/components/ProjectTemplateManager';
 import { ProjectTemplatePicker } from '@/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker';
 

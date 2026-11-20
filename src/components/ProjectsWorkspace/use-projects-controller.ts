@@ -44,7 +44,7 @@ import {
 } from '../../lib/projectPageState';
 import { getActiveFrontHrefs } from '../../lib/navigation';
 import { authSessionFromAccess, logoutAndReload } from '../../lib/auth-session';
-import { parseProjectDeepLink } from '../../lib/projectDeepLink';
+import { parseProjectDeepLink, writeProjectLocation } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
@@ -87,6 +87,13 @@ type VerifiedCreation = { id: string; title: string };
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
+}
+
+/** MAIR-846 (C7): the PATCH body keeps only the fields that differ from the project shown. */
+export function changedProjectBody(form: ProjectFormState, shown: ProjectFormState) {
+  const next = updateProjectBodyFromForm(form) as Record<string, unknown>;
+  const before = updateProjectBodyFromForm(shown) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(next).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key]))) as ReturnType<typeof updateProjectBodyFromForm>;
 }
 
 function validateProjectForm(form: ProjectFormState) {
@@ -643,7 +650,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     return selection;
   }, []);
 
-  const closeProjectDetails = useCallback(() => {
+  const closeProjectDetails = useCallback((options: { keepLocation?: boolean } = {}) => {
+    // MAIR-846: the project page is addressable; leaving it goes back to the list URL (filters kept).
+    if (!options.keepLocation) writeProjectLocation(null);
     detailSelectionRef.current = null;
     setSelectedProjectDetails(null);
     setLinkedTaskId(null);
@@ -750,6 +759,23 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     });
     return () => { active = false; };
   }, [beginDetailSelection, readCurrentProjectDetails]);
+
+  // MAIR-846: browser Back / Forward between the list and a project page.
+  const openProjectDetailsRef = useRef<((project: Pick<Project, 'id'>, options: { keepLocation?: boolean }) => Promise<void>) | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const followHistory = () => {
+      const target = parseProjectDeepLink(window.location.search ?? '');
+      const current = detailSelectionRef.current?.projectId ?? null;
+      if (!target || 'error' in target) {
+        if (current) closeProjectDetails({ keepLocation: true });
+        return;
+      }
+      if (target.projectId !== current) void openProjectDetailsRef.current?.({ id: target.projectId }, { keepLocation: true });
+    };
+    window.addEventListener('popstate', followHistory);
+    return () => window.removeEventListener('popstate', followHistory);
+  }, [closeProjectDetails]);
 
   const refreshProjectDetails = async (projectId: string, selection: DetailSelection | null, reportDetailError = true) => {
     const revision = selection && detailSelectionRef.current === selection && selection.projectId === projectId
@@ -906,7 +932,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     setCreateProjectOpen(true);
   };
 
-  const openProjectDetails = async (project: Project) => {
+  const openProjectDetails = async (project: Pick<Project, 'id'>, options: { keepLocation?: boolean } = {}) => {
+    if (!options.keepLocation) writeProjectLocation(project.id);
     const selection = beginDetailSelection(project.id);
     const revision = ++selection.readRevision;
 
@@ -914,9 +941,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       const details = await readCurrentProjectDetails(project.id, () => detailSelectionRef.current === selection && selection.readRevision === revision);
       if (details) setSelectedProjectDetails(details);
     } catch (error) {
-      if (detailSelectionRef.current === selection && selection.readRevision === revision) showError(error);
+      if (detailSelectionRef.current === selection && selection.readRevision === revision) {
+        // No page without its detail: the URL goes back to the list it was opened from.
+        if (!options.keepLocation) writeProjectLocation(null, 'overview', 'replace');
+        showError(error);
+      }
     }
   };
+
+  openProjectDetailsRef.current = openProjectDetails;
 
   const openEditProject = async (project: Project) => {
     if (projectFormPendingRef.current || project.permissions?.canEdit === false) return;
@@ -1013,7 +1046,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     } catch {
       // The write is confirmed: a failed refresh must not invite a second PATCH.
     }
-    setAlert({ type: 'info', message: `Projet "${title}" enregistré dans un groupe dont vous n’êtes pas membre : il ne fait plus partie de vos projets.` });
+    // MAIR-846 (C7): back to the list with the « Modifications enregistrées » toast.
+    setFeedback({ title: 'Modifications enregistrées', message: `Projet « ${title} » enregistré dans un groupe dont vous n’êtes pas membre : il ne fait plus partie de vos projets.` });
   };
 
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
@@ -1027,9 +1061,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       throw error;
     }
 
+    // MAIR-846 (C7): only the fields changed on the page are sent; nothing changed, nothing written.
+    const shown = selectedProjectDetails?.project.id === projectId ? selectedProjectDetails.project : projects.find((project) => project.id === projectId);
+    const body = shown ? changedProjectBody(form, projectToFormState(shown)) : updateProjectBodyFromForm(form);
+    if (Object.keys(body).length === 0) return;
+
     let details: ProjectDetailsResponse | null;
     try {
-      details = await updateProject(projectId, updateProjectBodyFromForm(form));
+      details = await updateProject(projectId, body);
     } catch (error) {
       showError(error);
       throw error;
@@ -1043,7 +1082,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     updateSelectedProject(confirmed, selection);
     try {
       await refreshProjectsPage({ silent: true, throwOnError: true });
-      setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+      setFeedback({ title: 'Modifications enregistrées', message: `Projet « ${details.project.title} » modifié.` });
     } catch (error) {
       // The mutation is confirmed: a failed refresh must not invite a second PATCH.
       setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });

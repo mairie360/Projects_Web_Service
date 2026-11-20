@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstanceProvider } from '@mairie360/lib-components/react';
 import { setInstanceTimeZone } from '@mairie360/lib-components/shared';
 import { ProjectTasksEditor } from '@/components/ProjectsWorkspace/components/ProjectTasksEditor';
-import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import { createProjectFormState } from '@/lib/projectPageState';
 import { getTaskCollaboration } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
@@ -53,7 +53,7 @@ describe('project dates in the municipal instance timezone', () => {
     receipt.history[0].createdAt = instant;
     vi.mocked(getTaskCollaboration).mockResolvedValue(receipt);
     const page = fixtures.projectsPage();
-    render(instance(<ProjectDetailModal project={fixtures.projectListItem()} tasks={[fixtures.projectTask()]}
+    render(instance(<ProjectPage initialTab="tasks" project={fixtures.projectListItem()} tasks={[fixtures.projectTask()]}
       memberOptions={page.options.members} labelOptions={page.options.labels} statusOptions={page.filters.statuses}
       priorityOptions={page.filters.priorities} onClose={vi.fn()} onUpdateProject={vi.fn()} onAddTask={vi.fn()}
       onUpdateTask={vi.fn()} onUpdateTaskStatus={vi.fn()} onDeleteTask={vi.fn()} onCloseProject={vi.fn()} />));

@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
 import { checkedOptions, toggleOption } from './units/multi-select';
+import { pageSection, visibleTabPanel } from './units/project-page';
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
@@ -16,7 +17,7 @@ function props() {
     labelOptions: page.options.labels,
     statusOptions: page.filters.statuses,
     priorityOptions: page.filters.priorities,
-    onClose: vi.fn(), onUpdateProject: vi.fn(), onAddTask: vi.fn(),
+    initialTab: 'tasks', onClose: vi.fn(), onUpdateProject: vi.fn(), onAddTask: vi.fn(),
     onUpdateTask: vi.fn(), onUpdateTaskStatus: vi.fn(), onDeleteTask: vi.fn(), onCloseProject: vi.fn(),
   };
 }
@@ -34,8 +35,8 @@ describe("Project task save confirmation", () => {
     const values = props();
     const save = mode === "edit" ? values.onUpdateTask : values.onAddTask;
     save.mockRejectedValueOnce(new Error("Enregistrement refusé")).mockResolvedValueOnce(undefined);
-    const { rerender } = render(<ProjectDetailModal {...values} />);
-    const dialog = within(screen.getByRole("dialog"));
+    const { rerender } = render(<ProjectPage {...values} />);
+    const dialog = within(visibleTabPanel());
     if (mode === "edit") await user.click(dialog.getAllByRole("button", { name: "Modifier", exact: true }).at(-1));
     const title = dialog.getByPlaceholderText("Ajouter une tâche...");
     await user.clear(title);
@@ -60,7 +61,7 @@ describe("Project task save confirmation", () => {
     expect(checkedOptions(dialog, 'Assignés')).toEqual(before.assignees);
     expect(checkedOptions(dialog, 'Étiquettes')).toEqual(before.labels);
     if (mode === "edit") expect(dialog.getByRole("button", { name: "Enregistrer la tâche", exact: true })).toBeTruthy();
-    rerender(<ProjectDetailModal {...values} project={{ ...values.project, priority: "high" }} tasks={values.tasks.map(task => ({ ...task }))} />);
+    rerender(<ProjectPage {...values} project={{ ...values.project, priority: "high" }} tasks={values.tasks.map(task => ({ ...task }))} />);
     expect(title.value).toBe(before.title);
     expect(dialog.getByLabelText("Priorité", { exact: true }).value).toBe("low");
     await user.click(dialog.getByRole("button", { name: mode === "edit" ? "Enregistrer la tâche" : "Ajouter la tâche", exact: true }));
@@ -81,8 +82,8 @@ describe("Project task save confirmation", () => {
     const values = props();
     const pending = deferred();
     values.onUpdateTask.mockReturnValue(pending.promise);
-    render(<ProjectDetailModal {...values} />);
-    const dialog = screen.getByRole("dialog");
+    render(<ProjectPage {...values} />);
+    const dialog = pageSection();
     const scope = within(dialog);
     await user.click(scope.getAllByRole("button", { name: "Modifier", exact: true }).at(-1));
     const title = scope.getByPlaceholderText("Ajouter une tâche...");
@@ -91,7 +92,7 @@ describe("Project task save confirmation", () => {
     expect(values.onUpdateTask).toHaveBeenCalledOnce();
     expect(title.matches(":disabled")).toBe(true);
     expect(scope.getByRole("button", { name: "Annuler", exact: true }).matches(":disabled")).toBe(true);
-    expect(scope.getByRole("button", { name: "Fermer la fiche projet" }).disabled).toBe(true);
+    expect(scope.getByRole("button", { name: "Projets" }).disabled).toBe(true);
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(values.onClose).not.toHaveBeenCalled();
     expect(scope.getByRole("status").textContent).toMatch(/Enregistrement/);
@@ -108,8 +109,8 @@ describe("Project task save confirmation", () => {
 
 it('requires an explicit assignee when the authenticated agent is unavailable, without substituting the project owner', async () => {
   const user=userEvent.setup();const values={ ...props(),defaultTaskAssigneeId:null };
-  render(<ProjectDetailModal {...values} />);
-  const scope=within(screen.getByRole('dialog'));const title=scope.getByPlaceholderText('Ajouter une tâche...');
+  render(<ProjectPage {...values} />);
+  const scope=within(pageSection());const title=scope.getByPlaceholderText('Ajouter une tâche...');
   await user.type(title,'Tâche sans identité supposée');
   fireEvent.submit(title.closest('form'));
   expect(await scope.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
@@ -123,8 +124,8 @@ it('requires an explicit assignee when the authenticated agent is unavailable, w
 it('prefills the fresh selectable identity, rereads after a save and does not overwrite a touched draft', async () => {
   const user = userEvent.setup(), values = props(), first = deferred(), second = deferred();
   const read = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
-  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
-  const dialog = within(screen.getByRole('dialog')), title = dialog.getByLabelText('Titre de la tâche', { exact:true });
+  render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
+  const dialog = within(pageSection()), title = dialog.getByLabelText('Titre de la tâche', { exact:true });
   expect(checkedOptions(dialog, 'Assignés')).toEqual([]);
   await act(async () => first.resolve('user-1'));
   expect(dialog.getByRole('button',{name:'Retirer Admin Mairie'})).toBeTruthy();
@@ -144,9 +145,9 @@ it('prefills the fresh selectable identity, rereads after a save and does not ov
 it('aborts a closed detail and reads the account again on reopening', async () => {
   const values=props(), old=deferred(), fresh=deferred();
   const read=vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
-  const view=render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  const view=render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   view.unmount(); expect(read.mock.calls[0][0].aborted).toBe(true);
-  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   await act(async()=>old.resolve('user-1'));
   expect(checkedOptions(screen, 'Assignés')).toEqual([]);
   await act(async()=>fresh.resolve('user-3'));
@@ -156,9 +157,9 @@ it('aborts a closed detail and reads the account again on reopening', async () =
 it('preserves a restored uncertain creation and existing task editing while reading new defaults', async () => {
   const user=userEvent.setup(), values=props(), read=vi.fn().mockResolvedValue('user-1');
   const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'review',priority:'low',assignees:['user-3'],labels:[],dueDate:'2026-11-17'}};
-  render(<ProjectDetailModal {...values} taskCreationState={state} readCurrentTaskAssignee={read} />);
+  render(<ProjectPage {...values} taskCreationState={state} readCurrentTaskAssignee={read} />);
   expect(read).not.toHaveBeenCalled();
-  const scope=within(screen.getByRole('dialog'));
+  const scope=within(pageSection());
   await user.click(scope.getAllByRole('button',{name:'Modifier',exact:true}).at(-1));
   expect(scope.getByLabelText('Titre de la tâche',{exact:true}).value).toBe(values.tasks[0].title);
   expect(read).not.toHaveBeenCalled();
@@ -171,7 +172,7 @@ it('preserves a restored uncertain creation and existing task editing while read
 it.each([null, 'refused'])('keeps an unavailable identity manual (%s)', async result => {
   const user=userEvent.setup(), values=props();
   const read=result==='refused'?vi.fn().mockRejectedValue(new Error('Unavailable')):vi.fn().mockResolvedValue(null);
-  render(<ProjectDetailModal {...values} readCurrentTaskAssignee={read} />);
+  render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   const title=screen.getByLabelText('Titre de la tâche',{exact:true});
   await user.type(title,'Affectation explicite requise');fireEvent.submit(title.closest('form'));
   expect(await screen.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');

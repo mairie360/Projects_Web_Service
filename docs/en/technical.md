@@ -106,7 +106,7 @@ flowchart LR
 `ProjectsWorkspace`. The controller retains the page's state/effects, read
 revisions and synchronous mutation guards; the workspace renders inferred props
 without extra reads or local business state. Creation and detail dialogs are
-directly imported from `CreateProjectModal.tsx` and `ProjectDetailModal.tsx`.
+directly imported from `CreateProjectModal.tsx` and `ProjectPage.tsx`.
 Their existing hook order, callback bodies, focus and pending behavior are
 preserved. `bffProjectClient.ts` still adapts the contract and `projectPageState.ts`
 centralizes page-state updates. The detail's task/collaboration workflow remains

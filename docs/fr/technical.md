@@ -107,7 +107,7 @@ flowchart LR
 `ProjectsWorkspace`. Le contrôleur conserve état/effets, révisions des lectures
 et gardes synchrones des mutations ; le rendu utilise ses props inférées sans
 lecture supplémentaire ni état métier dupliqué. Les dialogues sont importés
-directement depuis `CreateProjectModal.tsx` et `ProjectDetailModal.tsx`.
+directement depuis `CreateProjectModal.tsx` et `ProjectPage.tsx`.
 Ordre des hooks, corps des callbacks, focus et protections pendant l'attente
 restent identiques. `bffProjectClient.ts` adapte toujours le contrat et
 `projectPageState.ts` centralise les mises à jour. Les tâches/collaborations du
@@ -273,7 +273,7 @@ supprimer avec `docker compose -f docker-compose-e2e.yml down -v` avant un nouve
 
 ### Confirmation des commentaires de tâche — MAIR-446 / issue #204
 
-`ProjectDetailModal` distingue la sélection du suivi, la génération de lecture
+`ProjectPage` distingue la sélection du suivi, la génération de lecture
 et le verrou immédiat d’envoi. Une réponse ou erreur tardive ne remplace pas
 une autre tâche et ne rouvre pas un panneau fermé. Une actualisation du même
 projet conserve le suivi et son brouillon ; un changement de projet ou le

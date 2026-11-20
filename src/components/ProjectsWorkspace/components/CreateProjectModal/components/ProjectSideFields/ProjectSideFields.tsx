@@ -3,7 +3,7 @@ import { DateField, MultiSelect, SelectField, TextField } from '@mairie360/lib-c
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
-import type { ProjectFieldErrors } from '../../project-form-validation';
+import type { ProjectFieldErrors } from '../../../../project-form-validation';
 
 export interface ProjectSideFieldsProps {
   form: ProjectFormState;
