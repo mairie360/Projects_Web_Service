@@ -63,7 +63,7 @@ test('MAIR-859 model: columns by category, « En retard » only before done, arc
 
 test('MAIR-859 C1: the board shows three columns, the cards and the archived done tasks', async () => {
   await openTasks();
-  assert.match(view.html, /aria-label="À faire"[^]*aria-label="En cours"[^]*aria-label="Terminé"/);
+  assert.match(view.html, /data-task-column="todo"[^]*data-task-column="in-progress"[^]*data-task-column="done"/);
   assert.equal(columnOf('task-1'), 'todo');
   assert.equal(columnOf('task-2'), 'in-progress', '« En revue » sits in « En cours »');
   assert.match(view.text(), /En retard/);

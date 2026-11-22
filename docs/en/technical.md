@@ -97,7 +97,18 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 [Module overview](module.md) · [Français](../fr/technical.md) · [README](../../README.md)
 
-## Sortable lists — MAIR-1138
+## Collapsible columns and view transitions — MAIR-1134
+
+`KanbanBoard` and `TaskBoard` render one lib `KanbanColumn` per column (`collapsible`, controlled `collapsed` /
+`onCollapsedChange`, `dropActive`, `onAdd` for the « + », `tone` from `projectColumnTone`). `use-collapsed-columns.ts`
+keeps the folded columns in `localStorage` (`m360-collapsed-projects` / `m360-collapsed-tasks`, read after mount, every
+access in try/catch: without storage the fold only lasts for the page). The column drag handlers sit on the
+`KanbanColumn` section, so a folded column still takes a drop. The views are wrapped in `<div key={view}
+className="m360-view-enter">` (`globals.css`: 260 ms fade and rise, `animation: none` under `prefers-reduced-motion`; a
+class of this front, not an override of the lib). `ProjectActionsMenu` (cards, table rows) and `ProjectMoreMenu` (page
+header) get « Modifier »: `openEditProject` of the controller, or the page edit modal.
+
+
 
 `src/components/ProjectsWorkspace/table-sort.ts` holds the client-side sort shared by `TableView` and `TaskListView`:
 `sortRows(rows, sort, valueOf)` (stable, French collation, numbers as numbers, empty values last in both directions),

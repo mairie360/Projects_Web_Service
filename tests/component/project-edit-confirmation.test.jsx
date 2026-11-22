@@ -86,7 +86,8 @@ describe("Project edit modal confirmation (MAIR-846)", () => {
     await user.click(screen.getByRole("button", { name: "Fermer la fenêtre" }));
     expect(screen.getByRole("form", { name: "Modifier le projet" })).toBe(form);
     expect(screen.getByRole("button", { name: "Projets" }).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Ajouter une tâche dans À faire", exact: true }).matches(":disabled")).toBe(true);
+    // No quick add while the project save runs (MAIR-1134: the lib KanbanColumn hides its « + »).
+    expect(screen.queryByRole("button", { name: "Ajouter dans À faire", exact: true })).toBeNull();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(values.onClose).not.toHaveBeenCalled();
     expect(within(form).getByRole("status").textContent).toMatch(/Enregistrement/);

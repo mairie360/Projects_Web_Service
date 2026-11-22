@@ -30,7 +30,22 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
-## lib-components 2.3 (MAIR-1133)
+## Colonnes repliables, sélecteur de vue fixe, transitions (MAIR-1134)
+
+- Chaque colonne du Kanban des projets et du tableau des tâches se replie avec le chevron de son en-tête (« Replier la
+  colonne Terminé »), « Terminé » comprise : le `KanbanColumn` de la lib garde la largeur et l’en-tête et replie le
+  contenu en 280 ms. Le choix est mémorisé par navigateur (`m360-collapsed-projects`, `m360-collapsed-tasks`) ; une
+  carte peut toujours être déposée sur une colonne repliée, et le « + » d’une colonne de tâches repliée la déplie pour
+  l’ajout rapide.
+- Le sélecteur de vue (Kanban / Grille / Tableau, et Tableau / Liste dans les tâches) a sa propre ligne, sous la
+  recherche et les filtres, aligné à gauche : il ne bouge jamais.
+- Changer de vue fait apparaître la nouvelle en fondu avec une légère montée (260 ms) ; rien ne bouge avec
+  `prefers-reduced-motion`.
+- « Modifier » (crayon) se trouve sous « Ouvrir le projet » dans le menu « … » des cartes et des lignes du tableau, et en
+  premier dans le « … » de l’en-tête de la page projet.
+- Le sous-titre de la page est « Pilotez les projets de votre mairie ».
+
+
 
 Le module utilise `@mairie360/lib-components` 2.3.0 tel que publié : cadre blanc (Sidebar et Header), sans pied de
 page, les visuels 2.3 (vert d’action, pastilles en rectangle arrondi, étiquettes blanches, cartes en rayon 12 avec

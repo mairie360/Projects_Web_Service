@@ -20,6 +20,7 @@ export function ProjectCard({
   onOpen,
   onDuplicate,
   onDelete,
+  onEdit,
   onChangeStatus,
 }: ProjectCardProps) {
   const overdue = isProjectOverdue(project);
@@ -39,6 +40,7 @@ export function ProjectCard({
           onOpen={onOpen}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
+          onEdit={onEdit}
           onChangeStatus={onChangeStatus}
         />
       </div>

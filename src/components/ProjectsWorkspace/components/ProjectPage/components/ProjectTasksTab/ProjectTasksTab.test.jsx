@@ -13,7 +13,7 @@ const props = (overrides = {}) => ({
   priorityOptions: page.filters.priorities, onClose: vi.fn(), onUpdateProject: vi.fn(), onAddTask: vi.fn(), onUpdateTask: vi.fn(),
   onUpdateTaskStatus: vi.fn(async () => true), onDeleteTask: vi.fn(async () => undefined), onCloseProject: vi.fn(), ...overrides,
 });
-const column = (title) => screen.getByRole('heading', { name: title }).closest('section').getAttribute('aria-label');
+const column = (title) => screen.getByRole('heading', { name: title }).closest('[data-task-column]').getAttribute('data-task-column');
 const moveTo = async (user, title, label) => {
   await user.click(screen.getByRole('button', { name: `Actions pour ${title}` }));
   await user.click(screen.getByRole('menuitemradio', { name: label }));
@@ -23,7 +23,7 @@ describe('ProjectTasksTab (MAIR-859)', () => {
   it('shows the board with « En retard » and the archived done tasks, filters, and switches to the list', async () => {
     const user = userEvent.setup();
     render(<ProjectPage {...props()} />);
-    expect(column(todo.title)).toBe('À faire');
+    expect(column(todo.title)).toBe('todo');
     expect(within(screen.getByRole('heading', { name: todo.title }).closest('article')).getByText('En retard')).toBeTruthy();
     expect(screen.getByText('+ 2 tâches terminées')).toBeTruthy();
     await user.type(screen.getByRole('searchbox', { name: 'Rechercher une tâche' }), 'voiries');
@@ -47,30 +47,30 @@ describe('ProjectTasksTab (MAIR-859)', () => {
     const view = render(<ProjectPage {...props({ onUpdateTaskStatus })} />);
     await moveTo(user, todo.title, 'Terminé');
     expect(onUpdateTaskStatus).toHaveBeenCalledWith('project-1', todo.id, 'done', undefined);
-    expect(column(todo.title)).toBe('Terminé');
+    expect(column(todo.title)).toBe('done');
     await act(async () => resolve(true));
     // The BFF archived it: the detail no longer lists it, the board still shows it struck through.
     view.rerender(<ProjectPage {...props({ onUpdateTaskStatus, tasks: [other] })} />);
-    expect(column(todo.title)).toBe('Terminé');
+    expect(column(todo.title)).toBe('done');
     expect(screen.getByText('+ 1 tâche terminée')).toBeTruthy();
     await moveTo(user, other.title, 'En cours');
-    expect(column(other.title)).toBe('En cours');
+    expect(column(other.title)).toBe('in-progress');
     await act(async () => resolve(false));
-    expect(column(other.title)).toBe('À faire');
+    expect(column(other.title)).toBe('todo');
   });
 
   it('adds a task from a column with the current agent, or opens the sheet without one', async () => {
     const user = userEvent.setup();
     const onAddTask = vi.fn(async () => undefined);
     const view = render(<ProjectPage {...props({ onAddTask })} />);
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche dans En cours' }));
+    await user.click(screen.getByRole('button', { name: 'Ajouter dans En cours' }));
     await user.type(screen.getByLabelText('Titre de la nouvelle tâche dans En cours'), 'Consulter les riverains{Enter}');
     expect(onAddTask).toHaveBeenCalledTimes(1);
     expect(onAddTask.mock.calls[0][1]).toMatchObject({ title: 'Consulter les riverains', status: 'in-progress' });
     expect(onAddTask.mock.calls[0][1].responsible.id).toBe('user-3');
     view.unmount();
     render(<ProjectPage {...props({ onAddTask, defaultTaskAssigneeId: null })} />);
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche dans À faire' }));
+    await user.click(screen.getByRole('button', { name: 'Ajouter dans À faire' }));
     await user.type(screen.getByLabelText('Titre de la nouvelle tâche dans À faire'), 'Sans agent{Enter}');
     expect(onAddTask).toHaveBeenCalledTimes(1);
     const sheet = screen.getByRole('dialog', { name: 'Nouvelle tâche' });

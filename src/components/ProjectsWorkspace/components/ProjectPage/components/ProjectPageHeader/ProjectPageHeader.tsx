@@ -48,7 +48,7 @@ export const ProjectPageHeader = ({
       <div className="flex shrink-0 items-center gap-2">
         {onEdit && <Button variant="outline" tone="neutral" icon={Pencil} label="Modifier" disabled={editDisabled} onClick={onEdit} />}
         {onNewTask && <Button variant="solid" tone="primary" icon={Plus} label="Nouvelle tâche" onClick={onNewTask} />}
-        <ProjectMoreMenu title={project.title} onDuplicate={onDuplicate} duplicateDisabled={duplicateDisabled} duplicateLabel={duplicateLabel} onDelete={onDelete} />
+        <ProjectMoreMenu title={project.title} onEdit={onEdit} editDisabled={editDisabled} onDuplicate={onDuplicate} duplicateDisabled={duplicateDisabled} duplicateLabel={duplicateLabel} onDelete={onDelete} />
       </div>
     </div>
   </header>

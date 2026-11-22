@@ -87,6 +87,8 @@ export function ProjectTasksTab({
         <p role="status" className="mb-3 text-sm text-[var(--mairie-muted)]">Actualisation des tâches en cours…</p>
       )}
 
+      {/* MAIR-1134 (C8): the view fades and rises in when it changes (260 ms, none under prefers-reduced-motion). */}
+      <div key={view} className="m360-view-enter">
       {view === 'board' ? (
         <TaskBoard
           columns={columns}
@@ -125,6 +127,7 @@ export function ProjectTasksTab({
           />
         </div>
       )}
+      </div>
 
       <TaskSheet
         open={taskForm.open}

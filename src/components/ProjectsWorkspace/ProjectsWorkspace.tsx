@@ -26,6 +26,9 @@ import type { ProjectsController } from './use-projects-controller';
 import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
+/** MAIR-1134: the subtitle of the projects page. */
+export const PAGE_SUBTITLE = 'Pilotez les projets de votre mairie';
+
 export function ProjectsWorkspace({
   workflowPort,
   saveWorkflowStatuses,
@@ -122,8 +125,8 @@ export function ProjectsWorkspace({
   selectedProjectTasks,
   canCreateProject,
   pageTitle,
-  pageSubtitle,
   frontHrefs,
+  openEditProject,
   logout,
 }: ProjectsController) {
   const creationReceipt = newProjectReceiptIssues.get('create');
@@ -280,7 +283,7 @@ export function ProjectsWorkspace({
               <div hidden={Boolean(selectedProject)}>
                 <WorkspaceHeader
                   title={pageTitle}
-                  subtitle={pageSubtitle}
+                  subtitle={PAGE_SUBTITLE}
                   scope={projectsPage?.access?.scope}
                   onCreate={canCreateProject ? () => openCreateProject() : undefined}
                   onSettings={() => navigateToPage('settings')}
@@ -316,6 +319,8 @@ export function ProjectsWorkspace({
 
                   {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
+                  {/* MAIR-1134 (C8): the view fades and rises in (260 ms) when it changes; no motion under prefers-reduced-motion. */}
+                  <div key={viewMode} className="m360-view-enter">
                   {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
                     <ProjectsEmptyState onReset={resetProjectFilters} />
                   )}
@@ -329,6 +334,7 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
                       onAddProject={canCreateProject ? openCreateProject : undefined}
                       onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                     />
@@ -342,6 +348,7 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
                       onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                     />
@@ -355,6 +362,7 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
                       onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                       selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
@@ -363,6 +371,7 @@ export function ProjectsWorkspace({
                       onDeleteSelection={requestBulkProjectDeletion}
                     />
                   )}
+                  </div>
                   {projectsPage && (
                     <ProjectPagination pagination={projectsPage.pagination} pending={pageLoading} stale={Boolean(pageError)} onChange={changeProjectPage} />
                   )}

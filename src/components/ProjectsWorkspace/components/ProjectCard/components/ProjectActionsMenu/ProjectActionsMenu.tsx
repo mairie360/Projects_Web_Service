@@ -13,7 +13,7 @@ import {
   MoreIconButton,
   ToolTip,
 } from '@mairie360/lib-components/primitives';
-import { Copy, ExternalLink, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 
 import type { Project } from '@/types/project';
 import { projectStatusLabel } from '../../../../project-card-meta';
@@ -21,7 +21,7 @@ import { projectStatusLabel } from '../../../../project-card-meta';
 const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
 
 /**
- * « … » menu of a project (MAIR-829, Figma F4): Ouvrir le projet, Dupliquer, Changer le statut (single choice),
+ * « … » menu of a project (MAIR-829, Figma F4): Ouvrir le projet, Modifier (MAIR-1134), Dupliquer, Changer le statut (single choice),
  * Supprimer (confirmed by the page). Items are `asChild` buttons so they keep `role`, `disabled` and keyboard activation.
  */
 export function ProjectActionsMenu({
@@ -31,6 +31,7 @@ export function ProjectActionsMenu({
   duplicationPending = false,
   duplicationVerificationRequired = false,
   onDelete,
+  onEdit,
   onChangeStatus,
 }: {
   project: Project;
@@ -39,16 +40,19 @@ export function ProjectActionsMenu({
   duplicationPending?: boolean;
   duplicationVerificationRequired?: boolean;
   onDelete?: (project: Project) => void;
+  /** MAIR-1134 (C14): « Modifier » under « Ouvrir le projet », opens the edit window. */
+  onEdit?: (project: Project) => void;
   onChangeStatus?: (project: Project, status: Project['status']) => void | Promise<void>;
 }) {
   const canOpen = project.permissions?.canView !== false && Boolean(onOpen);
   const canDuplicate = project.permissions?.canDuplicate !== false && Boolean(onDuplicate);
   const canChangeStatus = project.permissions?.canEdit === true && Boolean(onChangeStatus);
   const canDelete = project.permissions?.canDelete !== false && Boolean(onDelete);
+  const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
-  if (!canOpen && !canDuplicate && !canChangeStatus && !canDelete) return null;
+  if (!canOpen && !canEdit && !canDuplicate && !canChangeStatus && !canDelete) return null;
 
   const runAction = (action?: (project: Project) => void) => (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -83,6 +87,13 @@ export function ProjectActionsMenu({
             <DropdownMenuItem asChild>
               <button type="button" role="menuitem" className="flex w-full items-center gap-2 text-left" onClick={runAction(onOpen)}>
                 <ExternalLink aria-hidden className="h-4 w-4" />Ouvrir le projet
+              </button>
+            </DropdownMenuItem>
+          )}
+          {canEdit && (
+            <DropdownMenuItem asChild>
+              <button type="button" role="menuitem" className="flex w-full items-center gap-2 text-left" onClick={runAction(onEdit)}>
+                <Pencil aria-hidden className="h-4 w-4" />Modifier
               </button>
             </DropdownMenuItem>
           )}

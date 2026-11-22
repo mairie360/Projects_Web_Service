@@ -57,7 +57,8 @@ test('the first pass renders the loading state, the next one the projects of GET
   // The page debounces its first load (250 ms) and sends only the declared filters.
   assert.deepEqual(pageCalls(), [{ status: 'all', priority: 'all', view: 'kanban', page: '1', limit: '50' }]);
   assert.equal(bffProject.requests[0].headers.authorization, `Bearer ${fixtures.jwt(fixtures.agents.marie.id)}`);
-  assert.match(html, /<p[^>]*>Suivi des projets de la mairie<\/p>/);
+  // MAIR-1134: the subtitle of the page is the front's.
+  assert.match(html, /<p[^>]*>Pilotez les projets de votre mairie<\/p>/);
   assert.match(html, /<span[^>]*>Projets de mon équipe<\/span>/);
   assert.match(view.text(), /Rénovation de l’éclairage public/);
   assert.match(view.text(), /Remplacement des candélabres du centre-ville\./);
@@ -918,7 +919,8 @@ test('MAIR-829: the card menu duplicates, opens, changes the status and deletes 
   // MAIR-829: « Ouvrir le projet » opens the project sheet.
   bffProject.on('get', '/projects/{projectId}', ({ pathParams }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ id: pathParams.projectId })) }));
   await view.click((props) => props['aria-label'] === `Actions pour ${title}`);
-  assert.doesNotMatch(view.text(), /Modifier/, 'the V2 menu has no « Modifier » (the sheet edits the project)');
+  // MAIR-1134 (C14): « Modifier » sits under « Ouvrir le projet ».
+  assert.match(view.text(), /Ouvrir le projet\s*Modifier/);
   await view.click((props, text) => props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Ouvrir le projet');
   await view.waitFor(() => view.find('ProjectPage').length === 1);
   assert.equal(view.props('ProjectPage').project.id, 'project-1');

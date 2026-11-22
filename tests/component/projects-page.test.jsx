@@ -308,7 +308,7 @@ describe("Projects page", () => {
     // The card is back in its column (a new element): the write is not confirmed.
     const rowAlert = await waitFor(() => within(taskCard(task.title)).getByRole('alert'));
     const row = taskCard(task.title);
-    expect(row.closest('section').getAttribute('aria-label')).toBe('À faire');
+    expect(row.closest('[data-task-column]').getAttribute('data-task-column')).toBe('todo');
     expect(rowAlert.textContent).toContain('acceptée');
     expect(rowAlert.textContent).toContain('confirmation de tâche est incohérente');
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation reçue' })).toBeNull();
@@ -347,12 +347,12 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const column = (title) => taskCard(title).closest('section').getAttribute('aria-label');
-    expect(column(task.title)).toBe('À faire');
+    const column = (title) => taskCard(title).closest('[data-task-column]').getAttribute('data-task-column');
+    expect(column(task.title)).toBe('todo');
     await moveTaskTo(user, task.title, 'Terminé');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
     // The card waits in its new column, busy, with no other move offered.
-    expect(column(task.title)).toBe('Terminé');
+    expect(column(task.title)).toBe('done');
     expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
     expect(within(taskCard(task.title)).getByRole('status').textContent).toBe('Enregistrement…');
     await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
@@ -363,7 +363,7 @@ describe("Projects page", () => {
     await user.keyboard('{Escape}');
     await act(async () => write.reject(new Error('Écriture refusée')));
     // Rolled back to « À faire », with the refusal on the card and in an error toast.
-    await waitFor(() => expect(column(task.title)).toBe('À faire'));
+    await waitFor(() => expect(column(task.title)).toBe('todo'));
     expect(within(taskCard(task.title)).getByRole('alert').textContent).toContain('Écriture refusée');
     expect(await screen.findByText('Statut non modifié')).toBeTruthy();
     expect(taskCard(task.title).getAttribute('aria-busy')).toBeNull();
@@ -372,7 +372,7 @@ describe("Projects page", () => {
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
     await moveTaskTo(user, task.title, 'Terminé');
     expect(await screen.findByRole('heading', { name: confirmed.title })).toBeTruthy();
-    expect(column(confirmed.title)).toBe('Terminé');
+    expect(column(confirmed.title)).toBe('done');
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(2);
   });
@@ -603,7 +603,7 @@ describe("Projects page", () => {
     expect(screen.queryByRole("group", { name: fixtures.projectListItem().title })).toBeNull();
   });
 
-  it("keeps the search and filter toolbar stacked until enough width is available", async () => {
+  it("keeps the filters on one row and the view switch on its own row under them (MAIR-1134 C6)", async () => {
     render(<ProjectsPage />);
     await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
 
@@ -617,10 +617,10 @@ describe("Projects page", () => {
     expect(controls.classList.contains("xl:flex-row")).toBe(true);
     expect(controls.classList.contains("md:flex-row")).toBe(false);
     expect(toolbar.classList.contains("items-start")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-wrap")).toBe(true);
-    expect(controls.classList.contains("2xl:basis-[50rem]")).toBe(true);
-    expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
+    expect(toolbar.classList.contains("flex-col")).toBe(true);
+    // The view switch never moves: its own row, left aligned, whatever the screen width.
+    expect([...toolbar.classList].some((name) => /flex-row/.test(name))).toBe(false);
+    expect(toolbar.lastElementChild).toBe(screen.getByRole("radiogroup", { name: "Vue des projets" }));
     expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
     expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
     expect(searchContainer.classList.contains("md:flex-1")).toBe(true);

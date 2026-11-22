@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { IconButton, StatusBadge, ToolTip } from '@mairie360/lib-components/primitives';
-import { Plus } from 'lucide-react';
+import { KanbanColumn } from '@mairie360/lib-components/primitives';
 
 import { ProjectCard } from '../ProjectCard';
-import { projectStatusBadge } from '../../project-card-meta';
+import { projectColumnTone } from '../../project-card-meta';
+import { COLLAPSED_PROJECT_COLUMNS_KEY, useCollapsedColumns } from '../../use-collapsed-columns';
 import type { Project } from '@/types/project';
 
 type KanbanBoardProps = {
@@ -16,6 +16,8 @@ type KanbanBoardProps = {
   onProjectOpen?: (project: Project) => void;
   onProjectDuplicate?: (project: Project) => void;
   onProjectDelete?: (project: Project) => void;
+  /** MAIR-1134: « Modifier » of the card menu. */
+  onProjectEdit?: (project: Project) => void;
   onAddProject?: (status: Project['status']) => void;
   /** Status change, by drag and drop or by the card menu (MAIR-829). */
   onMoveProject?: (project: Project, status: Project['status']) => Promise<void>;
@@ -29,6 +31,7 @@ export function KanbanBoard({
   onProjectOpen,
   onProjectDuplicate,
   onProjectDelete,
+  onProjectEdit,
   onAddProject,
   onMoveProject,
 }: KanbanBoardProps) {
@@ -39,6 +42,8 @@ export function KanbanBoard({
   const startedOnControl = React.useRef(false);
   const suppressNextClick = React.useRef(false);
   const instructionsId = React.useId();
+  // MAIR-1134: a column folds from its header chevron; the choice is remembered per browser.
+  const { collapsed, setColumnCollapsed } = useCollapsedColumns(COLLAPSED_PROJECT_COLUMNS_KEY);
   const dragged = projects.find((project) => project.id === draggedId);
   const canMove = (project: Project) => Boolean(onMoveProject && movingId === null && project.permissions?.canEdit === true);
   const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status);
@@ -79,11 +84,18 @@ export function KanbanBoard({
         const columnProjects = projects.filter((project) => project.status === column.status);
 
         return (
-          <section
+          <KanbanColumn
             key={column.status}
-            className={`min-w-0 rounded-lg border border-[var(--mairie-border)] bg-[var(--mairie-background)] p-3 transition-colors ${targetStatus === column.status ? 'bg-[var(--mairie-accent-surface)] ring-2 ring-[var(--mairie-accent)]' : ''}`}
+            title={column.label}
+            tone={projectColumnTone[column.status]}
+            count={columnProjects.length}
+            onAdd={onAddProject ? () => onAddProject(column.status) : undefined}
+            collapsible
+            collapsed={collapsed.has(column.status)}
+            onCollapsedChange={(folded) => setColumnCollapsed(column.status, folded)}
+            dropActive={targetStatus === column.status}
+            emptyLabel="Aucun projet"
             data-project-status={column.status}
-            aria-label={column.label}
             onDragOver={(event) => {
               if (!acceptsDrop(column.status)) return;
               event.preventDefault();
@@ -97,18 +109,7 @@ export function KanbanBoard({
             }}
             onDrop={(event) => void dropProject(event, column.status)}
           >
-            <div className="mb-3 flex h-10 items-center justify-between gap-2">
-              <h2 className="flex min-w-0 items-center gap-2">
-                <StatusBadge status={projectStatusBadge[column.status]} label={column.label} />
-                <span className="text-sm text-[var(--mairie-muted)]" aria-label={`${columnProjects.length} projet${columnProjects.length > 1 ? 's' : ''}`}>{columnProjects.length}</span>
-              </h2>
-              {onAddProject && <ToolTip text={`Ajouter dans ${column.label}`}>
-                <IconButton icon={Plus} label={`Ajouter un projet ${column.label}`} size="s" onClick={() => onAddProject(column.status)} />
-              </ToolTip>}
-            </div>
-
-            <div className="min-h-[120px] space-y-2.5">
-              {columnProjects.map((project) => (
+            {columnProjects.map((project) => (
                 <div
                   key={project.id}
                   data-project-id={project.id}
@@ -147,13 +148,13 @@ export function KanbanBoard({
                     onOpen={onProjectOpen}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}
+                    onEdit={onProjectEdit}
                     onChangeStatus={onMoveProject && canMove(project) ? moveProject : undefined}
                     variant="kanban"
                   />
                 </div>
-              ))}
-            </div>
-          </section>
+            ))}
+          </KanbanColumn>
         );
       })}
     </div>

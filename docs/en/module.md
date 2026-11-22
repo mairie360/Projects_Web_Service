@@ -27,7 +27,20 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
-## lib-components 2.3 (MAIR-1133)
+## Collapsible columns, fixed view switch, transitions (MAIR-1134)
+
+- Every column of the projects Kanban and of the task board folds from the chevron of its header (« Replier la colonne
+  Terminé »), « Terminé » included: the lib `KanbanColumn` keeps the width and the header and folds the content in
+  280 ms. The choice is remembered per browser (`m360-collapsed-projects`, `m360-collapsed-tasks`); a card can still be
+  dropped on a folded column, and the « + » of a folded task column unfolds it for the quick add.
+- The view switch (Kanban / Grille / Tableau, and Tableau / Liste in the tasks) has its own row, under the search and
+  the filters, aligned left: it never moves.
+- Changing the view fades and rises the new one in (260 ms); nothing moves under `prefers-reduced-motion`.
+- « Modifier » (pencil) sits under « Ouvrir le projet » in the « … » menu of the cards and of the table rows, and first in
+  the « … » of the project page header.
+- The page subtitle is « Pilotez les projets de votre mairie ».
+
+
 
 The module runs on `@mairie360/lib-components` 2.3.0 as published: white frame (Sidebar and Header), no footer,
 the 2.3 visuals (action green, rounded pills, white tags, 12 px cards with their shadow, field focus ring, 14 px
