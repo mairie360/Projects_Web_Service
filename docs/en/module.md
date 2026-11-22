@@ -27,6 +27,18 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
+## Sortable lists (MAIR-1138)
+
+The lists sort by a click on a column header (lib `DataTable`): the first click sorts ascending, the second descending,
+an arrow marks the sorted column and `aria-sort` says it to assistive technologies. Empty values (no due date, no
+assignee) always stay last, whatever the direction. The state follows the business order À faire < En cours (< En
+revue) < Terminé, the priority Haute < Moyenne < Basse.
+
+- **Task list** of a project (« Tâches » › Liste): Tâche, État, Priorité, Assignée à, Échéance; sorted by due date
+  first. No « Début » column: the published contract has no task start date yet (MAIR-1087).
+- **Projects table**: every column but the selection and the actions, with the same rendering and rules.
+- The « Équipe » tab does not exist yet (MAIR-874): its sort comes with it.
+
 ## Project page: « Tâches » tab (MAIR-859)
 
 The « Tâches » tab of the project page (Figma F6, 6.1 to 6.13) shows the project tasks as a **board** or a **list**.

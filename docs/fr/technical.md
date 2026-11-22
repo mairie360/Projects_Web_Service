@@ -93,6 +93,15 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 [Présentation du module](module.md) · [English](../en/technical.md) · [README](../../README.md)
 
+## Listes triables — MAIR-1138
+
+`src/components/ProjectsWorkspace/table-sort.ts` porte le tri côté front partagé par `TableView` et `TaskListView` :
+`sortRows(rows, sort, valueOf)` (stable, ordre alphabétique français, nombres comparés comme nombres, valeurs vides en
+fin dans les deux sens), les rangs métier `statusRank` / `priorityRank` et `sortableDate`. Les deux tableaux passent
+`sort` / `onSort` au `DataTable` de la lib, qui affiche les boutons d’en-tête, alterne croissant / décroissant et pose
+`aria-sort` ; `TaskListView` démarre sur `DEFAULT_TASK_SORT` (échéance croissante). Le contrat n’a pas de paramètre de
+tri : seules les lignes chargées sont triées.
+
 ## Onglet « Tâches » de la page projet — MAIR-859
 
 `ProjectPage` affiche `ProjectTasksTab` dans son panneau « Tâches » : `TaskToolbar` (`SearchField`, deux

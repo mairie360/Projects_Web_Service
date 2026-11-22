@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox, DataTable, PriorityPill, ProgressMeter, StatusBadge, StatusPill, TagList, UserIdentity } from '@mairie360/lib-components/primitives';
-import type { DataTableColumn, SortDirection } from '@mairie360/lib-components/primitives';
+import type { DataTableColumn } from '@mairie360/lib-components/primitives';
 import { CalendarDays } from 'lucide-react';
 import { formatProjectDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
+import { priorityRank, sortableDate, sortRows, statusRank, type SortValue, type TableSort } from '../../table-sort';
 import { ProjectActionsMenu } from '../ProjectCard/components/ProjectActionsMenu';
 import type { Project } from '@/types/project';
 import { ProjectsEmptyState as EmptyState } from '../ProjectsEmptyState';
@@ -12,32 +13,19 @@ import { SelectionBar } from './components/SelectionBar';
 
 type SortKey = 'key' | 'title' | 'status' | 'priority' | 'responsible' | 'dueDate' | 'progress';
 
-const STATUS_ORDER: Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
-const PRIORITY_ORDER: Project['priority'][] = ['high', 'medium', 'low'];
-const collator = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' });
-
-const sortValue: Record<SortKey, (project: Project) => string | number> = {
+const sortValue: Record<SortKey, (project: Project) => SortValue> = {
   key: (project) => getProjectNumber(project),
   title: (project) => project.title,
-  status: (project) => STATUS_ORDER.indexOf(project.status),
-  priority: (project) => PRIORITY_ORDER.indexOf(project.priority),
+  status: (project) => statusRank(project.status),
+  priority: (project) => priorityRank(project.priority),
   responsible: (project) => project.responsible.name,
-  // Projects without a valid due date go last in both directions.
-  dueDate: (project) => (/^\d{4}-\d{2}-\d{2}/.test(project.dueDate) ? project.dueDate.slice(0, 10) : ''),
+  dueDate: (project) => sortableDate(project.dueDate),
   progress: (project) => project.progress,
 };
 
-/** Client-side sort of the loaded page (MAIR-833): the contract has no sort parameter. */
-export function sortProjects(projects: Project[], sort: { key: SortKey; direction: SortDirection } | null) {
-  if (!sort) return projects;
-  const value = sortValue[sort.key];
-  const factor = sort.direction === 'asc' ? 1 : -1;
-  return [...projects].sort((left, right) => {
-    const a = value(left);
-    const b = value(right);
-    if (a === '' || b === '') return a === b ? 0 : a === '' ? 1 : -1;
-    return factor * (typeof a === 'number' && typeof b === 'number' ? a - b : collator.compare(String(a), String(b)));
-  });
+/** Client-side sort of the loaded page (MAIR-833, lib mechanism of MAIR-1138): the contract has no sort parameter. */
+export function sortProjects(projects: Project[], sort: TableSort<SortKey> | null) {
+  return sortRows(projects, sort, sortValue);
 }
 
 function SelectAll({ projects, selectedIds, onChange }: { projects: Project[]; selectedIds: ReadonlySet<string>; onChange: (ids: string[], selected: boolean) => void }) {
@@ -91,7 +79,7 @@ export function TableView({
   /** Shown in the empty state when a search or a filter hides every project (MAIR-829). */
   onResetFilters?: () => void;
 }) {
-  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const [sort, setSort] = useState<TableSort<SortKey> | null>(null);
   if (projects.length === 0) return <EmptyState onReset={onResetFilters} />;
 
   const selected = selectedProjectIds ?? new Set<string>();

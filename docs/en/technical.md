@@ -92,6 +92,14 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 [Module overview](module.md) · [Français](../fr/technical.md) · [README](../../README.md)
 
+## Sortable lists — MAIR-1138
+
+`src/components/ProjectsWorkspace/table-sort.ts` holds the client-side sort shared by `TableView` and `TaskListView`:
+`sortRows(rows, sort, valueOf)` (stable, French collation, numbers as numbers, empty values last in both directions),
+the business ranks `statusRank` / `priorityRank` and `sortableDate`. Both tables pass `sort` / `onSort` to the lib
+`DataTable`, which renders the header buttons, toggles ascending / descending and sets `aria-sort`; `TaskListView`
+starts on `DEFAULT_TASK_SORT` (due date ascending). The contract has no sort parameter: only the loaded rows are sorted.
+
 ## « Tâches » tab of the project page — MAIR-859
 
 `ProjectPage` renders `ProjectTasksTab` in its « Tâches » panel: `TaskToolbar` (lib `SearchField`, two `FilterSelect`s,

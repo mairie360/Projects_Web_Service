@@ -30,6 +30,21 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
+## Listes triables (MAIR-1138)
+
+Les listes se trient au clic sur l’en-tête d’une colonne (`DataTable` de la lib) : le premier clic trie par ordre
+croissant, le second par ordre décroissant, une flèche marque la colonne triée et `aria-sort` l’annonce aux
+technologies d’assistance. Les valeurs vides (sans échéance, sans personne assignée) restent toujours en fin de
+liste, quel que soit le sens. L’état suit l’ordre métier À faire < En cours (< En revue) < Terminé, la priorité
+Haute < Moyenne < Basse.
+
+- **Liste des tâches** d’un projet (« Tâches » › Liste) : Tâche, État, Priorité, Assignée à, Échéance ; triée par
+  échéance par défaut. Pas de colonne « Début » : le contrat publié n’a pas encore de date de début de tâche
+  (MAIR-1087).
+- **Tableau des projets** : toutes les colonnes sauf la sélection et les actions, avec le même rendu et les mêmes
+  règles.
+- L’onglet « Équipe » n’existe pas encore (MAIR-874) : son tri viendra avec lui.
+
 ## Page projet : onglet « Tâches » (MAIR-859)
 
 L’onglet « Tâches » de la page projet (Figma F6, 6.1 à 6.13) montre les tâches du projet en **tableau** ou en **liste**.
