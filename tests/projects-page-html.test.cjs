@@ -66,13 +66,9 @@ test('the first pass renders the loading state, the next one the projects of GET
   assert.deepEqual(view.props('KanbanBoard').columns.map((column) => column.label), ['À faire', 'En cours', 'En revue', 'Terminé']);
   assert.deepEqual(view.props('ProjectFiltersBar').views.map((option) => option.value), ['kanban', 'grid', 'table']);
   assert.equal(view.props('Header').isAdmin, false);
-  const footer = html.match(/<footer\b[^>]*>[\s\S]*?<\/footer>/)?.[0];
-  assert.ok(footer);
-  assert.doesNotMatch(html, /<aside\b[^]*?<footer\b[^]*?<\/footer>[^]*?<\/aside>/);
-  // MAIR-828: lib-components 2 frame, the full-width footer sits after the main area.
-  assert.match(html, /<\/main>[\s\S]*<div class="app-shell-footer shrink-0"[^>]*><footer\b/);
-  assert.match(footer.replace(/<[^>]*>/g, ''), new RegExp(`© ${new Date().getFullYear()} Mairie360`));
-  assert.doesNotMatch(footer, /Version|<button\b|<a\b/);
+  // MAIR-1133: lib-components 2.3 page base, white frame without footer.
+  assert.doesNotMatch(html, /<footer\b|role="contentinfo"|app-shell-footer/);
+  assert.doesNotMatch(html.replace(/<[^>]*>/g, ''), /© \d{4} Mairie360/);
 });
 
 test('an agent without the creation right sees no "Nouveau projet" button', async () => {

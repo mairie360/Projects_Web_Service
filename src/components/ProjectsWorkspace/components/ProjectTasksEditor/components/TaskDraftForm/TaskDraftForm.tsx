@@ -101,14 +101,12 @@ export function TaskDraftForm({
               label="Annuler"
               type="button"
               onClick={onCancel}
-              className="!h-9 !min-h-0 !rounded-md !border-[#d0d7de] !bg-white !px-4 !text-sm !font-semibold !text-[#24292f] hover:!bg-[#eef1f4]"
             />
           )}
           <Button
             label={editing ? 'Enregistrer la tâche' : 'Ajouter la tâche'}
             type="button"
             onClick={onSave}
-            className="!h-9 !min-h-0 !rounded-md !border-[#2da44e] !bg-[#2da44e] !px-4 !text-sm !font-semibold !text-white hover:!bg-[#2c974b]"
           />
         </div>
       </div>

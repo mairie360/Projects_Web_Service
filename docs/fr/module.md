@@ -30,6 +30,13 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
+## lib-components 2.3 (MAIR-1133)
+
+Le module utilise `@mairie360/lib-components` 2.3.0 tel que publié : cadre blanc (Sidebar et Header), sans pied de
+page, les visuels 2.3 (vert d’action, pastilles en rectangle arrondi, étiquettes blanches, cartes en rayon 12 avec
+ombre, anneau de focus des champs, fenêtres en rayon 14, toasts en bas à droite, infobulles sombres immédiates,
+compteur rond sur la cloche). La feuille de style locale n’en surcharge plus aucun.
+
 ## Listes triables (MAIR-1138)
 
 Les listes se trient au clic sur l’en-tête d’une colonne (`DataTable` de la lib) : le premier clic trie par ordre

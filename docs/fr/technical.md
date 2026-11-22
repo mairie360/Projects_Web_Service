@@ -53,11 +53,17 @@ compatible `1.1.21`, avec l’intégrité vérifiée sur le registre, conformém
 [l’avis amont](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 Aucun seuil d’audit, workflow ou contrôle de sécurité n’est assoupli.
 
-Le paquet est épinglé à `@mairie360/lib-components@2.1.0` (MAIR-828, listé dans
-`tests/fixtures/shared-ui-releases.json`). Son `AccessibleShell` dessine un bandeau
-de navigation desktop, garde la sidebar pour le seul tiroir mobile, affiche un pied
-de page pleine largeur (`app-shell-footer`) et confirme la déconnexion dans une
-boîte de dialogue ; le layout racine fixe toujours `data-theme="light"`.
+Le paquet est épinglé à `@mairie360/lib-components@2.3.0` (MAIR-1133, listé dans
+`tests/fixtures/shared-ui-releases.json` avec les empreintes de ses fichiers). Son
+`AccessibleShell` est le cadre blanc de la 2.3 (Sidebar repliée ou dépliée par son
+bouton « Replier », Header blanc avec le `Counter` rond sur la cloche) et, depuis la
+2.3, **sans pied de page** : la base de page n’en affiche un qu’avec `showFooter`, que
+ce front ne pose jamais. Il confirme la déconnexion dans une boîte de dialogue ; le
+layout racine fixe toujours `data-theme="light"`. `src/app/globals.css` ne garde que
+les règles de base de la page (échelle racine, body, polices) et aucune règle sur un
+composant de la lib (sidebar, cadre, sélecteur de vue), et aucun `Button`, pastille,
+carte ou fenêtre de la lib n’est restylé par des utilitaires `!`
+(`tests/mair-1133-lib-components-2-3.test.cjs`).
 Les contrats, les API/BFF et les approbations de déploiement sont inchangés.
 Le suivi de l’adoption reste dans [l’issue partagée #387](https://github.com/mairie360/lib-components/issues/387).
 

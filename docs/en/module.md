@@ -27,6 +27,13 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
+## lib-components 2.3 (MAIR-1133)
+
+The module runs on `@mairie360/lib-components` 2.3.0 as published: white frame (Sidebar and Header), no footer,
+the 2.3 visuals (action green, rounded pills, white tags, 12 px cards with their shadow, field focus ring, 14 px
+modals, toasts bottom right, dark immediate tooltips, round counter on the bell). The local stylesheet no longer
+overrides any of them.
+
 ## Sortable lists (MAIR-1138)
 
 The lists sort by a click on a column header (lib `DataTable`): the first click sorts ascending, the second descending,

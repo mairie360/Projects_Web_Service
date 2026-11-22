@@ -52,11 +52,16 @@ The unchanged CI audit exposed the transitive tooling dependency
 [the upstream advisory](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 No audit threshold, workflow or security policy is relaxed.
 
-The package is pinned to published `@mairie360/lib-components@2.1.0` (MAIR-828,
-listed in `tests/fixtures/shared-ui-releases.json`). Its `AccessibleShell` draws a
-desktop navigation band, keeps the sidebar for the mobile drawer only, renders a
-full-width footer (`app-shell-footer`) and confirms logout in a dialog; the root
-layout always sets `data-theme="light"`.
+The package is pinned to published `@mairie360/lib-components@2.3.0` (MAIR-1133,
+listed in `tests/fixtures/shared-ui-releases.json` with its artifact hashes). Its
+`AccessibleShell` is the white 2.3 frame (Sidebar folded or unfolded by its
+« Replier » button, white Header with the round `Counter` on the bell) and, since
+2.3, **no footer**: the page base only renders one with `showFooter`, which this
+front never sets. It confirms logout in a dialog; the root layout always sets
+`data-theme="light"`. `src/app/globals.css` keeps the base page rules (root scale,
+body, fonts) and no rule over a lib component (sidebar, frame, view switch), and no
+lib `Button` / pill / card / modal is restyled with `!` utilities
+(`tests/mair-1133-lib-components-2-3.test.cjs`).
 Contracts, APIs/BFFs and deployment approvals are unchanged. Consumer adoption
 is tracked in [shared issue #387](https://github.com/mairie360/lib-components/issues/387).
 

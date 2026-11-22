@@ -191,7 +191,6 @@ export function ProjectsWorkspace({
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
-        className="projects-shell"
       >
             {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
             {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}
