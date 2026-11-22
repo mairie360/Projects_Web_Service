@@ -64,7 +64,9 @@ describe('project templates', () => {
   it('shows the selected template status preview and passes its verified revision', async () => {
     let selected;
     render(<ProjectTemplatePicker port={port()} onChange={value => { selected = value; }} />);
-    fireEvent.change(await screen.findByLabelText('Modèle de projet'), { target: { value: 'model1' } });
+    // The catalogue is read after mount: choose once its option is in.
+    await screen.findByRole('option', { name: 'Dossier municipal' });
+    fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'model1' } });
     expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Validation municipale');
     expect(selected).toEqual(template);
   });
