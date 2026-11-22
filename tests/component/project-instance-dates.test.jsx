@@ -57,7 +57,9 @@ describe('project dates in the municipal instance timezone', () => {
       memberOptions={page.options.members} labelOptions={page.options.labels} statusOptions={page.filters.statuses}
       priorityOptions={page.filters.priorities} onClose={vi.fn()} onUpdateProject={vi.fn()} onAddTask={vi.fn()}
       onUpdateTask={vi.fn()} onUpdateTaskStatus={vi.fn()} onDeleteTask={vi.fn()} onCloseProject={vi.fn()} />));
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Suivi' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: `Ouvrir la tâche ${fixtures.projectTask().title}` }));
+    await user.click(screen.getByRole('button', { name: 'Suivi et commentaires' }));
     expect(await screen.findByText(label, { selector: 'time' })).toBeTruthy();
     expect(screen.getByText(`Marie Durand · ${label}`)).toBeTruthy();
     expect(getTaskCollaboration).toHaveBeenLastCalledWith('project-1', 'task-1');

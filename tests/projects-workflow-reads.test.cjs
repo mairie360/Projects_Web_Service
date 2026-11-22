@@ -70,19 +70,20 @@ async function openSheet() {
   await view.waitFor(html => html.includes('Statuts des tâches du projet') && !html.includes('Chargement des statuts'));
 }
 
-test('MAIR-567: the detailed task list stays visible with project statuses', async () => {
+test('MAIR-567 / MAIR-859: the board groups the tasks by the category of their project status', async () => {
   await openSheet();
-  const toggle = view.hostElements((_props, text, tag) => tag === 'button' && text === 'Détails des tâches')[0];
-  assert.equal(toggle.props['aria-expanded'], true);
-  assert.ok(view.hostElements((_props, text, tag) => tag === 'button' && text.includes('Suivi')).length > 0, 'task follow-up is reachable');
+  const items = view.props('TaskBoard').items;
+  assert.deepEqual(items.map(item => [item.task.id, item.column]), [['task-1', 'todo'], ['task-2', 'done']]);
+  assert.equal(view.props('ProjectTasksTab').unavailableColumns.size, 0);
 });
 
 test('MAIR-567: a task added from the sheet without a status choice takes the project status of its category', async () => {
   await openSheet();
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: f.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
-  await view.fire((props, _text, tag) => tag === 'input' && props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Poser les lanternes' } });
-  await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'detail-task-assignees').props.onChange(['user-3']));
-  await view.fire((props, _text, tag) => tag === 'form' && props.className === 'space-y-3', 'onSubmit');
+  await view.click((_props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
+  await view.fire((props) => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Poser les lanternes' } });
+  await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
+  await view.fire((props, _text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks', 'post').length === 1);
 
   const [{ body }] = bffProject.calls('/projects/{projectId}/tasks', 'post');
@@ -90,10 +91,11 @@ test('MAIR-567: a task added from the sheet without a status choice takes the pr
   assert.doesNotMatch(view.text(), /Choisissez un statut du projet/);
 });
 
-test('MAIR-567: completing a task from the sheet moves it to the first "Terminé" project status', async () => {
+test('MAIR-567: completing a task on the board moves it to the first "Terminé" project status', async () => {
   await openSheet();
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ status: 'done' }) });
-  await view.click(props => props['aria-label'] === 'Marquer Relevé des candélabres comme terminée');
+  const task = view.props('TaskBoard').items.find(item => item.task.id === 'task-1').task;
+  await view.act(() => view.props('TaskBoard').onMoveTask(task, 'done'));
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length === 1);
 
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch')[0].body, { statusId: 'status-4' });

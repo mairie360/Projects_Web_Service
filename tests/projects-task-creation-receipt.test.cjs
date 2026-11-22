@@ -68,6 +68,8 @@ for (const mode of ['kanban', 'grid', 'table']) test(`${mode}: closing or changi
   await view.waitFor(() => !workspace().pageLoading);
   assert.match(view.text(), /Création de tâche non vérifiée/);
   await view.act(() => workspace().openProjectDetails(project));
+  // MAIR-859: the creation sheet keeps its « Ajouter la tâche » disabled while the receipt is unverified.
+  await view.click((props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
   const add = view.hostElements((props, text, tag) => tag === 'button' && text === 'Ajouter la tâche');
   assert.equal(add.length, 1); assert.equal(add[0].props.disabled, true);
   assert.equal(view.props('ProjectPage').taskCreationState.uncertainTitle, draft.title);
@@ -190,7 +192,8 @@ test('the uncertain task draft keeps subsequent field edits across detail closur
   await view.act(() => workspace().openProjectDetails(project));
   // The refused draft keeps the project status id of the task it was created from (MAIR-567).
   assert.deepEqual(view.props('ProjectPage').taskCreationState.draft, { ...retained, statusId: draft.statusId });
-  const input = view.hostElements(props => props['aria-label'] === 'Titre de la tâche');
+  await view.click((props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
+  const input = view.hostElements(props => props.id === 'task-sheet-title');
   assert.equal(input[0].props.value, retained.title);
   assert.equal(writes().length, 1);
 });

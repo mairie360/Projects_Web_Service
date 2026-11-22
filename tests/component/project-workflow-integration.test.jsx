@@ -25,10 +25,12 @@ describe('workflow adoption by existing project forms', () => {
       return <><ProjectPage {...props} workflowPort={port} workflowRole="User" onAddTask={(_project, draft) => setSaved(draft)} /><output data-testid="saved">{JSON.stringify(saved)}</output></>;
     }
     render(<Detail />);
-    await screen.findByRole('region', { name: 'Conseil municipal' });
+    fireEvent.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     const form = screen.getByRole('form', { name: 'Créer une tâche' });
-    fireEvent.change(within(form).getByLabelText('Titre de la tâche'), { target: { value: 'Plan communal' } });
-    fireEvent.change(within(form).getByLabelText('Statut', { exact: true }), { target: { value: 'status-2' } });
+    // The sheet's « État » lists the project's own statuses once they are read (MAIR-567, MAIR-859).
+    await within(form).findByRole('option', { name: 'Conseil municipal' });
+    fireEvent.change(within(form).getByLabelText(/^Titre/), { target: { value: 'Plan communal' } });
+    fireEvent.change(within(form).getByLabelText('État', { exact: true }), { target: { value: 'status-2' } });
     fireEvent.submit(form);
     const saved = JSON.parse((await screen.findByTestId('saved')).textContent);
     expect(saved.title).toBe('Plan communal');

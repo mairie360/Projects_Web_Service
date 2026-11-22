@@ -9,7 +9,7 @@ follow it; the list stays mounted behind it, with its filters, view and page.
 
 - **Breadcrumb** « ← Projets / #12 » brings the list back and gives the focus to the opener.
 - **Header**: status pill opening the status choice (when the project may be managed), priority, labels, title,
-  description; « Modifier », « Nouvelle tâche » (opens « Tâches » on the task title) and « … » (Dupliquer;
+  description; « Modifier », « Nouvelle tâche » (opens « Tâches » and the empty task sheet, MAIR-859) and « … » (Dupliquer;
   Supprimer with the confirmation, then back to the list). A duplication of a project without group shows the
   BFF error (400).
 - **Indicators**: Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » or the delay, in the
@@ -26,6 +26,33 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   is sent; only the changed fields are sent (`PATCH`), nothing when nothing changed. The success is the toast
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
+
+## Project page: « Tâches » tab (MAIR-859)
+
+The « Tâches » tab of the project page (Figma F6, 6.1 to 6.13) shows the project tasks as a **board** or a **list**.
+
+- **Board** (C1): three columns À faire, En cours (« En revue » tasks too), Terminé, each with its count. A card shows
+  the title, the « … » menu, the priority, « En retard » (due date past in the instance day, task not done), the
+  assignee and the due date; done tasks are struck through. Done tasks the BFF archived are counted under
+  « Terminé » (« + 3 tâches terminées »), not listed (MAIR-559).
+- **Drag and drop** (C2): a card dropped on another column changes its status (the project status of that category
+  when the project has its own statuses). The card waits in its new column while the BFF answers, then the toast
+  « Tâche terminée » or « Statut mis à jour » confirms it and the project progress is the refreshed one; a refusal
+  puts the card back in its column, with the error toast « Statut non modifié » and the message on the card. A task
+  completed here stays in « Terminé », struck through, after the BFF archived it.
+- **Keyboard alternative**: « Déplacer vers » in the card « … » menu (À faire, En cours, Terminé), and « État » in
+  the task sheet (every project status).
+- **Quick add** (C3): the « + » of a column opens a title field; Entrée adds the task in that column with the
+  creation defaults (the signed-in agent as assignee), Échap cancels. Without a known agent the task sheet opens
+  with the typed title.
+- **Task sheet** (C4, C5): a size m `Drawer` opened by a card (« Ouvrir la tâche »), a list row, or « Nouvelle tâche »
+  of the page header (empty sheet). Fields: Titre (required: « Donnez un titre à la tâche » under the field before
+  any write), État, Priorité, Assignée à, Échéance, Étiquettes; then the follow-up (comments and history) and
+  « Supprimer la tâche » with its confirmation. The published contract has no task description nor start date
+  (MAIR-1087 is in progress on the back): the sheet shows neither. A refused save keeps every field.
+- **List** (C6): a lib `DataTable` — done checkbox (completes or reopens), task, state, priority, assignee, due date.
+- **Search and filters** (C7): search on the title and the labels, « Tous les assignés », « Toutes les priorités »,
+  and the Tableau / Liste switch; they filter the loaded tasks (the contract has no task query).
 
 ## Project creation V2 (MAIR-836)
 
@@ -170,11 +197,12 @@ project statuses are being saved. Such a refusal sends nothing and is shown as a
 plain message, not as an unverified write; after a confirmed write the controller
 re-reads the sheet and the page.
 
-The sheet keeps its existing behaviour: the detailed task list (follow-up,
-comments, task links) stays visible and the « Détails des tâches » button only
-hides it; a new task without an explicit choice takes the project's first status
-of its form category (À faire / En cours / Terminé); the completion checkbox
-moves a task to the first « Terminé » status, or back to the first « À faire ».
+Since MAIR-859 the tasks are moved on the three-column board of the « Tâches »
+tab (one column per category, the move takes the project's first status of that
+category); the statuses panel only reads the statuses (the sheet's « État ») and
+lets the managers set them up. A new task without an explicit choice takes the
+project's first status of its category; the list checkbox moves a task to the
+first « Terminé » status, or back to the first « À faire ».
 
 ## Keyboard entry from Table (MAIR-310)
 

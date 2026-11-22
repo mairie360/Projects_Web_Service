@@ -74,16 +74,6 @@ export function createPublishedProjectWorkflowPort(operations: Operations): Proj
   };
   return {
     readProject, readStatuses, readTemplates,
-    moveTask: async (draft, signal) => {
-      const before = await preflight(draft.projectId, draft.revision, signal);
-      if (!before.statuses.some(status => status.id === draft.statusId) || !before.tasks.some(task => task.id === draft.taskId && task.canUpdateStatus)) throw new Error(WORKFLOW_UNVERIFIED);
-      const receipt = await operations.patchProjectsProjectIdTasksTaskIdStatus(segment(draft.projectId), segment(draft.taskId), { statusId: draft.statusId }, { signal });
-      signal.throwIfAborted();
-      if (receipt.data.id !== draft.taskId || receipt.data.statusId !== draft.statusId) throw new Error(WORKFLOW_UNVERIFIED);
-      const after = await readProject(draft.projectId, signal);
-      if (!after.tasks.some(task => task.id === draft.taskId && task.statusId === draft.statusId)) throw new Error(WORKFLOW_UNVERIFIED);
-      return after;
-    },
     saveProjectStatuses: async (draft, signal) => {
       if (!validStatuses(draft.statuses)) throw new Error('Les statuts saisis sont invalides.');
       const current = await preflight(draft.projectId, draft.revision, signal);

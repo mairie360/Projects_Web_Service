@@ -86,7 +86,7 @@ describe("Project edit modal confirmation (MAIR-846)", () => {
     await user.click(screen.getByRole("button", { name: "Fermer la fenêtre" }));
     expect(screen.getByRole("form", { name: "Modifier le projet" })).toBe(form);
     expect(screen.getByRole("button", { name: "Projets" }).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Ajouter la tâche", exact: true }).matches(":disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Ajouter une tâche dans À faire", exact: true }).matches(":disabled")).toBe(true);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(values.onClose).not.toHaveBeenCalled();
     expect(within(form).getByRole("status").textContent).toMatch(/Enregistrement/);

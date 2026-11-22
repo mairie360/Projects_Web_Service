@@ -26,16 +26,19 @@ describe('ProjectPage', () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<ProjectPage project={project({ permissions: editable })} {...base} onClose={onClose} {...handlers()} />);
-    const taskTitle = document.querySelector('input[aria-label="Titre de la tâche"]');
-    expect(taskTitle).toBeTruthy();
+    // MAIR-859 (C5): « Nouvelle tâche » opens « Tâches » and the empty task sheet, focused on its title.
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     expect(screen.getByRole('tab', { name: /^Tâches/ }).getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(taskTitle);
-    await user.type(taskTitle, 'Brouillon gardé');
+    const sheet = screen.getByRole('dialog', { name: 'Nouvelle tâche' });
+    expect(document.activeElement).toBe(within(sheet).getByLabelText(/^Titre/));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Nouvelle tâche' })).toBeNull();
+    const search = within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' });
+    await user.type(search, 'Brouillon gardé');
     await user.click(screen.getByRole('tab', { name: 'Équipe2' }));
     expect(within(screen.getByRole('tabpanel')).getByText('L’onglet « Équipe » arrive avec son propre ticket.')).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: /^Tâches/ }));
-    expect(document.querySelector('input[aria-label="Titre de la tâche"]').value).toBe('Brouillon gardé');
+    expect(within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' }).value).toBe('Brouillon gardé');
     await user.click(screen.getByRole('button', { name: 'Projets' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });

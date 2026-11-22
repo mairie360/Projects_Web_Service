@@ -49,6 +49,7 @@ import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
 import type { TaskCreationState } from './components/TaskCreationNotice';
+import type { Feedback } from './components/FeedbackToast';
 import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
@@ -192,7 +193,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
   // MAIR-829: confirmation shown as a lib toast (« Statut mis à jour »).
-  const [feedback, setFeedback] = useState<{ title: string; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const clearFeedback = useCallback(() => setFeedback(null), []);
   const [projectFormPending, setProjectFormPending] = useState(false);
   const projectFormPendingRef = useRef(false);
@@ -1350,7 +1351,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(project.id, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" ajoutée à "${project.title}".` });
+        // MAIR-859 (Figma F6 6.6): the confirmation floats as a toast over the board.
+        setFeedback({ title: 'Tâche ajoutée', message: `Tâche « ${confirmed.title} » ajoutée à « ${project.title} ».` });
       } catch (error) {
         showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
@@ -1492,7 +1494,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" modifiée.` });
+        setFeedback({ title: 'Tâche mise à jour', message: `Tâche « ${confirmed.title} » modifiée.` });
       } catch (error) {
         showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
@@ -1506,30 +1508,36 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     statusId?: string
   ) => {
     const selection = detailSelectionRef.current;
-    return runTaskWrite(projectId, taskId, async () => {
+    // MAIR-859: `true` once the BFF confirmed the status, so the board keeps the card in its new column (C2).
+    let confirmedStatus = false;
+    await runTaskWrite(projectId, taskId, async () => {
       let updatedTask: ProjectTask;
       try {
         updatedTask = await updateProjectTaskStatus(projectId, taskId, status, statusId);
       } catch (error) {
-        showTaskWriteError(projectId, taskId, error);
+        // The board puts the card back in its column; the refusal floats as an error toast (Figma F6).
+        setTaskWriteError(projectId, taskId, getBffProjectErrorMessage(error));
+        setFeedback({ tone: 'error', title: 'Statut non modifié', message: getBffProjectErrorMessage(error) });
         return;
       }
       if (updatedTask.id !== taskId || (statusId && updatedTask.statusId !== statusId)) {
         await verifyInconsistentTaskReceipt(projectId, taskId, selection);
         return;
       }
+      confirmedStatus = true;
       applyConfirmedTask(projectId, updatedTask.id, updatedTask, selection);
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({
-          type: 'success',
-          message: `Statut de la tâche "${updatedTask.title}" mis à jour : ${updatedTask.statusLabel ?? status}.`,
-        });
+        // MAIR-859 (Figma F6 6.4): « Tâche terminée » / « Statut mis à jour » toast, the progress is the refreshed one.
+        setFeedback(status === 'done'
+          ? { title: 'Tâche terminée', message: `« ${updatedTask.title} » est terminée.` }
+          : { title: 'Statut mis à jour', message: `« ${updatedTask.title} » est maintenant « ${updatedTask.statusName ?? updatedTask.statusLabel ?? projectStatusLabel(status)} ».` });
       } catch (error) {
         showInfo(`Tâche "${updatedTask.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
     });
+    return confirmedStatus;
   };
 
   // Workflow writes (MAIR-570) share the task write guards. A refusal before dispatch is a
@@ -1540,22 +1548,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     } catch (error) {
       showInfo(`Modification enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
     }
-  };
-
-  const moveWorkflowTask = async (draft: { projectId: string; revision: string; taskId: string; statusId: string }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
-    if (!workflowPort?.moveTask) throw new WorkflowWriteRefusedError(WORKFLOW_UNAVAILABLE);
-    const { projectId, taskId } = draft;
-    // The same refusals as runTaskWrite, checked here so that they surface as refusals, not uncertainty.
-    if (taskVerificationsRef.current.get(projectId)?.has(taskId)) throw new WorkflowWriteRefusedError(TASK_VERIFICATION_MESSAGE);
-    if (taskWritesRef.current.has(JSON.stringify([projectId, taskId]))) throw new WorkflowWriteRefusedError('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
-    if (workflowSavesRef.current.has(projectId)) throw new WorkflowWriteRefusedError(WORKFLOW_STATUS_SAVE_PENDING);
-    const selection = detailSelectionRef.current;
-    let snapshot: ProjectWorkflowSnapshot | undefined;
-    await runTaskWrite(projectId, taskId, async () => {
-      snapshot = await workflowPort.moveTask!(draft, signal);
-      await refreshAfterWorkflowWrite(projectId, selection);
-    }, true);
-    return snapshot!;
   };
 
   const saveWorkflowStatuses = async (draft: { projectId: string; revision: string; statuses: TaskStatusDefinition[]; migrations: StatusMigration[] }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
@@ -1589,7 +1581,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
+        setFeedback({ title: 'Tâche supprimée', message: `Tâche « ${taskTitle} » supprimée.` });
       } catch (error) {
         showInfo(`Tâche "${taskTitle}" supprimée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
@@ -1641,7 +1633,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 
   return {
     workflowPort,
-    moveWorkflowTask,
     saveWorkflowStatuses,
     readCurrentTaskAssignee,
     projectsPage,

@@ -10,7 +10,7 @@ sa page.
 
 - **Fil d’Ariane** « ← Projets / #12 » : retour à la liste, le focus revient sur le bouton qui a ouvert le projet.
 - **En-tête** : pastille de statut ouvrant le choix du statut (si le projet peut être géré), priorité, étiquettes,
-  titre, description ; « Modifier », « Nouvelle tâche » (ouvre « Tâches » sur le titre de la tâche) et « … »
+  titre, description ; « Modifier », « Nouvelle tâche » (ouvre « Tâches » et la fiche vide de la tâche, MAIR-859) et « … »
   (Dupliquer ; Supprimer avec confirmation, puis retour à la liste). Dupliquer un projet sans groupe affiche
   l’erreur du BFF (400).
 - **Indicateurs** : Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » ou le retard, dans le fuseau
@@ -29,6 +29,37 @@ sa page.
   si rien n’a changé. Le succès est la notification « Modifications enregistrées ». Un `204` (l’appelant ne voyait
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
+
+## Page projet : onglet « Tâches » (MAIR-859)
+
+L’onglet « Tâches » de la page projet (Figma F6, 6.1 à 6.13) montre les tâches du projet en **tableau** ou en **liste**.
+
+- **Tableau** (C1) : trois colonnes À faire, En cours (les tâches « En revue » aussi), Terminé, chacune avec son
+  compteur. Une carte montre le titre, le menu « … », la priorité, « En retard » (échéance passée dans la journée de
+  l’instance, tâche non terminée), la personne assignée et l’échéance ; les tâches terminées sont barrées. Les
+  tâches terminées que le BFF a archivées sont comptées sous « Terminé » (« + 3 tâches terminées »), pas listées
+  (MAIR-559).
+- **Glisser-déposer** (C2) : une carte déposée dans une autre colonne change de statut (le statut du projet de
+  cette catégorie quand le projet a ses propres statuts). La carte attend dans sa nouvelle colonne la réponse du
+  BFF, puis le toast « Tâche terminée » ou « Statut mis à jour » la confirme et l’avancement du projet est celui
+  relu ; un refus remet la carte dans sa colonne, avec le toast d’erreur « Statut non modifié » et le message sur la
+  carte. Une tâche terminée ici reste dans « Terminé », barrée, après son archivage par le BFF.
+- **Alternative au clavier** : « Déplacer vers » dans le menu « … » de la carte (À faire, En cours, Terminé), et
+  « État » dans la fiche de la tâche (tous les statuts du projet).
+- **Ajout rapide** (C3) : le « + » d’une colonne ouvre un champ de titre ; Entrée ajoute la tâche dans cette colonne
+  avec les valeurs par défaut de la création (l’agent connecté comme personne assignée), Échap annule. Sans agent
+  connu, la fiche de la tâche s’ouvre avec le titre saisi.
+- **Fiche de la tâche** (C4, C5) : un `Drawer` de taille m ouvert par une carte (« Ouvrir la tâche »), une ligne de
+  la liste, ou « Nouvelle tâche » de l’en-tête (fiche vide). Champs : Titre (obligatoire : « Donnez un titre à la
+  tâche » sous le champ avant tout envoi), État, Priorité, Assignée à, Échéance, Étiquettes ; puis le suivi
+  (commentaires et historique) et « Supprimer la tâche » avec sa confirmation. Le contrat publié n’a ni description
+  ni date de début de tâche (MAIR-1087 est en cours côté back) : la fiche n’affiche ni l’une ni l’autre. Un
+  enregistrement refusé garde tous les champs.
+- **Liste** (C6) : un `DataTable` de la lib — case « terminée » (termine ou rouvre), tâche, état, priorité, personne
+  assignée, échéance.
+- **Recherche et filtres** (C7) : recherche sur le titre et les étiquettes, « Tous les assignés », « Toutes les
+  priorités », et la bascule Tableau / Liste ; ils filtrent les tâches chargées (le contrat n’a pas de requête de
+  tâches).
 
 ## Création de projet V2 (MAIR-836)
 
@@ -181,12 +212,13 @@ des statuts. Un tel refus n’envoie rien et s’affiche comme un simple message
 comme une écriture non vérifiée ; après une écriture confirmée, le contrôleur
 relit la fiche et la page.
 
-La fiche garde son comportement existant : la liste détaillée des tâches (suivi,
-commentaires, liens vers une tâche) reste visible et le bouton « Détails des
-tâches » sert seulement à la masquer ; sans choix explicite, une nouvelle tâche
-prend le premier statut du projet de sa catégorie (À faire / En cours / Terminé) ;
-la case de fin de tâche la place dans le premier statut « Terminé », ou la remet
-dans le premier « À faire ».
+Depuis MAIR-859, les tâches se déplacent sur le tableau à trois colonnes de
+l’onglet « Tâches » (une colonne par catégorie, le déplacement prend le premier
+statut du projet de cette catégorie) ; le panneau des statuts ne fait que lire les
+statuts (« État » de la fiche) et laisse les responsables les paramétrer. Sans
+choix explicite, une nouvelle tâche prend le premier statut du projet de sa
+catégorie ; la case de la liste place une tâche dans le premier statut
+« Terminé », ou la remet dans le premier « À faire ».
 
 ## Ouverture clavier depuis Tableau (MAIR-310)
 

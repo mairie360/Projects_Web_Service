@@ -22,3 +22,20 @@ export const pageSection = () => screen.getByRole('heading', { level: 1 }).close
 
 /** The visible tab panel of the project page (« Tâches » for the task tests). */
 export const visibleTabPanel = () => screen.getByRole('tabpanel');
+
+/** MAIR-859: the task sheet (lib Drawer « Nouvelle tâche » / « Modifier la tâche ») of the project page. */
+export const taskSheetElement = () => screen.getByRole('dialog', { name: /^(Nouvelle tâche|Modifier la tâche)$/ });
+export const taskSheet = () => within(taskSheetElement());
+export const queryTaskSheet = () => screen.queryByRole('dialog', { name: /^(Nouvelle tâche|Modifier la tâche)$/ });
+
+/** Opens the creation sheet from the page header « Nouvelle tâche ». */
+export async function openNewTaskSheet(user = userEvent.setup()) {
+  await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+  return taskSheet();
+}
+
+/** Opens the sheet of a task from its card (or list row) title. */
+export async function openTaskSheet(user, title) {
+  await user.click((await screen.findAllByRole('button', { name: `Ouvrir la tâche ${title}` }))[0]);
+  return taskSheet();
+}

@@ -93,6 +93,28 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 [Présentation du module](module.md) · [English](../en/technical.md) · [README](../../README.md)
 
+## Onglet « Tâches » de la page projet — MAIR-859
+
+`ProjectPage` affiche `ProjectTasksTab` dans son panneau « Tâches » : `TaskToolbar` (`SearchField`, deux
+`FilterSelect`, `SegmentedControl` de la lib), `TaskBoard` (ex-`TaskStatusKanban` : trois colonnes par catégorie,
+glisser-déposer HTML5 avec le type `application/x-mairie360-task`, `TaskCard` → `TaskCardMenu` (`DropdownMenu` de la
+lib), `QuickAddTask`), `TaskListView` (`DataTable` de la lib), `TaskSheet` (`Drawer` de la lib, taille m →
+`TaskFollowUp`) et `TaskDeleteConfirm` (`ConfirmModal` de la lib). `TaskFormPanel`, `DetailTaskList` (`TaskFilters`,
+`TaskRow`) et le kanban par statut de `ProjectWorkflow` disparaissent ; `ProjectWorkflow` ne fait que lire et
+paramétrer les statuts du projet, et le port n’a plus `moveTask`.
+
+Les écritures reprennent les opérations existantes du contrôleur : `postProjectsProjectIdTasks` (fiche, ajout
+rapide), `patchProjectsProjectIdTasksTaskId` (fiche), `patchProjectsProjectIdTasksTaskIdStatus` (tableau, menu, case
+de la liste ; `statusId` du premier statut du projet de la catégorie de la colonne quand le projet a ses statuts) et
+`deleteProjectsProjectIdTasksTaskId`. `changeProjectTaskStatus` renvoie `true` une fois le statut confirmé par le BFF :
+`use-task-board.ts` garde la carte dans sa colonne cible pendant ce temps et retire ce placement après la réponse,
+ce qui fait le retour arrière d’un refus. Les confirmations sont des `FeedbackToast` (« Tâche ajoutée », « Tâche mise
+à jour », « Tâche terminée », « Statut mis à jour », « Tâche supprimée » ; « Statut non modifié » avec
+`tone: 'error'`). `use-detail-task-form.ts` porte la fiche (`open`, `openCreate(status)`, `edit(task)`,
+`quickAdd(title, status)`, `titleError` « Donnez un titre à la tâche ») ; `use-task-filters.ts` la recherche et les
+filtres par personne assignée et priorité. Ni description ni date de début de tâche : le contrat publié n’en a pas
+(MAIR-1087 en cours).
+
 ## Architecture et traitement des requêtes
 
 Application Next.js 16.3.8, React 19 et TypeScript avec App Router. Le navigateur appelle les routes de la même origine; le serveur Next.js relaie les données vers **BFF_Project**.

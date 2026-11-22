@@ -14,6 +14,18 @@ async function tasksTab(user) {
   await user.click(await screen.findByRole('tab', { name: /^Tâches/ }));
   return within(screen.getByRole('tabpanel'));
 }
+// MAIR-859: tasks are cards of the board; a card is the <article> of its title, its sheet is a Drawer.
+const taskCard = (title) => screen.getByRole('heading', { name: title }).closest('article');
+const sheet = () => within(screen.getByRole('dialog', { name: /^(Nouvelle tâche|Modifier la tâche)$/ }));
+const sheetTitle = () => sheet().getByRole('textbox', { name: /^Titre/ });
+async function openTaskCard(user, title) {
+  await user.click(within(taskCard(title)).getByRole('button', { name: `Ouvrir la tâche ${title}` }));
+  return sheet();
+}
+async function moveTaskTo(user, title, column) {
+  await user.click(within(taskCard(title)).getByRole('button', { name: `Actions pour ${title}` }));
+  await user.click(await screen.findByRole('menuitemradio', { name: column }));
+}
 const projectHeading = (name) => screen.queryByRole('heading', { level: 1, ...(name ? { name } : {}) });
 async function leaveProject(user) {
   await user.click(within(projectHeading().closest('section')).getByRole('button', { name: 'Projets', exact: true }));
@@ -57,9 +69,11 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     const opener = await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` });
     await user.click(opener);
-    const dialog = await tasksTab(user), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
+    await tasksTab(user);
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    const dialog = sheet(), input = sheetTitle();
     await user.type(input, 'Brouillon collision conservé');
-    await toggleOption(user, dialog, 'Assignés', 'Marie Durand'); await user.click(input);
+    await toggleOption(user, dialog, 'Assignée à', 'Marie Durand'); await user.click(input);
     await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
     fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
@@ -67,7 +81,7 @@ describe("Projects page", () => {
     expect(input.value).toBe('Brouillon collision conservé');
     expect(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }).disabled).toBe(true);
     expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
-    expect(dialog.getByText(task.title, { exact: true })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
     expect(screen.queryByText('Reçu collision interdit')).toBeNull();
     await user.type(input, ' — dernière saisie');
     fireEvent.submit(input.closest('form'));
@@ -81,16 +95,20 @@ describe("Projects page", () => {
     expect(input.value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
+    await user.click(dialog.getByRole('button', { name: 'Annuler', exact: true }));
     await leaveProject(user);
     await user.click(opener);
-    const reopened = await tasksTab(user);
-    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
-    expect(reopened.getByLabelText('Priorité', { exact: true }).value).toBe('low');
-    expect(reopened.getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
-    await user.click(reopened.getAllByRole('button', { name: 'Modifier', exact: true }).at(-1));
-    expect(reopened.getByRole('button', { name: 'Enregistrer la tâche', exact: true }).disabled).toBe(false);
-    await user.click(reopened.getByRole('button', { name: 'Annuler', exact: true }));
-    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
+    await tasksTab(user);
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
+    expect(sheet().getByLabelText('Priorité', { exact: true }).value).toBe('low');
+    expect(sheet().getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
+    await user.click(sheet().getByRole('button', { name: 'Annuler', exact: true }));
+    const edit = await openTaskCard(user, task.title);
+    expect(edit.getByRole('button', { name: 'Enregistrer la tâche', exact: true }).disabled).toBe(false);
+    await user.click(edit.getByRole('button', { name: 'Annuler', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
   });
   it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
@@ -208,19 +226,18 @@ describe("Projects page", () => {
     await user.click(screen.getByRole('button', { name: 'Suspendre', exact: true }));
     await tasksTab(user);
     expect(closeProject).toHaveBeenCalledTimes(1);
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title); await user.type(title, 'Brouillon à conserver');
     const confirmed = fixtures.projectTask({ title: 'Tâche confirmée récemment', status: 'done' });
     const verified = { ...confirmed, title: 'Tâche enrichie par lecture' };
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
     vi.mocked(getProjectsPage).mockRejectedValue(new Error('Liste temporairement refusée'));
     if (successfulRead) vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
     else vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Détail temporairement refusé'));
-    await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
+    await moveTaskTo(user, task.title, 'Terminé');
     const expected = successfulRead ? verified.title : confirmed.title;
     expect(await screen.findByRole('heading', { name: expected })).toBeTruthy();
+    const draft = await openTaskCard(user, other.title);
+    const title = draft.getByRole('textbox', { name: /^Titre/ });
+    await user.clear(title); await user.type(title, 'Brouillon à conserver');
     await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2, active: 9, archived: 0 } }, [task, other])));
     expect(await screen.findByRole('heading', { level: 1, name: 'Projet confirmé tardivement' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: expected })).toBeTruthy();
@@ -250,9 +267,9 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
+    const row = taskCard(task.title);
+    await openTaskCard(user, task.title);
+    const title = sheetTitle();
     await user.clear(title); await user.type(title, 'Modification envoyée');
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Vérification indisponible'));
     await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
@@ -270,7 +287,8 @@ describe("Projects page", () => {
     expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).queryByRole('alert')).toBeNull();
     await user.clear(title);
     await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
-    expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).getByRole('alert').textContent).toBe('Le titre de la tâche est obligatoire.');
+    // MAIR-859 (C5): the title rule is shown under the field.
+    expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).getByRole('alert').textContent).toBe('Donnez un titre à la tâche');
     expect(updateProjectTask).toHaveBeenCalledTimes(1);
   });
 
@@ -285,34 +303,39 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title); await user.type(title, 'Brouillon à garder');
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Vérification indisponible'));
-    await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
-    const rowAlert = await within(row).findByRole('alert');
+    await moveTaskTo(user, task.title, 'Terminé');
+    // The card is back in its column (a new element): the write is not confirmed.
+    const rowAlert = await waitFor(() => within(taskCard(task.title)).getByRole('alert'));
+    const row = taskCard(task.title);
+    expect(row.closest('section').getAttribute('aria-label')).toBe('À faire');
     expect(rowAlert.textContent).toContain('acceptée');
     expect(rowAlert.textContent).toContain('confirmation de tâche est incohérente');
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation reçue' })).toBeNull();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
-    expect(title.value).toBe('Brouillon à garder');
+    // The task waits for a verification read: no move, no deletion, no save from its sheet.
+    await user.click(within(row).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.queryByRole('menuitemradio')).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }).disabled).toBe(true);
+    await user.keyboard('{Escape}');
+    await user.click(within(taskCard(other.title)).getByRole('button', { name: `Actions pour ${other.title}` }));
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3);
+    await user.keyboard('{Escape}');
+    await openTaskCard(user, task.title);
+    const title = sheetTitle();
+    await user.clear(title); await user.type(title, 'Brouillon à garder');
     expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
-    expect(within(row).getByRole('combobox').disabled).toBe(true);
-    expect(within(row).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    expect(within(otherRow).getByRole('combobox').disabled).toBe(false);
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     const verified = fixtures.projectTask({ title: 'Titre vérifié par lecture' });
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: verified.title })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(false);
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('Brouillon à garder');
+    expect(sheetTitle().value).toBe('Brouillon à garder');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a scoped pending status guard, retains an edit draft and leaves other tasks usable", async () => {
+  it("shows a scoped pending status guard, moves the card while the write runs and rolls it back on refusal (MAIR-859 C2)", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
@@ -324,40 +347,37 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    await user.click(within(firstRow).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title);
-    await user.type(title, 'Brouillon conservé');
-    const toggle = within(firstRow).getByRole('button', { name: `Marquer ${task.title} comme terminée` });
-    await user.dblClick(toggle);
+    const column = (title) => taskCard(title).closest('section').getAttribute('aria-label');
+    expect(column(task.title)).toBe('À faire');
+    await moveTaskTo(user, task.title, 'Terminé');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
-    expect(firstRow.getAttribute('aria-busy')).toBe('true');
-    expect(within(firstRow).getByRole('status').textContent).toBe('Opération sur la tâche en cours…');
-    expect(toggle.disabled).toBe(true);
-    expect(within(firstRow).getByRole('combobox', { name: `Statut de ${task.title}` }).disabled).toBe(true);
-    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
-    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
-    expect(title.value).toBe('Brouillon conservé');
+    // The card waits in its new column, busy, with no other move offered.
+    expect(column(task.title)).toBe('Terminé');
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
+    expect(within(taskCard(task.title)).getByRole('status').textContent).toBe('Enregistrement…');
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.queryByRole('menuitemradio')).toBeNull();
+    await user.keyboard('{Escape}');
+    await user.click(within(taskCard(other.title)).getByRole('button', { name: `Actions pour ${other.title}` }));
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3);
+    await user.keyboard('{Escape}');
     await act(async () => write.reject(new Error('Écriture refusée')));
-    expect(await within(firstRow).findByRole('alert')).toBeTruthy();
-    expect(within(firstRow).getByRole('alert').textContent).toContain('Écriture refusée');
-    expect(toggle.disabled).toBe(false);
-    expect(firstRow.getAttribute('aria-busy')).toBeNull();
-    expect(title.value).toBe('Brouillon conservé');
+    // Rolled back to « À faire », with the refusal on the card and in an error toast.
+    await waitFor(() => expect(column(task.title)).toBe('À faire'));
+    expect(within(taskCard(task.title)).getByRole('alert').textContent).toContain('Écriture refusée');
+    expect(await screen.findByText('Statut non modifié')).toBeTruthy();
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBeNull();
     const confirmed = fixtures.projectTask({ title: 'Statut canonique reçu', status: 'done', completed: true });
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
-    toggle.focus(); await user.keyboard('{Enter}');
+    await moveTaskTo(user, task.title, 'Terminé');
     expect(await screen.findByRole('heading', { name: confirmed.title })).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('Brouillon conservé');
+    expect(column(confirmed.title)).toBe('Terminé');
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(2);
   });
 
-  it("guards a pending delete, retains other rows and retries only the refused read", async () => {
+  it("guards a pending delete, retains other cards and retries only the refused read", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
@@ -369,16 +389,15 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
-    await user.click(within(firstRow).getByRole('button', { name: 'Supprimer', exact: true }));
-    expect(firstRow.getAttribute('aria-busy')).toBe('true');
-    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    await user.dblClick(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }));
+    expect(screen.getByText('Supprimer définitivement cette tâche ?')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Supprimer', exact: true }));
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }).disabled).toBe(true);
+    await user.keyboard('{Escape}');
     expect(deleteProjectTask).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
     await act(async () => write.resolve());
     expect(await screen.findByRole('button', { name: 'Réessayer la fiche' })).toBeTruthy();
@@ -405,12 +424,13 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
-    await toggleOption(user, screen, 'Assignés', 'Marie Durand'); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    await user.type(sheetTitle(), 'Brouillon soumis');
+    await toggleOption(user, sheet(), 'Assignée à', 'Marie Durand'); await user.click(sheetTitle());
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
-    expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: confirmed.title, level: 4 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('');
+    expect(screen.queryByRole('dialog', { name: 'Nouvelle tâche' })).toBeNull();
     expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/2 tâches terminées'); // MAIR-846: « Avancement » metric
     const retry = screen.getByRole('button', { name: 'Réessayer la fiche' });
     retry.focus();
@@ -422,7 +442,7 @@ describe("Projects page", () => {
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
     await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1, active: 3, archived: 0 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
-    expect(screen.getByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: confirmed.title, level: 4 })).toBeTruthy();
     expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/3 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(createProjectTask).toHaveBeenCalledTimes(1);
     expect(createProjectTask.mock.calls[0][1].title).toBe('Brouillon soumis');
@@ -682,6 +702,7 @@ it('wires the existing Login identity to a received Project member only when the
     const opener=await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`});
     expect(fetch).not.toHaveBeenCalled();await user.click(opener);
     await tasksTab(user);
+    await user.click(screen.getByRole('button',{name:'Nouvelle tâche'}));
     await screen.findByRole('button',{name:'Retirer Admin Mairie'});
     // Besides the Login identity, opening reads only the project statuses and archived tasks (MAIR-567).
     const urls=fetch.mock.calls.map(([input])=>String(input instanceof Request?input.url:input));

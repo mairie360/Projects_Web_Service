@@ -92,6 +92,26 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 [Module overview](module.md) · [Français](../fr/technical.md) · [README](../../README.md)
 
+## « Tâches » tab of the project page — MAIR-859
+
+`ProjectPage` renders `ProjectTasksTab` in its « Tâches » panel: `TaskToolbar` (lib `SearchField`, two `FilterSelect`s,
+`SegmentedControl`), `TaskBoard` (formerly `TaskStatusKanban`: three category columns, HTML5 drag and drop with the
+`application/x-mairie360-task` type, `TaskCard` → `TaskCardMenu` lib `DropdownMenu`, `QuickAddTask`), `TaskListView`
+(lib `DataTable`), `TaskSheet` (lib `Drawer` size m → `TaskFollowUp`) and `TaskDeleteConfirm` (lib `ConfirmModal`).
+`TaskFormPanel`, `DetailTaskList` (`TaskFilters`, `TaskRow`) and the per-status kanban of `ProjectWorkflow` are
+gone; `ProjectWorkflow` only reads and sets up the project statuses, and the port no longer has `moveTask`.
+
+Writes reuse the existing operations of the controller: `postProjectsProjectIdTasks` (sheet, quick add),
+`patchProjectsProjectIdTasksTaskId` (sheet), `patchProjectsProjectIdTasksTaskIdStatus` (board, menu, list checkbox;
+`statusId` of the first project status of the column category when the project has its statuses) and
+`deleteProjectsProjectIdTasksTaskId`. `changeProjectTaskStatus` resolves `true` once the BFF confirmed the status:
+`use-task-board.ts` keeps the card in its target column meanwhile and drops that override after the answer, which
+is the rollback of a refusal. Confirmations are `FeedbackToast`s (« Tâche ajoutée », « Tâche mise à jour »,
+« Tâche terminée », « Statut mis à jour », « Tâche supprimée »; « Statut non modifié » with `tone: 'error'`).
+`use-detail-task-form.ts` owns the sheet (`open`, `openCreate(status)`, `edit(task)`, `quickAdd(title, status)`,
+`titleError` « Donnez un titre à la tâche »); `use-task-filters.ts` the search, assignee and priority filters.
+No task description nor start date: the published contract has neither (MAIR-1087 in progress).
+
 ## Architecture and request handling
 
 Next.js 16.3.8, React 19 and TypeScript application using the App Router. The browser calls same-origin routes; the Next.js server forwards data to **BFF_Project**.

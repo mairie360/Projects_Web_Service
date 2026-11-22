@@ -10,16 +10,15 @@ import type { FilterOption, ProjectFormState, TaskFormState } from '@/lib/projec
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '@/types/project';
 import { TaskCreationNotice, type TaskCreationState } from '../TaskCreationNotice';
 import { DetailRefreshAlert } from './components/DetailRefreshAlert';
-import { DetailTaskList } from './components/DetailTaskList';
 import { ProjectEditForm } from './components/ProjectEditForm';
 import { ProjectMetrics } from './components/ProjectMetrics';
 import { ProjectOverview } from './components/ProjectOverview';
 import { ProjectPageHeader } from './components/ProjectPageHeader';
+import { ProjectTasksTab } from './components/ProjectTasksTab';
 import { ProjectWorkflow } from './components/ProjectWorkflow';
-import { TaskFormPanel } from './components/TaskFormPanel';
-import { useDetailTaskForm } from './use-detail-task-form';
+import { useDetailTaskForm, type TaskColumnStatus } from './use-detail-task-form';
 import { useLinkedTaskScroll } from './use-linked-task-scroll';
-import { projectStatusHelpers } from './status-helpers';
+import { categoryOf, projectStatusHelpers } from './status-helpers';
 import { useProjectEdit, type MutationLock } from './use-project-edit';
 import { useTaskCollaboration } from './use-task-collaboration';
 import { useTaskFilters } from './use-task-filters';
@@ -27,7 +26,6 @@ import { useTaskFilters } from './use-task-filters';
 export function ProjectPage({
   project,
   workflowPort,
-  onMoveWorkflowTask,
   onSaveWorkflowStatuses,
   workflowRole,
   defaultTaskAssigneeId,
@@ -67,8 +65,7 @@ export function ProjectPage({
 }: {
   project: Project;
   workflowPort?: ProjectWorkflowPort;
-  /** Controller-owned workflow writes (MAIR-570); without them the panel writes through the port. */
-  onMoveWorkflowTask?: ProjectWorkflowPort['moveTask'];
+  /** Controller-owned status settings write (MAIR-570); without it the panel writes through the port. */
   onSaveWorkflowStatuses?: ProjectWorkflowPort['saveProjectStatuses'];
   workflowRole?: string;
   defaultTaskAssigneeId?: string | null;
@@ -96,8 +93,9 @@ export function ProjectPage({
   onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
   onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
   onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
-  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus, statusId?: string) => void | Promise<void>;
-  onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<void>;
+  /** Resolves `true` once the BFF confirmed the status (MAIR-859: the board rolls back otherwise). */
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus, statusId?: string) => void | boolean | Promise<void | boolean>;
+  onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<unknown>;
   onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
   /** MAIR-846: the status pill menu, the « … » actions (Dupliquer, Supprimer + confirmation by the workspace). */
   onChangeStatus?: (project: Project, status: Project['status']) => void | Promise<void>;
@@ -112,8 +110,6 @@ export function ProjectPage({
   const receiveWorkflow = React.useCallback((snapshot: ProjectWorkflowSnapshot) => setWorkflow(snapshot), []);
   const dynamicStatuses = workflow?.projectId === project.id ? workflow.statuses : undefined;
   const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? statusOptions;
-  // The detailed task list (follow-up, comments, task links) stays visible by default; the button only hides it.
-  const [showTaskDetails, setShowTaskDetails] = React.useState(true);
   const lockRef: MutationLock = React.useRef({ project: false, task: false });
   const closeDetail = () => {
     if (!lockRef.current.project && !lockRef.current.task) onClose();
@@ -136,19 +132,12 @@ export function ProjectPage({
     setTab(next);
     writeProjectLocation(project.id, next, 'replace');
   };
-  const [taskTitleFocusRequest, setTaskTitleFocusRequest] = React.useState(0);
   const tabsId = React.useId();
-  const pageRef = React.useRef<HTMLElement | null>(null);
-  React.useEffect(() => {
-    if (taskTitleFocusRequest === 0) return;
-    pageRef.current?.querySelector<HTMLInputElement>('input[aria-label="Titre de la tâche"]')?.focus();
-  }, [taskTitleFocusRequest]);
   // The ref stays out of the `taskForm` object so the compiler lint does not read it as a ref access during render.
   const { noticeRef: taskNoticeRef, ...taskForm } = useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
-  const filters = useTaskFilters({ tasks, dynamicStatuses });
+  const filters = useTaskFilters({ tasks });
   const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
   const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
-  const [deletingTaskId, setDeletingTaskId] = React.useState<string | null>(null);
   const taskProjectIdRef = React.useRef(project.id);
   const officialProjectRef = React.useRef<Project | null>(null);
   const titleId = React.useId();
@@ -158,6 +147,10 @@ export function ProjectPage({
     ? [{ value: project.group.id, label: project.group.name }, ...(groupOptions ?? [])]
     : groupOptions;
   const { firstStatusOf } = projectStatusHelpers(dynamicStatuses);
+  // MAIR-859: a board column is the first project status of its category; a category without one takes no task.
+  const unavailableColumns = new Set<TaskColumnStatus>(dynamicStatuses ? (['todo', 'in-progress', 'done'] as const).filter((status) => !firstStatusOf(categoryOf(status))) : []);
+  const moveTask = async (task: ProjectTask, status: TaskColumnStatus) =>
+    (await onUpdateTaskStatus(project.id, task.id, status, dynamicStatuses ? firstStatusOf(categoryOf(status)) : undefined)) === true;
   const team = new Set([project.responsible, ...project.assignees].filter((person) => person.name).map((person) => person.id ?? person.name));
   const tabItems: TabItem<ProjectTab>[] = [
     { key: 'overview', label: 'Vue d’ensemble', icon: LayoutGrid },
@@ -183,13 +176,12 @@ export function ProjectPage({
       taskForm.resetForProject();
       collaboration.reset();
     }
-    filters.reset();
-    setDeletingTaskId(null);
+    if (projectChanged) filters.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the hooks' reset callbacks read the latest props by closure
   }, [project, taskCreationState?.draft]);
 
   return (
-    <section ref={pageRef} aria-labelledby={titleId} className="space-y-6">
+    <section aria-labelledby={titleId} className="space-y-6">
       <ProjectPageHeader
         project={project}
         titleId={titleId}
@@ -200,7 +192,7 @@ export function ProjectPage({
         statusDisabled={mutationPending || projectVerificationRequired || projectVerificationPending}
         onEdit={project.permissions?.canEdit !== false ? projectEdit.toggle : undefined}
         editDisabled={mutationPending || projectVerificationRequired}
-        onNewTask={project.permissions?.canCreateTask !== false ? () => { showTab('tasks'); setTaskTitleFocusRequest((value) => value + 1); } : undefined}
+        onNewTask={project.permissions?.canCreateTask !== false ? () => { showTab('tasks'); taskForm.openCreate(); } : undefined}
         onDuplicate={onDuplicate && project.permissions?.canDuplicate !== false ? () => void onDuplicate(project) : undefined}
         duplicateDisabled={duplicationPending || duplicationVerificationRequired}
         duplicateLabel={duplicationVerificationRequired ? 'Copie à vérifier' : 'Dupliquer'}
@@ -236,55 +228,35 @@ export function ProjectPage({
 
       {/* The tasks stay mounted on every tab: drafts, pending writes and comments survive a tab change. */}
       <div {...panelProps('tasks')} ref={contentRef}>
-        {/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). */}
-        {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onMoveTask={onMoveWorkflowTask} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onMoveWorkflowTask || onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
-        {dynamicStatuses && <button type="button" className="mb-4 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 text-sm" aria-expanded={showTaskDetails} onClick={() => setShowTaskDetails(value => !value)}>Détails des tâches</button>}
-        {project.permissions?.canCreateTask !== false && (
-          <TaskFormPanel
-            form={taskForm.form}
-            editing={!!taskForm.editingTaskId}
-            saving={taskForm.saving}
-            error={taskForm.error}
-            disabled={mutationPending}
-            submitDisabled={taskForm.submitDisabled}
-            statusValue={taskForm.statusValue}
-            statusOptions={taskForm.missingDefaultStatus ? [{ value: '', label: 'Choisir un statut du projet' }, ...taskStatusOptions] : taskStatusOptions}
-            priorityOptions={priorityOptions}
-            memberOptions={memberOptions}
-            labelOptions={labelOptions}
-            onStatusChange={taskForm.onStatusChange}
-            onChange={taskForm.update}
-            onCancelEdit={taskForm.cancel}
-            onSubmit={taskForm.submit}
-          >
-            <div ref={taskNoticeRef} tabIndex={-1} className="focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+        <ProjectTasksTab
+          key={project.id}
+          project={project}
+          tasks={tasks}
+          filters={filters}
+          taskForm={taskForm}
+          collaboration={collaboration}
+          statusOptions={taskStatusOptions}
+          priorityOptions={priorityOptions}
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
+          unavailableColumns={unavailableColumns}
+          pendingTaskIds={pendingTaskIds}
+          unverifiedTaskIds={unverifiedTaskIds}
+          taskWriteErrors={taskWriteErrors}
+          mutationPending={mutationPending}
+          highlightTaskId={highlightTaskId}
+          highlightedTaskRef={highlightedTaskRef}
+          onMoveTask={moveTask}
+          onDeleteTask={onDeleteTask}
+          creationNotice={(
+            <div ref={taskNoticeRef} tabIndex={-1} className="mt-4 focus-visible:outline-2 focus-visible:outline-[#cf222e]">
               <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
             </div>
-          </TaskFormPanel>
-        )}
-
-        {(!dynamicStatuses || showTaskDetails) && (
-          <DetailTaskList
-            project={project}
-            tasks={tasks}
-            filters={filters}
-            collaboration={collaboration}
-            taskStatusOptions={taskStatusOptions}
-            priorityOptions={priorityOptions}
-            dynamicStatuses={dynamicStatuses}
-            pendingTaskIds={pendingTaskIds}
-            unverifiedTaskIds={unverifiedTaskIds}
-            taskWriteErrors={taskWriteErrors}
-            mutationPending={mutationPending}
-            highlightTaskId={highlightTaskId}
-            highlightedTaskRef={highlightedTaskRef}
-            deletingTaskId={deletingTaskId}
-            onDeletingChange={setDeletingTaskId}
-            onUpdateTaskStatus={onUpdateTaskStatus}
-            onDeleteTask={onDeleteTask}
-            onEditTask={taskForm.edit}
-          />
-        )}
+          )}
+        />
+        {/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). It reads the
+            project's own statuses (the sheet's « État ») and lets the managers set them up. */}
+        {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
       </div>
 
       <div {...panelProps('planning')}>{pendingFeature('Planning')}</div>

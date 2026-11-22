@@ -10,7 +10,14 @@ import type { TaskCreationState } from '../TaskCreationNotice';
 import { categoryOf, projectStatusHelpers } from './status-helpers';
 import type { MutationLock } from './use-project-edit';
 
-// The task form of the detail: creation draft (with the current agent as default assignee) or edit of one task.
+/** Column of the task board (MAIR-859): the status a task created or moved there takes. */
+export type TaskColumnStatus = 'todo' | 'in-progress' | 'done';
+
+/** MAIR-859 (C5): the only field the sheet requires before any write. */
+export const TASK_TITLE_REQUIRED = 'Donnez un titre à la tâche';
+
+// The task sheet (MAIR-859): creation draft (with the current agent as default assignee) or edit of one task, in a
+// Drawer opened by « Nouvelle tâche », a card or a row; the board quick add goes through the same writes.
 export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask }: {
   project: Project;
   lockRef: MutationLock;
@@ -32,6 +39,8 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
   const [resetRevision, setResetRevision] = React.useState(0);
   const [editingTaskId, setEditingTaskId] = React.useState<string | null>(null);
   const [error, setError] = React.useState('');
+  const [titleError, setTitleError] = React.useState('');
+  const [open, setOpen] = React.useState(false);
   const [verificationError, setVerificationError] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   React.useEffect(() => {
@@ -59,7 +68,9 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     setResetRevision(current => current + 1);
     setForm(taskCreationState?.draft ?? newTaskForm());
     setEditingTaskId(null);
+    setOpen(false);
     setError('');
+    setTitleError('');
   };
 
   const update = (patch: Partial<TaskFormState>) => {
@@ -68,54 +79,61 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     setForm((current) => ({ ...current, ...patch }));
     if (!editingTaskId && taskCreationState?.uncertainTitle) onPreserveTaskDraft?.(patch);
     if (error) setError('');
+    if (titleError && patch.title?.trim()) setTitleError('');
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (lockRef.current.task || lockRef.current.project) return;
-    if (!editingTaskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return;
-    if (editingTaskId && pendingTaskIds?.has(editingTaskId)) return;
-    if (editingTaskId && unverifiedTaskIds?.has(editingTaskId)) return;
+  const columnPatch = (status: TaskColumnStatus): Pick<TaskFormState, 'status' | 'statusId'> => {
+    const statusId = firstStatusOf(categoryOf(status));
+    return { status, ...(dynamicStatuses && statusId ? { statusId } : { statusId: undefined }) };
+  };
+
+  /** Checks a form and writes it; `true` once the BFF confirmed it. The refusals stay in the sheet. */
+  const persist = async (submitted: TaskFormState, taskId: string | null): Promise<boolean> => {
+    if (lockRef.current.task || lockRef.current.project) return false;
+    if (!taskId && (taskCreationState?.pending || taskCreationState?.uncertainTitle)) return false;
+    if (taskId && pendingTaskIds?.has(taskId)) return false;
+    if (taskId && unverifiedTaskIds?.has(taskId)) return false;
     touchedRef.current = true;
     agentReadRef.current?.abort();
     setVerificationError(false);
 
-    const title = form.title.trim();
+    const title = submitted.title.trim();
     if (!title) {
-      setError('Le titre de la tâche est obligatoire.');
-      return;
+      setTitleError(TASK_TITLE_REQUIRED);
+      return false;
     }
 
     // Without an explicit choice, a task takes the project's first status of its form category.
-    const formStatusId = dynamicStatuses && dynamicStatuses.some(status => status.id === form.statusId) ? form.statusId : firstStatusOf(categoryOf(form.status));
+    const formStatusId = dynamicStatuses && dynamicStatuses.some(status => status.id === submitted.statusId) ? submitted.statusId : firstStatusOf(categoryOf(submitted.status));
     if (dynamicStatuses && !formStatusId) {
       setError('Choisissez un statut du projet pour la tâche.');
-      return;
+      return false;
     }
 
-    if (!form.assignees.length) {
+    if (!submitted.assignees.length) {
       setError('Choisissez au moins un agent assigné à cette tâche.');
-      return;
+      return false;
     }
-    const assigneeValues = uniqueAssigneesInOrder(form.assignees);
+    const assigneeValues = uniqueAssigneesInOrder(submitted.assignees);
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
-      status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : form.status,
+      status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : submitted.status,
       ...(dynamicStatuses ? { statusId: formStatusId } : {}),
       responsible: assignees[0],
       assignees,
-      priority: form.priority,
-      labels: form.labels,
-      dueDate: form.dueDate,
+      priority: submitted.priority,
+      labels: submitted.labels,
+      dueDate: submitted.dueDate,
     };
 
     lockRef.current.task = true;
     setSaving(true);
     setError('');
+    setTitleError('');
     try {
-      if (editingTaskId) {
-        await onUpdateTask(project.id, editingTaskId, taskDraft);
+      if (taskId) {
+        await onUpdateTask(project.id, taskId, taskDraft);
       } else {
         await onAddTask(project, taskDraft);
       }
@@ -123,22 +141,71 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
       touchedRef.current = false;
       setResetRevision(current => current + 1);
       setEditingTaskId(null);
+      setOpen(false);
+      return true;
     } catch (error) {
       setError(getBffProjectErrorMessage(error));
       setVerificationError(error instanceof ProjectTaskVerificationRequiredError || error instanceof NewTaskReceiptVerificationRequiredError);
+      return false;
     } finally {
       lockRef.current.task = false;
       setSaving(false);
     }
   };
 
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await persist(form, editingTaskId);
+  };
+
+  /** « Nouvelle tâche » (C5) or the « + » of a column (C3, with its status): the creation sheet. */
+  const openCreate = (status: TaskColumnStatus = 'todo', title = '') => {
+    if (lockRef.current.task || lockRef.current.project) return;
+    if (taskCreationState?.draft) setForm(taskCreationState.draft);
+    else if (editingTaskId) {
+      // An earlier edit leaves its fields: a new sheet starts from the defaults and reads the current agent again.
+      touchedRef.current = false;
+      setResetRevision(current => current + 1);
+      setForm({ ...newTaskForm(), title, ...columnPatch(status) });
+    } else setForm(current => ({ ...current, ...(title ? { title } : {}), ...columnPatch(status) }));
+    setEditingTaskId(null);
+    setError('');
+    setTitleError('');
+    setOpen(true);
+  };
+
+  /**
+   * C3 quick add: the column's status and the creation defaults (current agent as assignee). Without a default
+   * assignee the sheet opens with the title, since a task needs one; `'sheet'` tells the column to close its field.
+   */
+  const quickAdd = async (title: string, status: TaskColumnStatus): Promise<'added' | 'sheet' | 'refused'> => {
+    if (!title.trim()) {
+      setTitleError(TASK_TITLE_REQUIRED);
+      return 'refused';
+    }
+    const draft: TaskFormState = { ...newTaskForm(), ...(form.assignees.length && !editingTaskId ? { assignees: form.assignees } : {}), title, ...columnPatch(status) };
+    if (!draft.assignees.length) {
+      openCreate(status, title);
+      return 'sheet';
+    }
+    if (await persist(draft, null)) return 'added';
+    // The refusal is shown in the sheet, which keeps the typed task for a retry.
+    setForm(draft);
+    setEditingTaskId(null);
+    setOpen(true);
+    return 'sheet';
+  };
+
+  // MAIR-859: the sheet of a pending or unverified task opens too (read it); its save stays disabled (`submitDisabled`).
   const edit = (task: ProjectTask) => {
-    if (lockRef.current.task || lockRef.current.project || pendingTaskIds?.has(task.id) || unverifiedTaskIds?.has(task.id)) return;
+    if (lockRef.current.task || lockRef.current.project) return;
     touchedRef.current = true;
     agentReadRef.current?.abort();
     setForm(taskToFormState(task));
     setEditingTaskId(task.id);
     setError('');
+    setTitleError('');
+    setOpen(true);
   };
 
   const cancel = () => {
@@ -148,7 +215,9 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     setForm(taskCreationState?.draft ?? newTaskForm());
     setResetRevision(current => current + 1);
     setEditingTaskId(null);
+    setOpen(false);
     setError('');
+    setTitleError('');
   };
 
   const statusValue = dynamicStatuses ? (dynamicStatuses.some(status => status.id === form.statusId) ? form.statusId : firstStatusOf(categoryOf(form.status))) ?? '' : form.status;
@@ -157,5 +226,5 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
   const visibleError = error && (!verificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) ? error : undefined;
   const onStatusChange = (status: string) => update(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] });
 
-  return { form, editingTaskId, error: visibleError, saving, noticeRef, statusValue, missingDefaultStatus, submitDisabled, update, onStatusChange, submit, edit, cancel, resetForProject };
+  return { form, open, editingTaskId, error: visibleError, titleError, saving, noticeRef, statusValue, missingDefaultStatus, submitDisabled, update, onStatusChange, submit, openCreate, quickAdd, edit, cancel, resetForProject };
 }

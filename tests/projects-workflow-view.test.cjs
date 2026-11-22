@@ -18,16 +18,14 @@ const port = { readProject: async () => snapshot, readTemplates: async () => [te
 let view;
 afterEach(() => { view?.unmount(); view = undefined; });
 
-test('server-view: Kanban uses the statuses of the selected project', async () => {
-  view = mount(React.createElement(ProjectWorkflow, { projectId: 'project-1', role: 'User', port }));
-  await view.waitFor(html => html.includes('Préparer le conseil'));
-  assert.match(view.html, /aria-label="Demandes reçues"/);
-  assert.match(view.html, /aria-label="Conseil municipal"/);
-  assert.match(view.html, /aria-label="Dossiers clos"/);
+test('server-view: the project statuses panel shows no second task board (MAIR-859)', async () => {
+  let received;
+  view = mount(React.createElement(ProjectWorkflow, { projectId: 'project-1', role: 'User', port, onSnapshot: value => { received = value; } }));
+  await view.waitFor(() => received !== undefined);
+  assert.equal(received.statuses.length, 3);
+  assert.doesNotMatch(view.html, /Préparer le conseil|aria-label="Conseil municipal"/);
   assert.doesNotMatch(view.html, /Paramétrer les statuts/);
-  const selector = view.hostElements((props, _text, tag) => tag === 'select' && props.value === 'status-2');
-  assert.equal(selector.length, 1);
-  assert.equal(selector[0].props.disabled, true);
+  assert.equal(view.hostElements((_props, _text, tag) => tag === 'select').length, 0);
 });
 
 test('server-view: a responsible configures a status and sees success only from its confirmed receipt', async () => {
@@ -37,7 +35,7 @@ test('server-view: a responsible configures a status and sees success only from 
   await view.fire((props, _text, tag) => tag === 'input' && props.value === 'Demandes reçues', 'onChange', { target: { value: 'Demandes à instruire' } });
   await view.fire((props, _text, tag) => tag === 'form' && props['aria-label'] === 'Paramétrage des statuts', 'onSubmit', { preventDefault() {} });
   await view.waitFor(html => html.includes('Statuts enregistrés.'));
-  assert.match(view.html, /aria-label="Demandes à instruire"/);
+  assert.doesNotMatch(view.html, /Paramétrage des statuts/);
 });
 
 test('server-view: template selection previews ordered statuses and carries the selected template', async () => {
