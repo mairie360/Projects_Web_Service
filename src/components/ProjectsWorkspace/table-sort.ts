@@ -11,7 +11,7 @@ const collator = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' })
 const isEmpty = (value: SortValue) => value === null || value === undefined || value === '';
 
 /** Business orders (MAIR-1138): À faire < En cours < (En revue) < Terminé, Haute < Moyenne < Basse. */
-export const STATUS_ORDER: readonly Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
+export const STATUS_ORDER: readonly Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold', 'done'];
 export const PRIORITY_ORDER: readonly Project['priority'][] = ['high', 'medium', 'low'];
 export const statusRank = (status: Project['status']) => STATUS_ORDER.indexOf(status);
 export const priorityRank = (priority: Project['priority']) => PRIORITY_ORDER.indexOf(priority);

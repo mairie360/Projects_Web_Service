@@ -68,8 +68,9 @@ for (const mode of ['kanban', 'grid', 'table']) test(`${mode}: closing or changi
   await view.waitFor(() => !workspace().pageLoading);
   assert.match(view.text(), /Création de tâche non vérifiée/);
   await view.act(() => workspace().openProjectDetails(project));
-  // MAIR-859: the creation sheet keeps its « Ajouter la tâche » disabled while the receipt is unverified.
+  // MAIR-859, MAIR-1137: the creation keeps its « Ajouter la tâche » (at the recap) disabled while the receipt is unverified.
   await view.click((props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
+  for (let step = 0; step < 2; step += 1) await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
   const add = view.hostElements((props, text, tag) => tag === 'button' && text === 'Ajouter la tâche');
   assert.equal(add.length, 1); assert.equal(add[0].props.disabled, true);
   assert.equal(view.props('ProjectPage').taskCreationState.uncertainTitle, draft.title);

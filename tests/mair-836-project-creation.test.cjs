@@ -34,14 +34,23 @@ async function openDialog() {
   await view.waitFor(() => view.find('CreateProjectModal').length === 1);
 }
 const submitDialog = () => view.fire((props, _text, tag) => tag === 'form' && props.role === 'dialog', 'onSubmit', { preventDefault() {} });
+// MAIR-1136: a submit before the recap moves to the next step; the fourth one creates.
+async function submitThroughSteps() {
+  for (let step = 0; step < 4; step += 1) {
+    await submitDialog();
+    await view.settle();
+  }
+}
 
 test('MAIR-836: an empty dialog shows the messages under its fields and sends nothing', async () => {
   await openDialog();
   await submitDialog();
 
-  for (const message of ['Le titre est obligatoire.', 'Le groupe est obligatoire.', 'Choisissez un responsable ou un membre de l’équipe.', 'La date d’échéance est obligatoire.']) {
+  // MAIR-1136: the first step checks its own fields; « Responsable » belongs to « Organisation ».
+  for (const message of ['Le titre est obligatoire.', 'Le groupe est obligatoire.', 'La date d’échéance est obligatoire.']) {
     assert.ok(view.text().includes(message), message);
   }
+  assert.ok(!view.text().includes('Choisissez un responsable ou un membre de l’équipe.'));
   assert.equal(bffProject.calls('/projects', 'post').length, 0);
   assert.equal(view.find('CreateProjectModal').length, 1);
 });
@@ -50,7 +59,7 @@ test('MAIR-836: a group refused by the BFF (deleted meanwhile) keeps the dialog 
   await openDialog();
   await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Rénovation du gymnase', dueDate: '2027-06-30', groupId: 'group-2', responsible: f.people.marie.id }));
   bffProject.on('post', '/projects', harness.errorReply(404, f.apiError('NOT_FOUND', 'Groupe introuvable')));
-  await submitDialog();
+  await submitThroughSteps();
   await view.waitFor(() => bffProject.calls('/projects', 'post').length === 1 && view.text().includes('Groupe introuvable'));
 
   assert.equal(bffProject.calls('/projects', 'post')[0].body.groupId, 'group-2');
@@ -64,7 +73,7 @@ test('MAIR-836: a created project lands in its column with the « Projet créé 
   bffProject.on('post', '/projects', { status: 201, body: f.projectDetails(created, []) });
   bffProject.on('get', '/projects-page', { body: f.projectsPage([f.projectListItem(), created]) });
   await view.act(() => view.props('CreateProjectModal').onChange({ title: created.title, dueDate: '2027-06-30', groupId: 'group-1', status: 'in-progress', responsible: f.people.marie.id, labels: ['Bâtiments', 'Sport'] }));
-  await submitDialog();
+  await submitThroughSteps();
   await view.waitFor(() => view.text().includes('Projet « Rénovation du gymnase » créé.'));
 
   const body = bffProject.calls('/projects', 'post')[0].body;
