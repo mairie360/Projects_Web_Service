@@ -179,6 +179,8 @@ function createFrontHarness() {
       bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
       bffProject.on('get', '/project-templates', { body: { templates: [] } });
       bffProject.on('get', '/project-groups', { body: fixtures.projectGroups() });
+      // MAIR-1089: the overview reads the latest activity of the project it shows.
+      bffProject.on('get', '/projects/{projectId}/activity', { body: fixtures.projectActivity() });
       for (const call of ownerCalls) {
         const value = new NextRequest(call.url, call.init).cookies.get('refreshToken')?.value;
         if (value) forgetUserSession(bffUser.url, value);

@@ -50,7 +50,7 @@ describe("Project task save confirmation", () => {
     }
     await chooseTaskAssignee(user, 'Admin Mairie', sheet);
     await user.click(radio(sheet, 'Priorité', 'Basse'));
-    await user.click(radio(sheet, mode === "edit" ? 'État' : 'Colonne de départ', 'En revue'));
+    await user.click(radio(sheet, mode === "edit" ? 'État' : 'Colonne de départ', 'En cours'));
     if (mode === "create") await nextTaskStep(user, sheet);
     const submitName = mode === "edit" ? /^Enregistrer \(\d+\)$/ : "Ajouter la tâche";
     await user.click(sheet.getByRole("button", { name: submitName }));
@@ -67,7 +67,7 @@ describe("Project task save confirmation", () => {
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1]).toEqual(save.mock.calls[0]);
     const draft = save.mock.calls[1].at(-1);
-    expect(draft).toMatchObject({ title: "Brouillon conservé", status: "review", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
+    expect(draft).toMatchObject({ title: "Brouillon conservé", status: "in-progress", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
     // MAIR-1137 (C12): the « Assignée à » cards name one agent.
     expect(draft.responsible.id).toBe("user-1");
     expect(draft.assignees.map(person => person.id)).toEqual(["user-1"]);
@@ -176,7 +176,7 @@ it('aborts a closed detail and reads the account again on reopening', async () =
 
 it('preserves a restored uncertain creation and existing task editing while reading new defaults', async () => {
   const user=userEvent.setup(), values=props(), read=vi.fn().mockResolvedValue('user-1');
-  const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'review',priority:'low',assignees:['user-3'],labels:[],dueDate:'2026-11-17'}};
+  const state={uncertainTitle:'Brouillon conservé',draft:{title:'Brouillon conservé',status:'in-progress',priority:'low',assignees:['user-3'],labels:[],dueDate:'2026-11-17'}};
   render(<ProjectPage {...values} taskCreationState={state} readCurrentTaskAssignee={read} />);
   expect(read).not.toHaveBeenCalled();
   let sheet = await openTaskSheet(user, values.tasks[0].title);

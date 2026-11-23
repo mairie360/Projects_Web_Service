@@ -117,7 +117,8 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
               labelWidth={110}
               items={[
                 { id: 'assignee', label: 'Assignée à', value: assignee ? <UserIdentity name={assignee.name} variant="nameOnly" size="s" /> : 'Non assignée' },
-                { id: 'period', label: 'Période', value: `Jusqu’au ${formatProjectDate(task.dueDate)}` },
+                // MAIR-1087: « Du … au … » once the task has a start date.
+                { id: 'period', label: 'Période', value: task.startDate ? `Du ${formatProjectDate(task.startDate)} au ${formatProjectDate(task.dueDate)}` : `Jusqu’au ${formatProjectDate(task.dueDate)}` },
                 { id: 'delay', label: 'Délai', value: delay || '—' },
                 { id: 'priority', label: 'Priorité', value: <PriorityPill level={task.priority} size="s" /> },
                 { id: 'project', label: 'Projet', value: project.title },

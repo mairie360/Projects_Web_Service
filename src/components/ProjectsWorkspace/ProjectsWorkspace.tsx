@@ -274,7 +274,7 @@ export function ProjectsWorkspace({
                   onUpdateTaskStatus={changeProjectTaskStatus}
                   onDeleteTask={deleteProjectTask}
                   onCloseProject={closeProject}
-                  onChangeStatus={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                  onChangeStatus={moveProjectStatus}
                   onDuplicate={duplicateProject}
                   duplicationPending={duplicatingProjectIds.includes(selectedProject.id)}
                   duplicationVerificationRequired={unverifiedDuplicationSourceIds.has(selectedProject.id)}
@@ -322,6 +322,8 @@ export function ProjectsWorkspace({
                   {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
                   {/* MAIR-1134 (C8): the view fades and rises in (260 ms) when it changes; no motion under prefers-reduced-motion. */}
+                  {/* MAIR-487 (RGAA 9.1): the views sit under an h2, between the page h1 and the h3 of the columns or cards. */}
+                  <h2 className="sr-only">{viewMode === 'kanban' ? 'Projets par statut' : viewMode === 'grid' ? 'Projets en grille' : 'Tableau des projets'}</h2>
                   <div key={viewMode} className="m360-view-enter">
                   {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
                     <ProjectsEmptyState onReset={resetProjectFilters} />
@@ -338,7 +340,7 @@ export function ProjectsWorkspace({
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
                       onAddProject={canCreateProject ? openCreateProject : undefined}
-                      onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onMoveProject={moveProjectStatus}
                     />
                   )}
 
@@ -351,7 +353,7 @@ export function ProjectsWorkspace({
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                     />
                   )}
@@ -365,7 +367,7 @@ export function ProjectsWorkspace({
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                       selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
                       onSelectionChange={changeProjectSelection}

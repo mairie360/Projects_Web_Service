@@ -3,7 +3,7 @@ import { getBffProjectErrorMessage } from '@/lib/bffProjectClient';
 import { projectToFormState, type ProjectFormState } from '@/lib/projectPageState';
 import { ProjectReceiptVerificationRequiredError } from '@/lib/projectReceiptVerification';
 import type { Project } from '@/types/project';
-import { PROJECT_EDIT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from '../../project-form-validation';
+import { PROJECT_EDIT_FIELD_IDS, validateProjectForm, type ProjectEditFieldErrors } from '../../project-form-validation';
 
 // One project write at a time: the project form and the task form share this lockRef.
 export type MutationLock = React.MutableRefObject<{ project: boolean; task: boolean }>;
@@ -21,7 +21,7 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState<ProjectFormState>(() => projectToFormState(project));
   const [error, setError] = React.useState('');
-  const [fieldErrors, setFieldErrors] = React.useState<ProjectFieldErrors>({});
+  const [fieldErrors, setFieldErrors] = React.useState<ProjectEditFieldErrors>({});
   const [verificationError, setVerificationError] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const projectIdRef = React.useRef(project.id);
@@ -84,7 +84,7 @@ export function useProjectEdit({ project, lockRef, dialogRef, verificationBlocke
     const errors = validateProjectForm(form, { creating: false, groupCount, groupRequired: true });
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      const first = (Object.keys(PROJECT_EDIT_FIELD_IDS) as (keyof ProjectFieldErrors)[]).find((key) => errors[key]);
+      const first = (Object.keys(PROJECT_EDIT_FIELD_IDS) as (keyof ProjectEditFieldErrors)[]).find((key) => errors[key]);
       if (first && typeof document !== 'undefined') document.getElementById(PROJECT_EDIT_FIELD_IDS[first])?.focus();
       return;
     }

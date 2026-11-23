@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 
 import { EditedSection } from '@/components/ProjectsWorkspace/components/EditedSection';
 import { taskToFormState } from '@/components/ProjectsWorkspace/components/ProjectTasksEditor';
-import type { FilterOption, TaskFormState } from '@/lib/projectPageState';
+import { taskStartAfterDue, type FilterOption, type TaskFormState } from '@/lib/projectPageState';
 import type { ProjectTask } from '@/types/project';
 import { TASK_TITLE_REQUIRED } from '../../../../use-detail-task-form';
 import { TaskAttributionFields } from './components/TaskAttributionFields';
@@ -17,14 +17,14 @@ export const TASK_CREATION_STEPS = [{ label: 'L’essentiel' }, { label: 'Attrib
 const RECAP = TASK_CREATION_STEPS.length - 1;
 export const TASK_ASSIGNEE_REQUIRED = 'Choisissez au moins un agent assigné à cette tâche.';
 
-type TaskField = 'title' | 'dueDate' | 'labels' | 'assignees' | 'priority' | 'status';
-const ESSENTIAL: readonly TaskField[] = ['title', 'dueDate', 'labels'];
+type TaskField = 'title' | 'startDate' | 'dueDate' | 'labels' | 'assignees' | 'priority' | 'status';
+const ESSENTIAL: readonly TaskField[] = ['title', 'startDate', 'dueDate', 'labels'];
 const statusOf = (form: TaskFormState) => [form.statusId ?? '', form.status];
 const fieldValue = (form: TaskFormState, field: TaskField) => JSON.stringify(field === 'status' ? statusOf(form) : form[field] ?? '');
 
 /** MAIR-1137 (C13): the fields of the edit that differ from the saved task. */
 export function changedTaskFields(form: TaskFormState, initial: TaskFormState): TaskField[] {
-  return (['title', 'dueDate', 'labels', 'assignees', 'priority', 'status'] as const).filter((field) => fieldValue(form, field) !== fieldValue(initial, field));
+  return (['title', 'startDate', 'dueDate', 'labels', 'assignees', 'priority', 'status'] as const).filter((field) => fieldValue(form, field) !== fieldValue(initial, field));
 }
 
 export interface TaskDialogProps {
@@ -99,6 +99,12 @@ export function TaskDialog({
       setStep(0);
       setStepTitleError(TASK_TITLE_REQUIRED);
       titleRef.current?.focus();
+      return;
+    }
+    // MAIR-1087: the start date stays at or before the due date (the field says so).
+    if (target > 0 && taskStartAfterDue(form)) {
+      setStep(0);
+      document.getElementById('task-sheet-start-date')?.focus();
       return;
     }
     if (target > 1 && !form.assignees.length) {

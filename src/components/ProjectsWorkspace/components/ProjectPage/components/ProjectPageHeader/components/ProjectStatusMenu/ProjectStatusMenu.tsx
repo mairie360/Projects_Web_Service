@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { projectStatusBadge, projectStatusLabel } from '../../../../../../project-card-meta';
 import type { Project } from '@/types/project';
 
-const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
+const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold', 'done'];
 
 export interface ProjectStatusMenuProps {
   status: Project['status'];
