@@ -162,12 +162,15 @@ test('MAIR-1087: a task created with a start date sends it, a start after the du
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 0);
 });
 
-test('MAIR-880: the lab page of the performance report is a page the front accepts (new fields, on-hold column)', () => {
+// The performance report measures the base branch with the same lab page (scripts/performance-server.mjs): the page
+// must satisfy this contract and stay readable by the page before it, so it carries the new fields (an older reader
+// ignores them) but no value an older reader refuses, such as an `on-hold` Kanban column.
+test('MAIR-880: the lab page of the performance report is a page the front accepts, and the base branch too', () => {
   const lab = require('./fixtures/performance.json').routes['/projects-page'];
   const { parseProjectsPageReceipt } = requireTs('src/lib/project-page-receipt.ts');
   const parsed = parseProjectsPageReceipt(lab, 1);
   assert.equal(parsed.projects[0].title, require('./fixtures/performance.json').readyText);
-  assert.ok(parsed.kanban.columns.some((column) => column.status === 'on-hold'));
+  assert.ok(parsed.kanban.columns.every((column) => ['todo', 'in-progress', 'review', 'done'].includes(column.status)), 'no column the previous contract refused');
   const contract = bffProject.contract;
   const operation = contract.match('GET', '/projects-page').operation;
   const schema = (operation.responses['2XX'] ?? operation.responses['200']).content['application/json'].schema;
