@@ -1,7 +1,12 @@
+'use client';
+
+import { Grid3X3, Kanban, List } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { DateField, FilterSelect, SearchField, SegmentedControl } from '@mairie360/lib-components/primitives';
 import type { FilterOption, ViewMode } from '@/lib/projectPageState';
-import { FilterSelect } from './components/FilterSelect';
-import { SearchInput } from './components/SearchInput';
-import { ViewToggle } from './components/ViewToggle';
+
+const ALL = 'all';
+const viewIcons: Record<ViewMode, LucideIcon> = { kanban: Kanban, grid: Grid3X3, table: List };
 
 export interface ProjectFiltersBarProps {
   search: string;
@@ -10,60 +15,70 @@ export interface ProjectFiltersBarProps {
   dueBefore: string;
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
-  openFilter: 'status' | 'priority' | null;
   viewMode: ViewMode;
   views: Array<{ value: ViewMode; label: string }>;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onPriorityChange: (value: string) => void;
   onDueBeforeChange: (value: string) => void;
-  onOpenFilterChange: (filter: 'status' | 'priority' | null) => void;
   onViewModeChange: (value: ViewMode) => void;
 }
 
-/** Search, status/priority/due filters and the Kanban/grid/table switch. */
+/** The BFF lists « Tous les statuts » as the `all` option; the lib filter calls it its empty value. */
+function LibFilter({ label, value, options, onChange }: { label: string; value: string; options: FilterOption[]; onChange: (value: string) => void }) {
+  const all = options.find((option) => option.value === ALL);
+  return (
+    <FilterSelect
+      label={label}
+      value={value === ALL ? '' : value}
+      options={options.filter((option) => option.value !== ALL).map(({ value: optionValue, label: optionLabel }) => ({ value: optionValue, label: optionLabel }))}
+      allLabel={all?.label}
+      onChange={(next) => onChange(next || ALL)}
+    />
+  );
+}
+
+/** Search, status/priority/due filters and, on its own row, the Kanban/grid/table switch, all lib-components (MAIR-828, MAIR-1134). */
 export const ProjectFiltersBar = ({
-  search, status, priority, dueBefore, statusOptions, priorityOptions, openFilter, viewMode, views,
-  onSearchChange, onStatusChange, onPriorityChange, onDueBeforeChange, onOpenFilterChange, onViewModeChange,
+  search, status, priority, dueBefore, statusOptions, priorityOptions, viewMode, views,
+  onSearchChange, onStatusChange, onPriorityChange, onDueBeforeChange, onViewModeChange,
 }: ProjectFiltersBarProps) => (
-  <section className="border-b border-[#e3e0dc] py-7">
-    <div className="flex flex-col items-start gap-4 2xl:flex-row 2xl:flex-wrap 2xl:items-center 2xl:justify-between">
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-center 2xl:basis-[50rem]">
+  <section className="border-b border-[var(--mairie-border)] py-6" aria-label="Filtres des projets">
+    {/* MAIR-1134 (C6): search and filters on one row, the view switch on its own row under them, left aligned:
+        it never moves, whatever the view or the active filters. */}
+    <div className="flex flex-col items-start gap-4">
+      <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:items-end">
         <div className="w-full md:min-w-[280px] md:max-w-[448px] md:flex-1 2xl:min-w-[240px]">
-          <SearchInput value={search} onChange={onSearchChange} />
+          <SearchField
+            aria-label="Rechercher un projet"
+            value={search}
+            placeholder="Rechercher des projets..."
+            onChange={(event) => onSearchChange(event.target.value)}
+            onClear={search ? () => onSearchChange('') : undefined}
+          />
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <FilterSelect
-            label="Filtrer par statut"
-            value={status}
-            options={statusOptions}
-            open={openFilter === 'status'}
-            onOpenChange={(open) => onOpenFilterChange(open ? 'status' : null)}
-            onChange={onStatusChange}
-          />
-          <FilterSelect
-            label="Filtrer par priorité"
-            value={priority}
-            options={priorityOptions}
-            open={openFilter === 'priority'}
-            widthClassName="sm:w-48"
-            onOpenChange={(open) => onOpenFilterChange(open ? 'priority' : null)}
-            onChange={onPriorityChange}
-          />
-          <label className="block w-full sm:w-44" title="Filtrer par échéance maximale">
-            <span className="mb-1 block text-sm font-medium">Échéance avant</span>
-            <input
-              type="date"
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <LibFilter label="Statut" value={status} options={statusOptions} onChange={onStatusChange} />
+          <LibFilter label="Priorité" value={priority} options={priorityOptions} onChange={onPriorityChange} />
+          <div className="w-full sm:w-44">
+            <DateField
+              id="projects-due-before"
+              label="Échéance avant"
               aria-label="Échéance avant"
               value={dueBefore}
-              className="h-10 w-full rounded-md border border-[#d0ccc7] bg-white px-3 text-sm font-normal text-[#2f3438] shadow-sm outline-none transition focus:border-[#4b908d] focus:ring-2 focus:ring-[#4b908d]/15"
               onChange={(event) => onDueBeforeChange(event.target.value)}
             />
-          </label>
+          </div>
         </div>
       </div>
 
-      <ViewToggle value={viewMode} options={views} onChange={onViewModeChange} />
+      <SegmentedControl
+        className="self-start"
+        label="Vue des projets"
+        value={viewMode}
+        options={views.map((view) => ({ key: view.value, label: view.label, icon: viewIcons[view.value] }))}
+        onChange={onViewModeChange}
+      />
     </div>
   </section>
 );

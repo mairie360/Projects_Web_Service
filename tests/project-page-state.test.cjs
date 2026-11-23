@@ -39,7 +39,7 @@ test('dates de formulaire et progression', () => {
 
 test('formulaires vides et formulaire d’édition depuis un projet du BFF', () => {
   assert.deepEqual(state.createProjectFormState(), {
-    title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '',
+    title: '', description: '', status: 'todo', priority: 'medium', responsible: '', assignees: [], labels: [], dueDate: '', groupId: '', budgetVoted: '', budgetCommitted: '',
     progress: 0, totalTasks: 0, completedTasks: 0, archivedTasks: 0, taskItems: [],
   });
   assert.equal(state.createProjectFormState('review').status, 'review');
@@ -52,7 +52,7 @@ test('formulaires vides et formulaire d’édition depuis un projet du BFF', () 
   const form = state.projectToFormState({ ...project, taskItems: tasks });
   assert.deepEqual({ ...form, taskItems: form.taskItems.length }, {
     title: project.title, description: project.description, status: 'in-progress', priority: 'high', responsible: 'user-3',
-    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
+    assignees: ['user-2', 'user-3'], labels: ['voirie', 'énergie'], dueDate: '2026-12-15', groupId: '', budgetVoted: '', budgetCommitted: '', progress: 50, totalTasks: 2, completedTasks: 1, archivedTasks: 0, taskItems: 1,
   });
 });
 
@@ -111,9 +111,7 @@ test('active shell destinations reject credential-bearing and non-web URLs', () 
 
 test('métadonnées des cartes projet : initiales, dates et numéro affiché', () => {
   const meta = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
-  assert.deepEqual(Object.keys(meta.statusMeta), ['todo', 'in-progress', 'review', 'done']);
-  assert.deepEqual(Object.keys(meta.priorityMeta), ['high', 'medium', 'low']);
-  assert.equal(meta.getInitials('marie  anne durand'), 'MA');
+  assert.deepEqual(Object.keys(meta.projectStatusBadge), ['todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.equal(meta.formatProjectDate('2026-12-15'), '15/12/2026');
   assert.equal(meta.formatProjectDate('2026-12-15', false), '15/12');
   assert.equal(meta.getProjectNumber({ id: '42' }), '#42');

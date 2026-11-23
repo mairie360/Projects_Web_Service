@@ -45,14 +45,14 @@ for(const operation of ['inline','card','move','close','review']) {
       await view.act(()=>view.props('ProjectsWorkspace').openProjectDetails(first));
       if(operation==='card') await view.act(()=>view.props('ProjectsWorkspace').openEditProject(first));
       const rows=structuredClone(view.props('ProjectsWorkspace').projects);
-      const selected=structuredClone(view.props('ProjectDetailModal').project);
+      const selected=structuredClone(view.props('ProjectPage').project);
       rejectReceipt(operation,kind);
       harness.bffProject.on('get','/projects-page',harness.errorReply(503,f.apiError('READ','Catalogue indisponible')));
       await view.act(()=>perform(operation));
       assert.deepEqual(view.props('ProjectsWorkspace').projects,rows);
-      assert.deepEqual(view.props('ProjectDetailModal').project,selected);
+      assert.deepEqual(view.props('ProjectPage').project,selected);
       assert.equal(view.props('ProjectsWorkspace').unverifiedProjectIds.has(first.id),true);
-      assert.equal(view.props('ProjectDetailModal').projectVerificationRequired,true);
+      assert.equal(view.props('ProjectPage').projectVerificationRequired,true);
       assert.match(view.text(),/acceptée.*confirmation.*incohérente/);
       assert.doesNotMatch(view.text(),/Ne pas appliquer ce reçu étranger|Titre non vérifié|ID répété/);
       if(operation==='card') {
@@ -93,8 +93,8 @@ test('only a coherent requested project GET clears uncertainty, preserves card d
 test('uncertainty belongs to the requested project, not its foreign receipt or another open detail',async()=>{
   await loaded(); await view.act(()=>view.props('ProjectsWorkspace').openProjectDetails(second));
   rejectReceipt('move'); await view.act(()=>perform('move'));
-  assert.equal(view.props('ProjectDetailModal').project.id,second.id);
-  assert.equal(view.props('ProjectDetailModal').projectVerificationRequired,false);
+  assert.equal(view.props('ProjectPage').project.id,second.id);
+  assert.equal(view.props('ProjectPage').projectVerificationRequired,false);
   assert.equal(view.props('ProjectsWorkspace').unverifiedProjectIds.has(second.id),false);
   harness.bffProject.on('patch','/projects/{projectId}',{body:f.projectDetails({...second,status:'done'},[task])});
   await view.act(()=>view.props('ProjectsWorkspace').moveProjectStatus(second,'done'));
@@ -108,12 +108,12 @@ test('a project detail read begun before the uncertain receipt cannot unlock or 
   const gate=new Promise(resolve=>{release=resolve;});const fetch=global.fetch;
   t.mock.method(global,'fetch',async(input,init)=>{const response=await fetch(input,init);if(input===`/projects/${first.id}`&&!held){++held;await gate;}return response;});
   try{
-    await view.act(()=>{pending=view.props('ProjectDetailModal').onRetry();});await view.waitFor(()=>held>0);
+    await view.act(()=>{pending=view.props('ProjectPage').onRetry();});await view.waitFor(()=>held>0);
     rejectReceipt('move');await view.act(()=>perform('move'));
     release();await pending;await view.settle();
     assert.equal(view.props('ProjectsWorkspace').unverifiedProjectIds.has(first.id),true);
-    assert.match(view.props('ProjectDetailModal').refreshError,/confirmation de projet.*incohérente/);
-    assert.equal(view.props('ProjectDetailModal').project.title,first.title);
+    assert.match(view.props('ProjectPage').refreshError,/confirmation de projet.*incohérente/);
+    assert.equal(view.props('ProjectPage').project.title,first.title);
     assert.equal(harness.bffProject.requests.filter(r=>r.method!=='GET').length,1);
   }finally{release();await pending;await view.settle();}
 });
@@ -147,10 +147,10 @@ test('a double verification is one GET; changing detail selection cannot reopen 
     await view.act(()=>{pending=view.props('ProjectsWorkspace').verifyProjectReceipt(first.id);});await view.waitFor(()=>held>0);
     await view.act(()=>view.props('ProjectsWorkspace').verifyProjectReceipt(first.id));
     assert.equal(harness.bffProject.calls('/projects/{projectId}','get').length,before+1);
-    await view.act(()=>view.props('ProjectDetailModal').onClose());
+    await view.act(()=>view.props('ProjectPage').onClose());
     await view.act(()=>view.props('ProjectsWorkspace').openProjectDetails(second));
     release();await pending;await view.settle();
-    assert.equal(view.props('ProjectDetailModal').project.id,second.id);
+    assert.equal(view.props('ProjectPage').project.id,second.id);
     assert.equal(view.props('ProjectsWorkspace').unverifiedProjectIds.size,0);
     assert.equal(harness.bffProject.requests.filter(r=>r.method!=='GET').length,1);
   }finally{release();await pending;await view.settle();}

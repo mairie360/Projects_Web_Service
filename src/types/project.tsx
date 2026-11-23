@@ -1,13 +1,23 @@
 import type {
+  ActivityItem as ContractActivityItem,
+  Milestone as ContractMilestone,
+  ProjectMemberRole as ContractProjectMemberRole,
   ProjectPriority as ContractProjectPriority,
   ProjectStatus as ContractProjectStatus,
   TaskCollaborationResponse,
   TaskComment as ContractTaskComment,
   TaskHistoryEntry as ContractTaskHistoryEntry,
 } from '@mairie360/bff-project-openapi/model';
-import { AlertCircle, CheckCircle2, Clock, Eye } from 'lucide-react';
 
 export type ProjectStatus = ContractProjectStatus;
+/** MAIR-1084: a task has three status categories; `review` and `on-hold` are project statuses only. */
+export type TaskStatus = Exclude<ProjectStatus, 'review' | 'on-hold'>;
+/** MAIR-1088: role of a member in the project (the owner always reads `manager`). */
+export type ProjectMemberRole = ContractProjectMemberRole;
+/** MAIR-1086: a milestone of the project (`dueDate` is a day, `YYYY-MM-DD`). */
+export type Milestone = ContractMilestone;
+/** MAIR-1089: an entry of the project activity (a project comment or the history of one of its tasks). */
+export type ActivityItem = ContractActivityItem;
 export type ProjectPriority = ContractProjectPriority;
 
 export interface Person {
@@ -30,6 +40,8 @@ export interface ProjectTask {
   priorityLabel?: string;
   labels: string[];
   dueDate: string;
+  /** MAIR-1087: start date (`YYYY-MM-DD` once normalized), `null` or absent without one. */
+  startDate?: string | null;
   completed: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -50,13 +62,15 @@ export type TaskCollaboration = TaskCollaborationResponse;
 
 export interface ProjectTaskDraft {
   title: string;
-  status: ProjectStatus;
+  status: TaskStatus;
   statusId?: string;
   responsible: Person;
   assignees: Person[];
   priority: ProjectPriority;
   labels: string[];
   dueDate: string;
+  /** MAIR-1087: start date (`YYYY-MM-DD`), empty for none. */
+  startDate?: string;
 }
 
 export interface Project {
@@ -72,6 +86,8 @@ export interface Project {
   priority: ProjectPriority;
   priorityLabel?: string;
   labels: string[];
+  /** Group whose members see the project (MAIR-880); `null` for a project created before groups or whose group was deleted. */
+  group?: { id: string; name: string } | null;
   taskItems?: ProjectTask[];
   /** BFF task counts: `total` and `completed` include the archived (done) tasks, `taskItems` only lists the `active` ones. */
   tasks: {
@@ -90,50 +106,23 @@ export interface Project {
     canClose?: boolean;
   };
   createdAt: string;
+  /** MAIR-1088: members with their role (first 5 on the page, all of them with their load in the detail). */
+  members?: ProjectMember[];
+  /** MAIR-1088: role of the caller in the project, `null` when they are not a member. */
+  myRole?: ProjectMemberRole | null;
+  /** MAIR-1085: budgets in cents of euro, `null` when not filled in. */
+  budgetVoted?: number | null;
+  budgetCommitted?: number | null;
+  /** MAIR-1086: the first 100 milestones (detail only) and their total. */
+  milestones?: Milestone[];
+  milestonesTotal?: number;
 }
 
-export const statusConfig = {
-  'todo': {
-    label: 'À faire',
-    icon: <AlertCircle className="h-4 w-4" />,
-    color: 'text-red-600',
-    bg: 'bg-red-50',
-    border: 'border-red-300'
-  },
-  'in-progress': {
-    label: 'En cours',
-    icon: <Clock className="h-4 w-4" />,
-    color: 'text-[#1256a6]',
-    bg: 'bg-[#d4e8e7]',
-    border: 'border-[#1256a6]'
-  },
-  'review': {
-    label: 'En révision',
-    icon: <Eye className="h-4 w-4" />,
-    color: 'text-[#1256a6]',
-    bg: 'bg-[#d4e8e7]',
-    border: 'border-[#1256a6]'
-  },
-  'done': {
-    label: 'Terminé',
-    icon: <CheckCircle2 className="h-4 w-4" />,
-    color: 'text-green-600',
-    bg: 'bg-green-50',
-    border: 'border-green-300'
-  }
-};
-
-export const priorityConfig = {
-  'high': { label: 'Haute', color: 'text-[#c53030]', bg: 'bg-red-50', border: 'border-[#c53030]' },
-  'medium': { label: 'Moyenne', color: 'text-[#4b908d]', bg: 'bg-[#d4e8e7]', border: 'border-[#4b908d]' },
-  'low': { label: 'Basse', color: 'text-[#6b6b6b]', bg: 'bg-[#e8e6e3]', border: 'border-[#d9d5d0]' }
-};
-
-export const labelColors = [
-  'bg-[#1256a6] text-white',
-  'bg-[#4b908d] text-white',
-  'bg-[#3c3c3c] text-white',
-  'bg-[#6aada9] text-white',
-  'bg-[#c53030] text-white',
-  'bg-[#0d3d6f] text-white'
-];
+export interface ProjectMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  role: ProjectMemberRole;
+  /** Detail only: active tasks of the project assigned to the member, and the open ones among them. */
+  load?: { tasksOpen: number; tasksTotal: number };
+}

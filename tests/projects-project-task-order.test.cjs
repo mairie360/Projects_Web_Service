@@ -29,7 +29,7 @@ async function loaded() {
 
 async function startProjectWrite(operation) {
   const form = { ...projectToFormState(project), title: 'Projet demandé' };
-  const props = view.props('ProjectDetailModal');
+  const props = view.props('ProjectPage');
   if (operation === 'inline') return props.onUpdateProject(project.id, form);
   if (operation === 'card') return view.props('CreateProjectModal').onSubmit({ preventDefault() {} });
   if (operation === 'move') return view.props('KanbanBoard').onMoveProject(project, 'review');
@@ -56,7 +56,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
         });
         // A card opens by GET before its write; let that opening complete normally.
         if (projectOperation === 'card') {
-          await view.act(() => view.props('KanbanBoard').onProjectEdit(project));
+          await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
           await view.act(() => view.props('CreateProjectModal').onChange({ ...projectToFormState(project), title: 'Projet demandé' }));
         }
         const confirmed = f.projectTask({ id: taskOperation === 'create' ? 'task-new' : task.id, title: 'Tâche récemment confirmée', status: 'done' });
@@ -76,7 +76,7 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
           harness.bffProject.on('get', '/projects/{projectId}', successfulRead
             ? { body: f.projectDetails(project, expected) }
             : harness.errorReply(503, f.apiError('READ', 'Détail refusé')));
-          const props = view.props('ProjectDetailModal');
+          const props = view.props('ProjectPage');
           if (taskOperation === 'delete') {
             harness.bffProject.on('delete', '/projects/{projectId}/tasks/{taskId}', { status: 204 });
             await view.act(() => props.onDeleteTask(project.id, task.id, task.title));
@@ -89,9 +89,9 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
               ? props.onUpdateTaskStatus(project.id, task.id, 'done')
               : props.onUpdateTask(project.id, task.id, { ...task, title: 'Tâche demandée' }));
           }
-          assert.deepEqual(view.props('ProjectDetailModal').tasks.map(t => t.title), expected.map(t => t.title));
+          assert.deepEqual(view.props('ProjectPage').tasks.map(t => t.title), expected.map(t => t.title));
           release(); await pending; await view.settle();
-          const selected = view.props('ProjectDetailModal');
+          const selected = view.props('ProjectPage');
           assert.deepEqual(selected.tasks.map(t => t.title), expected.map(t => t.title));
           assert.equal(selected.project.title, confirmedProject.title);
           assert.equal(selected.project.status, confirmedProject.status);
@@ -104,9 +104,9 @@ for (const projectOperation of ['inline', 'card', 'move', 'done', 'review']) {
           assert.deepEqual(card.taskItems.map(t => t.title), expected.map(t => t.title));
           assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 2);
           harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...confirmedProject, tasks: { total: expected.length, completed: 1, active: expected.length, archived: 0 }, progress: 38 }, expected) });
-          await view.act(() => view.props('ProjectDetailModal').onRetry());
-          assert.equal(view.props('ProjectDetailModal').refreshError, '');
-          assert.equal(view.props('ProjectDetailModal').project.progress, 38);
+          await view.act(() => view.props('ProjectPage').onRetry());
+          assert.equal(view.props('ProjectPage').refreshError, '');
+          assert.equal(view.props('ProjectPage').project.progress, 38);
           assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 2);
         } finally { release(); await pending; await view.settle(); }
       });
@@ -118,12 +118,12 @@ test('a project write begun after the task confirmation remains authoritative', 
   await loaded();
   harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ title: 'Confirmation antérieure', status: 'done' }) });
   harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Détail refusé')));
-  await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
+  await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
   const latest = f.projectTask({ title: 'Tâche de la modification projet ultérieure', status: 'review' });
   harness.bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails(project, [latest, other]) });
   harness.bffProject.on('get', '/projects-page', harness.errorReply(503, f.apiError('PAGE', 'Liste refusée')));
   await view.act(() => startProjectWrite('inline'));
-  assert.equal(view.props('ProjectDetailModal').tasks[0].title, latest.title);
+  assert.equal(view.props('ProjectPage').tasks[0].title, latest.title);
   harness.bffProject.on('get', '/projects-page', { body: f.projectsPage([project]) });
   await view.act(() => view.props('ProjectsWorkspace').retryProjectsPage());
   assert.equal(view.props('KanbanBoard').projects[0].taskItems, undefined, 'an old task overlay cannot survive a later authoritative project write');
@@ -169,7 +169,7 @@ for (const operation of ['create', 'duplicate']) {
       harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Détail refusé')));
       harness.bffProject.on('get', '/projects-page', harness.errorReply(503, f.apiError('PAGE', 'Liste refusée')));
       harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ title: 'Confirmation du projet source', status: 'done' }) });
-      await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
+      await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
       release(); await pending; await view.settle();
       const copied = view.props('KanbanBoard').projects.find(p => p.id === copy.id);
       assert.deepEqual(copied.taskItems.map(t => t.title), [task.title, other.title]);
@@ -191,23 +191,23 @@ for (const reopen of [false, true]) {
       return response;
     });
     try {
-      await view.act(() => { pending = view.props('ProjectDetailModal').onCloseProject(project.id, 'review'); });
+      await view.act(() => { pending = view.props('ProjectPage').onCloseProject(project.id, 'review'); });
       await view.waitFor(() => held > 0);
       harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ title: 'Tâche confirmée', status: 'done' }) });
       harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Détail refusé')));
       harness.bffProject.on('get', '/projects-page', harness.errorReply(503, f.apiError('PAGE', 'Liste refusée')));
-      await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'));
-      await view.act(() => view.props('ProjectDetailModal').onClose());
+      await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'));
+      await view.act(() => view.props('ProjectPage').onClose());
       if (reopen) {
         harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails({ ...project, title: 'Nouvelle consultation' }, [f.projectTask({ title: 'Tâche de la nouvelle consultation' }), other]) });
         await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
       }
       release(); await pending; await view.settle();
       if (reopen) {
-        assert.equal(view.props('ProjectDetailModal').project.title, 'Nouvelle consultation');
-        assert.equal(view.props('ProjectDetailModal').tasks[0].title, 'Tâche de la nouvelle consultation');
-        assert.equal(view.props('ProjectDetailModal').refreshError, '');
-      } else assert.equal(view.find('ProjectDetailModal').length, 0);
+        assert.equal(view.props('ProjectPage').project.title, 'Nouvelle consultation');
+        assert.equal(view.props('ProjectPage').tasks[0].title, 'Tâche de la nouvelle consultation');
+        assert.equal(view.props('ProjectPage').refreshError, '');
+      } else assert.equal(view.find('ProjectPage').length, 0);
       assert.equal(harness.bffProject.requests.filter(r => r.method !== 'GET').length, 2);
     } finally { release(); await pending; await view.settle(); }
   });

@@ -46,17 +46,17 @@ async function performProjectOperation(operation, component, project) {
   if (operation === 'move') return view.act(() => view.props(component).onMoveProject(project, 'review'));
   if (operation === 'delete') {
     await view.act(() => view.props(component).onProjectDelete(project));
-    await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer' && props.className.includes('bg-[#cf222e]'));
+    await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer' && props.role !== 'menuitem');
     // The host button intentionally starts a void callback; wait for the actual outcome.
     return view.waitFor(() => view.hostElements(props => props['data-tone'] !== undefined && ['alert', 'status'].includes(props.role)).length > 0);
   }
   if (operation === 'edit-detail' || operation === 'close' || operation === 'review') {
     await view.act(() => view.props(component).onProjectOpen(project));
-    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectDetailModal').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
+    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectPage').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
     const form = requireTs('src/lib/projectPageState.ts').projectToFormState(project);
-    return view.act(() => view.props('ProjectDetailModal').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
+    return view.act(() => view.props('ProjectPage').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
   }
-  if (operation === 'edit-card') await view.act(() => view.props(component).onProjectEdit(project));
+  if (operation === 'edit-card') await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
   else await view.click('Nouveau projet');
   await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Brouillon différent du résultat officiel', description: 'Description saisie', responsible: fixtures.people.marie.id, dueDate: '2026-12-15' }));
   return view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
@@ -76,7 +76,7 @@ for (const [operation, method, path, status] of confirmedOperations) {
       const other = fixtures.projectListItem({ id: 'project-other', title: 'Autre projet inchangé' });
       await load(fixtures.projectsPage([project, other]));
       if (mode !== 'kanban') {
-        await view.act(() => view.props('ViewToggle').onChange(mode));
+        await view.act(() => view.props('SegmentedControl').onChange(mode));
         await view.waitFor(() => pageCalls().length === 2);
       }
       const before = pageCalls().length;
@@ -152,7 +152,7 @@ for (const operation of ['edit-card', 'delete']) {
         return response;
       });
       if (refusedEarlierRead) failPage();
-      await view.act(() => view.props('ViewToggle').onChange('grid'));
+      await view.act(() => view.props('SegmentedControl').onChange('grid'));
       await view.waitFor(() => pageCalls().length === 2);
       bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project) });
       bffProject.on(operation === 'delete' ? 'delete' : 'patch', '/projects/{projectId}', operation === 'delete' ? { status: 204 } : { body: fixtures.projectDetails(official) });
@@ -192,12 +192,12 @@ for (const [mode, component] of [['kanban', 'KanbanBoard'], ['grid', 'GridView']
   test(`a refused refresh in ${mode} retains confirmed projects, shows its error and retries the active filters`, async () => {
     await load();
     if (mode !== 'kanban') {
-      await view.act(() => view.props('ViewToggle').onChange(mode));
+      await view.act(() => view.props('SegmentedControl').onChange(mode));
       await view.waitFor(() => pageCalls().length === 2);
     }
     const before = pageCalls().length;
     failPage();
-    await view.act(() => view.props('SearchInput').onChange('éclairage'));
+    await view.act(() => view.props('ProjectFiltersBar').onSearchChange('éclairage'));
     await view.waitFor(() => pageCalls().length === before + 1);
     await view.waitFor(() => hasRetry());
     assert.equal(view.find(component).length, 1);
@@ -217,10 +217,10 @@ for (const [mode, component] of [['kanban', 'KanbanBoard'], ['grid', 'GridView']
 
 test('a failed refresh after an empty response is not presented as a new confirmed empty result', async () => {
   await load(fixtures.projectsPage([]));
-  await view.act(() => view.props('ViewToggle').onChange('grid'));
+  await view.act(() => view.props('SegmentedControl').onChange('grid'));
   await view.waitFor(() => pageCalls().length === 2);
   failPage();
-  await view.act(() => view.props('SearchInput').onChange('introuvable'));
+  await view.act(() => view.props('ProjectFiltersBar').onSearchChange('introuvable'));
   await view.waitFor(() => pageCalls().length === 3);
   await view.waitFor(() => hasRetry());
   assert.match(view.text(), /Liste momentanément indisponible/);
@@ -249,15 +249,15 @@ test('retrying a failed refresh after a confirmed duplicate only reads and never
 test('retry keeps every active filter and accepts a genuinely empty successful response', async () => {
   await load();
   await view.act(() => {
-    view.props('SearchInput').onChange('éclairage');
-    view.props('FilterSelect', 0).onChange('in-progress');
-    view.props('FilterSelect', 1).onChange('high');
-    view.props('ViewToggle').onChange('grid');
+    view.props('ProjectFiltersBar').onSearchChange('éclairage');
+    view.props('ProjectFiltersBar').onStatusChange('in-progress');
+    view.props('ProjectFiltersBar').onPriorityChange('high');
+    view.props('SegmentedControl').onChange('grid');
   });
   await view.fire((props) => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } });
   await view.waitFor(() => pageCalls().length === 2);
   failPage();
-  await view.act(() => view.props('SearchInput').onChange('éclairage public'));
+  await view.act(() => view.props('ProjectFiltersBar').onSearchChange('éclairage public'));
   await view.waitFor(() => hasRetry());
   bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([]) });
   await retry();
@@ -265,7 +265,7 @@ test('retry keeps every active filter and accepts a genuinely empty successful r
   assert.deepEqual(Object.fromEntries(pageCalls().at(-1).url.searchParams), {
     q: 'éclairage public', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'grid', page: '1', limit: '50',
   });
-  assert.match(view.text(), /Aucun projet ne correspond aux filtres sélectionnés/);
+  assert.match(view.text(), /Aucun projet ne correspond à la recherche ou aux filtres sélectionnés/);
   assert.doesNotMatch(view.text(), /Dernières données reçues|Liste momentanément indisponible|Rénovation de l’éclairage public/);
   assert.ok(bffProject.requests.every((request) => request.method === 'GET'));
 });

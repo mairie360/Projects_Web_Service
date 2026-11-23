@@ -1,11 +1,10 @@
 'use client';
 
+import { Avatar, PriorityPill, StatusBadge } from '@mairie360/lib-components/primitives';
+
 import { CalendarDays, CheckSquare2, Square } from 'lucide-react';
 import type { ProjectTask } from '@/types/project';
-import { formatProjectDate } from '../../../../project-card-meta';
-import { PersonAvatar } from '../../../PersonAvatar';
-import { PriorityPill } from '../../../PriorityPill';
-import { StatusPill } from '../../../StatusPill';
+import { formatProjectDate, projectStatusBadge } from '../../../../project-card-meta';
 import { TaskEditButton } from '../../../TaskEditButton';
 
 export function DraftTaskRow({ task, onToggle, onEdit }: { task: ProjectTask; onToggle: () => void; onEdit: () => void }) {
@@ -31,11 +30,11 @@ export function DraftTaskRow({ task, onToggle, onEdit }: { task: ProjectTask; on
           <TaskEditButton onClick={onEdit} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#57606a]">
-          <StatusPill status={task.status} />
-          <PriorityPill priority={task.priority} />
+          <StatusBadge status={projectStatusBadge[task.status]} />
+          <PriorityPill level={task.priority} />
           <span className="inline-flex items-center gap-1">
             {people.slice(0, 3).map((assignee) => (
-              <PersonAvatar key={assignee.name} name={assignee.name} />
+              <Avatar key={assignee.name} alt={assignee.name} size="xs" />
             ))}
             {people.length > 3 && <span>+{people.length - 3}</span>}
           </span>

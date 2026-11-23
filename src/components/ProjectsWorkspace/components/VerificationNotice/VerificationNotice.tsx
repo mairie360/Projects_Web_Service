@@ -1,3 +1,5 @@
+import { Button, ErrorAlert } from '@mairie360/lib-components/primitives';
+
 export interface VerificationNoticeProps {
   title: string;
   message: string;
@@ -8,14 +10,23 @@ export interface VerificationNoticeProps {
   onVerify: () => void;
 }
 
-/** A write whose receipt could not be confirmed: what happened and the verification read. */
+/**
+ * A write whose receipt could not be confirmed: what happened and the verification read, on the lib
+ * ErrorAlert (MAIR-828). It stays until the verification answers, so it is an alert and not a toast; the
+ * action is a lib Button because it must stay disabled while the verification runs.
+ */
 export const VerificationNotice = ({ title, message, error, pending, label, pendingLabel, onVerify }: VerificationNoticeProps) => (
-  <div role="alert" className="mb-5 rounded-md border border-[#ffcecb] bg-[#ffebe9] p-4 text-sm text-[#cf222e] [overflow-wrap:anywhere]">
-    <p className="font-semibold">{title}</p>
-    <p>{message}</p>
-    {error && <p className="mt-2">{error}</p>}
-    <button type="button" disabled={pending} aria-busy={pending} onClick={onVerify} className="mt-3 min-h-11 rounded-md border border-[#d0d7de] bg-white px-3 py-2 font-semibold text-[#24292f] disabled:opacity-60">
-      {pending ? pendingLabel : label}
-    </button>
-  </div>
+  <ErrorAlert
+    className="mb-5 [overflow-wrap:anywhere]"
+    title={title}
+    description={(
+      <>
+        <span className="block">{message}</span>
+        {error && <span className="mt-2 block">{error}</span>}
+        <span className="mt-2 block">
+          <Button variant="outline" tone="danger" size="s" label={pending ? pendingLabel : label} disabled={pending} aria-busy={pending} onClick={onVerify} />
+        </span>
+      </>
+    )}
+  />
 );

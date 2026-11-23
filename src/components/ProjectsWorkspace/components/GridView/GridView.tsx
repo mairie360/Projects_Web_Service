@@ -1,66 +1,49 @@
 'use client';
 
 import { ProjectCard } from '../ProjectCard';
-import type { Project, ProjectTaskDraft } from '@/types/project';
-import { type FilterOption } from '@/lib/projectPageState';
+import type { Project } from '@/types/project';
 import { ProjectsEmptyState as EmptyState } from '../ProjectsEmptyState';
 
 export function GridView({
   projects,
-  workflowPort,
-  taskCreationStates,
-  onInspectTaskCreation,
-  onPreserveTaskDraft,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
-  memberOptions,
-  labelOptions,
   onProjectOpen,
-  onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
-  onProjectTaskAdd,
+  onProjectEdit,
+  onProjectStatusChange,
+  onResetFilters,
 }: {
   projects: Project[];
-  workflowPort?: import('@/lib/projectWorkflow').ProjectWorkflowPort;
-  taskCreationStates?: ReadonlyMap<string, import('../TaskCreationNotice').TaskCreationState>;
-  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
-  onPreserveTaskDraft?: import('../ProjectCard/project-card-types').ProjectCardProps['onPreserveTaskDraft'];
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
-  memberOptions: FilterOption[];
-  labelOptions: FilterOption[];
   onProjectOpen: (project: Project) => void;
-  onProjectEdit: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
-  onProjectTaskAdd: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
+  onProjectEdit?: (project: Project) => void;
+  onProjectStatusChange?: (project: Project, status: Project['status']) => void | Promise<void>;
+  /** Shown in the empty state when a search or a filter hides every project (MAIR-829). */
+  onResetFilters?: () => void;
 }) {
-  if (projects.length === 0) return <EmptyState />;
+  if (projects.length === 0) return <EmptyState onReset={onResetFilters} />;
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
       {projects.map((project) => (
         <ProjectCard
           key={project.id}
           project={project}
-          workflowPort={workflowPort}
           variant="grid"
-          taskCreationState={taskCreationStates?.get(project.id)}
-          onInspectTaskCreation={onInspectTaskCreation}
-          onPreserveTaskDraft={onPreserveTaskDraft}
           duplicationPending={duplicatingProjectIds.includes(project.id)}
           duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
-          memberOptions={memberOptions}
-          labelOptions={labelOptions}
           onOpen={onProjectOpen}
-          onEdit={onProjectEdit}
           onDuplicate={onProjectDuplicate}
           onDelete={onProjectDelete}
-          onAddTask={onProjectTaskAdd}
+          onEdit={onProjectEdit}
+          onChangeStatus={onProjectStatusChange}
         />
       ))}
     </div>
   );
 }
-

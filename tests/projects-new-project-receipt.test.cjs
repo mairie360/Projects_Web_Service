@@ -53,14 +53,14 @@ for (const operation of ['create', 'duplicate']) {
     test(`${operation}: ${bad} new-project receipt preserves rows, detail and draft without replay`, async () => {
       await loaded();
       await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(second));
-      const selected = structuredClone(view.props('ProjectDetailModal').project);
+      const selected = structuredClone(view.props('ProjectPage').project);
       const rows = structuredClone(view.props('ProjectsWorkspace').projects);
       await prepare(operation);
       harness.bffProject.on('post', pathFor(operation), { body: invalidReceipt(bad) });
       const reads = harness.bffProject.requests.filter(({ method }) => method === 'GET').length;
       await view.act(() => perform(operation));
       assert.deepEqual(view.props('ProjectsWorkspace').projects, rows);
-      assert.deepEqual(view.props('ProjectDetailModal').project, selected);
+      assert.deepEqual(view.props('ProjectPage').project, selected);
       assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor(operation)), true);
       assert.match(view.text(), bad === 'task-collision' ? /tâches.*incohérentes/ : /identité du nouveau projet n’est pas vérifiable/);
       assert.doesNotMatch(view.text(), /Reçu non vérifié à ne pas appliquer/);
@@ -180,7 +180,8 @@ test('a late duplicate cannot reuse the ID already confirmed by a different new-
     release(); await pending; await view.settle();
     assert.equal(view.props('ProjectsWorkspace').projects.find(project => project.id === created.id).title, created.title);
     assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor('duplicate')), true);
-    assert.equal(view.props('ProjectDetailModal').project.title, created.title);
+    // MAIR-836: a creation no longer opens the sheet; the list keeps the confirmed title.
+    assert.equal(view.find('ProjectPage').length, 0);
     await view.act(() => perform('duplicate'));
     assert.equal(writes().length, 2);
   } finally { release(); await pending; await view.settle(); }
@@ -194,14 +195,14 @@ for (const mode of ['kanban', 'grid', 'table']) {
     await view.act(() => view.props('ProjectsWorkspace').setViewMode(mode));
     await view.waitFor(() => !view.props('ProjectsWorkspace').pageLoading);
     await view.click(props => props['aria-label'] === `Actions pour ${first.title}`);
-    const blocked = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && text === 'Copie à vérifier');
+    const blocked = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Copie à vérifier');
     assert.equal(blocked.length, 1);
     assert.equal(blocked[0].props.disabled, true);
     assert.equal(blocked[0].props['aria-busy'], undefined, 'uncertainty is not a still-running request');
     assert.equal(view.props('ProjectsWorkspace').projects[0].permissions.canDuplicate, first.permissions.canDuplicate);
     await view.click(props => props['aria-label'] === `Actions pour ${first.title}`);
     await view.click(props => props['aria-label'] === `Actions pour ${second.title}`);
-    const available = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && text === 'Dupliquer');
+    const available = view.hostElements((props, text, tag) => tag === 'button' && props.role === 'menuitem' && props['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer');
     assert.equal(available.length, 1);
     assert.equal(available[0].props.disabled, false);
     assert.equal(writes().length, 1);
@@ -256,7 +257,7 @@ for (const operation of ['create', 'duplicate']) {
     const created = f.projectListItem({ id: 'new-id', title: 'Projet consulté vérifié' });
     harness.bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(created) });
     await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(created));
-    assert.equal(view.props('ProjectDetailModal').project.id, created.id);
+    assert.equal(view.props('ProjectPage').project.id, created.id);
     assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor(operation)), false);
     assert.equal(writes().length, 1);
   });
@@ -330,7 +331,7 @@ test('an abandoned consultation cannot resolve a distinct receipt or reopen anot
     await ready;
     await view.act(() => view.props('ProjectsWorkspace').openProjectDetails(second));
     release(); await pending; await view.settle();
-    assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+    assert.equal(view.props('ProjectPage').project.id, second.id);
     assert.equal(view.props('ProjectsWorkspace').newProjectReceiptIssues.has(keyFor('duplicate')), true);
     assert.equal(writes().length, 1);
   } finally { release(); await pending; await view.settle(); }
@@ -351,7 +352,7 @@ test('verification after closing creation leaves a different editor and consulta
   assert.equal(view.props('CreateProjectModal').mode, 'edit');
   assert.equal(view.props('CreateProjectModal').form.title, 'Autre édition préservée');
   assert.equal(view.props('CreateProjectModal').confirmedCreationTitle, undefined);
-  assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+  assert.equal(view.props('ProjectPage').project.id, second.id);
   await view.act(() => view.props('CreateProjectModal').onClose());
   await view.act(() => view.props('ProjectsWorkspace').openCreateProject());
   assert.equal(view.props('CreateProjectModal').form.title, 'Dernier brouillon avant fermeture');

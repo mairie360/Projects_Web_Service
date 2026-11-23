@@ -49,7 +49,7 @@ for (const mode of ['kanban', 'grid', 'table']) {
       await view.settle();
       assert.equal(pending.initiated(), 1, 'synchronous guard must precede the disabled render');
       await view.fire((p) => p['aria-label'] === `Actions pour ${project.title}`, 'onClick');
-      assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && text === 'Dupliquer' && p.disabled).length, 1);
+      assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && p['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer' && p.disabled).length, 1);
       assert.match(view.html, /role="status"[^>]*>Duplication du projet/);
       assert.match(view.html, /aria-busy="true"/);
       pending.release();
@@ -57,7 +57,7 @@ for (const mode of ['kanban', 'grid', 'table']) {
       await view.settle();
       assert.equal(harness.bffProject.calls(duplicatePath, 'post').length, 1);
       assert.match(view.text(), /Duplication refusée/);
-      assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && text === 'Dupliquer' && !p.disabled).length, 1);
+      assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && p['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer' && !p.disabled).length, 1);
       assert.equal(props(mode).projects[0].id, project.id);
       harness.bffProject.on('post', duplicatePath, { status: 201, body: copy });
       await view.act(() => props(mode).onProjectDuplicate(project));
@@ -83,7 +83,7 @@ test('guard remains active during the follow-up GET and across a view change', a
     writes.push(props('grid').onProjectDuplicate(project));
     await view.settle();
     await view.fire((p) => p['aria-label'] === `Actions pour ${project.title}`, 'onClick');
-    assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && text === 'Dupliquer' && p.disabled).length, 1);
+    assert.equal(view.hostElements((p, text, tag) => tag === 'button' && p.role === 'menuitem' && p['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer' && p.disabled).length, 1);
     assert.equal(harness.bffProject.calls(duplicatePath, 'post').length, 1);
     pendingRead.release();
     await Promise.all(writes);
@@ -128,13 +128,13 @@ test('pending duplicate and refused refresh compose across views without losing 
 test('a refused duplication preserves active filters and does not trigger a follow-up read', async () => {
   await open();
   await view.fire((p) => p.type === 'search', 'onChange', { target: { value: 'éclairage' } });
-  await view.waitFor(() => view.props('SearchInput').value === 'éclairage');
+  await view.waitFor(() => view.props('ProjectFiltersBar').search === 'éclairage');
   await view.settle();
   harness.bffProject.on('post', duplicatePath, refused());
   const reads = harness.bffProject.calls('/projects-page', 'get').length;
   await view.act(() => props().onProjectDuplicate(props().projects[0]));
   assert.equal(harness.bffProject.calls('/projects-page', 'get').length, reads);
-  assert.equal(view.props('SearchInput').value, 'éclairage');
+  assert.equal(view.props('ProjectFiltersBar').search, 'éclairage');
   assert.match(view.text(), /Duplication refusée/);
 });
 
@@ -164,7 +164,7 @@ test('permission refusal keeps Dupliquer absent and never creates a write', asyn
   await open('kanban', page);
   const project = props().projects[0];
   await view.fire((p) => p['aria-label'] === `Actions pour ${project.title}`, 'onClick');
-  assert.equal(view.hostElements((p, text) => p.role === 'menuitem' && text === 'Dupliquer').length, 0);
+  assert.equal(view.hostElements((p, text) => p.role === 'menuitem' && p['data-slot'] === 'dropdown-menu-item' && text === 'Dupliquer').length, 0);
   await view.act(() => props().onProjectDuplicate(project));
   assert.equal(harness.bffProject.calls(duplicatePath, 'post').length, 0);
 });

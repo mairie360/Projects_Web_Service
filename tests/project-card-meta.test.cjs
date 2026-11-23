@@ -1,31 +1,20 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
-const { AlertCircle, CheckCircle2, Clock3, Eye } = require('lucide-react');
-const { getInitials, formatProjectDate, getProjectNumber, statusMeta, priorityMeta, labelStyles } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
+const { statuses } = require('@mairie360/lib-components/primitives');
+const { formatProjectDate, getProjectNumber, projectStatusBadge, projectStatusLabel } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
 
-// These are the public card labels and icon choices used by the legacy project DTO.
-test('each published project status has its distinct readable label and icon', () => {
-  assert.deepEqual(Object.keys(statusMeta).sort(), ['done', 'in-progress', 'review', 'todo']);
-  for (const [status, label, icon] of [
-    ['todo', 'À faire', AlertCircle], ['in-progress', 'En cours', Clock3],
-    ['review', 'En révision', Eye], ['done', 'Terminé', CheckCircle2],
+// MAIR-828: the statuses take the lib colours and French labels, no local colour table any more.
+test('each published project status maps to its lib status and label', () => {
+  assert.deepEqual(Object.keys(projectStatusBadge).sort(), ['done', 'in-progress', 'on-hold', 'review', 'todo']);
+  for (const [status, badge, label] of [
+    ['todo', 'todo', 'À faire'], ['in-progress', 'inprogress', 'En cours'],
+    ['review', 'review', 'En revue'], ['on-hold', 'paused', 'Suspendu'], ['done', 'done', 'Terminé'],
   ]) {
-    assert.equal(statusMeta[status].label, label);
-    assert.equal(statusMeta[status].icon, icon);
-    assert.ok(statusMeta[status].className.trim());
-    assert.ok(statusMeta[status].iconClassName.trim());
+    assert.equal(projectStatusBadge[status], badge);
+    assert.ok(statuses[badge], badge);
+    assert.equal(projectStatusLabel(status), label);
   }
-  assert.deepEqual(Object.values(priorityMeta).map(meta => meta.label), ['Haute', 'Moyenne', 'Basse']);
-  assert.ok(Object.values(priorityMeta).every(meta => meta.text && meta.dot && meta.pill));
-  assert.equal(new Set(labelStyles).size, labelStyles.length);
-});
-
-test('initials tolerate empty names and repeated spaces while preserving French characters', () => {
-  for (const [name, initials] of [
-    ['', ''], ['   ', ''], ['Alice', 'A'], [' Alice   Martin ', 'AM'],
-    ['Élodie Çelik', 'ÉÇ'], ['Jean Pierre Dupont', 'JP'], ['Anne-Marie Le Gall', 'AL'],
-  ]) assert.equal(getInitials(name), initials, JSON.stringify(name));
 });
 
 test('civil due dates keep their day and optionally their year without host timezone conversion', () => {

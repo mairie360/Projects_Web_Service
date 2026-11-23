@@ -1,4 +1,5 @@
-import type { Person, Project, ProjectTask } from '../types/project';
+import type { Person, Project, ProjectStatus, ProjectTask, TaskStatus } from '../types/project';
+import { budgetInputValue } from './projectBudget';
 
 export type ViewMode = 'kanban' | 'grid' | 'table';
 
@@ -18,6 +19,11 @@ export type ProjectFormState = {
   assignees: string[];
   labels: string[];
   dueDate: string;
+  /** Group of the project (`GET /project-groups`, MAIR-880); required to create, kept empty for a project created before groups. */
+  groupId: string;
+  /** MAIR-1085: budgets typed in euros (« 12 500,50 »), empty for none; only the page edit sends them. */
+  budgetVoted: string;
+  budgetCommitted: string;
   progress: number;
   totalTasks: number;
   completedTasks: number;
@@ -28,13 +34,31 @@ export type ProjectFormState = {
 
 export type TaskFormState = {
   title: string;
-  status: Project['status'];
+  status: TaskStatus;
   statusId?: string;
   priority: Project['priority'];
   assignees: string[];
   labels: string[];
   dueDate: string;
+  /** MAIR-1087: start day of the task, empty for none; at or before `dueDate`. */
+  startDate?: string;
 };
+
+/** MAIR-1087: a start after the due date is refused (by the BFF too, 400 on `body.startDate`). */
+export const TASK_START_AFTER_DUE = 'Le début doit précéder l’échéance.';
+export function taskStartAfterDue(form: Pick<TaskFormState, 'startDate' | 'dueDate'>) {
+  return Boolean(form.startDate && form.dueDate && form.startDate > form.dueDate);
+}
+
+/** MAIR-1084: the task category of a status; `review` and `on-hold` (project statuses only) read as « En cours ». */
+export function taskStatusOf(status: ProjectStatus): TaskStatus {
+  return status === 'review' || status === 'on-hold' ? 'in-progress' : status;
+}
+
+/** MAIR-1084: the status choices a task may take (`review` and `on-hold` are project statuses only). */
+export function taskStatusOptions<T extends { value: string }>(options: T[]) {
+  return options.filter((option) => option.value !== 'review' && option.value !== 'on-hold');
+}
 
 export function getUniqueValues(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) =>
@@ -80,6 +104,9 @@ export function createProjectFormState(status: Project['status'] = 'todo'): Proj
     assignees: [],
     labels: [],
     dueDate: '',
+    groupId: '',
+    budgetVoted: '',
+    budgetCommitted: '',
     progress: 0,
     totalTasks: 0,
     completedTasks: 0,
@@ -91,7 +118,7 @@ export function createProjectFormState(status: Project['status'] = 'todo'): Proj
 export function createTaskFormState(project: Project): TaskFormState {
   return {
     title: '',
-    status: project.status,
+    status: taskStatusOf(project.status),
     priority: project.priority,
     assignees: [getPersonValue(project.responsible)],
     labels: [],
@@ -129,6 +156,9 @@ export function projectToFormState(project: Project): ProjectFormState {
     assignees: participantValues,
     labels: project.labels,
     dueDate: project.dueDate,
+    groupId: project.group?.id ?? '',
+    budgetVoted: budgetInputValue(project.budgetVoted),
+    budgetCommitted: budgetInputValue(project.budgetCommitted),
     progress: project.progress,
     totalTasks: project.tasks.total,
     completedTasks: project.tasks.completed,
