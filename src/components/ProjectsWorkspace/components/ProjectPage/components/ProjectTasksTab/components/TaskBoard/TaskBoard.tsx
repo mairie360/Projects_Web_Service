@@ -31,6 +31,8 @@ export interface TaskBoardProps {
   highlightedTaskRef?: React.Ref<HTMLElement>;
   quickAddPending?: boolean;
   onOpenTask: (task: ProjectTask) => void;
+  /** « Modifier la tâche » (MAIR-1137); absent without the right to edit tasks. */
+  onEditTask?: (task: ProjectTask) => void;
   onMoveTask: (task: ProjectTask, status: TaskColumnStatus) => void;
   onDeleteTask: (task: ProjectTask) => void;
   /** C3: the « + » of a column; absent without the right to create a task. Resolves `true` once the field may close. */
@@ -44,7 +46,7 @@ export interface TaskBoardProps {
  */
 export function TaskBoard({
   columns, items, archivedLabel, isOverdue, canMove, canDelete, blocked, pendingTaskIds, taskWriteErrors, highlightTaskId, highlightedTaskRef,
-  quickAddPending = false, onOpenTask, onMoveTask, onDeleteTask, onQuickAdd,
+  quickAddPending = false, onOpenTask, onEditTask, onMoveTask, onDeleteTask, onQuickAdd,
 }: TaskBoardProps) {
   const [draggedId, setDraggedId] = React.useState<string | null>(null);
   const [target, setTarget] = React.useState<TaskColumnStatus | null>(null);
@@ -158,6 +160,7 @@ export function TaskBoard({
                       linked={linked}
                       articleRef={linked ? highlightedTaskRef : undefined}
                       onOpen={() => onOpenTask(task)}
+                      onEdit={onEditTask && task.permissions?.canEdit !== false ? () => onEditTask(task) : undefined}
                       onMove={movable ? (next) => onMoveTask(task, next) : undefined}
                       onDelete={canDelete(task) ? () => onDeleteTask(task) : undefined}
                     />

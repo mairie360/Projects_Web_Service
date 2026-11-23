@@ -33,6 +33,8 @@ export const projectStatusBadge = {
   todo: 'todo',
   'in-progress': 'inprogress',
   review: 'review',
+  // MAIR-1084: a project put on hold reads « Suspendu », the lib's `paused` status.
+  'on-hold': 'paused',
   done: 'done',
 } as const satisfies Record<Project['status'], Status>;
 
@@ -41,6 +43,7 @@ export const projectColumnTone = {
   todo: 'neutral',
   'in-progress': 'info',
   review: 'warning',
+  'on-hold': 'warning',
   done: 'success',
 } as const satisfies Record<Project['status'], StatusPillTone>;
 

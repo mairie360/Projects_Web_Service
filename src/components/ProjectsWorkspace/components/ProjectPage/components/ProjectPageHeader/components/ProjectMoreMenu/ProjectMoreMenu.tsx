@@ -28,7 +28,7 @@ export const ProjectMoreMenu = ({ title, onEdit, editDisabled = false, onDuplica
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <ToolTip text="Plus d’actions">
         <DropdownMenuTrigger asChild>
-          <MoreIconButton ref={triggerRef} label={`Plus d’actions pour ${title}`} aria-haspopup="menu" aria-expanded={open} />
+          <MoreIconButton ref={triggerRef} label={`Plus d’actions pour ${title}`} aria-haspopup="menu" aria-expanded={open} size="m" />
         </DropdownMenuTrigger>
       </ToolTip>
       <DropdownMenuContent role="menu" align="end" aria-label={`Plus d’actions pour ${title}`} className="w-52">

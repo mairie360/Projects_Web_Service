@@ -27,10 +27,11 @@ describe('workflow adoption by existing project forms', () => {
     render(<Detail />);
     fireEvent.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     const form = screen.getByRole('form', { name: 'Créer une tâche' });
-    // The sheet's « État » lists the project's own statuses once they are read (MAIR-567, MAIR-859).
-    await within(form).findByRole('option', { name: 'Conseil municipal' });
     fireEvent.change(within(form).getByLabelText(/^Titre/), { target: { value: 'Plan communal' } });
-    fireEvent.change(within(form).getByLabelText('État', { exact: true }), { target: { value: 'status-2' } });
+    fireEvent.submit(form);
+    // The « Colonne de départ » cards list the project's own statuses once they are read (MAIR-567, MAIR-1137).
+    fireEvent.click(await within(form).findByRole('radio', { name: /^Conseil municipal/ }));
+    fireEvent.submit(form);
     fireEvent.submit(form);
     const saved = JSON.parse((await screen.findByTestId('saved')).textContent);
     expect(saved.title).toBe('Plan communal');
@@ -45,10 +46,14 @@ describe('workflow adoption by existing project forms', () => {
       return <><CreateProjectModal mode="create" workflowPort={port} form={projectToFormState(project)} error="" memberOptions={page.options.members} labelOptions={[]} groupOptions={[{ value: 'group-1', label: 'Services techniques' }]} statusOptions={page.filters.statuses} priorityOptions={page.filters.priorities} onChange={() => undefined} onClose={() => undefined} onSubmit={(event, selected) => { event.preventDefault(); setSelection(selected); }} /><output data-testid="selection">{JSON.stringify(selection)}</output></>;
     }
     render(<Creation />);
+    // MAIR-1136: the template is chosen at the « Tâches » step; the creation is sent from the recap.
+    fireEvent.click(screen.getByRole('button', { name: 'Étape 3 sur 4 : Tâches (facultative)' }));
     await screen.findByRole('option', { name: 'Instruction municipale' });
     fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'template-1' } });
+    expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Conseil municipal');
+    fireEvent.submit(screen.getByRole('dialog'));
+    expect(screen.getByRole('region', { name: 'Tâches' }).textContent).toContain('Instruction municipale');
     fireEvent.submit(screen.getByRole('dialog'));
     expect(JSON.parse(screen.getByTestId('selection').textContent)).toEqual(template);
-    expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Conseil municipal');
   });
 });

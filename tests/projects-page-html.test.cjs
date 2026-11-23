@@ -64,7 +64,7 @@ test('the first pass renders the loading state, the next one the projects of GET
   assert.match(view.text(), /Remplacement des candélabres du centre-ville\./);
   assert.match(view.text(), /Nouveau projet/);
   assert.equal(view.find('KanbanBoard').length, 1);
-  assert.deepEqual(view.props('KanbanBoard').columns.map((column) => column.label), ['À faire', 'En cours', 'En revue', 'Terminé']);
+  assert.deepEqual(view.props('KanbanBoard').columns.map((column) => column.label), ['À faire', 'En cours', 'En revue', 'Suspendu', 'Terminé']);
   assert.deepEqual(view.props('ProjectFiltersBar').views.map((option) => option.value), ['kanban', 'grid', 'table']);
   assert.equal(view.props('Header').isAdmin, false);
   // MAIR-1133: lib-components 2.3 page base, white frame without footer.
@@ -244,12 +244,11 @@ test('Kanban ignores control-origin and foreign drags, and prevents a post-drag 
   assert.equal(stopped, 1);
 });
 
-test('Kanban disables dragging when project management access is absent', async () => {
-  const page = fixtures.projectsPage();
+test('Kanban disables dragging when the project rights refuse its edition (MAIR-1088: the project decides)', async () => {
+  const page = fixtures.projectsPage([fixtures.projectListItem({ permissions: { ...fixtures.projectListItem().permissions, canEdit: false } })]);
   page.access = { ...page.access, canManageProjects: false };
   await renderLoadedPage(page);
 
-  assert.equal(view.props('KanbanBoard').onMoveProject, undefined);
   assert.equal(view.hostElements((props) => props['data-project-id'] === 'project-1')[0].props.draggable, false);
 });
 
@@ -630,7 +629,8 @@ test('module boundaries retain detail task search and comment drafts through und
     await view.act(() => view.find('SegmentedControl').find(x => x.props.label === 'Vue des projets').props.onChange(value));
     await view.waitFor(() => pageCalls().length === reads + 1);
     assert.equal(view.find('ProjectPage').length, 1);
-    assert.equal(view.hostElements(props => props['aria-label'] === 'Rechercher une tâche')[0].props.value, 'candélabres');
+    // MAIR-1137: the task page replaces the toolbar while it is open; the search stays in the page state.
+    assert.equal(view.props('ProjectTasksTab').filters.search, 'candélabres');
     const comment = view.hostElements(props => props.placeholder === 'Ajouter un commentaire...');
     assert.equal(comment.length, 1);
     assert.equal(comment[0].props.value, 'Commentaire non envoyé');
@@ -811,21 +811,35 @@ const openDetails = async () => {
   await view.waitFor(() => view.find('ProjectPage').length === 1);
 };
 
-// MAIR-859: a task opens in its sheet (lib Drawer) from its card; the creation sheet from « Nouvelle tâche ».
+// MAIR-859, MAIR-1137: a card opens the task page; « Modifier » opens the task window (lib Modal), « Nouvelle tâche »
+// the creation in three steps.
 const boardTask = (taskId) => view.props('TaskBoard').items.find((item) => item.task.id === taskId).task;
-const openTaskSheet = async (taskId = 'task-1') => {
+const taskPageShown = (taskId) => view.find('TaskPage').length > 0 && view.props('TaskPage').task.id === taskId;
+const openTaskPage = async (taskId = 'task-1') => {
+  if (taskPageShown(taskId)) return;
+  if (view.find('TaskPage').length) await view.act(() => view.props('TaskPage').onBack());
   await view.act(() => view.props('TaskBoard').onOpenTask(boardTask(taskId)));
-  await view.waitFor(() => view.props('TaskSheet').open && view.props('TaskSheet').task?.id === taskId);
+  await view.waitFor(() => taskPageShown(taskId));
+};
+const openTaskSheet = async (taskId = 'task-1') => {
+  await openTaskPage(taskId);
+  await view.act(() => view.props('TaskPage').onEdit());
+  await view.waitFor(() => view.props('TaskDialog').open && view.props('TaskDialog').task?.id === taskId);
 };
 const openNewTaskSheet = async () => {
   await view.click((props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
-  await view.waitFor(() => view.props('TaskSheet').open && !view.props('TaskSheet').task);
+  await view.waitFor(() => view.props('TaskDialog').open && !view.props('TaskDialog').task);
 };
 const submitTaskSheet = () => view.fire((props, text, tag) => tag === 'form' && /^(Créer|Modifier) une tâche$/.test(props['aria-label'] ?? ''), 'onSubmit');
-// Shows (or hides) the follow-up of a task, its sheet opened first.
+// A creation goes through « L’essentiel », « Attribution », then the recap writes it (MAIR-1137 C12).
+const submitTaskCreation = async () => {
+  for (let step = 0; step < 3; step += 1) await submitTaskSheet();
+};
+const setTaskRadio = (name, value) => view.act(() => view.find('RadioGroup').find((group) => group.props.name === name).props.onChange(value));
+// Shows (or hides) the follow-up of a task: its page reads it when it opens, `open` toggles it afterwards.
 const follow = async (taskId = 'task-1') => {
-  if (!view.find('TaskSheet').length || view.props('TaskSheet').task?.id !== taskId) await openTaskSheet(taskId);
-  await view.click((props, text, tag) => tag === 'button' && (text === 'Suivi et commentaires' || text === 'Masquer le suivi'));
+  if (!taskPageShown(taskId)) return openTaskPage(taskId);
+  await view.act(() => view.props('TaskPage').collaboration.open(taskId));
 };
 
 test('search, filters and the grid view reload the page with the declared query parameters', async () => {
@@ -862,7 +876,7 @@ test('filter controls show and restore the actual unfiltered BFF query', async (
 
   assert.equal(pageCalls()[0].status, 'all');
   assert.equal(pageCalls()[0].priority, 'all');
-  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.deepEqual(view.props('ProjectFiltersBar').priorityOptions.map((option) => option.value), ['all', 'high', 'medium', 'low']);
   assert.match(view.text(), /Tous les statuts/);
   assert.match(view.text(), /Toutes les priorités/);
@@ -893,7 +907,7 @@ test('filter controls do not duplicate all when the BFF already supplies it', as
   page.filters.priorities.unshift({ value: 'all', label: 'Toutes' });
   await renderLoadedPage(page);
 
-  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.deepEqual(view.props('ProjectFiltersBar').priorityOptions.map((option) => option.value), ['all', 'high', 'medium', 'low']);
   assert.match(view.text(), /Tous les statuts/);
   assert.match(view.text(), /Toutes les priorités/);
@@ -965,21 +979,21 @@ for (const mode of ['create', 'edit']) {
     const route = mode === 'edit' ? '/projects/{projectId}/tasks/{taskId}' : '/projects/{projectId}/tasks';
     bffProject.on(method, route, harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Sauvegarde temporairement refusée')));
     await view.fire((props) => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Saisie à conserver' } });
-    await view.fire((props) => props.id === 'task-sheet-status', 'onChange', { target: { value: 'status-3' } });
-    await view.fire((props) => props.id === 'task-sheet-priority', 'onChange', { target: { value: 'low' } });
+    await setTaskRadio('task-status', 'status-3');
+    await setTaskRadio('task-priority', 'low');
     await view.fire((props) => props.id === 'task-sheet-due-date', 'onChange', { target: { value: '2026-11-17' } });
-    if (mode === 'create') await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
-    await submitTaskSheet();
+    if (mode === 'create') await setTaskRadio('task-assignee', 'user-3');
+    if (mode === 'create') await submitTaskCreation(); else await submitTaskSheet();
     await view.waitFor(html => html.includes('Sauvegarde temporairement refusée'));
     assert.match(view.html, /id="task-sheet-title"[^>]*value="Saisie à conserver"|value="Saisie à conserver"[^>]*id="task-sheet-title"/);
-    // MAIR-859: the task sheet is a Drawer of the « Tâches » panel.
+    // MAIR-1137: the task window is a lib Modal of the « Tâches » panel.
     assert.match(view.html, /role="dialog"[^]*role="alert"[^>]*>Sauvegarde temporairement refusée/);
-    assert.match(view.text(), mode === 'edit' ? /Enregistrer la tâche/ : /Ajouter la tâche/);
+    assert.match(view.text(), mode === 'edit' ? /Enregistrer \(\d+\)/ : /Ajouter la tâche/);
     assert.equal(bffProject.calls(route, method).length, 1);
     assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1, 'no refresh before confirmation');
     bffProject.on(method, route, ({ body }) => ({ status: mode === 'edit' ? 200 : 201, body: fixtures.projectTask({ ...body, id: mode === 'edit' ? 'task-1' : 'task-3' }) }));
     await submitTaskSheet();
-    await view.waitFor(() => !view.props('TaskSheet').open);
+    await view.waitFor(() => !view.props('TaskDialog').open);
     assert.equal(bffProject.calls(route, method).length, 2);
     assert.deepEqual(bffProject.calls(route, method)[1].body, bffProject.calls(route, method)[0].body);
     assert.doesNotMatch(view.text(), /Sauvegarde temporairement refusée/);
@@ -994,15 +1008,14 @@ for (const mode of ['create', 'edit']) {
     if (mode === 'edit') await openTaskSheet('task-1');
     else await openNewTaskSheet();
     await view.fire(props => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Responsable conservé' } });
-    await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'task-sheet-assignees').props.onChange(
-      mode === 'edit' ? ['user-3', 'user-2', 'user-1'] : ['user-3', 'user-1']
-    ));
+    // MAIR-1137 (C12): the « Assignée à » cards name one agent.
+    await setTaskRadio('task-assignee', 'user-3');
     const method = mode === 'edit' ? 'patch' : 'post';
     const route = mode === 'edit' ? '/projects/{projectId}/tasks/{taskId}' : '/projects/{projectId}/tasks';
     bffProject.on(method, route, harness.errorReply(503, fixtures.apiError('UNAVAILABLE', 'Assignation refusée')));
-    await submitTaskSheet();
+    if (mode === 'create') await submitTaskCreation(); else await submitTaskSheet();
     await view.waitFor(html => html.includes('Assignation refusée'));
-    const expected = mode === 'edit' ? ['user-3', 'user-2', 'user-1'] : ['user-3', 'user-1'];
+    const expected = ['user-3'];
     const first = bffProject.calls(route, method)[0];
     assert.equal(first.pathParams.projectId, 'project-1');
     if (mode === 'edit') assert.equal(first.pathParams.taskId, 'task-1');
@@ -1018,7 +1031,7 @@ for (const mode of ['create', 'edit']) {
     bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem(),
       [official, fixtures.projectTask({ id: 'task-2', status: 'done' })]) });
     await submitTaskSheet();
-    await view.waitFor(() => !view.props('TaskSheet').open);
+    await view.waitFor(() => !view.props('TaskDialog').open);
     assert.equal(bffProject.calls(route, method).length, 2);
     assert.deepEqual(bffProject.calls(route, method)[1].body, first.body);
     assert.equal(view.props('ProjectPage').tasks.find(task => task.id === official.id).responsible.id, 'user-3');
@@ -1090,11 +1103,12 @@ test('the project page drives the tasks: board move with its toast, deletion wit
   assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value=""/, 'the comment field is cleared once sent');
 
   bffProject.on('delete', '/projects/{projectId}/tasks/{taskId}', { status: 204 });
-  await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer la tâche');
+  // MAIR-1137 (C15): « Supprimer la tâche » of the task page « … ».
+  await view.act(() => view.props('TaskPage').onDelete());
   assert.match(view.text(), /Supprimer définitivement cette tâche \?/);
   await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer' && props.role !== 'menuitem');
   await view.waitFor(() => view.text().includes(`Tâche « ${task} » supprimée.`));
-  assert.equal(view.props('TaskSheet').open, false);
+  assert.equal(view.find('TaskPage').length, 0, 'back to the board');
   assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'delete')[0].pathParams, { projectId: 'project-1', taskId: 'task-1' });
 });
 
@@ -1113,13 +1127,11 @@ test('task follow-up ignores a late response from a previously selected task', a
   bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', ({ pathParams }) => ({ body: { ...fixtures.taskCollaboration(),
     comments: [fixtures.taskComment({ message: `Suivi ${pathParams.taskId}` })], history: [],
   } }));
-  await openTaskSheet('task-1');
-  const followButton = () => view.hostElements((props, text, tag) => tag === 'button' && text === 'Suivi et commentaires')[0];
-  await view.act(() => { void followButton().props.onClick(); });
+  // MAIR-1137: the task page reads its follow-up when it opens.
+  await openTaskPage('task-1');
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length === 1);
-  await view.act(() => view.props('TaskSheet').onClose());
-  await openTaskSheet('task-2');
-  await view.act(() => { void followButton().props.onClick(); });
+  await view.act(() => view.props('TaskPage').onBack());
+  await openTaskPage('task-2');
   await view.waitFor(html => html.includes('Suivi task-2'));
   release();
   await view.waitFor(() => !view.text().includes('Chargement du suivi'));
@@ -1244,7 +1256,7 @@ test('task follow-up never applies a late comment confirmation to another task',
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/comments', 'post').length === 1);
   assert.match(view.html, /role="status"[^>]*>Envoi du commentaire/);
   assert.equal(view.hostElements(props => props.placeholder === 'Ajouter un commentaire...')[0].props.disabled, true);
-  await view.act(() => view.props('TaskSheet').onClose());
+  await view.act(() => view.props('TaskPage').onBack());
   await follow('task-2');
   await view.waitFor(html => html.includes('Suivi task-2'));
   await view.act(() => submit({ preventDefault() {} }));
@@ -1264,8 +1276,8 @@ test('task follow-up preserves its draft across a same-project status refresh', 
   await view.waitFor(html => html.includes('Devis reçu.'));
   await view.fire(props => props.placeholder === 'Ajouter un commentaire...', 'onChange', { target: { value: 'Brouillon encore présent' } });
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: fixtures.projectTask({ status: 'in-progress' }) });
-  // MAIR-859: a board move refreshes the project while the sheet keeps its comment draft.
-  await view.act(() => view.props('TaskBoard').onMoveTask(boardTask('task-1'), 'in-progress'));
+  // MAIR-859, MAIR-1137: a state change from the task page refreshes the project while it keeps its comment draft.
+  await view.act(() => view.props('TaskPage').onMove('in-progress'));
   await view.waitFor(() => view.text().includes('Statut mis à jour'));
   assert.match(view.html, /placeholder="Ajouter un commentaire\.\.\."[^>]*value="Brouillon encore présent"/);
   assert.match(view.text(), /Devis reçu\./);
@@ -1392,15 +1404,15 @@ test('the project page edits the project in its modal, adds a task from its shee
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: fixtures.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await openNewTaskSheet();
   await view.fire((props) => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Poser les lanternes' } });
-  await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
-  await submitTaskSheet();
+  await setTaskRadio('task-assignee', 'user-3');
+  await submitTaskCreation();
   await view.waitFor(() => view.text().includes('Tâche « Poser les lanternes » ajoutée à « Éclairage LED ».'));
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post')[0].body.title, 'Poser les lanternes');
 
   bffProject.on('patch', '/projects/{projectId}/close', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ status: body.status })) }));
   await view.click((props, text, tag) => tag === 'button' && text === 'Suspendre');
   await view.waitFor(() => alertText() === 'Projet "Rénovation de l’éclairage public" suspendu.');
-  assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[0].body, { status: 'review' });
+  assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[0].body, { status: 'on-hold' }, 'MAIR-1084: « Suspendre » puts the project on hold');
   await view.click((props, text, tag) => tag === 'button' && text === 'Clôturer');
   await view.waitFor(() => alertText() === 'Projet "Rénovation de l’éclairage public" clôturé.');
   assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[1].body, { status: 'done' });

@@ -10,12 +10,12 @@ describe('ProjectStatusMenu (MAIR-846, Figma 5.4)', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('offers the four statuses and ignores the current one', async () => {
+  it('offers the five statuses (MAIR-1084: « Suspendu ») and ignores the current one', async () => {
     const user = userEvent.setup(); const onChange = vi.fn();
     render(<ProjectStatusMenu status="in-progress" onChange={onChange} />);
     await user.click(screen.getByRole('button', { name: 'Statut : En cours. Changer le statut' }));
     expect(screen.getAllByRole('menuitemradio').map((item) => [item.textContent, item.getAttribute('aria-checked')])).toEqual([
-      ['À faire', 'false'], ['En cours', 'true'], ['En revue', 'false'], ['Terminé', 'false'],
+      ['À faire', 'false'], ['En cours', 'true'], ['En revue', 'false'], ['Suspendu', 'false'], ['Terminé', 'false'],
     ]);
     fireEvent.keyDown(screen.getByRole('menuitemradio', { name: 'En cours' }), { key: 'Enter' });
     expect(onChange).not.toHaveBeenCalled();

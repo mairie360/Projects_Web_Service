@@ -18,7 +18,7 @@ import { Copy, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import type { Project } from '@/types/project';
 import { projectStatusLabel } from '../../../../project-card-meta';
 
-const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'done'];
+const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold', 'done'];
 
 /**
  * « … » menu of a project (MAIR-829, Figma F4): Ouvrir le projet, Modifier (MAIR-1134), Dupliquer, Changer le statut (single choice),
