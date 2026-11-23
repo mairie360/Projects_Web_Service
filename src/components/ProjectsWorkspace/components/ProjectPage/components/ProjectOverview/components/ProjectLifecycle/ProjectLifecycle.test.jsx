@@ -12,4 +12,13 @@ describe('ProjectLifecycle', () => {
     expect(onSuspend).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('offers « Reprendre » instead of « Suspendre » for a project on hold (MAIR-1084)', async () => {
+    const onSuspend = vi.fn(); const onResume = vi.fn(); const onClose = vi.fn();
+    render(<ProjectLifecycle disabled={false} onHold onSuspend={onSuspend} onResume={onResume} onClose={onClose} />);
+    expect(screen.queryByRole('button', { name: 'Suspendre' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Reprendre' }));
+    expect(onResume).toHaveBeenCalledTimes(1);
+    expect(onSuspend).not.toHaveBeenCalled();
+  });
 });

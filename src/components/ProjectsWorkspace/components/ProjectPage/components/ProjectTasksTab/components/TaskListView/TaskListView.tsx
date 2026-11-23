@@ -10,6 +10,7 @@ import { priorityRank, sortableDate, sortRows, statusRank, type SortValue, type 
 import type { TaskColumnStatus } from '@/components/ProjectsWorkspace/components/ProjectPage/use-detail-task-form';
 import { taskAssignees } from '@/components/ProjectsWorkspace/components/ProjectPage/use-task-filters';
 import type { ProjectTask } from '@/types/project';
+import { TaskActionsMenu, type TaskMenuColumn } from '../TaskActionsMenu';
 
 export type TaskListItem = { task: ProjectTask; column: TaskColumnStatus; archived: boolean; moving: boolean };
 
@@ -38,14 +39,21 @@ export function sortTaskItems(items: readonly TaskListItem[], sort: TableSort<Ta
  * MAIR-859 (C6, Figma F6 6.12): the tasks as a lib DataTable — done checkbox, task, state, priority, assignee, due date.
  * The checkbox completes or reopens the task through the same write as the board; the title opens the sheet.
  * MAIR-1138: Tâche, État, Priorité, Assignée à and Échéance sort by their header, by due date first.
+ * MAIR-1137 (C15): a row opens the task page; its « … » offers Ouvrir, Modifier, Changer l’état and Supprimer.
  */
-export function TaskListView({ items, isOverdue, canMove, onOpenTask, onMoveTask, emptyTitle }: {
+export function TaskListView({ items, isOverdue, canMove, onOpenTask, onMoveTask, emptyTitle, menuColumns = [], blocked, onEditTask, onDeleteTask }: {
   items: readonly TaskListItem[];
   isOverdue: (task: ProjectTask) => boolean;
   canMove: (task: ProjectTask) => boolean;
   onOpenTask: (task: ProjectTask) => void;
   onMoveTask: (task: ProjectTask, status: TaskColumnStatus) => void;
   emptyTitle: string;
+  /** States offered by the « … » of a row (MAIR-1137). */
+  menuColumns?: readonly TaskMenuColumn[];
+  blocked?: (task: ProjectTask) => boolean;
+  onEditTask?: (task: ProjectTask) => void;
+  /** Absent for a task the caller may not delete. */
+  onDeleteTask?: (task: ProjectTask) => (() => void) | undefined;
 }) {
   const [sort, setSort] = React.useState<TableSort<TaskSortKey>>(DEFAULT_TASK_SORT);
   const columns: DataTableColumn<TaskListItem>[] = [
@@ -111,6 +119,25 @@ export function TaskListView({ items, isOverdue, canMove, onOpenTask, onMoveTask
           {formatProjectDate(item.task.dueDate)}
           {isOverdue(item.task) && <StatusPill label="En retard" tone="danger" dot size="s" />}
         </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      hideHeader: true,
+      kind: 'content',
+      width: '56px',
+      cell: (item) => item.archived ? null : (
+        <TaskActionsMenu
+          title={item.task.title}
+          column={item.column}
+          columns={menuColumns}
+          disabled={blocked?.(item.task)}
+          onOpen={() => onOpenTask(item.task)}
+          onEdit={onEditTask && item.task.permissions?.canEdit !== false ? () => onEditTask(item.task) : undefined}
+          onMove={canMove(item.task) ? (status) => onMoveTask(item.task, status) : undefined}
+          onDelete={onDeleteTask?.(item.task)}
+        />
       ),
     },
   ];

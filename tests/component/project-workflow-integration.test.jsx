@@ -27,10 +27,11 @@ describe('workflow adoption by existing project forms', () => {
     render(<Detail />);
     fireEvent.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     const form = screen.getByRole('form', { name: 'Créer une tâche' });
-    // The sheet's « État » lists the project's own statuses once they are read (MAIR-567, MAIR-859).
-    await within(form).findByRole('option', { name: 'Conseil municipal' });
     fireEvent.change(within(form).getByLabelText(/^Titre/), { target: { value: 'Plan communal' } });
-    fireEvent.change(within(form).getByLabelText('État', { exact: true }), { target: { value: 'status-2' } });
+    fireEvent.submit(form);
+    // The « Colonne de départ » cards list the project's own statuses once they are read (MAIR-567, MAIR-1137).
+    fireEvent.click(await within(form).findByRole('radio', { name: /^Conseil municipal/ }));
+    fireEvent.submit(form);
     fireEvent.submit(form);
     const saved = JSON.parse((await screen.findByTestId('saved')).textContent);
     expect(saved.title).toBe('Plan communal');

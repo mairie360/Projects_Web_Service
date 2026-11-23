@@ -82,8 +82,12 @@ test('MAIR-567: a task added from the sheet without a status choice takes the pr
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: f.projectTask({ id: 'task-3', title: 'Poser les lanternes' }) });
   await view.click((_props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
   await view.fire((props) => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Poser les lanternes' } });
-  await view.act(() => view.find('MultiSelect').find(x => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
-  await view.fire((props, _text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  // MAIR-1137: « L’essentiel », « Attribution » (an agent card), then the recap writes the task.
+  const submit = () => view.fire((props, _text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  await submit();
+  await view.act(() => view.find('RadioGroup').find((group) => group.props.name === 'task-assignee').props.onChange('user-3'));
+  await submit();
+  await submit();
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks', 'post').length === 1);
 
   const [{ body }] = bffProject.calls('/projects/{projectId}/tasks', 'post');

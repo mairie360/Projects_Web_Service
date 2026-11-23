@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { type FilterOption, type ProjectFormState } from '@/lib/projectPageState';
+import { taskStatusOptions, type FilterOption, type ProjectFormState } from '@/lib/projectPageState';
 import { CreateProjectFeedback } from './components/CreateProjectFeedback';
 import { CreateProjectFooter } from './components/CreateProjectFooter';
 import { ProjectMainFields } from './components/ProjectMainFields';
@@ -282,7 +282,7 @@ export function CreateProjectModal({
                 form={form}
                 memberOptions={memberOptions}
                 labelOptions={labelOptions}
-                statusOptions={statusOptions}
+                statusOptions={taskStatusOptions(statusOptions)}
                 priorityOptions={priorityOptions}
                 onChange={onChange}
               />

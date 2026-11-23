@@ -3,7 +3,23 @@ import { CalendarDays } from 'lucide-react';
 import type React from 'react';
 
 import { formatLongDate } from '../../../ProjectMetrics';
-import type { Project } from '@/types/project';
+import { formatBudget } from '@/lib/projectBudget';
+import type { Project, ProjectMemberRole } from '@/types/project';
+
+/** MAIR-1088: French name of a member's role in the project. */
+export const MEMBER_ROLE_LABELS: Record<ProjectMemberRole, string> = { manager: 'Responsable', contributor: 'Contributeur', reader: 'Lecteur' };
+
+const Budget = ({ project }: { project: Project }) => {
+  const voted = project.budgetVoted ?? null;
+  const committed = project.budgetCommitted ?? null;
+  if (voted === null && committed === null) return <span className="text-[var(--mairie-text-muted)]">Non renseigné</span>;
+  return (
+    <span className="flex flex-col">
+      <span className="font-medium text-[var(--mairie-text)]">{voted === null ? 'Voté : non renseigné' : `${formatBudget(voted)} votés`}</span>
+      <span className="text-xs text-[var(--mairie-text-muted)]">{committed === null ? 'Engagé : non renseigné' : `${formatBudget(committed)} engagés`}</span>
+    </span>
+  );
+};
 
 const Day = ({ date }: { date: string }) => (
   <span className="inline-flex items-center gap-1.5"><CalendarDays aria-hidden className="h-4 w-4 text-[var(--mairie-text-muted)]" />{formatLongDate(date)}</span>
@@ -35,7 +51,10 @@ export const ProjectSummary = ({ project }: { project: Project }) => {
     },
     // MAIR-1135 (C5): the labels left the header for « Informations ».
     { id: 'labels', label: 'Étiquettes', value: project.labels.length ? <TagList label="Étiquettes du projet" items={project.labels} size="s" /> : <span className="text-[var(--mairie-text-muted)]">Aucune</span> },
-    { id: 'budget', label: 'Budget', value: <span className="text-[var(--mairie-text-muted)]">Non renseigné</span> },
+    // MAIR-1085: the voted and committed budgets, in euros.
+    { id: 'budget', label: 'Budget', value: <Budget project={project} /> },
+    // MAIR-1088: the caller's role in the project, when they are a member.
+    ...(project.myRole ? [{ id: 'my-role', label: 'Votre rôle', value: <span className="font-medium text-[var(--mairie-text)]">{MEMBER_ROLE_LABELS[project.myRole]}</span> }] : []),
   ];
   return (
     <div className="space-y-4">

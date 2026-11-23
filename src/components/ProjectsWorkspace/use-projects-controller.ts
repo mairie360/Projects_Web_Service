@@ -15,6 +15,7 @@ import {
   createProject,
   createProjectBodyFromForm,
   createProjectTask,
+  bulkDeleteProjects,
   closeProject as closeBffProject,
   deleteProject as deleteBffProject,
   deleteProjectTask as deleteBffProjectTask,
@@ -31,6 +32,7 @@ import {
   updateProjectTaskStatus,
   type ProjectDetailsResponse,
   type ProjectsPageResponse,
+  type BulkDeletionResult,
 } from '../../lib/bffProjectClient';
 import {
   createProjectFormState,
@@ -1091,7 +1093,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
-    if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
+    // MAIR-1088: the project's own rights decide (a member with the `manager` role manages it whatever their role).
+    if (project.status === status || project.permissions?.canEdit !== true) return;
     setAlert(null);
 
     const selection = detailSelectionRef.current;
@@ -1265,19 +1268,27 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!bulkDeletionPending) setBulkDeletionOpen(false);
   };
 
-  // MAIR-833: the contract has no bulk route, so each selected project gets its own DELETE. Deleted projects
-  // leave the page and the selection; refused ones stay selected and are reported with their reason.
+  // MAIR-833 / MAIR-1089: one `POST /projects/bulk-delete` for the selection, one result per project. Deleted
+  // projects leave the page and the selection; refused ones stay selected and are reported with their reason.
   const confirmBulkProjectDeletion = async () => {
     const targets = selectedProjects;
     if (targets.length === 0 || bulkDeletionPending) return;
     setAlert(null);
     setBulkDeletionPending(true);
     try {
-      const results = await Promise.allSettled(targets.map((project) => deleteBffProject(project.id)));
-      const deleted = targets.filter((_, index) => results[index].status === 'fulfilled');
-      const refused = targets.flatMap((project, index) => {
-        const result = results[index];
-        return result.status === 'rejected' ? [{ project, message: getBffProjectErrorMessage(result.reason) }] : [];
+      let results: Map<string, BulkDeletionResult['status']> | null = null;
+      let failure = '';
+      try {
+        results = new Map((await bulkDeleteProjects(targets.map((project) => project.id))).map((result) => [result.projectId, result.status]));
+      } catch (error) {
+        failure = getBffProjectErrorMessage(error);
+      }
+      const deleted = targets.filter((project) => results?.get(project.id) === 'deleted');
+      const refused = targets.flatMap((project) => {
+        const status = results?.get(project.id);
+        if (status === 'deleted') return [];
+        const message = !results ? failure : status === 'forbidden' ? 'suppression non autorisée' : status === 'not_found' ? 'projet introuvable ou plus visible' : 'aucun résultat reçu';
+        return [{ project, message }];
       });
       setBulkDeletionOpen(false);
       if (deleted.length > 0) {
@@ -1288,6 +1299,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
         if (detailSelectionRef.current && deletedIds.has(detailSelectionRef.current.projectId)) closeProjectDetails();
         if (editingProjectId && deletedIds.has(editingProjectId)) closeCreateProject();
         setFeedback(bulkDeletionFeedback(deleted.map((project) => project.title)));
+        await refreshProjectsPage({ silent: true });
+      } else if (results && refused.some(({ project }) => results?.get(project.id) === 'not_found')) {
+        // A project deleted meanwhile by someone else leaves the page with the refresh.
         await refreshProjectsPage({ silent: true });
       }
       if (refused.length > 0) {
@@ -1588,7 +1602,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     });
   };
 
-  const closeProject = async (projectId: string, status: 'done' | 'review') => {
+  // MAIR-1084: « Suspendre » puts the project on hold (`on-hold`), no longer in review.
+  const closeProject = async (projectId: string, status: 'done' | 'on-hold' | 'review') => {
     setAlert(null);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
@@ -1601,7 +1616,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       await refreshProjectsPage({ silent: true });
       setAlert({
         type: 'success',
-        message: status === 'done' ? `Projet "${details.project.title}" clôturé.` : `Projet "${details.project.title}" suspendu.`,
+        message: status === 'done' ? `Projet "${details.project.title}" clôturé.` : status === 'on-hold' ? `Projet "${details.project.title}" suspendu.` : `Projet "${details.project.title}" mis en revue.`,
       });
     } catch (error) {
       showError(error);

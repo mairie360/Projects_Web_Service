@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN, reportMarkupValidity } from '@/lib/text-constraints';
 
 import { EditedSection } from '../../../EditedSection';
-import { changedProjectFields, PROJECT_FORM_SECTIONS, type ProjectFieldErrors } from '../../../../project-form-validation';
+import { changedProjectFields, PROJECT_FORM_SECTIONS, type ProjectEditFieldErrors } from '../../../../project-form-validation';
 import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
 
@@ -14,7 +14,7 @@ export interface ProjectEditFormProps {
   /** Error to show, already filtered by the caller. */
   error?: string;
   /** Messages under the fields (MAIR-846). */
-  fieldErrors?: ProjectFieldErrors;
+  fieldErrors?: ProjectEditFieldErrors;
   disabled: boolean;
   saveDisabled: boolean;
   statusOptions: FilterOption[];
@@ -37,7 +37,7 @@ export interface ProjectEditFormProps {
 /**
  * MAIR-846 (C7, Figma F5 5.6): the project fields only, in the « Modifier le projet » modal of the page. MAIR-1136
  * (C13, C16): one page in two sections, « L’essentiel » (Titre, Description, Groupe / Échéance) and « Organisation »
- * (Responsable / Priorité / Statut, Équipe / Étiquettes), each marked « Modifié » once changed; « Enregistrer (n) »
+ * (Responsable / Priorité / Statut, Équipe / Étiquettes), then « Budget » (MAIR-1085: voted, committed), each marked « Modifié » once changed; « Enregistrer (n) »
  * counts the changed fields. The group is required and cannot be removed: once one is chosen, the select offers no
  * empty choice.
  */
@@ -83,6 +83,13 @@ export const ProjectEditForm = ({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <MultiSelect id="detail-project-assignees" label="Équipe" value={form.assignees} options={memberOptions} onChange={(assignees) => onChange({ assignees })} />
             <MultiSelect id="detail-project-labels" label="Étiquettes" value={form.labels} options={labelOptions} onChange={(labels) => onChange({ labels })} />
+          </div>
+        </EditedSection>
+        {/* MAIR-1085: amounts in euros; an empty field clears the budget. */}
+        <EditedSection title="Budget" modified={modified('budget')}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField id="detail-project-budget-voted" label="Budget voté (€)" inputMode="decimal" autoComplete="off" value={form.budgetVoted} hint="Laissez vide si le budget n’est pas encore voté." error={fieldErrors.budgetVoted} onChange={(event) => onChange({ budgetVoted: event.target.value })} />
+            <TextField id="detail-project-budget-committed" label="Budget engagé (€)" inputMode="decimal" autoComplete="off" value={form.budgetCommitted} hint="Montant des commandes déjà passées." error={fieldErrors.budgetCommitted} onChange={(event) => onChange({ budgetCommitted: event.target.value })} />
           </div>
         </EditedSection>
 

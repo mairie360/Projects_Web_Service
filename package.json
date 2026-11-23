@@ -25,7 +25,7 @@
     "e2e": "npm --prefix e2e test"
   },
   "dependencies": {
-    "@mairie360/bff-project-openapi": "0.0.0-dev.db5bf904195ca656740b704bf57b1009539251fc",
+    "@mairie360/bff-project-openapi": "0.0.0-dev.c6b822d3ef7fb93153c2787c7817ee0cf1d3ed49",
     "@mairie360/lib-components": "2.3.0",
     "axios": "1.20.0",
     "daisyui": "^5.0.0",

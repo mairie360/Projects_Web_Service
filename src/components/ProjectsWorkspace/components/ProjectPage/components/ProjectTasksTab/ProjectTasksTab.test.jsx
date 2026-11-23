@@ -77,24 +77,31 @@ describe('ProjectTasksTab (MAIR-859)', () => {
     expect(within(sheet).getByLabelText(/^Titre/).value).toBe('Sans agent');
   });
 
-  it('deletes a task from its sheet after the confirmation and closes the sheet', async () => {
+  it('MAIR-1137: deletes a task from the « … » of its page after the confirmation and goes back to the board', async () => {
     const user = userEvent.setup();
     const onDeleteTask = vi.fn(async () => undefined);
     render(<ProjectPage {...props({ onDeleteTask })} />);
     await user.click(screen.getByRole('button', { name: `Ouvrir la tâche ${todo.title}` }));
-    await user.click(screen.getByRole('button', { name: 'Supprimer la tâche' }));
+    expect(screen.getByRole('article', { name: todo.title })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Modifier la tâche' })).toBeNull();
+    await user.click(within(screen.getByRole('article', { name: todo.title })).getByRole('button', { name: `Actions pour ${todo.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }));
     await user.click(screen.getByRole('button', { name: 'Supprimer', exact: true }));
     expect(onDeleteTask).toHaveBeenCalledWith('project-1', todo.id, todo.title);
-    expect(screen.queryByRole('dialog', { name: 'Modifier la tâche' })).toBeNull();
+    expect(screen.queryByRole('article', { name: todo.title })).toBeNull();
   });
 
-  it('changes the state from the sheet, the keyboard alternative to the drag and drop', async () => {
+  it('MAIR-1137: changes the state from « Modifier », with « Enregistrer (n) » and the « Modifié » section', async () => {
     const user = userEvent.setup();
     const onUpdateTask = vi.fn(async () => undefined);
     render(<ProjectPage {...props({ onUpdateTask })} />);
     await user.click(screen.getByRole('button', { name: `Ouvrir la tâche ${todo.title}` }));
-    await user.selectOptions(screen.getByLabelText('État', { exact: true }), 'done');
-    await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+    await user.click(within(screen.getByRole('article', { name: todo.title })).getByRole('button', { name: 'Modifier', exact: true }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Modifier la tâche' }));
+    expect(dialog.getByRole('button', { name: 'Enregistrer (0)' }).disabled).toBe(true);
+    await user.click(within(dialog.getByRole('group', { name: /^État/ })).getByRole('radio', { name: /^Terminé/ }));
+    expect(dialog.getByRole('region', { name: 'Attribution' }).textContent).toContain('Modifié');
+    await user.click(dialog.getByRole('button', { name: 'Enregistrer (1)' }));
     expect(onUpdateTask.mock.calls[0][2]).toMatchObject({ status: 'done' });
   });
 });
