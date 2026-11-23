@@ -138,12 +138,6 @@
             "count": 0
           },
           {
-            "status": "on-hold",
-            "label": "Suspendu",
-            "projectIds": [],
-            "count": 0
-          },
-          {
             "status": "done",
             "label": "Terminé",
             "projectIds": [],
