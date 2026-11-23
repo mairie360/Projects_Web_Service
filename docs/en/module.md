@@ -27,6 +27,24 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
+## Task page, task window and task menu (MAIR-1137)
+
+- **Task page**: a click on a task (board card, list row, « Prochaines tâches ») opens its page in the « Tâches » tab,
+  never its edit: breadcrumb back to the project, title, a meta line (state, clickable to change it; priority; « En
+  retard »; assignee; due date), « Modifier », « Marquer comme terminée » or « Rouvrir », and « … » (Modifier, Dupliquer,
+  Supprimer). On the left the description and the activity of the task (comments and history, with the comment field);
+  on the right « Informations » (assignee, period, time left, priority, project).
+- **« … » of the cards and rows**: Ouvrir la tâche, Modifier la tâche, Changer l’état, Supprimer la tâche.
+- **Creation in three steps**: « L’essentiel » (title, due date with the time left and the « Après la fin du projet »
+  alert, labels), « Attribution » (cards for the agent with their current load, the priority with a help sentence and
+  the starting column) and « Récapitulatif » with « Créer une autre tâche ensuite » (the button becomes « Ajouter et
+  continuer »). The « + » of a column keeps its quick add.
+- **Edit on one page**: « L’essentiel » and « Attribution » sections marked « Modifié », « Enregistrer (n) »,
+  « Supprimer ».
+- **Not done**: the task description and start date, and a project activity filtered per task, are not in the BFF
+  contract (MAIR-1089); the page shows the description as unavailable and the period as « Jusqu’au <échéance> ». The
+  deletion keeps its confirmation (the BFF has no undo), and the task page has no URL of its own yet.
+
 ## Project creation in steps and single-page edit (MAIR-1136)
 
 - **Creation in four steps**: « L’essentiel » (title, description, group, due date), « Organisation » (responsible,

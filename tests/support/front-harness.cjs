@@ -175,6 +175,8 @@ function createFrontHarness() {
       const fixtures = require('./bff-fixtures.cjs');
       bffProject.on('get', '/projects/{projectId}/statuses', { body: fixtures.projectTaskStatuses() });
       bffProject.on('get', '/projects/{projectId}/archived-tasks', { body: fixtures.archivedTasks() });
+      // MAIR-1137: the page of a task reads its follow-up as soon as it opens.
+      bffProject.on('get', '/projects/{projectId}/tasks/{taskId}/collaboration', { body: fixtures.taskCollaboration() });
       bffProject.on('get', '/project-templates', { body: { templates: [] } });
       bffProject.on('get', '/project-groups', { body: fixtures.projectGroups() });
       for (const call of ownerCalls) {

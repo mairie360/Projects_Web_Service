@@ -135,6 +135,12 @@ export function ProjectPage({
     writeProjectLocation(project.id, next, 'replace');
   };
   const tabsId = React.useId();
+  // MAIR-1137 (C15): the task whose page is shown in « Tâches » (from the board, the list or « Prochaines tâches »).
+  const [viewedTaskId, setViewedTaskId] = React.useState<string | null>(null);
+  const viewTask = (taskId: string) => {
+    showTab('tasks');
+    setViewedTaskId(taskId);
+  };
   // The ref stays out of the `taskForm` object so the compiler lint does not read it as a ref access during render.
   const { noticeRef: taskNoticeRef, ...taskForm } = useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
   const filters = useTaskFilters({ tasks });
@@ -177,6 +183,7 @@ export function ProjectPage({
       taskProjectIdRef.current = project.id;
       taskForm.resetForProject();
       collaboration.reset();
+      setViewedTaskId(null);
     }
     if (projectChanged) filters.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the hooks' reset callbacks read the latest props by closure
@@ -223,6 +230,7 @@ export function ProjectPage({
           lifecycleDisabled={projectVerificationRequired || projectVerificationPending}
           onCompleteTask={(task) => void onUpdateTaskStatus(project.id, task.id, 'done', firstStatusOf('done'))}
           onShowTab={showTab}
+          onOpenTask={(task) => viewTask(task.id)}
           onSuspend={() => void onCloseProject(project.id, 'review')}
           onCloseProject={() => void onCloseProject(project.id, 'done')}
         />
@@ -248,6 +256,8 @@ export function ProjectPage({
           mutationPending={mutationPending}
           highlightTaskId={highlightTaskId}
           highlightedTaskRef={highlightedTaskRef}
+          viewedTaskId={viewedTaskId}
+          onViewTask={setViewedTaskId}
           onMoveTask={moveTask}
           onDeleteTask={onDeleteTask}
           creationNotice={(

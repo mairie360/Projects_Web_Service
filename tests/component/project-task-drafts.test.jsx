@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import { NewTaskReceiptVerificationRequiredError } from "@/lib/projectTaskVerification";
 import { checkedOptions, toggleOption } from './units/multi-select';
-import { openNewTaskSheet, openTaskSheet, pageSection, queryTaskSheet, taskSheet } from './units/project-page';
+import { chooseTaskAssignee, nextTaskStep, openNewTaskSheet, openTaskSheet, pageSection, queryTaskSheet, taskSheet } from './units/project-page';
+
+const radio = (scope, group, name) => within(scope.getByRole('group', { name: new RegExp(`^${group}`) })).getByRole('radio', { name: new RegExp(`^${name}`) });
+const checkedRadio = (scope, group) => within(scope.getByRole('group', { name: new RegExp(`^${group}`), hidden: true })).getAllByRole('radio', { hidden: true }).find((input) => input.checked)?.value;
 import fixtures from "../support/bff-fixtures.cjs";
 
 function props() {
@@ -30,7 +33,7 @@ function deferred() {
 }
 
 describe("Project task save confirmation", () => {
-  it.each(["create", "edit"])("preserves every sheet %s field on refusal, then closes only after confirmed retry (MAIR-859)", async (mode) => {
+  it.each(["create", "edit"])("preserves every %s field on refusal, then closes only after confirmed retry (MAIR-859, MAIR-1137)", async (mode) => {
     const user = userEvent.setup();
     const values = props();
     const save = mode === "edit" ? values.onUpdateTask : values.onAddTask;
@@ -40,37 +43,35 @@ describe("Project task save confirmation", () => {
     const title = sheet.getByLabelText(/^Titre/);
     await user.clear(title);
     await user.type(title, "Brouillon conservé");
-    await user.selectOptions(sheet.getByLabelText("État", { exact: true }), "review");
-    await user.selectOptions(sheet.getByLabelText("Priorité", { exact: true }), "low");
     fireEvent.change(sheet.getByLabelText("Échéance", { exact: true }), { target: { value: "2026-11-17" } });
-    await toggleOption(user, sheet, 'Assignée à', 'Admin Mairie');
-    if (mode === "create") await toggleOption(user, sheet, 'Étiquettes', 'voirie');
-    await user.click(title);
-    const before = {
-      title: title.value,
-      assignees: checkedOptions(sheet, 'Assignée à'),
-      labels: checkedOptions(sheet, 'Étiquettes'),
-    };
-    await user.click(sheet.getByRole("button", { name: mode === "edit" ? "Enregistrer la tâche" : "Ajouter la tâche", exact: true }));
+    if (mode === "create") {
+      await toggleOption(user, sheet, 'Étiquettes', 'voirie');
+      await nextTaskStep(user, sheet);
+    }
+    await chooseTaskAssignee(user, 'Admin Mairie', sheet);
+    await user.click(radio(sheet, 'Priorité', 'Basse'));
+    await user.click(radio(sheet, mode === "edit" ? 'État' : 'Colonne de départ', 'En revue'));
+    if (mode === "create") await nextTaskStep(user, sheet);
+    const submitName = mode === "edit" ? /^Enregistrer \(\d+\)$/ : "Ajouter la tâche";
+    await user.click(sheet.getByRole("button", { name: submitName }));
     expect(await sheet.findByRole("alert")).toHaveProperty("textContent", "Enregistrement refusé");
-    expect(title.value).toBe(before.title);
-    expect(sheet.getByLabelText("État", { exact: true }).value).toBe("review");
-    expect(sheet.getByLabelText("Priorité", { exact: true }).value).toBe("low");
+    expect(title.value).toBe("Brouillon conservé");
+    expect(checkedRadio(sheet, 'Priorité')).toBe("low");
     expect(sheet.getByLabelText("Échéance", { exact: true }).value).toBe("2026-11-17");
-    expect(checkedOptions(sheet, 'Assignée à')).toEqual(before.assignees);
-    expect(checkedOptions(sheet, 'Étiquettes')).toEqual(before.labels);
+    expect(checkedRadio(sheet, 'Assignée à')).toBe("user-1");
     rerender(<ProjectPage {...values} project={{ ...values.project, priority: "high" }} tasks={values.tasks.map(task => ({ ...task }))} />);
-    expect(taskSheet().getByLabelText(/^Titre/).value).toBe(before.title);
-    expect(taskSheet().getByLabelText("Priorité", { exact: true }).value).toBe("low");
-    await user.click(taskSheet().getByRole("button", { name: mode === "edit" ? "Enregistrer la tâche" : "Ajouter la tâche", exact: true }));
+    expect(taskSheet().getByLabelText(/^Titre/).value).toBe("Brouillon conservé");
+    expect(checkedRadio(taskSheet(), 'Priorité')).toBe("low");
+    await user.click(taskSheet().getByRole("button", { name: submitName }));
     await waitFor(() => expect(queryTaskSheet()).toBeNull());
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1]).toEqual(save.mock.calls[0]);
     const draft = save.mock.calls[1].at(-1);
-    expect(draft).toMatchObject({ title: before.title, status: "review", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
-    expect(draft.responsible.id).toBe("user-3");
-    expect(draft.assignees.map(person => person.id)).toEqual(mode === "edit" ? ["user-3", "user-2", "user-1"] : ["user-3", "user-1"]);
-    // The next sheet starts empty.
+    expect(draft).toMatchObject({ title: "Brouillon conservé", status: "review", priority: "low", dueDate: "2026-11-17", labels: ["voirie"] });
+    // MAIR-1137 (C12): the « Assignée à » cards name one agent.
+    expect(draft.responsible.id).toBe("user-1");
+    expect(draft.assignees.map(person => person.id)).toEqual(["user-1"]);
+    // The next creation starts empty, at its first step.
     const next = await openNewTaskSheet(user);
     expect(next.getByLabelText(/^Titre/).value).toBe("");
     expect(next.queryByRole("alert")).toBeNull();
@@ -109,7 +110,8 @@ describe("Project task save confirmation", () => {
     const values = props();
     render(<ProjectPage {...values} />);
     const sheet = await openNewTaskSheet(user);
-    await user.click(sheet.getByRole("button", { name: "Ajouter la tâche", exact: true }));
+    // MAIR-1137 (C12): « Suivant » checks the title of the first step.
+    await nextTaskStep(user, sheet);
     expect(sheet.getByText("Donnez un titre à la tâche")).toBeTruthy();
     expect(sheet.getByLabelText(/^Titre/).getAttribute("aria-invalid")).toBe("true");
     expect(values.onAddTask).not.toHaveBeenCalled();
@@ -124,9 +126,12 @@ it('requires an explicit assignee when the authenticated agent is unavailable, w
   const scope=await openNewTaskSheet(user);const title=scope.getByLabelText(/^Titre/);
   await user.type(title,'Tâche sans identité supposée');
   fireEvent.submit(title.closest('form'));
-  expect(await scope.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
+  // MAIR-1137: « Attribution » keeps the agent there until an agent is chosen.
+  fireEvent.submit(title.closest('form'));
+  expect(await scope.findByText('Choisissez au moins un agent assigné à cette tâche.')).toBeTruthy();
   expect(values.onAddTask).not.toHaveBeenCalled();
-  await toggleOption(user, scope, 'Assignée à', 'Admin Mairie');await user.click(title);
+  await chooseTaskAssignee(user, 'Admin Mairie', scope);
+  fireEvent.submit(title.closest('form'));
   fireEvent.submit(title.closest('form'));
   await waitFor(()=>expect(values.onAddTask).toHaveBeenCalledOnce());
   expect(values.onAddTask.mock.calls[0].at(-1).responsible.id).toBe('user-1');
@@ -137,21 +142,22 @@ it('prefills the fresh selectable identity, rereads after a save and does not ov
   const read = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
   render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   let sheet = await openNewTaskSheet(user);
-  expect(checkedOptions(sheet, 'Assignée à')).toEqual([]);
+  expect(checkedRadio(sheet, 'Assignée à')).toBeUndefined();
   await act(async () => first.resolve('user-1'));
-  expect(sheet.getByRole('button',{name:'Retirer Admin Mairie'})).toBeTruthy();
+  expect(checkedRadio(sheet, 'Assignée à')).toBe('user-1');
   await user.type(sheet.getByLabelText(/^Titre/), 'Tâche confirmée');
+  await nextTaskStep(user, sheet); await nextTaskStep(user, sheet);
   await user.click(sheet.getByRole('button', {name:'Ajouter la tâche',exact:true}));
   await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
   expect(values.onAddTask.mock.calls[0][1].responsible.id).toBe('user-1');
   sheet = await openNewTaskSheet(user);
   const title = sheet.getByLabelText(/^Titre/);
   await user.type(title, 'Brouillon saisi avant la réponse');
-  await toggleOption(user, sheet, 'Assignée à', 'Marie Durand'); await user.click(title);
+  await nextTaskStep(user, sheet);
+  await chooseTaskAssignee(user, 'Marie Durand', sheet);
   await act(async () => second.resolve('user-1'));
   expect(read.mock.calls[1][0].aborted).toBe(true);
-  expect(sheet.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
-  expect(sheet.queryByRole('button',{name:'Retirer Admin Mairie'})).toBeNull();
+  expect(checkedRadio(sheet, 'Assignée à')).toBe('user-3');
   expect(title.value).toBe('Brouillon saisi avant la réponse');
 });
 
@@ -163,9 +169,9 @@ it('aborts a closed detail and reads the account again on reopening', async () =
   render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   await act(async()=>old.resolve('user-1'));
   const sheet = await openNewTaskSheet(user);
-  expect(checkedOptions(sheet, 'Assignée à')).toEqual([]);
+  expect(checkedRadio(sheet, 'Assignée à')).toBeUndefined();
   await act(async()=>fresh.resolve('user-3'));
-  expect(sheet.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
+  expect(checkedRadio(sheet, 'Assignée à')).toBe('user-3');
 });
 
 it('preserves a restored uncertain creation and existing task editing while reading new defaults', async () => {
@@ -179,7 +185,7 @@ it('preserves a restored uncertain creation and existing task editing while read
   await user.click(sheet.getByRole('button',{name:'Annuler',exact:true}));
   sheet = await openNewTaskSheet(user);
   expect(sheet.getByLabelText(/^Titre/).value).toBe('Brouillon conservé');
-  expect(sheet.getByRole('button',{name:'Retirer Marie Durand'})).toBeTruthy();
+  expect(checkedRadio(sheet, 'Assignée à')).toBe('user-3');
   expect(read).not.toHaveBeenCalled();
 });
 
@@ -189,7 +195,7 @@ it.each([null, 'refused'])('keeps an unavailable identity manual (%s)', async re
   render(<ProjectPage {...values} readCurrentTaskAssignee={read} />);
   const sheet = await openNewTaskSheet(user);
   const title=sheet.getByLabelText(/^Titre/);
-  await user.type(title,'Affectation explicite requise');fireEvent.submit(title.closest('form'));
-  expect(await sheet.findByRole('alert')).toHaveProperty('textContent','Choisissez au moins un agent assigné à cette tâche.');
+  await user.type(title,'Affectation explicite requise');fireEvent.submit(title.closest('form'));fireEvent.submit(title.closest('form'));
+  expect(await sheet.findByText('Choisissez au moins un agent assigné à cette tâche.')).toBeTruthy();
   expect(values.onAddTask).not.toHaveBeenCalled();
 });

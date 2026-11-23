@@ -59,7 +59,7 @@ describe('project dates in the municipal instance timezone', () => {
       onUpdateTask={vi.fn()} onUpdateTaskStatus={vi.fn()} onDeleteTask={vi.fn()} onCloseProject={vi.fn()} />));
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: `Ouvrir la tâche ${fixtures.projectTask().title}` }));
-    await user.click(screen.getByRole('button', { name: 'Suivi et commentaires' }));
+    // MAIR-1137 (C15): the task page reads its follow-up as soon as it opens.
     expect(await screen.findByText(label, { selector: 'time' })).toBeTruthy();
     expect(screen.getByText(`Marie Durand · ${label}`)).toBeTruthy();
     expect(getTaskCollaboration).toHaveBeenLastCalledWith('project-1', 'task-1');

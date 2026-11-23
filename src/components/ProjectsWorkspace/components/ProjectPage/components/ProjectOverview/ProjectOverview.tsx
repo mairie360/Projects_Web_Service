@@ -13,6 +13,8 @@ export interface ProjectOverviewProps {
   lifecycleDisabled?: boolean;
   onCompleteTask: (task: ProjectTask) => void;
   onShowTab: (tab: 'tasks' | 'activity') => void;
+  /** MAIR-1137 (C15): opens the page of a task of « Prochaines tâches ». */
+  onOpenTask?: (task: ProjectTask) => void;
   onSuspend: () => void;
   onCloseProject: () => void;
 }
@@ -23,11 +25,11 @@ export interface ProjectOverviewProps {
  * panels say so instead of showing made-up content.
  */
 export const ProjectOverview = ({
-  project, tasks, pendingTaskIds, disabled = false, lifecycleDisabled = false, onCompleteTask, onShowTab, onSuspend, onCloseProject,
+  project, tasks, pendingTaskIds, disabled = false, lifecycleDisabled = false, onCompleteTask, onShowTab, onOpenTask, onSuspend, onCloseProject,
 }: ProjectOverviewProps) => (
   <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_clamp(320px,28vw,380px)]">
     <div className="min-w-0 space-y-8">
-      <NextTasksPanel tasks={tasks} pendingTaskIds={pendingTaskIds} disabled={disabled} onComplete={onCompleteTask} onShowAll={() => onShowTab('tasks')} />
+      <NextTasksPanel tasks={tasks} pendingTaskIds={pendingTaskIds} disabled={disabled} onComplete={onCompleteTask} onOpen={onOpenTask} onShowAll={() => onShowTab('tasks')} />
       <Panel
         title="Jalons"
         description="Étapes clés validées par la collectivité"

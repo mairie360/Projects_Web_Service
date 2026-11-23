@@ -30,6 +30,26 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
+## Page de la tâche, fenêtre de la tâche et menu des tâches (MAIR-1137)
+
+- **Page de la tâche** : un clic sur une tâche (carte du tableau, ligne de la liste, « Prochaines tâches ») ouvre sa
+  page dans l’onglet « Tâches », jamais sa modification : fil d’Ariane vers le projet, titre, une ligne de méta (état,
+  cliquable pour le changer ; priorité ; « En retard » ; assignée ; échéance), « Modifier », « Marquer comme terminée »
+  ou « Rouvrir », et « … » (Modifier, Dupliquer, Supprimer). À gauche la description et l’activité de la tâche
+  (commentaires et historique, avec le champ de commentaire) ; à droite « Informations » (assignée, période, délai,
+  priorité, projet).
+- **« … » des cartes et des lignes** : Ouvrir la tâche, Modifier la tâche, Changer l’état, Supprimer la tâche.
+- **Création en trois étapes** : « L’essentiel » (titre, échéance avec le délai et l’alerte « Après la fin du
+  projet », étiquettes), « Attribution » (cartes pour l’agent avec sa charge, la priorité avec une phrase d’aide et la
+  colonne de départ) et « Récapitulatif » avec « Créer une autre tâche ensuite » (le bouton devient « Ajouter et
+  continuer »). Le « + » d’une colonne garde son ajout rapide.
+- **Modification sur une page** : sections « L’essentiel » et « Attribution » marquées « Modifié »,
+  « Enregistrer (n) », « Supprimer ».
+- **Non fait** : la description et la date de début d’une tâche, et une activité de projet filtrée par tâche, ne sont
+  pas dans le contrat du BFF (MAIR-1089) ; la page affiche la description comme indisponible et la période comme
+  « Jusqu’au <échéance> ». La suppression garde sa confirmation (le BFF n’a pas d’annulation), et la page de la tâche
+  n’a pas encore d’URL propre.
+
 ## Création de projet par étapes et modification sur une page (MAIR-1136)
 
 - **Création en quatre étapes** : « L’essentiel » (titre, description, groupe, échéance), « Organisation »

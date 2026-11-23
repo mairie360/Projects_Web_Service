@@ -1,4 +1,4 @@
-import { isProjectOverdue } from '@/components/ProjectsWorkspace/project-card-meta';
+import { instanceToday, isProjectOverdue } from '@/components/ProjectsWorkspace/project-card-meta';
 import type { ProjectTask } from '@/types/project';
 import type { TaskColumnStatus } from '../../use-detail-task-form';
 
@@ -27,4 +27,38 @@ export type BoardTask = { task: ProjectTask; column: TaskColumnStatus; archived:
 /** « + 3 tâches terminées »: the done tasks the BFF archived, counted but not listed (MAIR-559). */
 export function archivedTasksMore(count: number) {
   return count > 0 ? `+ ${count} tâche${count > 1 ? 's' : ''} terminée${count > 1 ? 's' : ''}` : '';
+}
+
+const DAY = 86_400_000;
+const isoDay = (value: string) => (/^\d{4}-\d{2}-\d{2}$/.test(value) ? Date.parse(`${value}T00:00:00Z`) : Number.NaN);
+
+/**
+ * MAIR-1137 (C12, C15): the time left before a due date, in instance days — « Dans 12 jours », « Aujourd’hui »,
+ * « En retard de 3 jours »; an absent or impossible date gives `''`.
+ */
+export function taskDelayLabel(dueDate: string, now = new Date()) {
+  const due = isoDay(dueDate);
+  const today = isoDay(instanceToday(now));
+  if (Number.isNaN(due) || Number.isNaN(today)) return '';
+  const days = Math.round((due - today) / DAY);
+  if (days === 0) return 'Aujourd’hui';
+  const count = Math.abs(days);
+  const unit = `${count} jour${count > 1 ? 's' : ''}`;
+  return days > 0 ? `Dans ${unit}` : `En retard de ${unit}`;
+}
+
+/** MAIR-1137 (C12): a task due after its project (« Après la fin du projet »). */
+export const dueAfterProject = (taskDue: string, projectDue: string) =>
+  !Number.isNaN(isoDay(taskDue)) && !Number.isNaN(isoDay(projectDue)) && taskDue > projectDue;
+
+/** MAIR-1137 (C12): the active tasks each agent holds, for the « charge » of the assignee cards. */
+export function assigneeLoads(tasks: readonly ProjectTask[]) {
+  const loads = new Map<string, number>();
+  for (const task of tasks) {
+    if (taskColumn(task) === 'done') continue;
+    // An agent who is both responsible and assignee of a task counts it once.
+    const people = new Set([task.responsible, ...(task.assignees ?? [])].map((person) => person?.id ?? person?.name).filter(Boolean).map(String));
+    for (const key of people) loads.set(key, (loads.get(key) ?? 0) + 1);
+  }
+  return loads;
 }
