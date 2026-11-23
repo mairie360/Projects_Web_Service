@@ -34,10 +34,10 @@ export const TaskFollowUp = ({ taskTitle, loading, saving, error, collaboration,
         <div className="min-w-0">
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><MessageSquare className="h-3.5 w-3.5" /> Commentaires</h4>
           <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
-            {collaboration.comments.length === 0 && <p className="text-xs text-[#6e7781]">Aucun commentaire.</p>}
+            {collaboration.comments.length === 0 && <p className="text-xs text-[#57606a]">Aucun commentaire.</p>}
             {collaboration.comments.map((comment) => (
               <div key={comment.id} className="rounded-md border border-[#d8dee4] bg-white p-2 text-xs">
-                <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#6e7781]">{formatMoment(comment.createdAt)}</time></div>
+                <div className="flex flex-col gap-1 font-semibold text-[#24292f] [overflow-wrap:anywhere] sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2"><span className="min-w-0">{comment.author.name}</span><time className="font-normal text-[#57606a]">{formatMoment(comment.createdAt)}</time></div>
                 <p className="mt-1 whitespace-pre-wrap text-[#57606a] [overflow-wrap:anywhere]">{comment.message}</p>
               </div>
             ))}
@@ -52,11 +52,11 @@ export const TaskFollowUp = ({ taskTitle, loading, saving, error, collaboration,
         <div className="min-w-0">
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-[#24292f]"><History className="h-3.5 w-3.5" /> Historique</h4>
           <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
-            {collaboration.history.length === 0 && <p className="text-xs text-[#6e7781]">Aucune modification enregistrée.</p>}
+            {collaboration.history.length === 0 && <p className="text-xs text-[#57606a]">Aucune modification enregistrée.</p>}
             {collaboration.history.map((entry) => (
               <div key={entry.id} className="border-l-2 border-[#0969da] pl-2 text-xs [overflow-wrap:anywhere]">
                 <p className="font-medium text-[#24292f]">{entry.label}</p>
-                <p className="mt-0.5 text-[#6e7781]">{entry.author.name} · {formatMoment(entry.createdAt)}</p>
+                <p className="mt-0.5 text-[#57606a]">{entry.author.name} · {formatMoment(entry.createdAt)}</p>
               </div>
             ))}
           </div>

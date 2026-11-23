@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Modal, PendingFeatureNotice, Tabs, tabsIds, type TabItem } from '@mairie360/lib-components/primitives';
+import { Modal, Panel, Tabs, tabsIds, type TabItem } from '@mairie360/lib-components/primitives';
+import { addProjectComment, getBffProjectErrorMessage } from '@/lib/bffProjectClient';
 import { Activity, CalendarRange, FileText, LayoutGrid, ListChecks, Users } from 'lucide-react';
 import { projectTabFromSearch, writeProjectLocation, type ProjectTab } from '@/lib/projectDeepLink';
 import { getProjectNumber } from '../../project-card-meta';
@@ -13,14 +14,18 @@ import { DetailRefreshAlert } from './components/DetailRefreshAlert';
 import { ProjectEditForm } from './components/ProjectEditForm';
 import { ProjectMetrics } from './components/ProjectMetrics';
 import { ProjectOverview } from './components/ProjectOverview';
+import { ProjectActivityTab } from './components/ProjectActivityTab';
 import { ProjectPageHeader } from './components/ProjectPageHeader';
+import { ProjectPlanningTab } from './components/ProjectPlanningTab';
 import { ProjectTasksTab } from './components/ProjectTasksTab';
+import { ProjectTeamTab } from './components/ProjectTeamTab';
 import { ProjectWorkflow } from './components/ProjectWorkflow';
 import { useDetailTaskForm, type TaskColumnStatus } from './use-detail-task-form';
 import { useLinkedTaskScroll } from './use-linked-task-scroll';
 import { categoryOf, projectStatusHelpers } from './status-helpers';
 import { useProjectActivity } from './use-project-activity';
 import { useProjectEdit, type MutationLock } from './use-project-edit';
+import { useProjectMembers } from './use-project-members';
 import { useProjectMilestones } from './use-project-milestones';
 import { useTaskCollaboration } from './use-task-collaboration';
 import { useTaskFilters } from './use-task-filters';
@@ -149,7 +154,14 @@ export function ProjectPage({
   // MAIR-1086: the milestones of the page (overview, planning); MAIR-1089: the latest activity, read once the
   // detail is in (like the statuses below) and again after each confirmed change of the project.
   const milestones = useProjectMilestones(project);
-  const recentActivity = useProjectActivity(project.taskItems ? project.id : null, project);
+  // MAIR-874 (C3): a published comment reads the activity again (overview and tab), from its first page.
+  const [activityRevision, setActivityRevision] = React.useState(0);
+  const activityKey = React.useMemo(() => ({ project, activityRevision }), [project, activityRevision]);
+  const recentActivity = useProjectActivity(project.taskItems ? project.id : null, activityKey);
+  const [activityPage, setActivityPage] = React.useState(1);
+  const [publishing, setPublishing] = React.useState(false);
+  const [publishError, setPublishError] = React.useState('');
+  const members = useProjectMembers(project);
   const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
   const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
   const taskProjectIdRef = React.useRef(project.id);
@@ -165,7 +177,25 @@ export function ProjectPage({
   const unavailableColumns = new Set<TaskColumnStatus>(dynamicStatuses ? (['todo', 'in-progress', 'done'] as const).filter((status) => !firstStatusOf(categoryOf(status))) : []);
   const moveTask = async (task: ProjectTask, status: TaskColumnStatus) =>
     (await onUpdateTaskStatus(project.id, task.id, status, dynamicStatuses ? firstStatusOf(categoryOf(status)) : undefined)) === true;
-  const team = new Set([project.responsible, ...project.assignees].filter((person) => person.name).map((person) => person.id ?? person.name));
+  const team = project.members ? new Set(members.members.map((member) => member.id)) : new Set([project.responsible, ...project.assignees].filter((person) => person.name).map((person) => person.id ?? person.name));
+  // The full history is read once « Activité » is shown (MAIR-874, C3).
+  const activityFeed = useProjectActivity(tab === 'activity' && project.taskItems ? project.id : null, activityKey, { limit: 20, page: activityPage });
+  const publishComment = async (message: string) => {
+    setPublishing(true);
+    setPublishError('');
+    try {
+      await addProjectComment(project.id, message);
+      setActivityPage(1);
+      setActivityRevision((value) => value + 1);
+      return true;
+    } catch (failure) {
+      setPublishError(getBffProjectErrorMessage(failure));
+      return false;
+    } finally {
+      setPublishing(false);
+    }
+  };
+  const canManageTeam = project.permissions?.canAssignMembers ?? project.permissions?.canEdit === true;
   const tabItems: TabItem<ProjectTab>[] = [
     { key: 'overview', label: 'Vue d’ensemble', icon: LayoutGrid },
     { key: 'tasks', label: 'Tâches', icon: ListChecks, count: tasks.length },
@@ -175,7 +205,6 @@ export function ProjectPage({
     { key: 'activity', label: 'Activité', icon: Activity },
   ];
   const panelProps = (key: ProjectTab) => ({ id: tabsIds(tabsId, key).panel, role: 'tabpanel', 'aria-labelledby': tabsIds(tabsId, key).tab, tabIndex: 0, hidden: tab !== key, className: 'focus-visible:outline-none' });
-  const pendingFeature = (feature: string) => <PendingFeatureNotice feature={feature} description={`L’onglet « ${feature} » arrive avec son propre ticket.`} />;
   const mutationPending = projectEdit.saving || taskForm.saving;
 
   React.useEffect(() => {
@@ -190,6 +219,8 @@ export function ProjectPage({
       taskForm.resetForProject();
       collaboration.reset();
       setViewedTaskId(null);
+      setActivityPage(1);
+      setPublishError('');
     }
     if (projectChanged) filters.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the hooks' reset callbacks read the latest props by closure
@@ -289,10 +320,44 @@ export function ProjectPage({
         {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
       </div>
 
-      <div {...panelProps('planning')}>{pendingFeature('Planning')}</div>
-      <div {...panelProps('team')}>{pendingFeature('Équipe')}</div>
-      <div {...panelProps('documents')}>{pendingFeature('Documents')}</div>
-      <div {...panelProps('activity')}>{pendingFeature('Activité')}</div>
+      {/* MAIR-868: a bar opens the task page in « Tâches », like a card of the board. */}
+      <div {...panelProps('planning')}>
+        <ProjectPlanningTab tasks={tasks} milestones={milestones.milestones} onOpenTask={viewTask} />
+      </div>
+      <div {...panelProps('team')}>
+        <ProjectTeamTab
+          members={members.members}
+          ownerId={project.responsible.id}
+          canManage={canManageTeam}
+          memberOptions={memberOptions}
+          pendingId={members.pendingId}
+          error={members.error}
+          notice={members.notice}
+          disabled={mutationPending}
+          onAdd={members.add}
+          onChangeRole={members.changeRole}
+          onRemove={members.remove}
+        />
+      </div>
+      {/* MAIR-874 (C2): the contract has no document storage yet; the tab says so instead of a fake upload. */}
+      <div {...panelProps('documents')}>
+        <Panel title="Documents" state="unavailable" stateProps={{ title: 'Documents non disponibles', description: 'Le dépôt des pièces du projet n’est pas encore fourni par le service Projets.' }} />
+      </div>
+      <div {...panelProps('activity')}>
+        <ProjectActivityTab
+          items={activityFeed.items}
+          page={activityPage}
+          pageSize={activityFeed.pageSize}
+          total={activityFeed.total}
+          loading={activityFeed.loading}
+          error={activityFeed.error}
+          onRetry={activityFeed.retry}
+          onPageChange={setActivityPage}
+          onPublish={project.permissions?.canView !== false ? publishComment : undefined}
+          publishing={publishing}
+          publishError={publishError}
+        />
+      </div>
 
       {/* MAIR-846 (C7, Figma F5 5.6): « Modifier » opens the project fields only, in a size m modal. */}
       <Modal open={projectEdit.editing} title={`Modifier le projet · ${getProjectNumber(project)}`} size="m" closeOnBackdrop={!mutationPending} onClose={projectEdit.cancel}>
