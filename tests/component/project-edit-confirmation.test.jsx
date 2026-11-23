@@ -35,7 +35,7 @@ describe("Project edit modal confirmation (MAIR-846)", () => {
     await toggleOption(user, form, 'Étiquettes', 'voirie');
     await user.click(form.getByLabelText(/^Titre/));
     fireEvent.change(form.getByLabelText(/^Échéance/), { target: { value: "2026-11-17" } });
-    await user.click(form.getByRole("button", { name: "Enregistrer", exact: true }));
+    await user.click(form.getByRole("button", { name: /^Enregistrer \(\d+\)$/ }));
     expect(await form.findByRole("alert")).toHaveProperty("textContent", "Projet refusé");
     const draft = values.onUpdateProject.mock.calls[0][1];
     const assertDraft = () => {
@@ -56,7 +56,7 @@ describe("Project edit modal confirmation (MAIR-846)", () => {
     expect(checkedOptions(form, 'Équipe')).toContain('Admin Mairie');
     await user.click(form.getByLabelText(/^Titre/));
     expect(form.getByRole("alert").textContent).toBe("Projet refusé");
-    await user.click(form.getByRole("button", { name: "Enregistrer", exact: true }));
+    await user.click(form.getByRole("button", { name: /^Enregistrer \(\d+\)$/ }));
     expect(screen.queryByRole("form", { name: "Modifier le projet" })).toBeNull();
     // MAIR-846: the edit modal closes and gives the focus back to the page.
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -86,7 +86,8 @@ describe("Project edit modal confirmation (MAIR-846)", () => {
     await user.click(screen.getByRole("button", { name: "Fermer la fenêtre" }));
     expect(screen.getByRole("form", { name: "Modifier le projet" })).toBe(form);
     expect(screen.getByRole("button", { name: "Projets" }).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Ajouter une tâche dans À faire", exact: true }).matches(":disabled")).toBe(true);
+    // No quick add while the project save runs (MAIR-1134: the lib KanbanColumn hides its « + »).
+    expect(screen.queryByRole("button", { name: "Ajouter dans À faire", exact: true })).toBeNull();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(values.onClose).not.toHaveBeenCalled();
     expect(within(form).getByRole("status").textContent).toMatch(/Enregistrement/);

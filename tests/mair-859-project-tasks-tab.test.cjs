@@ -48,6 +48,10 @@ const items = () => view.props('TaskBoard').items;
 const columnOf = (taskId) => items().find((item) => item.task.id === taskId)?.column;
 const boardTask = (taskId) => items().find((item) => item.task.id === taskId).task;
 const writes = () => bffProject.requests.filter((request) => request.method !== 'GET');
+// MAIR-1137: the task window (lib Modal) replaced the Drawer sheet; a creation goes through its steps.
+const dialog = () => view.props('TaskDialog');
+const submitTask = (label) => view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === label, 'onSubmit');
+const radioGroup = (name) => view.find('RadioGroup').find((group) => group.props.name === name).props;
 
 test('MAIR-859 model: columns by category, « En retard » only before done, archived count wording', () => {
   assert.equal(taskColumn({ status: 'review', completed: false }), 'in-progress');
@@ -63,7 +67,7 @@ test('MAIR-859 model: columns by category, « En retard » only before done, arc
 
 test('MAIR-859 C1: the board shows three columns, the cards and the archived done tasks', async () => {
   await openTasks();
-  assert.match(view.html, /aria-label="À faire"[^]*aria-label="En cours"[^]*aria-label="Terminé"/);
+  assert.match(view.html, /data-task-column="todo"[^]*data-task-column="in-progress"[^]*data-task-column="done"/);
   assert.equal(columnOf('task-1'), 'todo');
   assert.equal(columnOf('task-2'), 'in-progress', '« En revue » sits in « En cours »');
   assert.match(view.text(), /En retard/);
@@ -99,11 +103,13 @@ test('MAIR-859 C3: the quick add of a column keeps its status; without a known a
   bffProject.on('post', '/projects/{projectId}/tasks', ({ body }) => ({ status: 201, body: f.projectTask({ ...body, id: 'task-9', status: 'in-progress', responsible: f.people.marie, assignees: [f.people.marie] }) }));
   // The harness has no Login identity: the task needs an assignee, so the sheet opens with the typed title.
   await view.act(() => view.props('TaskBoard').onQuickAdd('Consulter les riverains', 'in-progress'));
-  assert.equal(view.props('TaskSheet').open, true);
-  assert.equal(view.props('TaskSheet').form.title, 'Consulter les riverains');
+  assert.equal(dialog().open, true);
+  assert.equal(dialog().form.title, 'Consulter les riverains');
   assert.equal(writes().length, 0);
-  await view.act(() => view.find('MultiSelect').find((x) => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
-  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  await submitTask('Créer une tâche');
+  await view.act(() => radioGroup('task-assignee').onChange('user-3'));
+  await submitTask('Créer une tâche');
+  await submitTask('Créer une tâche');
   await view.waitFor(() => view.text().includes('Tâche ajoutée'));
   const [{ body }] = bffProject.calls('/projects/{projectId}/tasks', 'post');
   assert.equal(body.title, 'Consulter les riverains');
@@ -114,38 +120,45 @@ test('MAIR-859 C3: the quick add of a column keeps its status; without a known a
 test('MAIR-859 C4, C5: « Nouvelle tâche » refuses an empty title, then creates the task from the sheet', async () => {
   await openTasks();
   await view.click((props, text, tag) => tag === 'button' && text === 'Nouvelle tâche');
-  assert.equal(view.props('TaskSheet').open, true);
-  assert.equal(view.props('TaskSheet').task, null);
+  assert.equal(dialog().open, true);
+  assert.equal(dialog().task, null);
   assert.match(view.html, /role="dialog"[^>]*aria-modal="true"/);
-  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
+  await submitTask('Créer une tâche');
   assert.match(view.text(), /Donnez un titre à la tâche/);
   assert.equal(writes().length, 0);
   bffProject.on('post', '/projects/{projectId}/tasks', ({ body }) => ({ status: 201, body: f.projectTask({ ...body, id: 'task-9', responsible: f.people.marie, assignees: [f.people.marie] }) }));
   await view.fire((props) => props.id === 'task-sheet-title', 'onChange', { target: { value: 'Réception des travaux' } });
-  await view.act(() => view.find('MultiSelect').find((x) => x.props.id === 'task-sheet-assignees').props.onChange(['user-3']));
-  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Créer une tâche', 'onSubmit');
-  await view.waitFor(() => !view.props('TaskSheet').open);
+  await submitTask('Créer une tâche');
+  await view.act(() => radioGroup('task-assignee').onChange('user-3'));
+  await submitTask('Créer une tâche');
+  await submitTask('Créer une tâche');
+  await view.waitFor(() => !dialog().open);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post')[0].body.title, 'Réception des travaux');
 });
 
-test('MAIR-859 C4: a card opens its sheet, the « État » saves the status and « Supprimer la tâche » asks first', async () => {
+test('MAIR-859 C4, MAIR-1137 C15: a card opens its page, « Modifier » saves the state and « Supprimer la tâche » asks first', async () => {
   await openTasks();
   await view.click((props) => props['aria-label'] === `Ouvrir la tâche ${todo.title}`);
-  assert.equal(view.props('TaskSheet').task.id, 'task-1');
+  assert.equal(view.props('TaskPage').task.id, 'task-1');
+  assert.equal(dialog().open, false, 'a click never opens the edit');
+  await view.act(() => view.props('TaskPage').onEdit());
+  assert.equal(dialog().task.id, 'task-1');
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}', ({ body }) => ({ body: f.projectTask({ ...body, id: 'task-1' }) }));
-  await view.fire((props) => props.id === 'task-sheet-status', 'onChange', { target: { value: 'status-2' } });
-  await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier une tâche', 'onSubmit');
+  await view.act(() => radioGroup('task-status').onChange('status-2'));
+  await submitTask('Modifier une tâche');
   await view.waitFor(() => view.text().includes('Tâche mise à jour'));
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'patch')[0].body.statusId, 'status-2');
 
-  await view.click((props) => props['aria-label'] === `Ouvrir la tâche ${todo.title}`);
-  await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer la tâche');
+  // The task page stays open after the save; its « … » « Supprimer la tâche » asks first.
+  assert.equal(view.props('TaskPage').task.id, 'task-1');
+  await view.act(() => view.props('TaskPage').onDelete());
   assert.match(view.text(), /Supprimer définitivement cette tâche \?/);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'delete').length, 0);
   bffProject.on('delete', '/projects/{projectId}/tasks/{taskId}', { status: 204 });
   await view.click((props, text, tag) => tag === 'button' && text === 'Supprimer' && props.role !== 'menuitem');
   await view.waitFor(() => view.text().includes('Tâche supprimée'));
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}', 'delete')[0].pathParams.taskId, 'task-1');
+  assert.equal(view.find('TaskPage').length, 0, 'back to the board once the task is deleted');
 });
 
 test('MAIR-859 C6, C7: the list, its done checkbox, the search and the filters', async () => {

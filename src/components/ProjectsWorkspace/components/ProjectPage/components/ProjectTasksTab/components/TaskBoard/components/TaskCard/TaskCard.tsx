@@ -8,12 +8,12 @@ import { formatProjectDate } from '@/components/ProjectsWorkspace/project-card-m
 import type { ProjectTask } from '@/types/project';
 import type { TaskColumnStatus } from '@/components/ProjectsWorkspace/components/ProjectPage/use-detail-task-form';
 import { taskAssignees } from '@/components/ProjectsWorkspace/components/ProjectPage/use-task-filters';
-import { TaskCardMenu, type TaskCardMenuColumn } from './components/TaskCardMenu';
+import { TaskActionsMenu, type TaskMenuColumn } from '../../../TaskActionsMenu';
 
 export interface TaskCardProps {
   task: ProjectTask;
   column: TaskColumnStatus;
-  columns: readonly TaskCardMenuColumn[];
+  columns: readonly TaskMenuColumn[];
   overdue: boolean;
   /** Archived by the BFF once done (MAIR-559): shown for the record, without actions. */
   archived?: boolean;
@@ -24,12 +24,14 @@ export interface TaskCardProps {
   linked?: boolean;
   articleRef?: React.Ref<HTMLElement>;
   onOpen: () => void;
+  /** « Modifier la tâche » of the « … » (MAIR-1137); absent without the right to edit it. */
+  onEdit?: () => void;
   onMove?: (status: TaskColumnStatus) => void;
   onDelete?: () => void;
 }
 
 /** A task of the board (MAIR-859, Figma F6 6.2): title, « … », priority, « En retard », assignee and due date; struck through once done. */
-export function TaskCard({ task, column, columns, overdue, archived = false, pending = false, blocked = false, writeError, linked = false, articleRef, onOpen, onMove, onDelete }: TaskCardProps) {
+export function TaskCard({ task, column, columns, overdue, archived = false, pending = false, blocked = false, writeError, linked = false, articleRef, onOpen, onEdit, onMove, onDelete }: TaskCardProps) {
   const done = column === 'done';
   const assignee = taskAssignees(task)[0];
 
@@ -58,7 +60,7 @@ export function TaskCard({ task, column, columns, overdue, archived = false, pen
             </button>
           </h4>
         )}
-        {!archived && <TaskCardMenu title={task.title} column={column} columns={columns} disabled={blocked} onOpen={onOpen} onMove={onMove} onDelete={onDelete} />}
+        {!archived && <TaskActionsMenu title={task.title} column={column} columns={columns} disabled={blocked} onOpen={onOpen} onEdit={onEdit} onMove={onMove} onDelete={onDelete} />}
       </div>
       <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
         <PriorityPill level={task.priority} size="s" />

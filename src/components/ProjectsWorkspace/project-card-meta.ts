@@ -1,4 +1,4 @@
-import { statuses, type Status } from '@mairie360/lib-components/primitives';
+import { statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
 import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import type { Project } from '../../types/project';
 
@@ -33,8 +33,19 @@ export const projectStatusBadge = {
   todo: 'todo',
   'in-progress': 'inprogress',
   review: 'review',
+  // MAIR-1084: a project put on hold reads « Suspendu », the lib's `paused` status.
+  'on-hold': 'paused',
   done: 'done',
 } as const satisfies Record<Project['status'], Status>;
+
+/** MAIR-1134: tone of the StatusPill heading a lib `KanbanColumn` of that status. */
+export const projectColumnTone = {
+  todo: 'neutral',
+  'in-progress': 'info',
+  review: 'warning',
+  'on-hold': 'warning',
+  done: 'success',
+} as const satisfies Record<Project['status'], StatusPillTone>;
 
 /** French label of a project or task status, the one the lib `StatusBadge` shows (« En revue »). */
 export const projectStatusLabel = (status: Project['status']) => statuses[projectStatusBadge[status]].label;

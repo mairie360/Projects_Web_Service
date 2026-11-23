@@ -28,4 +28,19 @@ describe('ProjectEditForm', () => {
     expect(screen.getByLabelText('Responsable')).toBeTruthy();
     expect(screen.getByRole('form', { name: 'Modifier le projet' }).noValidate).toBe(true);
   });
+
+  it('MAIR-1136: counts the changed fields, marks their section and offers the deletion on the left', async () => {
+    const initial = projectToFormState(project());
+    const onDelete = vi.fn();
+    const props = { saving: false, disabled: false, saveDisabled: false, statusOptions, priorityOptions, responsibleOptions: memberOptions, memberOptions, labelOptions: [], initial, onDelete, onChange: vi.fn(), onCancel: vi.fn(), onSubmit: vi.fn() };
+    const { rerender } = render(<ProjectEditForm form={initial} {...props} />);
+    expect(screen.getByRole('button', { name: 'Enregistrer (0)' }).disabled).toBe(true);
+    expect(screen.queryByText('Modifié')).toBeNull();
+    rerender(<ProjectEditForm form={{ ...initial, title: 'Autre titre', priority: initial.priority === 'low' ? 'high' : 'low' }} {...props} />);
+    expect(screen.getByRole('button', { name: 'Enregistrer (2)' }).disabled).toBe(false);
+    expect(screen.getByRole('region', { name: 'L’essentiel' }).textContent).toContain('Modifié');
+    expect(screen.getByRole('region', { name: 'Organisation' }).textContent).toContain('Modifié');
+    await userEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
 });

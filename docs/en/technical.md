@@ -52,11 +52,16 @@ The unchanged CI audit exposed the transitive tooling dependency
 [the upstream advisory](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 No audit threshold, workflow or security policy is relaxed.
 
-The package is pinned to published `@mairie360/lib-components@2.1.0` (MAIR-828,
-listed in `tests/fixtures/shared-ui-releases.json`). Its `AccessibleShell` draws a
-desktop navigation band, keeps the sidebar for the mobile drawer only, renders a
-full-width footer (`app-shell-footer`) and confirms logout in a dialog; the root
-layout always sets `data-theme="light"`.
+The package is pinned to published `@mairie360/lib-components@2.3.0` (MAIR-1133,
+listed in `tests/fixtures/shared-ui-releases.json` with its artifact hashes). Its
+`AccessibleShell` is the white 2.3 frame (Sidebar folded or unfolded by its
+« Replier » button, white Header with the round `Counter` on the bell) and, since
+2.3, **no footer**: the page base only renders one with `showFooter`, which this
+front never sets. It confirms logout in a dialog; the root layout always sets
+`data-theme="light"`. `src/app/globals.css` keeps the base page rules (root scale,
+body, fonts) and no rule over a lib component (sidebar, frame, view switch), and no
+lib `Button` / pill / card / modal is restyled with `!` utilities
+(`tests/mair-1133-lib-components-2-3.test.cjs`).
 Contracts, APIs/BFFs and deployment approvals are unchanged. Consumer adoption
 is tracked in [shared issue #387](https://github.com/mairie360/lib-components/issues/387).
 
@@ -92,7 +97,18 @@ can be resolved. No BFF/API contract or deployment variable is added.
 
 [Module overview](module.md) · [Français](../fr/technical.md) · [README](../../README.md)
 
-## Sortable lists — MAIR-1138
+## Collapsible columns and view transitions — MAIR-1134
+
+`KanbanBoard` and `TaskBoard` render one lib `KanbanColumn` per column (`collapsible`, controlled `collapsed` /
+`onCollapsedChange`, `dropActive`, `onAdd` for the « + », `tone` from `projectColumnTone`). `use-collapsed-columns.ts`
+keeps the folded columns in `localStorage` (`m360-collapsed-projects` / `m360-collapsed-tasks`, read after mount, every
+access in try/catch: without storage the fold only lasts for the page). The column drag handlers sit on the
+`KanbanColumn` section, so a folded column still takes a drop. The views are wrapped in `<div key={view}
+className="m360-view-enter">` (`globals.css`: 260 ms fade and rise, `animation: none` under `prefers-reduced-motion`; a
+class of this front, not an override of the lib). `ProjectActionsMenu` (cards, table rows) and `ProjectMoreMenu` (page
+header) get « Modifier »: `openEditProject` of the controller, or the page edit modal.
+
+
 
 `src/components/ProjectsWorkspace/table-sort.ts` holds the client-side sort shared by `TableView` and `TaskListView`:
 `sortRows(rows, sort, valueOf)` (stable, French collation, numbers as numbers, empty values last in both directions),
@@ -118,7 +134,7 @@ is the rollback of a refusal. Confirmations are `FeedbackToast`s (« Tâche ajou
 « Tâche terminée », « Statut mis à jour », « Tâche supprimée »; « Statut non modifié » with `tone: 'error'`).
 `use-detail-task-form.ts` owns the sheet (`open`, `openCreate(status)`, `edit(task)`, `quickAdd(title, status)`,
 `titleError` « Donnez un titre à la tâche »); `use-task-filters.ts` the search, assignee and priority filters.
-No task description nor start date: the published contract has neither (MAIR-1087 in progress).
+No task description (not in the contract); the start date (`startDate`, MAIR-1087) is edited next to the due date.
 
 ## Architecture and request handling
 
