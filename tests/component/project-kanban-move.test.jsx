@@ -14,7 +14,7 @@ function board(overrides = {}) {
   const project = fixtures.projectListItem({ status: 'todo', permissions: { canEdit: true } });
   const props = { projects: [project], columns, onMoveProject: vi.fn().mockResolvedValue(undefined), onProjectOpen: vi.fn(), ...overrides };
   render(<KanbanBoard {...props} />);
-  return { props, project: props.projects[0], card: screen.getByRole('group', { name: props.projects[0].title }), target: screen.getByRole('region', { name: 'En cours' }) };
+  return { props, project: props.projects[0], card: screen.getByRole('group', { name: props.projects[0].title }), target: screen.getByRole('region', { name: /^En cours/ }) };
 }
 it('a pending move submits the original project once and keeps the card in its confirmed column', async () => {
   let finish;
@@ -30,7 +30,7 @@ it('a pending move submits the original project once and keeps the card in its c
   expect(move).toHaveBeenCalledTimes(1);
   expect(move).toHaveBeenCalledWith(project, 'in-progress');
   expect(card.getAttribute('aria-busy')).toBe('true');
-  expect(screen.getByRole('region', { name: 'À faire' }).contains(card)).toBe(true);
+  expect(screen.getByRole('region', { name: /^À faire/ }).contains(card)).toBe(true);
   fireEvent.click(within(card).getByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
   expect(props.onProjectOpen).not.toHaveBeenCalled();
   await act(async () => finish());
@@ -60,8 +60,8 @@ it('an interactive card control cannot become a drag and a foreign payload canno
 });
 it('the add command keeps its selected status and the public status and priority labels stay readable', () => {
   const add = vi.fn(); board({ onAddProject: add });
-  fireEvent.click(screen.getByRole('button', { name: 'Ajouter un projet En revue' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ajouter dans En revue' }));
   expect(add).toHaveBeenCalledWith('review');
-  expect(screen.getByRole('region', { name: 'Terminé' })).toBeTruthy();
+  expect(screen.getByRole('region', { name: /^Terminé/ })).toBeTruthy();
   expect(priorities.high.label).toBe('Haute');
 });

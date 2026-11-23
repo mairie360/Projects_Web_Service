@@ -49,6 +49,10 @@
             "value": "review"
           },
           {
+            "label": "Suspendu",
+            "value": "on-hold"
+          },
+          {
             "label": "Terminé",
             "value": "done"
           }
@@ -102,6 +106,7 @@
           "todo": 0,
           "in-progress": 1,
           "review": 0,
+          "on-hold": 0,
           "done": 0
         },
         "projectsByPriority": {
@@ -187,7 +192,24 @@
             "canCreateTask": true,
             "canAssignMembers": true,
             "canClose": true
-          }
+          },
+          "members": [
+            {
+              "id": "user-3",
+              "name": "Marie Durand",
+              "avatarUrl": null,
+              "role": "manager"
+            },
+            {
+              "id": "user-2",
+              "name": "Alice Martin",
+              "avatarUrl": null,
+              "role": "contributor"
+            }
+          ],
+          "myRole": null,
+          "budgetVoted": null,
+          "budgetCommitted": null
         }
       ],
       "pagination": {

@@ -1,4 +1,4 @@
-import { calculateProjectProgress, getPersonValue, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
+import { calculateProjectProgress, getPersonValue, taskStatusOf, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
 import type { ProjectTask } from '@/types/project';
 
 // The listed tasks are the active ones: the archived (done) tasks still count in the summary.
@@ -31,7 +31,7 @@ export type TaskDraftFormState = Omit<TaskFormState, 'dueDate'> & { dueDate: str
 export function createTaskFormStateFromProjectForm(form: ProjectFormState): TaskDraftFormState {
   return {
     title: '',
-    status: form.status,
+    status: taskStatusOf(form.status),
     priority: form.priority,
     assignees: [],
     labels: [],
@@ -44,12 +44,13 @@ export function taskToFormState(task: ProjectTask): TaskFormState {
 
   return {
     title: task.title,
-    status: task.status,
+    status: taskStatusOf(task.status),
     ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,
     assignees: uniqueAssigneesInOrder(assigneeNames),
     labels: task.labels,
     dueDate: task.dueDate,
+    startDate: task.startDate ?? '',
   };
 }
 

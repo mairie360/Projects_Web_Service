@@ -9,9 +9,10 @@ import type { TaskFiltersState } from '../../use-task-filters';
 import { TaskBoard } from './components/TaskBoard';
 import { TaskDeleteConfirm } from './components/TaskDeleteConfirm';
 import { TaskListView } from './components/TaskListView';
-import { TaskSheet } from './components/TaskSheet';
+import { TaskDialog } from './components/TaskDialog';
+import { TaskPage } from './components/TaskPage';
 import { TaskToolbar, type TaskView } from './components/TaskToolbar';
-import { archivedTasksMore, isTaskOverdue, TASK_COLUMNS } from './task-board-model';
+import { archivedTasksMore, assigneeLoads, isTaskOverdue, TASK_COLUMNS } from './task-board-model';
 import { useTaskBoard } from './use-task-board';
 
 type TaskForm = Omit<ReturnType<typeof useDetailTaskForm>, 'noticeRef'>;
@@ -37,18 +38,23 @@ export interface ProjectTasksTabProps {
   /** Resolves `true` once the BFF confirmed the new status (the controller shows the toast either way). */
   onMoveTask: (task: ProjectTask, status: TaskColumnStatus) => Promise<boolean>;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<unknown>;
-  /** Task creation notice (receipt to verify), shown in the creation sheet. */
+  /** Task creation notice (receipt to verify), shown in the creation window. */
   creationNotice?: React.ReactNode;
+  /** MAIR-1137 (C15): the task whose page is shown in place of the board, or `null`. */
+  viewedTaskId?: string | null;
+  onViewTask?: (taskId: string | null) => void;
 }
 
 /**
  * MAIR-859 (Figma F6): the « Tâches » tab — toolbar (search, assignee and priority filters, Tableau / Liste), the
- * three-column board or the list, the task sheet (Drawer) and the deletion confirmation. Writes go through the page
- * controller (task create / patch / status / delete operations of BFF_Project).
+ * three-column board or the list, the task window and the deletion confirmation. MAIR-1137: a click on a task opens its
+ * page (`TaskPage`) in place of the board; « Modifier » opens the window (`TaskDialog`, which replaced the Drawer
+ * sheet). Writes go through the page controller (task create / patch / status / delete operations of BFF_Project).
  */
 export function ProjectTasksTab({
   project, tasks, filters, taskForm, collaboration, statusOptions, priorityOptions, memberOptions, labelOptions, unavailableColumns,
   pendingTaskIds, unverifiedTaskIds, taskWriteErrors, mutationPending, highlightTaskId, highlightedTaskRef, onMoveTask, onDeleteTask, creationNotice,
+  viewedTaskId = null, onViewTask,
 }: ProjectTasksTabProps) {
   const [view, setView] = React.useState<TaskView>('board');
   const [deleting, setDeleting] = React.useState<ProjectTask | null>(null);
@@ -67,9 +73,31 @@ export function ProjectTasksTab({
   const askDelete = (task: ProjectTask) => {
     if (!blocked(task)) setDeleting(task);
   };
+  const canEdit = (task: ProjectTask) => task.permissions?.canEdit !== false;
+  // MAIR-1137 (C15): opening a task shows its page; the edit is « Modifier » only.
+  const openTask = (task: ProjectTask) => onViewTask ? onViewTask(task.id) : taskForm.edit(task);
+  const viewed = viewedTaskId ? board.boardTasks.find((item) => item.task.id === viewedTaskId) ?? null : null;
+  const loads = React.useMemo(() => assigneeLoads(tasks), [tasks]);
 
   return (
     <div className="min-w-0">
+      {viewed ? (
+        <TaskPage
+          task={viewed.task}
+          project={project}
+          column={viewed.column}
+          columns={columns}
+          overdue={isTaskOverdue(viewed.task)}
+          blocked={blocked(viewed.task) || viewed.archived}
+          collaboration={collaboration}
+          onBack={() => onViewTask?.(null)}
+          onEdit={canEdit(viewed.task) && !viewed.archived ? () => taskForm.edit(viewed.task) : undefined}
+          onMove={canMove(viewed.task) && !viewed.archived ? (status) => move(viewed.task, status) : undefined}
+          onDuplicate={canCreate && !viewed.archived ? () => void taskForm.duplicate(viewed.task) : undefined}
+          onDelete={canDelete(viewed.task) && !viewed.archived ? () => askDelete(viewed.task) : undefined}
+        />
+      ) : (
+      <>
       <TaskToolbar
         search={filters.search}
         assignee={filters.assignee}
@@ -87,6 +115,8 @@ export function ProjectTasksTab({
         <p role="status" className="mb-3 text-sm text-[var(--mairie-muted)]">Actualisation des tâches en cours…</p>
       )}
 
+      {/* MAIR-1134 (C8): the view fades and rises in when it changes (260 ms, none under prefers-reduced-motion). */}
+      <div key={view} className="m360-view-enter">
       {view === 'board' ? (
         <TaskBoard
           columns={columns}
@@ -101,7 +131,8 @@ export function ProjectTasksTab({
           highlightTaskId={highlightTaskId}
           highlightedTaskRef={highlightedTaskRef}
           quickAddPending={quickAddPending || mutationPending}
-          onOpenTask={taskForm.edit}
+          onOpenTask={openTask}
+          onEditTask={taskForm.edit}
           onMoveTask={move}
           onDeleteTask={askDelete}
           onQuickAdd={canCreate ? async (title, status) => {
@@ -119,14 +150,22 @@ export function ProjectTasksTab({
             items={items}
             isOverdue={(task) => isTaskOverdue(task)}
             canMove={canMove}
-            onOpenTask={taskForm.edit}
+            onOpenTask={openTask}
+            onEditTask={taskForm.edit}
             onMoveTask={move}
+            menuColumns={columns}
+            blocked={blocked}
+            onDeleteTask={(task) => canDelete(task) ? () => askDelete(task) : undefined}
             emptyTitle={filters.active ? 'Aucune tâche ne correspond aux filtres' : 'Aucune tâche pour ce projet'}
           />
         </div>
       )}
+      </div>
 
-      <TaskSheet
+      </>
+      )}
+
+      <TaskDialog
         open={taskForm.open}
         task={editedTask}
         form={taskForm.form}
@@ -135,12 +174,13 @@ export function ProjectTasksTab({
         saving={taskForm.saving}
         disabled={mutationPending}
         submitDisabled={taskForm.submitDisabled}
+        projectDueDate={project.dueDate}
         statusValue={taskForm.statusValue}
         statusOptions={taskForm.missingDefaultStatus ? [{ value: '', label: 'Choisir un statut du projet' }, ...statusOptions] : statusOptions}
         priorityOptions={priorityOptions}
         memberOptions={memberOptions}
         labelOptions={labelOptions}
-        collaboration={collaboration}
+        loads={loads}
         onStatusChange={taskForm.onStatusChange}
         onChange={taskForm.update}
         onClose={taskForm.cancel}
@@ -148,7 +188,7 @@ export function ProjectTasksTab({
         onDelete={editedTask && canDelete(editedTask) ? () => askDelete(editedTask) : undefined}
       >
         {creationNotice}
-      </TaskSheet>
+      </TaskDialog>
 
       {deleting && (
         <TaskDeleteConfirm
@@ -159,6 +199,7 @@ export function ProjectTasksTab({
             const task = deleting;
             setDeleting(null);
             if (taskForm.editingTaskId === task.id) taskForm.cancel();
+            if (viewedTaskId === task.id) onViewTask?.(null);
             void onDeleteTask(project.id, task.id, task.title);
           }}
         />

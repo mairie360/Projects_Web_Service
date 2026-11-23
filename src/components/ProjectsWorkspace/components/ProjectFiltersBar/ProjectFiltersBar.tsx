@@ -38,14 +38,16 @@ function LibFilter({ label, value, options, onChange }: { label: string; value: 
   );
 }
 
-/** Search, status/priority/due filters and the Kanban/grid/table switch, all lib-components (MAIR-828). */
+/** Search, status/priority/due filters and, on its own row, the Kanban/grid/table switch, all lib-components (MAIR-828, MAIR-1134). */
 export const ProjectFiltersBar = ({
   search, status, priority, dueBefore, statusOptions, priorityOptions, viewMode, views,
   onSearchChange, onStatusChange, onPriorityChange, onDueBeforeChange, onViewModeChange,
 }: ProjectFiltersBarProps) => (
   <section className="border-b border-[var(--mairie-border)] py-6" aria-label="Filtres des projets">
-    <div className="flex flex-col items-start gap-4 2xl:flex-row 2xl:flex-wrap 2xl:items-end 2xl:justify-between">
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-end 2xl:basis-[50rem]">
+    {/* MAIR-1134 (C6): search and filters on one row, the view switch on its own row under them, left aligned:
+        it never moves, whatever the view or the active filters. */}
+    <div className="flex flex-col items-start gap-4">
+      <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:items-end">
         <div className="w-full md:min-w-[280px] md:max-w-[448px] md:flex-1 2xl:min-w-[240px]">
           <SearchField
             aria-label="Rechercher un projet"
@@ -71,6 +73,7 @@ export const ProjectFiltersBar = ({
       </div>
 
       <SegmentedControl
+        className="self-start"
         label="Vue des projets"
         value={viewMode}
         options={views.map((view) => ({ key: view.value, label: view.label, icon: viewIcons[view.value] }))}

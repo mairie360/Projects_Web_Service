@@ -76,4 +76,16 @@ describe('TableView V2 (MAIR-833)', () => {
     expect(sortProjects([none, later, soon], { key: 'dueDate', direction: 'asc' }).map((p) => p.id)).toEqual(['project-2', 'project-3', 'project-1']);
     expect(sortProjects([none, soon, later], { key: 'dueDate', direction: 'desc' }).map((p) => p.id)).toEqual(['project-3', 'project-2', 'project-1']);
   });
+
+  it('follows the business orders and keeps an empty responsible last (MAIR-1138)', () => {
+    const done = fixtures.projectListItem({ id: 'project-1', status: 'done', priority: 'low' });
+    const todo = fixtures.projectListItem({ id: 'project-2', status: 'todo', priority: 'high' });
+    const review = fixtures.projectListItem({ id: 'project-3', status: 'review', priority: 'medium', responsible: { name: '' } });
+    const ids = (sort) => sortProjects([done, review, todo], sort).map((p) => p.id);
+    expect(ids({ key: 'status', direction: 'asc' })).toEqual(['project-2', 'project-3', 'project-1']);
+    expect(ids({ key: 'status', direction: 'desc' })).toEqual(['project-1', 'project-3', 'project-2']);
+    expect(ids({ key: 'priority', direction: 'asc' })).toEqual(['project-2', 'project-3', 'project-1']);
+    expect(ids({ key: 'responsible', direction: 'asc' }).at(-1)).toBe('project-3');
+    expect(ids({ key: 'responsible', direction: 'desc' }).at(-1)).toBe('project-3');
+  });
 });

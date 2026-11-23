@@ -1,6 +1,6 @@
 import React from 'react';
 import { civilDateInZone } from '@mairie360/lib-components/shared';
-import { createPersonFromOptionValue, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
+import { createPersonFromOptionValue, taskStatusOf, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
 import type { Project, ProjectTask } from '@/types/project';
 import { createDraftTaskId, createTaskFormStateFromProjectForm, createTaskSummaryPatch, taskToFormState, uniqueAssigneesInOrder, type TaskDraftFormState } from './task-form-state';
 
@@ -18,7 +18,7 @@ export function useTaskDrafts({ form, memberOptions, onChange }: {
   React.useEffect(() => {
     setTaskForm((current) => ({
       ...current,
-      status: current.title ? current.status : form.status,
+      status: current.title ? current.status : taskStatusOf(form.status),
       priority: current.title ? current.priority : form.priority,
     }));
   }, [form.priority, form.status]);

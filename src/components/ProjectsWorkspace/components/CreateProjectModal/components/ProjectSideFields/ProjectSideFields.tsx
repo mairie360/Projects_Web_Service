@@ -18,6 +18,11 @@ export interface ProjectSideFieldsProps {
   /** The group is required to create a project, optional to edit one created before groups. */
   groupRequired?: boolean;
   errors?: ProjectFieldErrors;
+  /**
+   * MAIR-1136 (C9, C16): the fields of one step or section — `essential` (Groupe, Échéance), `organisation`
+   * (Responsable, Priorité, Statut, then Équipe, Étiquettes) — or all of them.
+   */
+  part?: 'essential' | 'organisation' | 'all';
   onChange: (patch: Partial<ProjectFormState>) => void;
 }
 
@@ -55,38 +60,47 @@ function NewLabel({ labels, onAdd }: { labels: string[]; onAdd: (label: string) 
   );
 }
 
-/** The fields under the description, in the Figma F3 order: Statut / Priorité / Groupe, Responsable / Échéance, Équipe / Étiquettes. */
-export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, groupOptions = [], groupsError, groupRequired = true, errors = {}, onChange }: ProjectSideFieldsProps) => {
+/**
+ * The fields under the description, in the rows of Figma F3 (MAIR-1136, C16): Groupe / Échéance, then
+ * Responsable / Priorité / Statut, then Équipe / Étiquettes.
+ */
+export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, groupOptions = [], groupsError, groupRequired = true, errors = {}, part = 'all', onChange }: ProjectSideFieldsProps) => {
   // Labels typed on the fly are not in the page options yet: keep them selectable (and removable) as chips.
   const labels = [...labelOptions, ...form.labels.filter((label) => !labelOptions.some((option) => option.value === label)).map((label) => ({ value: label, label }))];
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
-        <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
-        <SelectField
-          id="project-group"
-          label="Groupe"
-          required={groupRequired}
-          value={form.groupId}
-          options={groupOptions}
-          placeholder="Choisir un groupe"
-          hint={GROUP_HINT}
-          error={errors.groupId || groupsError || undefined}
-          onChange={(groupId) => onChange({ groupId })}
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField id="project-responsible" label="Responsable" value={form.responsible} options={responsibleOptions} placeholder={null} error={errors.responsible} onChange={(responsible) => onChange({ responsible })} />
-        <DateField id="project-due-date" label="Échéance" value={form.dueDate} required error={errors.dueDate} onChange={(event) => onChange({ dueDate: event.target.value })} />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <MultiSelect id="project-assignees" label="Équipe" value={form.assignees} options={memberOptions} visibleOptions={4} onChange={(assignees) => onChange({ assignees })} />
-        <div className="space-y-2">
-          <MultiSelect id="project-labels" label="Étiquettes" value={form.labels} options={labels} visibleOptions={4} onChange={(selected) => onChange({ labels: selected })} />
-          <NewLabel labels={form.labels} onAdd={(label) => onChange({ labels: [...form.labels, label] })} />
+      {part !== 'organisation' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            id="project-group"
+            label="Groupe"
+            required={groupRequired}
+            value={form.groupId}
+            options={groupOptions}
+            placeholder="Choisir un groupe"
+            hint={GROUP_HINT}
+            error={errors.groupId || groupsError || undefined}
+            onChange={(groupId) => onChange({ groupId })}
+          />
+          <DateField id="project-due-date" label="Échéance" value={form.dueDate} required error={errors.dueDate} onChange={(event) => onChange({ dueDate: event.target.value })} />
         </div>
-      </div>
+      )}
+      {part !== 'essential' && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <SelectField id="project-responsible" label="Responsable" value={form.responsible} options={responsibleOptions} placeholder={null} error={errors.responsible} onChange={(responsible) => onChange({ responsible })} />
+            <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
+            <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MultiSelect id="project-assignees" label="Équipe" value={form.assignees} options={memberOptions} visibleOptions={4} onChange={(assignees) => onChange({ assignees })} />
+            <div className="space-y-2">
+              <MultiSelect id="project-labels" label="Étiquettes" value={form.labels} options={labels} visibleOptions={4} onChange={(selected) => onChange({ labels: selected })} />
+              <NewLabel labels={form.labels} onAdd={(label) => onChange({ labels: [...form.labels, label] })} />
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };

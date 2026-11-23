@@ -21,11 +21,11 @@ const transfer = () => { const data = {}; return { setData: (type, value) => { d
 describe('TaskBoard (MAIR-859)', () => {
   it('shows three columns with their counts, cards and the archived done tasks', () => {
     board({ archivedLabel: '+ 2 tâches terminées' });
-    const todoColumn = screen.getByRole('region', { name: 'À faire' });
+    const todoColumn = screen.getByRole('region', { name: /^À faire/ });
     expect(within(todoColumn).getByRole('heading', { name: todo.title })).toBeTruthy();
-    expect(within(todoColumn).getByLabelText('1 tâche')).toBeTruthy();
-    expect(within(screen.getByRole('region', { name: 'En cours' })).getByText('Aucune tâche')).toBeTruthy();
-    expect(within(screen.getByRole('region', { name: 'Terminé' })).getByText('+ 2 tâches terminées')).toBeTruthy();
+    expect(within(todoColumn).getByRole('heading', { level: 3 }).textContent).toBe('À faire, 1 carte');
+    expect(within(screen.getByRole('region', { name: /^En cours/ })).getByText('Aucune tâche')).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: /^Terminé/ })).getByText('+ 2 tâches terminées')).toBeTruthy();
   });
 
   it('moves a card dropped on another column, and only there', () => {
@@ -33,12 +33,12 @@ describe('TaskBoard (MAIR-859)', () => {
     const card = screen.getByRole('group', { name: todo.title });
     const dataTransfer = transfer();
     fireEvent.dragStart(card, { dataTransfer });
-    fireEvent.dragOver(screen.getByRole('region', { name: 'À faire' }), { dataTransfer });
-    fireEvent.drop(screen.getByRole('region', { name: 'À faire' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('region', { name: /^À faire/ }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('region', { name: /^À faire/ }), { dataTransfer });
     expect(onMoveTask).not.toHaveBeenCalled();
     fireEvent.dragStart(card, { dataTransfer });
-    fireEvent.dragOver(screen.getByRole('region', { name: 'Terminé' }), { dataTransfer });
-    fireEvent.drop(screen.getByRole('region', { name: 'Terminé' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('region', { name: /^Terminé/ }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('region', { name: /^Terminé/ }), { dataTransfer });
     expect(onMoveTask).toHaveBeenCalledWith(todo, 'done');
   });
 
@@ -50,7 +50,7 @@ describe('TaskBoard (MAIR-859)', () => {
   it('adds a task from the « + » of a column with Entrée and cancels with Échap', async () => {
     const user = userEvent.setup();
     const { onQuickAdd } = board();
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche dans En cours' }));
+    await user.click(screen.getByRole('button', { name: 'Ajouter dans En cours' }));
     const field = screen.getByLabelText('Titre de la nouvelle tâche dans En cours');
     expect(document.activeElement).toBe(field);
     await user.keyboard('{Enter}');
@@ -58,7 +58,7 @@ describe('TaskBoard (MAIR-859)', () => {
     await user.type(field, 'Consulter les riverains{Enter}');
     expect(onQuickAdd).toHaveBeenCalledWith('Consulter les riverains', 'in-progress');
     expect(screen.queryByLabelText('Titre de la nouvelle tâche dans En cours')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Ajouter une tâche dans À faire' }));
+    await user.click(screen.getByRole('button', { name: 'Ajouter dans À faire' }));
     await user.keyboard('Brouillon{Escape}');
     expect(screen.queryByLabelText('Titre de la nouvelle tâche dans À faire')).toBeNull();
     expect(onQuickAdd).toHaveBeenCalledTimes(1);
@@ -66,6 +66,24 @@ describe('TaskBoard (MAIR-859)', () => {
 
   it('offers no « + » without the right to create a task', () => {
     board({ onQuickAdd: undefined });
-    expect(screen.queryByRole('button', { name: /^Ajouter une tâche dans/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Ajouter dans/ })).toBeNull();
+  });
+
+  it('folds « Terminé » from its chevron, remembers it and still takes a drop (MAIR-1134)', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    const { onMoveTask } = board();
+    await user.click(screen.getByRole('button', { name: 'Replier la colonne Terminé' }));
+    expect(JSON.parse(window.localStorage.getItem('m360-collapsed-tasks'))).toEqual(['done']);
+    expect(screen.getByRole('button', { name: 'Déplier la colonne Terminé' }).getAttribute('aria-expanded')).toBe('false');
+    const dataTransfer = transfer();
+    fireEvent.dragStart(screen.getByRole('group', { name: todo.title }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('region', { name: /^Terminé/ }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('region', { name: /^Terminé/ }), { dataTransfer });
+    expect(onMoveTask).toHaveBeenCalledWith(todo, 'done');
+    // The « + » of a folded column unfolds it for the quick add.
+    await user.click(screen.getByRole('button', { name: 'Ajouter dans Terminé' }));
+    expect(screen.getByLabelText('Titre de la nouvelle tâche dans Terminé')).toBeTruthy();
+    window.localStorage.clear();
   });
 });

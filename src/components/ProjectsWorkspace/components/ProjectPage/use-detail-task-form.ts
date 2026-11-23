@@ -1,7 +1,7 @@
 import React from 'react';
 import { getBffProjectErrorMessage } from '@/lib/bffProjectClient';
 import { createDetailTaskFormState } from '@/lib/current-agent';
-import { createPersonFromOptionValue, type FilterOption, type TaskFormState } from '@/lib/projectPageState';
+import { createPersonFromOptionValue, TASK_START_AFTER_DUE, taskStartAfterDue, taskStatusOf, type FilterOption, type TaskFormState } from '@/lib/projectPageState';
 import { NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError } from '@/lib/projectTaskVerification';
 import type { TaskStatusDefinition } from '@/lib/projectWorkflow';
 import type { Project, ProjectTask, ProjectTaskDraft } from '@/types/project';
@@ -17,7 +17,7 @@ export type TaskColumnStatus = 'todo' | 'in-progress' | 'done';
 export const TASK_TITLE_REQUIRED = 'Donnez un titre à la tâche';
 
 // The task sheet (MAIR-859): creation draft (with the current agent as default assignee) or edit of one task, in a
-// Drawer opened by « Nouvelle tâche », a card or a row; the board quick add goes through the same writes.
+// window (lib Modal, MAIR-1137) opened by « Nouvelle tâche » or « Modifier »; the board quick add goes through the same writes.
 export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask }: {
   project: Project;
   lockRef: MutationLock;
@@ -82,6 +82,8 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     if (titleError && patch.title?.trim()) setTitleError('');
   };
 
+  const categoryColumn = (status: Project['status']): TaskColumnStatus => (status === 'done' || status === 'in-progress' ? status : 'todo');
+
   const columnPatch = (status: TaskColumnStatus): Pick<TaskFormState, 'status' | 'statusId'> => {
     const statusId = firstStatusOf(categoryOf(status));
     return { status, ...(dynamicStatuses && statusId ? { statusId } : { statusId: undefined }) };
@@ -102,6 +104,10 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
       setTitleError(TASK_TITLE_REQUIRED);
       return false;
     }
+    if (taskStartAfterDue(submitted)) {
+      setError(TASK_START_AFTER_DUE);
+      return false;
+    }
 
     // Without an explicit choice, a task takes the project's first status of its form category.
     const formStatusId = dynamicStatuses && dynamicStatuses.some(status => status.id === submitted.statusId) ? submitted.statusId : firstStatusOf(categoryOf(submitted.status));
@@ -118,13 +124,15 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
-      status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : submitted.status,
+      status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : taskStatusOf(submitted.status),
       ...(dynamicStatuses ? { statusId: formStatusId } : {}),
       responsible: assignees[0],
       assignees,
       priority: submitted.priority,
       labels: submitted.labels,
       dueDate: submitted.dueDate,
+      // MAIR-1087: kept as typed; an empty start date is « none » (cleared on an edit).
+      ...(submitted.startDate !== undefined ? { startDate: submitted.startDate } : {}),
     };
 
     lockRef.current.task = true;
@@ -153,10 +161,22 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     }
   };
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  /**
+   * MAIR-1137 (C12): « Ajouter et continuer » (`continueAfter`) opens a new creation once the task is saved, for a
+   * chain of tasks.
+   */
+  const submit = async (event: React.FormEvent<HTMLFormElement>, { continueAfter = false }: { continueAfter?: boolean } = {}) => {
     event.preventDefault();
-    await persist(form, editingTaskId);
+    const saved = await persist(form, editingTaskId);
+    if (saved && continueAfter && !editingTaskId) {
+      setForm((current) => ({ ...current, ...columnPatch(categoryColumn(form.status)) }));
+      setOpen(true);
+    }
+    return saved;
   };
+
+  /** MAIR-1137 (C15): « Dupliquer » of the task page writes a copy of the task in the same state. */
+  const duplicate = (task: ProjectTask) => persist({ ...taskToFormState(task), title: `${task.title} (copie)` }, null);
 
   /** « Nouvelle tâche » (C5) or the « + » of a column (C3, with its status): the creation sheet. */
   const openCreate = (status: TaskColumnStatus = 'todo', title = '') => {
@@ -224,7 +244,7 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
   const missingDefaultStatus = !!dynamicStatuses && !firstStatusOf(categoryOf(form.status));
   const submitDisabled = editingTaskId ? (!!pendingTaskIds?.has(editingTaskId) || !!unverifiedTaskIds?.has(editingTaskId)) : !!(taskCreationState?.pending || taskCreationState?.uncertainTitle);
   const visibleError = error && (!verificationError || (!!editingTaskId && !!unverifiedTaskIds?.has(editingTaskId))) ? error : undefined;
-  const onStatusChange = (status: string) => update(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: status as Project['status'] });
+  const onStatusChange = (status: string) => update(dynamicStatuses ? { statusId: status, status: categoryStatus(status) } : { status: taskStatusOf(status as Project['status']) });
 
-  return { form, open, editingTaskId, error: visibleError, titleError, saving, noticeRef, statusValue, missingDefaultStatus, submitDisabled, update, onStatusChange, submit, openCreate, quickAdd, edit, cancel, resetForProject };
+  return { form, open, editingTaskId, error: visibleError, titleError, saving, noticeRef, statusValue, missingDefaultStatus, submitDisabled, update, onStatusChange, submit, duplicate, openCreate, quickAdd, edit, cancel, resetForProject };
 }
