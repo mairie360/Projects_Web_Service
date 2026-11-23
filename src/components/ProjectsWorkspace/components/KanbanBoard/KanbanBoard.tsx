@@ -1,67 +1,37 @@
 'use client';
 
 import React from 'react';
-import { ToolTip } from '@mairie360/lib-components/primitives';
-import { AlertCircle, CheckCircle2, Clock3, Eye, Plus } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { KanbanColumn } from '@mairie360/lib-components/primitives';
 
 import { ProjectCard } from '../ProjectCard';
-import type { Project, ProjectTaskDraft } from '@/types/project';
-import type { TaskCreationState } from '../TaskCreationNotice';
-
-type SelectOption = {
-  label: string;
-  value: string;
-};
+import { projectColumnTone } from '../../project-card-meta';
+import { COLLAPSED_PROJECT_COLUMNS_KEY, useCollapsedColumns } from '../../use-collapsed-columns';
+import type { Project } from '@/types/project';
 
 type KanbanBoardProps = {
   projects: Project[];
-  workflowPort?: import('@/lib/projectWorkflow').ProjectWorkflowPort;
   duplicatingProjectIds?: string[];
   unverifiedDuplicationSourceIds?: ReadonlySet<string>;
-  taskCreationStates?: ReadonlyMap<string, TaskCreationState>;
-  onInspectTaskCreation?: (projectId: string) => void | Promise<void>;
-  onPreserveTaskDraft?: import('../ProjectCard/project-card-types').ProjectCardProps['onPreserveTaskDraft'];
   columns: Array<{ status: Project['status']; label: string }>;
-  memberOptions?: SelectOption[];
-  labelOptions?: SelectOption[];
   onProjectOpen?: (project: Project) => void;
-  onProjectEdit?: (project: Project) => void;
   onProjectDuplicate?: (project: Project) => void;
   onProjectDelete?: (project: Project) => void;
-  onProjectTaskAdd?: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
+  /** MAIR-1134: « Modifier » of the card menu. */
+  onProjectEdit?: (project: Project) => void;
   onAddProject?: (status: Project['status']) => void;
+  /** Status change, by drag and drop or by the card menu (MAIR-829). */
   onMoveProject?: (project: Project, status: Project['status']) => Promise<void>;
-};
-
-type KanbanColumnPresentation = {
-  icon: LucideIcon;
-  iconClassName: string;
-};
-
-const columnPresentation: Record<Project['status'], KanbanColumnPresentation> = {
-  todo: { icon: AlertCircle, iconClassName: 'text-[#e60012]' },
-  'in-progress': { icon: Clock3, iconClassName: 'text-[#1256a6]' },
-  review: { icon: Eye, iconClassName: 'text-[#1256a6]' },
-  done: { icon: CheckCircle2, iconClassName: 'text-[#00a94f]' },
 };
 
 export function KanbanBoard({
   projects,
-  workflowPort,
   duplicatingProjectIds = [],
   unverifiedDuplicationSourceIds,
-  taskCreationStates,
-  onInspectTaskCreation,
-  onPreserveTaskDraft,
   columns,
-  memberOptions,
-  labelOptions,
   onProjectOpen,
-  onProjectEdit,
   onProjectDuplicate,
   onProjectDelete,
-  onProjectTaskAdd,
+  onProjectEdit,
   onAddProject,
   onMoveProject,
 }: KanbanBoardProps) {
@@ -72,6 +42,8 @@ export function KanbanBoard({
   const startedOnControl = React.useRef(false);
   const suppressNextClick = React.useRef(false);
   const instructionsId = React.useId();
+  // MAIR-1134: a column folds from its header chevron; the choice is remembered per browser.
+  const { collapsed, setColumnCollapsed } = useCollapsedColumns(COLLAPSED_PROJECT_COLUMNS_KEY);
   const dragged = projects.find((project) => project.id === draggedId);
   const canMove = (project: Project) => Boolean(onMoveProject && movingId === null && project.permissions?.canEdit === true);
   const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status);
@@ -82,12 +54,8 @@ export function KanbanBoard({
     suppressNextClick.current = true;
   };
 
-  const dropProject = async (event: React.DragEvent, status: Project['status']) => {
-    event.preventDefault();
-    if (moving.current || !dragged || !acceptsDrop(status) || event.dataTransfer.getData('application/x-mairie360-project') !== dragged.id) return;
-
-    const project = dragged;
-    endDrag();
+  const moveProject = async (project: Project, status: Project['status']) => {
+    if (moving.current) return;
     moving.current = true;
     setMovingId(project.id);
     try {
@@ -98,22 +66,36 @@ export function KanbanBoard({
     }
   };
 
+  const dropProject = async (event: React.DragEvent, status: Project['status']) => {
+    event.preventDefault();
+    if (moving.current || !dragged || !acceptsDrop(status) || event.dataTransfer.getData('application/x-mairie360-project') !== dragged.id) return;
+
+    const project = dragged;
+    endDrag();
+    await moveProject(project, status);
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
       <p id={instructionsId} className="sr-only">
-        Glissez une carte vers une autre colonne pour changer son statut. Au clavier ou sur mobile, utilisez Modifier dans le menu Actions du projet.
+        Glissez une carte vers une autre colonne pour changer son statut. Au clavier ou sur mobile, utilisez « Changer le statut » dans le menu Actions du projet.
       </p>
       {columns.map((column) => {
-        const presentation = columnPresentation[column.status];
-        const Icon = presentation.icon;
         const columnProjects = projects.filter((project) => project.status === column.status);
 
         return (
-          <section
+          <KanbanColumn
             key={column.status}
-            className={`min-w-0 rounded-md transition-colors ${targetStatus === column.status ? 'bg-[#ddf4ff] ring-2 ring-[#0969da]' : ''}`}
+            title={column.label}
+            tone={projectColumnTone[column.status]}
+            count={columnProjects.length}
+            onAdd={onAddProject ? () => onAddProject(column.status) : undefined}
+            collapsible
+            collapsed={collapsed.has(column.status)}
+            onCollapsedChange={(folded) => setColumnCollapsed(column.status, folded)}
+            dropActive={targetStatus === column.status}
+            emptyLabel="Aucun projet"
             data-project-status={column.status}
-            aria-label={column.label}
             onDragOver={(event) => {
               if (!acceptsDrop(column.status)) return;
               event.preventDefault();
@@ -127,28 +109,7 @@ export function KanbanBoard({
             }}
             onDrop={(event) => void dropProject(event, column.status)}
           >
-            <div className="mb-3 flex h-12 items-center justify-between rounded-md border border-[#d0d7de] bg-[#f6f8fa] px-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Icon className={`h-4 w-4 shrink-0 ${presentation.iconClassName}`} strokeWidth={2} />
-                <h2 className="truncate text-sm font-semibold text-[#24292f]">{column.label}</h2>
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d8dee4] px-1.5 text-xs font-semibold text-[#57606a]">
-                  {columnProjects.length}
-                </span>
-              </div>
-              {onAddProject && <ToolTip text={`Ajouter dans ${column.label}`}>
-                <button
-                  type="button"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#57606a] transition hover:bg-[#d8dee4] hover:text-[#24292f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0969da]/30"
-                  aria-label={`Ajouter un projet ${column.label}`}
-                  onClick={() => onAddProject?.(column.status)}
-                >
-                  <Plus className="h-4 w-4" strokeWidth={2} />
-                </button>
-              </ToolTip>}
-            </div>
-
-            <div className="min-h-[120px] space-y-2.5">
-              {columnProjects.map((project) => (
+            {columnProjects.map((project) => (
                 <div
                   key={project.id}
                   data-project-id={project.id}
@@ -157,7 +118,7 @@ export function KanbanBoard({
                   aria-describedby={instructionsId}
                   aria-busy={movingId === project.id}
                   draggable={canMove(project)}
-                  className={draggedId === project.id ? 'opacity-50' : ''}
+                  className={draggedId === project.id ? 'opacity-40' : ''}
                   onPointerDownCapture={(event) => {
                     suppressNextClick.current = false;
                     startedOnControl.current = Boolean((event.target as Element).closest('button, a, input, textarea, select, [contenteditable="true"]'));
@@ -182,25 +143,18 @@ export function KanbanBoard({
                 >
                   <ProjectCard
                     project={project}
-                    workflowPort={workflowPort}
-                    taskCreationState={taskCreationStates?.get(project.id)}
-                    onInspectTaskCreation={onInspectTaskCreation}
-                    onPreserveTaskDraft={onPreserveTaskDraft}
                     duplicationPending={duplicatingProjectIds.includes(project.id)}
                     duplicationVerificationRequired={unverifiedDuplicationSourceIds?.has(project.id)}
-                    memberOptions={memberOptions}
-                    labelOptions={labelOptions}
                     onOpen={onProjectOpen}
-                    onEdit={onProjectEdit}
                     onDuplicate={onProjectDuplicate}
                     onDelete={onProjectDelete}
-                    onAddTask={onProjectTaskAdd}
+                    onEdit={onProjectEdit}
+                    onChangeStatus={onMoveProject && canMove(project) ? moveProject : undefined}
                     variant="kanban"
                   />
                 </div>
-              ))}
-            </div>
-          </section>
+            ))}
+          </KanbanColumn>
         );
       })}
     </div>

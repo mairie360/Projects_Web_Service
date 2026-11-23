@@ -59,9 +59,9 @@ for (const obsoleteFailure of [false, true]) {
     await view.act(() => { previous = view.props('KanbanBoard').onProjectOpen(first); });
     await view.waitFor(() => detailCalls().length === 1);
     await view.act(() => view.props('KanbanBoard').onProjectOpen(second));
-    assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+    assert.equal(view.props('ProjectPage').project.id, second.id);
     await release(); await previous; await view.settle();
-    assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+    assert.equal(view.props('ProjectPage').project.id, second.id);
     assert.doesNotMatch(view.text(), /Erreur du projet abandonné/);
     assert.equal(detailCalls().length, 2);
     assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
@@ -75,17 +75,17 @@ for (const nextSelection of ['closed', 'other', 'same-reopened']) {
     bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ status: 'done' }) });
     const release = gateNextDetail(t, first.id);
     let pending;
-    await view.act(() => { pending = view.props('ProjectDetailModal').onUpdateTaskStatus(first.id, 'task-1', 'done'); });
+    await view.act(() => { pending = view.props('ProjectPage').onUpdateTaskStatus(first.id, 'task-1', 'done'); });
     await view.waitFor(() => detailCalls().length === 2);
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
     if (nextSelection !== 'closed') {
       const next = nextSelection === 'other' ? second : { ...first, title: 'Fiche réouverte actuelle' };
       bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(next) });
       await view.act(() => view.props('KanbanBoard').onProjectOpen(next));
     }
     await release(); await pending; await view.settle();
-    if (nextSelection === 'closed') assert.equal(view.find('ProjectDetailModal').length, 0, 'a closed detail must not reopen');
-    else assert.equal(view.props('ProjectDetailModal').project.title, nextSelection === 'other' ? second.title : 'Fiche réouverte actuelle');
+    if (nextSelection === 'closed') assert.equal(view.find('ProjectPage').length, 0, 'a closed detail must not reopen');
+    else assert.equal(view.props('ProjectPage').project.title, nextSelection === 'other' ? second.title : 'Fiche réouverte actuelle');
     assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length, 1);
   });
 }
@@ -98,8 +98,8 @@ test('a late task deep link cannot replace a project chosen manually meanwhile',
   await view.act(() => view.props('KanbanBoard').onProjectOpen(second));
   await release();
   await view.settle();
-  assert.equal(view.props('ProjectDetailModal').project.id, second.id);
-  assert.equal(view.props('ProjectDetailModal').highlightTaskId, null);
+  assert.equal(view.props('ProjectPage').project.id, second.id);
+  assert.equal(view.props('ProjectPage').highlightTaskId, null);
   assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
 });
 
@@ -119,17 +119,17 @@ for (const nextSelection of ['closed', 'other', 'same-reopened', 'unchanged']) {
       return response;
     });
     let pending;
-    await view.act(() => { pending = view.props('ProjectDetailModal').onCloseProject(first.id, 'done'); });
+    await view.act(() => { pending = view.props('ProjectPage').onCloseProject(first.id, 'done'); });
     await view.waitFor(() => bffProject.calls('/projects/{projectId}/close', 'patch').length === 1);
-    if (nextSelection !== 'unchanged') await view.act(() => view.props('ProjectDetailModal').onClose());
+    if (nextSelection !== 'unchanged') await view.act(() => view.props('ProjectPage').onClose());
     if (nextSelection === 'other' || nextSelection === 'same-reopened') {
       const next = nextSelection === 'other' ? second : { ...first, title: 'Nouvelle consultation du même projet' };
       bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(next) });
       await view.act(() => view.props('KanbanBoard').onProjectOpen(next));
     }
     release(); await pending; await view.settle();
-    if (nextSelection === 'closed') assert.equal(view.find('ProjectDetailModal').length, 0);
-    else assert.equal(view.props('ProjectDetailModal').project.title, nextSelection === 'unchanged'
+    if (nextSelection === 'closed') assert.equal(view.find('ProjectPage').length, 0);
+    else assert.equal(view.props('ProjectPage').project.title, nextSelection === 'unchanged'
       ? confirmed.title : nextSelection === 'other' ? second.title : 'Nouvelle consultation du même projet');
     assert.equal(bffProject.calls('/projects/{projectId}/close', 'patch').length, 1);
   });
@@ -146,11 +146,11 @@ test('the latest detail refusal remains visible and can be recovered without an 
   await view.waitFor(() => detailCalls().length === 1);
   await view.act(() => view.props('KanbanBoard').onProjectOpen(second));
   await release(); await old; await view.settle();
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.match(view.text(), /Fiche actuelle indisponible/);
   bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(second) });
   await view.act(() => view.props('KanbanBoard').onProjectOpen(second));
-  assert.equal(view.props('ProjectDetailModal').project.id, second.id);
+  assert.equal(view.props('ProjectPage').project.id, second.id);
   assert.equal(bffProject.requests.filter(request => request.method !== 'GET').length, 0);
 });
 
@@ -164,6 +164,6 @@ test('a confirmed current-project update satisfies an opening in flight instead 
   bffProject.on('patch', '/projects/{projectId}', { body: f.projectDetails(confirmed) });
   await view.act(() => view.props('KanbanBoard').onMoveProject(first, 'review'));
   await release(); await opening; await view.settle();
-  assert.equal(view.props('ProjectDetailModal').project.title, confirmed.title);
+  assert.equal(view.props('ProjectPage').project.title, confirmed.title);
   assert.equal(bffProject.calls('/projects/{projectId}', 'patch').length, 1);
 });

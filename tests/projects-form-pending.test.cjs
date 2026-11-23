@@ -28,7 +28,7 @@ async function openForm(mode) {
   view = mount(React.createElement(Page));
   await view.waitFor((html) => !html.includes('Chargement des projets'));
   if (mode === 'create') await view.click('Nouveau projet');
-  else await view.act(() => view.props('KanbanBoard').onProjectEdit(view.props('KanbanBoard').projects[0]));
+  else await view.act(() => view.props('ProjectsWorkspace').openEditProject(view.props('KanbanBoard').projects[0]));
   await view.act(() => view.props('CreateProjectModal').onChange(draft()));
 }
 function delayWrite(method) {
@@ -118,12 +118,11 @@ for (const mode of ['create', 'edit']) {
     const receipt = view.hostElements(props => props['data-tone'] !== undefined && props.role === 'status')[0];
     assert.ok(receipt, 'the confirmed write must have a polite receipt rather than a refusal alert');
     assert.match(view.text(), /enregistré\. Actualisation impossible/); // the lib Alert renders its title in a nested Text
-    assert.equal(view.find('ProjectDetailModal').length, mode === 'create' ? 1 : 0);
+    assert.equal(view.find('ProjectPage').length, 0, 'MAIR-836: a creation no longer opens the sheet');
     const received = view.props('KanbanBoard').projects;
     assert.equal(received.filter(project => project.id === official.id).length, 1);
     assert.equal(received.find(project => project.id === official.id).title, official.title);
     assert.equal(received.find(project => project.id === official.id).permissions.canEdit, false);
-    if (mode === 'create') await view.act(() => view.props('ProjectDetailModal').onClose());
     harness.bffProject.on('get', '/projects-page', { body: fixtures.projectsPage(mode === 'create' ? [fixtures.projectListItem(), official] : [official]) });
     await view.click((props, text, tag) => tag === 'button' && text === 'Réessayer');
     await view.waitFor(() => view.hostElements((props, text, tag) => tag === 'button' && text === 'Réessayer').length === 0);

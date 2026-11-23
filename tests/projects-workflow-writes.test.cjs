@@ -7,7 +7,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectDetailModal/components/ProjectWorkflow/ProjectWorkflow.tsx');
+const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow/ProjectWorkflow.tsx');
 const { WorkflowWriteRefusedError } = requireTs('src/lib/projectWorkflow.ts');
 
 // MAIR-570: the project workflow writes (task moves, status settings) share the controller's task write
@@ -50,16 +50,15 @@ function hold(t, method, pathPattern, template, reply) {
   });
   return () => release();
 }
-const revision = async () => (await workspace().workflowPort.readProject(project.id, signal())).revision;
 
-test('MAIR-570: a workflow move is refused while the same task has a write in flight', async t => {
+test('MAIR-570 / MAIR-859: a board move is not sent while the same task has a write in flight', async t => {
   await openSheet();
   const release = hold(t, 'patch', /\/tasks\/task-1\/status$/, '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ status: 'done' }) });
   let listWrite;
   try {
     await view.act(() => { listWrite = workspace().changeProjectTaskStatus(project.id, task.id, 'done', 'status-4'); });
     await view.waitFor(() => writes().length === 1);
-    await assert.rejects(workspace().moveWorkflowTask({ projectId: project.id, revision: 'any', taskId: task.id, statusId: 'status-2' }, signal()), WorkflowWriteRefusedError);
+    assert.equal(await workspace().changeProjectTaskStatus(project.id, task.id, 'in-progress', 'status-2'), false);
   } finally { release(); await listWrite; await view.settle(); }
   assert.deepEqual(writes().map(request => request.template), ['/projects/{projectId}/tasks/{taskId}/status']);
 });
@@ -77,7 +76,6 @@ test('MAIR-570: no task write starts while the project statuses are being saved'
     await view.waitFor(() => writes().length === 1);
     await view.act(() => workspace().changeProjectTaskStatus(project.id, task.id, 'done', 'status-4'));
     await assert.rejects(workspace().addProjectTask(project, { ...f.projectTask({ id: undefined }), title: 'Pendant le paramétrage', assignees: [f.people.marie], responsible: f.people.marie }), /statuts du projet sont en cours d’enregistrement/);
-    await assert.rejects(workspace().moveWorkflowTask({ projectId: project.id, revision: snapshot.revision, taskId: task.id, statusId: 'status-2' }, signal()), WorkflowWriteRefusedError);
     assert.match(view.text(), /statuts du projet sont en cours d’enregistrement/);
   } finally { release(); await save; await view.settle(); }
   assert.deepEqual(writes().map(request => request.template), ['/projects/{projectId}/statuses/{statusId}']);
@@ -95,7 +93,7 @@ test('MAIR-570: statuses are not saved while a task write of the project is in f
   assert.equal(writes().length, 1);
 });
 
-test('MAIR-570: a task awaiting verification cannot be moved from the workflow', async () => {
+test('MAIR-570 / MAIR-859: a task awaiting verification cannot be moved on the board', async () => {
   await openSheet();
   // A receipt for another task leaves this one awaiting verification.
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: f.projectTask({ id: 'task-other', status: 'done' }) });
@@ -103,40 +101,43 @@ test('MAIR-570: a task awaiting verification cannot be moved from the workflow',
   await view.act(() => workspace().changeProjectTaskStatus(project.id, task.id, 'done', 'status-4'));
   await view.waitFor(() => workspace().unverifiedTaskIds.has(task.id));
 
-  await assert.rejects(workspace().moveWorkflowTask({ projectId: project.id, revision: 'any', taskId: task.id, statusId: 'status-2' }, signal()), WorkflowWriteRefusedError);
+  assert.equal(await workspace().changeProjectTaskStatus(project.id, task.id, 'in-progress', 'status-2'), false);
   assert.equal(writes().length, 1);
 });
 
-test('MAIR-570: a confirmed workflow move marks the task pending, then re-reads the sheet', async () => {
+test('MAIR-859: a confirmed board move marks the task pending, re-reads the sheet and shows « Statut mis à jour »', async () => {
   await openSheet();
   let current = task;
   bffProject.on('get', '/projects/{projectId}', () => ({ body: f.projectDetails(project, [current]) }));
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', ({ body }) => { current = f.projectTask({ status: 'in-progress', statusId: body.statusId }); return { body: current }; });
   const detailReads = bffProject.calls('/projects/{projectId}', 'get').length;
-  const draft = { projectId: project.id, revision: await revision(), taskId: task.id, statusId: 'status-2' };
   let move;
-  await view.act(() => { move = workspace().moveWorkflowTask(draft, signal()); });
+  await view.act(() => { move = workspace().changeProjectTaskStatus(project.id, task.id, 'in-progress', 'status-2'); });
   assert.ok(workspace().pendingTaskIds.has(task.id), 'the task is shown pending during the move');
-  const snapshot = await move;
+  assert.equal(await move, true);
   await view.settle();
 
-  assert.equal(snapshot.tasks.find(item => item.id === task.id).statusId, 'status-2');
+  assert.deepEqual(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch')[0].body, { statusId: 'status-2' });
   assert.equal(workspace().pendingTaskIds.has(task.id), false);
-  assert.ok(bffProject.calls('/projects/{projectId}', 'get').length > detailReads + 1, 'the controller re-reads the sheet after confirmation');
+  assert.ok(bffProject.calls('/projects/{projectId}', 'get').length > detailReads, 'the controller re-reads the sheet after confirmation');
+  await view.waitFor(html => html.includes('Statut mis à jour'));
 });
 
-test('MAIR-570: a refused workflow write is shown without asking for a verification read', async () => {
+test('MAIR-570: a refused statuses save is shown without asking for a verification read', async () => {
   const statuses = [
     { id: 'status-1', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
     { id: 'status-2', name: 'Conseil municipal', color: '#4b908d', category: 'inprogress' },
+    { id: 'status-3', name: 'Clos', color: '#267845', category: 'done' },
   ];
   const snapshot = { projectId: 'project-1', revision: 'v1', statuses, tasks: [{ id: 'task-1', title: 'Préparer le conseil', statusId: 'status-1', canUpdateStatus: true }] };
   const port = { readProject: async () => snapshot, readTemplates: async () => [] };
-  const onMoveTask = async () => { throw new WorkflowWriteRefusedError('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.'); };
-  view = mount(React.createElement(ProjectWorkflow, { projectId: 'project-1', role: 'Responsable', port, onMoveTask, onSaveStatuses: async () => snapshot }));
-  await view.waitFor(html => html.includes('Préparer le conseil'));
-  await view.act(() => view.props('TaskStatusKanban').onStatusChange('task-1', 'status-2'));
-  await view.waitFor(html => html.includes('Une opération est déjà en cours pour cette tâche.'));
+  const onSaveStatuses = async () => { throw new WorkflowWriteRefusedError('Une modification de tâche est en cours sur ce projet. Réessayez après sa confirmation.'); };
+  view = mount(React.createElement(ProjectWorkflow, { projectId: 'project-1', role: 'Responsable', port, onSaveStatuses }));
+  await view.waitFor(html => html.includes('Paramétrer les statuts') && !html.includes('Chargement des statuts'));
+  await view.click((_props, text, tag) => tag === 'button' && text === 'Paramétrer les statuts');
+  await view.fire((props, _text, tag) => tag === 'input' && props.value === 'Demandes reçues', 'onChange', { target: { value: 'Demandes' } });
+  await view.fire((props, _text, tag) => tag === 'form' && props['aria-label'] === 'Paramétrage des statuts', 'onSubmit');
+  await view.waitFor(html => html.includes('Une modification de tâche est en cours sur ce projet.'));
 
   assert.doesNotMatch(view.text(), /n’a pas pu être vérifiée/);
   const settings = view.hostElements((_props, text, tag) => tag === 'button' && text === 'Paramétrer les statuts')[0];

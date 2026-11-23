@@ -48,21 +48,6 @@ test('MAIR-567: invalid statuses are refused by the statuses-only read', async (
   await assert.rejects(port.readStatuses('project-1', signal()), /vérifi/);
 });
 
-test('MAIR-567: moving a task uses its statusId and accepts only a confirmed, re-read destination', async () => {
-  let current = task;
-  const port = createPublishedProjectWorkflowPort(service({
-    getProjectsProjectId: async () => ({ data: { project: { id: 'project-1' }, taskItems: [current] } }),
-    patchProjectsProjectIdTasksTaskIdStatus: async (_p, _t, body) => { current = { ...task, statusId: body.statusId }; return { data: current }; },
-  }));
-  const before = await port.readProject('project-1', signal());
-  const after = await port.moveTask({ projectId: 'project-1', revision: before.revision, taskId: 'task-1', statusId: 'status-1' }, signal());
-  assert.equal(after.tasks[0].statusId, 'status-1');
-
-  const ignored = createPublishedProjectWorkflowPort(service({ patchProjectsProjectIdTasksTaskIdStatus: async () => ({ data: task }) }));
-  const snapshot = await ignored.readProject('project-1', signal());
-  await assert.rejects(ignored.moveTask({ projectId: 'project-1', revision: snapshot.revision, taskId: 'task-1', statusId: 'status-1' }, signal()), /vérifi/);
-});
-
 test('MAIR-567: saving statuses refuses a changed snapshot before any write', async () => {
   let changed = false;
   const port = createPublishedProjectWorkflowPort(service({

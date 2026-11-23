@@ -52,11 +52,11 @@ async function performProjectOperation(operation, component, project) {
   }
   if (operation === 'edit-detail' || operation === 'close' || operation === 'review') {
     await view.act(() => view.props(component).onProjectOpen(project));
-    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectDetailModal').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
+    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectPage').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
     const form = requireTs('src/lib/projectPageState.ts').projectToFormState(project);
-    return view.act(() => view.props('ProjectDetailModal').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
+    return view.act(() => view.props('ProjectPage').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
   }
-  if (operation === 'edit-card') await view.act(() => view.props(component).onProjectEdit(project));
+  if (operation === 'edit-card') await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
   else await view.click('Nouveau projet');
   await view.act(() => view.props('CreateProjectModal').onChange({ title: 'Brouillon différent du résultat officiel', description: 'Description saisie', responsible: fixtures.people.marie.id, dueDate: '2026-12-15' }));
   return view.act(() => view.props('CreateProjectModal').onSubmit({ preventDefault() {} }));
@@ -265,7 +265,7 @@ test('retry keeps every active filter and accepts a genuinely empty successful r
   assert.deepEqual(Object.fromEntries(pageCalls().at(-1).url.searchParams), {
     q: 'éclairage public', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'grid', page: '1', limit: '50',
   });
-  assert.match(view.text(), /Aucun projet ne correspond aux filtres sélectionnés/);
+  assert.match(view.text(), /Aucun projet ne correspond à la recherche ou aux filtres sélectionnés/);
   assert.doesNotMatch(view.text(), /Dernières données reçues|Liste momentanément indisponible|Rénovation de l’éclairage public/);
   assert.ok(bffProject.requests.every((request) => request.method === 'GET'));
 });

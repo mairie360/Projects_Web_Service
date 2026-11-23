@@ -1,7 +1,9 @@
-import { DateField, MultiSelect, ProgressMeter, SelectField } from '@mairie360/lib-components/primitives';
+import React from 'react';
+import { DateField, MultiSelect, SelectField, TextField } from '@mairie360/lib-components/primitives';
+import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import type { FilterOption, ProjectFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
-
+import type { ProjectFieldErrors } from '../../../../project-form-validation';
 
 export interface ProjectSideFieldsProps {
   form: ProjectFormState;
@@ -10,40 +12,95 @@ export interface ProjectSideFieldsProps {
   responsibleOptions: FilterOption[];
   memberOptions: FilterOption[];
   labelOptions: FilterOption[];
+  /** Groups the project can be linked to (MAIR-880). */
+  groupOptions?: FilterOption[];
+  groupsError?: string;
+  /** The group is required to create a project, optional to edit one created before groups. */
+  groupRequired?: boolean;
+  errors?: ProjectFieldErrors;
+  /**
+   * MAIR-1136 (C9, C16): the fields of one step or section — `essential` (Groupe, Échéance), `organisation`
+   * (Responsable, Priorité, Statut, then Équipe, Étiquettes) — or all of them.
+   */
+  part?: 'essential' | 'organisation' | 'all';
   onChange: (patch: Partial<ProjectFormState>) => void;
 }
 
-const TaskCount = ({ label, value }: { label: string; value: number }) => (
-  <div className="rounded-md border border-[#d9d5d0] bg-white px-3 py-2">
-    <div className="text-xs font-semibold text-[#57606a]">{label}</div>
-    <div className="mt-1 text-lg font-semibold text-[#24292f]">{value}</div>
-  </div>
-);
+const GROUP_HINT = 'Tous les membres du groupe verront le projet. Seuls vos groupes sont proposés.';
 
-/** "Champs du projet": status, priority, people, labels, due date, progress and task counts. */
-export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, onChange }: ProjectSideFieldsProps) => (
-  <>
-    <div>
-      <h3 className="text-sm font-semibold text-[#24292f]">Champs du projet</h3>
-      <p className="mt-1 text-xs text-[#57606a]">Configure les champs visibles sur les cartes.</p>
-    </div>
+/** Adds a label that is not proposed yet (MAIR-836 « création à la volée »): Entrée or « Ajouter ». */
+function NewLabel({ labels, onAdd }: { labels: string[]; onAdd: (label: string) => void }) {
+  const [draft, setDraft] = React.useState('');
+  const value = draft.trim();
+  const invalid = /[<>]/.test(value);
+  const add = () => {
+    if (!value || invalid) return;
+    if (!labels.includes(value)) onAdd(value);
+    setDraft('');
+  };
+  return (
+    <TextField
+      id="project-new-label"
+      label="Nouvelle étiquette"
+      size="s"
+      value={draft}
+      placeholder="Ajouter une étiquette…"
+      pattern={NO_MARKUP_PATTERN}
+      title={NO_MARKUP_HINT}
+      hint="Entrée pour l’ajouter au projet."
+      error={invalid ? 'Une étiquette ne doit pas contenir les caractères < ou >.' : undefined}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter') return;
+        // Enter adds the label instead of submitting the dialog.
+        event.preventDefault();
+        add();
+      }}
+    />
+  );
+}
 
-    <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
-    <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
-    <SelectField id="project-responsible" label="Assigné principal" value={form.responsible} options={responsibleOptions} placeholder={null} onChange={(responsible) => onChange({ responsible })} />
-    <MultiSelect id="project-assignees" label="Assignés" value={form.assignees} options={memberOptions} onChange={(assignees) => onChange({ assignees })} />
-    <MultiSelect id="project-labels" label="Étiquettes" value={form.labels} options={labelOptions} onChange={(labels) => onChange({ labels })} />
-
-    <DateField id="project-due-date" label="Échéance" value={form.dueDate} required onChange={(event) => onChange({ dueDate: event.target.value })} />
-
-    <div>
-      <h3 className="mb-2 text-sm font-semibold text-[#24292f]">Progression</h3>
-      <ProgressMeter label="Progression" value={form.progress} />
-    </div>
-
-    <div className="grid grid-cols-2 gap-3">
-      <TaskCount label="Terminées" value={form.completedTasks} />
-      <TaskCount label="Total" value={form.totalTasks} />
-    </div>
-  </>
-);
+/**
+ * The fields under the description, in the rows of Figma F3 (MAIR-1136, C16): Groupe / Échéance, then
+ * Responsable / Priorité / Statut, then Équipe / Étiquettes.
+ */
+export const ProjectSideFields = ({ form, statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, groupOptions = [], groupsError, groupRequired = true, errors = {}, part = 'all', onChange }: ProjectSideFieldsProps) => {
+  // Labels typed on the fly are not in the page options yet: keep them selectable (and removable) as chips.
+  const labels = [...labelOptions, ...form.labels.filter((label) => !labelOptions.some((option) => option.value === label)).map((label) => ({ value: label, label }))];
+  return (
+    <>
+      {part !== 'organisation' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            id="project-group"
+            label="Groupe"
+            required={groupRequired}
+            value={form.groupId}
+            options={groupOptions}
+            placeholder="Choisir un groupe"
+            hint={GROUP_HINT}
+            error={errors.groupId || groupsError || undefined}
+            onChange={(groupId) => onChange({ groupId })}
+          />
+          <DateField id="project-due-date" label="Échéance" value={form.dueDate} required error={errors.dueDate} onChange={(event) => onChange({ dueDate: event.target.value })} />
+        </div>
+      )}
+      {part !== 'essential' && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <SelectField id="project-responsible" label="Responsable" value={form.responsible} options={responsibleOptions} placeholder={null} error={errors.responsible} onChange={(responsible) => onChange({ responsible })} />
+            <SelectField id="project-priority" label="Priorité" value={form.priority} options={priorityOptions} placeholder={null} onChange={(priority) => onChange({ priority: priority as Project['priority'] })} />
+            <SelectField id="project-status" label="Statut" value={form.status} options={statusOptions} placeholder={null} onChange={(status) => onChange({ status: status as Project['status'] })} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MultiSelect id="project-assignees" label="Équipe" value={form.assignees} options={memberOptions} visibleOptions={4} onChange={(assignees) => onChange({ assignees })} />
+            <div className="space-y-2">
+              <MultiSelect id="project-labels" label="Étiquettes" value={form.labels} options={labels} visibleOptions={4} onChange={(selected) => onChange({ labels: selected })} />
+              <NewLabel labels={form.labels} onAdd={(label) => onChange({ labels: [...form.labels, label] })} />
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};

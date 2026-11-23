@@ -2,6 +2,7 @@
 import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow';
 import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '../../lib/page-return';
+import { projectStatusLabel } from './project-card-meta';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,12 +15,14 @@ import {
   createProject,
   createProjectBodyFromForm,
   createProjectTask,
+  bulkDeleteProjects,
   closeProject as closeBffProject,
   deleteProject as deleteBffProject,
   deleteProjectTask as deleteBffProjectTask,
   duplicateProject as duplicateBffProject,
   getBffProjectErrorMessage,
   getProjectDetails,
+  getProjectGroups,
   getProjectsPage,
   mergeProjectDetails,
   taskBodyFromDraft,
@@ -29,6 +32,7 @@ import {
   updateProjectTaskStatus,
   type ProjectDetailsResponse,
   type ProjectsPageResponse,
+  type BulkDeletionResult,
 } from '../../lib/bffProjectClient';
 import {
   createProjectFormState,
@@ -42,11 +46,12 @@ import {
 } from '../../lib/projectPageState';
 import { getActiveFrontHrefs } from '../../lib/navigation';
 import { authSessionFromAccess, logoutAndReload } from '../../lib/auth-session';
-import { parseProjectDeepLink } from '../../lib/projectDeepLink';
+import { parseProjectDeepLink, writeProjectLocation } from '../../lib/projectDeepLink';
 import { isProjectPaginationValid } from '../../lib/projectPagination';
 import { applyTaskConfirmations, reconcileTaskConfirmations, taskConfirmationsAfter, type TaskConfirmation } from '../../lib/projectTaskConfirmations';
 import { assertProjectDetailsIdentity, NewTaskReceiptVerificationRequiredError, ProjectTaskVerificationRequiredError, TASK_VERIFICATION_MESSAGE } from '../../lib/projectTaskVerification';
 import type { TaskCreationState } from './components/TaskCreationNotice';
+import type { Feedback } from './components/FeedbackToast';
 import { NewProjectReceiptVerificationRequiredError, NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, ProjectReceiptVerificationRequiredError, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '../../types/project';
 
@@ -87,10 +92,17 @@ function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
+/** MAIR-846 (C7): the PATCH body keeps only the fields that differ from the project shown. */
+export function changedProjectBody(form: ProjectFormState, shown: ProjectFormState) {
+  const next = updateProjectBodyFromForm(form) as Record<string, unknown>;
+  const before = updateProjectBodyFromForm(shown) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(next).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key]))) as ReturnType<typeof updateProjectBodyFromForm>;
+}
+
 function validateProjectForm(form: ProjectFormState) {
   return Boolean(
+    // MAIR-836: the description is optional (BFF_Project and Project API accept an empty one).
     form.title.trim() &&
-      form.description.trim() &&
       form.dueDate &&
       (form.responsible.trim() || form.assignees.length > 0)
   );
@@ -175,8 +187,16 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectPendingDeletion, setProjectPendingDeletion] = useState<Project | null>(null);
+  // MAIR-833: table selection. Only the projects of the loaded page can be selected; a page, filter or
+  // view change resets it explicitly.
+  const [selectedProjectIds, setSelectedProjectIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkDeletionOpen, setBulkDeletionOpen] = useState(false);
+  const [bulkDeletionPending, setBulkDeletionPending] = useState(false);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(() => createProjectFormState());
   const [projectFormError, setProjectFormError] = useState('');
+  // MAIR-829: confirmation shown as a lib toast (« Statut mis à jour »).
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const clearFeedback = useCallback(() => setFeedback(null), []);
   const [projectFormPending, setProjectFormPending] = useState(false);
   const projectFormPendingRef = useRef(false);
   const projectFormOpeningRef = useRef<symbol | null>(null);
@@ -202,6 +222,27 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       projectsPage?.options.labels ??
       createSelectOptions(projects.flatMap((project) => project.labels)),
     [projects, projectsPage?.options.labels]
+  );
+
+  // MAIR-880: the groups a project can be linked to, read once; a refused read leaves the list empty and
+  // the creation form explains it instead of inventing a group.
+  const [projectGroups, setProjectGroups] = useState<{ id: string; name: string }[] | null>(null);
+  const [projectGroupsError, setProjectGroupsError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    getProjectGroups(controller.signal).then(
+      (groups) => {
+        if (controller.signal.aborted) return;
+        setProjectGroups(groups);
+        setProjectGroupsError(groups.length ? '' : 'Aucun groupe disponible : demandez à un administrateur de vous ajouter à un groupe.');
+      },
+      (error) => { if (!controller.signal.aborted) { setProjectGroups([]); setProjectGroupsError(getBffProjectErrorMessage(error)); } },
+    );
+    return () => controller.abort();
+  }, []);
+  const groupOptions = useMemo<FilterOption[]>(
+    () => (projectGroups ?? []).map((group) => ({ value: group.id, label: group.name })),
+    [projectGroups]
   );
 
   const statusOptionsFromBff = projectsPage?.filters.statuses;
@@ -380,6 +421,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (pageLoading || pageReadPendingRef.current || pageError || !pagination) return;
     if (direction === 'previous' ? pagination.page <= 1 : !pagination.hasNextPage) return;
     const nextPage = pagination.page + (direction === 'previous' ? -1 : 1);
+    setSelectedProjectIds(new Set());
     requestedPageRef.current = nextPage;
     pageUrl.update({ page: String(nextPage) });
     const controller = new AbortController();
@@ -389,6 +431,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const prepareQueryChange = (firstPage: boolean) => {
+    setSelectedProjectIds(new Set());
     ++pageRevisionRef.current;
     navigationReadRef.current?.abort();
     if (firstPage) requestedPageRef.current = 1;
@@ -433,6 +476,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const resetProjectFilters = () => {
+    setSelectedProjectIds(new Set());
     pageUrl.update({ q: '', status: 'all', priority: 'all', dueBefore: '', page: '1' });
     requestedPageRef.current = 1;
     queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '' };
@@ -609,7 +653,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     return selection;
   }, []);
 
-  const closeProjectDetails = useCallback(() => {
+  const closeProjectDetails = useCallback((options: { keepLocation?: boolean } = {}) => {
+    // MAIR-846: the project page is addressable; leaving it goes back to the list URL (filters kept).
+    if (!options.keepLocation) writeProjectLocation(null);
     detailSelectionRef.current = null;
     setSelectedProjectDetails(null);
     setLinkedTaskId(null);
@@ -716,6 +762,23 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     });
     return () => { active = false; };
   }, [beginDetailSelection, readCurrentProjectDetails]);
+
+  // MAIR-846: browser Back / Forward between the list and a project page.
+  const openProjectDetailsRef = useRef<((project: Pick<Project, 'id'>, options: { keepLocation?: boolean }) => Promise<void>) | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const followHistory = () => {
+      const target = parseProjectDeepLink(window.location.search ?? '');
+      const current = detailSelectionRef.current?.projectId ?? null;
+      if (!target || 'error' in target) {
+        if (current) closeProjectDetails({ keepLocation: true });
+        return;
+      }
+      if (target.projectId !== current) void openProjectDetailsRef.current?.({ id: target.projectId }, { keepLocation: true });
+    };
+    window.addEventListener('popstate', followHistory);
+    return () => window.removeEventListener('popstate', followHistory);
+  }, [closeProjectDetails]);
 
   const refreshProjectDetails = async (projectId: string, selection: DetailSelection | null, reportDetailError = true) => {
     const revision = selection && detailSelectionRef.current === selection && selection.projectId === projectId
@@ -864,13 +927,16 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const openCreateProject = (status: Project['status'] = 'todo') => {
     if (projectFormPendingRef.current) return;
     projectFormOpeningRef.current = null;
-    setProjectForm(uncertainCreationDraftRef.current ?? createProjectFormState(status));
+    // A single linkable group is the only possible choice, so it starts selected.
+    const onlyGroup = projectGroups?.length === 1 ? projectGroups[0].id : '';
+    setProjectForm(uncertainCreationDraftRef.current ?? { ...createProjectFormState(status), groupId: onlyGroup });
     setEditingProjectId(null);
     setProjectFormError('');
     setCreateProjectOpen(true);
   };
 
-  const openProjectDetails = async (project: Project) => {
+  const openProjectDetails = async (project: Pick<Project, 'id'>, options: { keepLocation?: boolean } = {}) => {
+    if (!options.keepLocation) writeProjectLocation(project.id);
     const selection = beginDetailSelection(project.id);
     const revision = ++selection.readRevision;
 
@@ -878,9 +944,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       const details = await readCurrentProjectDetails(project.id, () => detailSelectionRef.current === selection && selection.readRevision === revision);
       if (details) setSelectedProjectDetails(details);
     } catch (error) {
-      if (detailSelectionRef.current === selection && selection.readRevision === revision) showError(error);
+      if (detailSelectionRef.current === selection && selection.readRevision === revision) {
+        // No page without its detail: the URL goes back to the list it was opened from.
+        if (!options.keepLocation) writeProjectLocation(null, 'overview', 'replace');
+        showError(error);
+      }
     }
   };
+
+  openProjectDetailsRef.current = openProjectDetails;
 
   const openEditProject = async (project: Project) => {
     if (projectFormPendingRef.current || project.permissions?.canEdit === false) return;
@@ -967,6 +1039,20 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!projectFormPendingRef.current) projectFormOpeningRef.current = null;
   };
 
+  // MAIR-880: a saved update that moved the project out of the caller's groups (204) removes it from the page.
+  const forgetMovedProject = async (projectId: string, title: string) => {
+    ++pageRevisionRef.current;
+    setProjects((current) => current.filter((value) => value.id !== projectId));
+    if (detailSelectionRef.current?.projectId === projectId) closeProjectDetails();
+    try {
+      await refreshProjectsPage({ silent: true, throwOnError: true });
+    } catch {
+      // The write is confirmed: a failed refresh must not invite a second PATCH.
+    }
+    // MAIR-846 (C7): back to the list with the « Modifications enregistrées » toast.
+    setFeedback({ title: 'Modifications enregistrées', message: `Projet « ${title} » enregistré dans un groupe dont vous n’êtes pas membre : il ne fait plus partie de vos projets.` });
+  };
+
   const updateProjectFromForm = async (projectId: string, form: ProjectFormState) => {
     setAlert(null);
     requireVerifiedProject(projectId);
@@ -978,19 +1064,28 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       throw error;
     }
 
-    let details: ProjectDetailsResponse;
+    // MAIR-846 (C7): only the fields changed on the page are sent; nothing changed, nothing written.
+    const shown = selectedProjectDetails?.project.id === projectId ? selectedProjectDetails.project : projects.find((project) => project.id === projectId);
+    const body = shown ? changedProjectBody(form, projectToFormState(shown)) : updateProjectBodyFromForm(form);
+    if (Object.keys(body).length === 0) return;
+
+    let details: ProjectDetailsResponse | null;
     try {
-      details = await updateProject(projectId, updateProjectBodyFromForm(form));
+      details = await updateProject(projectId, body);
     } catch (error) {
       showError(error);
       throw error;
+    }
+    if (!details) {
+      await forgetMovedProject(projectId, form.title.trim());
+      return;
     }
     requireProjectReceipt(projectId, details);
     const confirmed = applyConfirmedProject(details, false, taskRevision);
     updateSelectedProject(confirmed, selection);
     try {
       await refreshProjectsPage({ silent: true, throwOnError: true });
-      setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+      setFeedback({ title: 'Modifications enregistrées', message: `Projet « ${details.project.title} » modifié.` });
     } catch (error) {
       // The mutation is confirmed: a failed refresh must not invite a second PATCH.
       setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
@@ -998,7 +1093,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   };
 
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
-    if (project.status === status || !projectsPage?.access?.canManageProjects || project.permissions?.canEdit !== true) return;
+    // MAIR-1088: the project's own rights decide (a member with the `manager` role manages it whatever their role).
+    if (project.status === status || project.permissions?.canEdit !== true) return;
     setAlert(null);
 
     const selection = detailSelectionRef.current;
@@ -1006,11 +1102,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     try {
       requireVerifiedProject(project.id);
       const details = await updateProject(project.id, { status });
+      if (!details) {
+        await forgetMovedProject(project.id, project.title);
+        return;
+      }
       requireProjectReceipt(project.id, details);
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
-      setAlert({ type: 'success', message: `Statut du projet "${project.title}" mis à jour.` });
+      setFeedback({ title: 'Statut mis à jour', message: `« ${project.title} » est maintenant « ${projectStatusLabel(status)} ».` });
     } catch (error) {
       showError(error);
     }
@@ -1027,6 +1127,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       setProjectFormError('Les champs obligatoires doivent être renseignés.');
       return;
     }
+    // A single linkable group is the only possible choice: it is sent even when the field was left empty.
+    const submittedForm = editingProjectId || projectForm.groupId || projectGroups?.length !== 1
+      ? projectForm
+      : { ...projectForm, groupId: projectGroups[0].id };
+    if (!editingProjectId && !submittedForm.groupId) {
+      setProjectFormError('Le groupe est obligatoire.');
+      return;
+    }
 
     projectFormPendingRef.current = true;
     const selection = detailSelectionRef.current;
@@ -1041,9 +1149,17 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
         : template
           ? await (() => {
             if (!workflowPort?.createProjectFromTemplate) throw new Error('La création depuis un modèle est indisponible.');
-            return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(projectForm));
+            return workflowPort.createProjectFromTemplate(template, createProjectBodyFromForm(submittedForm));
           })()
-          : await createProject(createProjectBodyFromForm(projectForm));
+          : await createProject(createProjectBodyFromForm(submittedForm));
+      if (!details) {
+        // Only an update answers without a body (204): the project left the caller's groups.
+        setCreateProjectOpen(false);
+        setEditingProjectId(null);
+        setProjectForm(createProjectFormState());
+        await forgetMovedProject(editingProjectId ?? '', projectForm.title.trim());
+        return;
+      }
       if (editingProjectId) requireProjectReceipt(editingProjectId, details);
       else requireNewProjectReceipt(details, 'create', { kind: 'create', title: projectForm.title }, knownAtDispatch);
       const confirmed = applyConfirmedProject(details, !editingProjectId, taskRevision);
@@ -1055,15 +1171,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       if (editingProjectId) {
         updateSelectedProject(confirmed, selection);
       } else {
+        // MAIR-836 (Figma F3 3.5): the new card shows in its column of the unfiltered first page, no detail opens.
         resetProjectFilters();
-        beginDetailSelection(details.project.id);
-        setSelectedProjectDetails(details);
       }
       try {
         await refreshProjectsPage(editingProjectId
           ? { silent: true, throwOnError: true }
           : { search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true, throwOnError: true });
-        setAlert({ type: 'success', message: `Projet "${details.project.title}" ${editingProjectId ? 'modifié' : 'créé'}.` });
+        if (editingProjectId) setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
+        else setFeedback({ title: 'Projet créé', message: `Projet « ${details.project.title} » créé.` });
       } catch (error) {
         setAlert({ type: 'info', message: `Projet "${details.project.title}" enregistré. Actualisation impossible : ${getBffProjectErrorMessage(error)}` });
       }
@@ -1129,6 +1245,79 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     }
   };
 
+  const selectedProjects = projects.filter((project) => selectedProjectIds.has(project.id));
+
+  const changeProjectSelection = (projectIds: string[], selected: boolean) => {
+    setSelectedProjectIds((current) => {
+      const next = new Set(current);
+      for (const id of projectIds) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const clearProjectSelection = () => setSelectedProjectIds(new Set());
+
+  const requestBulkProjectDeletion = () => {
+    if (selectedProjects.length > 0) setBulkDeletionOpen(true);
+  };
+
+  const cancelBulkProjectDeletion = () => {
+    if (!bulkDeletionPending) setBulkDeletionOpen(false);
+  };
+
+  // MAIR-833 / MAIR-1089: one `POST /projects/bulk-delete` for the selection, one result per project. Deleted
+  // projects leave the page and the selection; refused ones stay selected and are reported with their reason.
+  const confirmBulkProjectDeletion = async () => {
+    const targets = selectedProjects;
+    if (targets.length === 0 || bulkDeletionPending) return;
+    setAlert(null);
+    setBulkDeletionPending(true);
+    try {
+      let results: Map<string, BulkDeletionResult['status']> | null = null;
+      let failure = '';
+      try {
+        results = new Map((await bulkDeleteProjects(targets.map((project) => project.id))).map((result) => [result.projectId, result.status]));
+      } catch (error) {
+        failure = getBffProjectErrorMessage(error);
+      }
+      const deleted = targets.filter((project) => results?.get(project.id) === 'deleted');
+      const refused = targets.flatMap((project) => {
+        const status = results?.get(project.id);
+        if (status === 'deleted') return [];
+        const message = !results ? failure : status === 'forbidden' ? 'suppression non autorisée' : status === 'not_found' ? 'projet introuvable ou plus visible' : 'aucun résultat reçu';
+        return [{ project, message }];
+      });
+      setBulkDeletionOpen(false);
+      if (deleted.length > 0) {
+        const deletedIds = new Set(deleted.map((project) => project.id));
+        ++pageRevisionRef.current;
+        setProjects((current) => current.filter((project) => !deletedIds.has(project.id)));
+        setSelectedProjectIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+        if (detailSelectionRef.current && deletedIds.has(detailSelectionRef.current.projectId)) closeProjectDetails();
+        if (editingProjectId && deletedIds.has(editingProjectId)) closeCreateProject();
+        setFeedback(bulkDeletionFeedback(deleted.map((project) => project.title)));
+        await refreshProjectsPage({ silent: true });
+      } else if (results && refused.some(({ project }) => results?.get(project.id) === 'not_found')) {
+        // A project deleted meanwhile by someone else leaves the page with the refresh.
+        await refreshProjectsPage({ silent: true });
+      }
+      if (refused.length > 0) {
+        const plural = refused.length > 1;
+        setAlert({
+          type: 'error',
+          message: `${refused.length} projet${plural ? 's' : ''} n’${plural ? 'ont' : 'a'} pas pu être supprimé${plural ? 's' : ''} : ${
+            refused.map(({ project, message }) => `« ${project.title} » (${message})`).join(', ')
+          }. ${plural ? 'Ils restent sélectionnés' : 'Il reste sélectionné'}.`,
+        });
+      }
+    } finally {
+      setBulkDeletionPending(false);
+    }
+  };
+
   const addProjectTask = async (project: Project, taskDraft: ProjectTaskDraft) => {
     const selection = detailSelectionRef.current;
     const title = taskDraft.title.trim();
@@ -1176,7 +1365,8 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(project.id, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" ajoutée à "${project.title}".` });
+        // MAIR-859 (Figma F6 6.6): the confirmation floats as a toast over the board.
+        setFeedback({ title: 'Tâche ajoutée', message: `Tâche « ${confirmed.title} » ajoutée à « ${project.title} ».` });
       } catch (error) {
         showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
@@ -1318,7 +1508,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${confirmed.title}" modifiée.` });
+        setFeedback({ title: 'Tâche mise à jour', message: `Tâche « ${confirmed.title} » modifiée.` });
       } catch (error) {
         showInfo(`Tâche "${confirmed.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
@@ -1332,30 +1522,36 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     statusId?: string
   ) => {
     const selection = detailSelectionRef.current;
-    return runTaskWrite(projectId, taskId, async () => {
+    // MAIR-859: `true` once the BFF confirmed the status, so the board keeps the card in its new column (C2).
+    let confirmedStatus = false;
+    await runTaskWrite(projectId, taskId, async () => {
       let updatedTask: ProjectTask;
       try {
         updatedTask = await updateProjectTaskStatus(projectId, taskId, status, statusId);
       } catch (error) {
-        showTaskWriteError(projectId, taskId, error);
+        // The board puts the card back in its column; the refusal floats as an error toast (Figma F6).
+        setTaskWriteError(projectId, taskId, getBffProjectErrorMessage(error));
+        setFeedback({ tone: 'error', title: 'Statut non modifié', message: getBffProjectErrorMessage(error) });
         return;
       }
       if (updatedTask.id !== taskId || (statusId && updatedTask.statusId !== statusId)) {
         await verifyInconsistentTaskReceipt(projectId, taskId, selection);
         return;
       }
+      confirmedStatus = true;
       applyConfirmedTask(projectId, updatedTask.id, updatedTask, selection);
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({
-          type: 'success',
-          message: `Statut de la tâche "${updatedTask.title}" mis à jour : ${updatedTask.statusLabel ?? status}.`,
-        });
+        // MAIR-859 (Figma F6 6.4): « Tâche terminée » / « Statut mis à jour » toast, the progress is the refreshed one.
+        setFeedback(status === 'done'
+          ? { title: 'Tâche terminée', message: `« ${updatedTask.title} » est terminée.` }
+          : { title: 'Statut mis à jour', message: `« ${updatedTask.title} » est maintenant « ${updatedTask.statusName ?? updatedTask.statusLabel ?? projectStatusLabel(status)} ».` });
       } catch (error) {
         showInfo(`Tâche "${updatedTask.title}" enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
     });
+    return confirmedStatus;
   };
 
   // Workflow writes (MAIR-570) share the task write guards. A refusal before dispatch is a
@@ -1366,22 +1562,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     } catch (error) {
       showInfo(`Modification enregistrée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
     }
-  };
-
-  const moveWorkflowTask = async (draft: { projectId: string; revision: string; taskId: string; statusId: string }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
-    if (!workflowPort?.moveTask) throw new WorkflowWriteRefusedError(WORKFLOW_UNAVAILABLE);
-    const { projectId, taskId } = draft;
-    // The same refusals as runTaskWrite, checked here so that they surface as refusals, not uncertainty.
-    if (taskVerificationsRef.current.get(projectId)?.has(taskId)) throw new WorkflowWriteRefusedError(TASK_VERIFICATION_MESSAGE);
-    if (taskWritesRef.current.has(JSON.stringify([projectId, taskId]))) throw new WorkflowWriteRefusedError('Une opération est déjà en cours pour cette tâche. Réessayez après sa confirmation.');
-    if (workflowSavesRef.current.has(projectId)) throw new WorkflowWriteRefusedError(WORKFLOW_STATUS_SAVE_PENDING);
-    const selection = detailSelectionRef.current;
-    let snapshot: ProjectWorkflowSnapshot | undefined;
-    await runTaskWrite(projectId, taskId, async () => {
-      snapshot = await workflowPort.moveTask!(draft, signal);
-      await refreshAfterWorkflowWrite(projectId, selection);
-    }, true);
-    return snapshot!;
   };
 
   const saveWorkflowStatuses = async (draft: { projectId: string; revision: string; statuses: TaskStatusDefinition[]; migrations: StatusMigration[] }, signal: AbortSignal): Promise<ProjectWorkflowSnapshot> => {
@@ -1415,14 +1595,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         if (!await refreshProjectDetails(projectId, selection)) return;
         await refreshProjectsPage({ silent: true });
-        setAlert({ type: 'success', message: `Tâche "${taskTitle}" supprimée.` });
+        setFeedback({ title: 'Tâche supprimée', message: `Tâche « ${taskTitle} » supprimée.` });
       } catch (error) {
         showInfo(`Tâche "${taskTitle}" supprimée. Actualisation impossible : ${getBffProjectErrorMessage(error)}`);
       }
     });
   };
 
-  const closeProject = async (projectId: string, status: 'done' | 'review') => {
+  // MAIR-1084: « Suspendre » puts the project on hold (`on-hold`), no longer in review.
+  const closeProject = async (projectId: string, status: 'done' | 'on-hold' | 'review') => {
     setAlert(null);
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(projectId)?.revision ?? 0;
@@ -1435,7 +1616,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       await refreshProjectsPage({ silent: true });
       setAlert({
         type: 'success',
-        message: status === 'done' ? `Projet "${details.project.title}" clôturé.` : `Projet "${details.project.title}" suspendu.`,
+        message: status === 'done' ? `Projet "${details.project.title}" clôturé.` : status === 'on-hold' ? `Projet "${details.project.title}" suspendu.` : `Projet "${details.project.title}" mis en revue.`,
       });
     } catch (error) {
       showError(error);
@@ -1467,7 +1648,6 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 
   return {
     workflowPort,
-    moveWorkflowTask,
     saveWorkflowStatuses,
     readCurrentTaskAssignee,
     projectsPage,
@@ -1522,11 +1702,17 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     session,
     memberOptions,
     labelOptions,
+    groupOptions,
+    projectGroupsError,
     statusFilterOptions,
     priorityFilterOptions,
     projectStatusOptions,
     projectPriorityOptions,
     filteredProjects,
+    feedback,
+    clearFeedback,
+    resetProjectFilters,
+    filtersActive: Boolean(searchTerm.trim()) || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueBeforeFilter),
     retryProjectsPage,
     changeProjectPage,
     openCreateProject,
@@ -1541,6 +1727,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     duplicateProject,
     deleteProject,
     confirmProjectDeletion,
+    selectedProjects,
+    changeProjectSelection,
+    clearProjectSelection,
+    bulkDeletionOpen,
+    bulkDeletionPending,
+    requestBulkProjectDeletion,
+    cancelBulkProjectDeletion,
+    confirmBulkProjectDeletion,
     addProjectTask,
     updateProjectTask,
     changeProjectTaskStatus,
@@ -1557,3 +1751,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 }
 
 export type ProjectsController = ReturnType<typeof useProjectsController>;
+
+/** « 2 projets supprimés » / « « A » et « B » ont été supprimés. » (Figma F1 1.5). */
+export function bulkDeletionFeedback(titles: string[]) {
+  const quoted = titles.map((title) => `« ${title} »`);
+  const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} et ${quoted.at(-1)}` : quoted[0];
+  const plural = titles.length > 1;
+  return {
+    title: `${titles.length} projet${plural ? 's' : ''} supprimé${plural ? 's' : ''}`,
+    message: `${list} ${plural ? 'ont' : 'a'} été supprimé${plural ? 's' : ''}.`,
+  };
+}

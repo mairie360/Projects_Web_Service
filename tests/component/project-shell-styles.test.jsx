@@ -23,47 +23,31 @@ function renderShell() {
   </AppShell>);
 }
 
-describe('Projects styles applied to the published shell', () => {
-  it('applies the reference sidebar position, shadow and navigation row styles to real elements', () => {
+describe('Projects styles applied to the published shell (MAIR-1133, lib-components 2.3)', () => {
+  it('keeps no local rule over the lib components: the sidebar, the frame and the view switch are the lib\'s', () => {
+    for (const selector of ['aside[', '.projects-shell', '[role="tablist"]', 'nav button', '> main']) {
+      expect(stylesheet.includes(selector), selector).toBe(false);
+    }
     renderShell();
     const sidebar = screen.getByRole('complementary', { name: 'Navigation principale' });
-    const computed = getComputedStyle(sidebar);
-    expect(computed.position).toBe('relative');
-    expect(computed.zIndex).toBe('20');
-    // This is computed CSS output, not matching a stylesheet source selector.
-    const tokens = computed.boxShadow.trim().split(/\s+(?![^()]*\))/);
-    const lengths = tokens.filter(token => Number.isFinite(Number.parseFloat(token)));
-    const colors = tokens.filter(token => !Number.isFinite(Number.parseFloat(token)));
-    expect([3, 4]).toContain(lengths.length);
-    expect(colors).toHaveLength(1);
-    const pixels = lengths.map(value => {
-      const number = Number.parseFloat(value);
-      expect(number === 0 || value.toLowerCase().endsWith('px')).toBe(true);
-      return number;
-    });
-    if (pixels.length === 3) pixels.push(0);
-    expect(pixels).toEqual([8, 0, 24, 0]);
-    const color = document.createElement('span');
-    color.style.color = colors[0]; document.body.append(color);
-    try { expect(getComputedStyle(color).color).toBe('rgba(12, 28, 48, 0.28)'); }
-    finally { color.remove(); }
+    expect(sidebar.style.boxShadow).toBe('');
     const navigation = within(sidebar).getByRole('navigation', { name: 'Menu principal' });
-    const buttons = within(navigation).getAllByRole('button');
-    expect(buttons.map((button) => button.textContent)).toEqual(defaultSidebarItems.map(({ label }) => label));
-    for (const button of buttons) {
-      expect(getComputedStyle(button).minHeight).toBe('44px');
-      expect(getComputedStyle(button).flexShrink).toBe('0');
-    }
+    expect(within(navigation).getAllByRole('button').map((button) => button.textContent)).toEqual(defaultSidebarItems.map(({ label }) => label));
   });
 
-  it('opens the real drawer, applies its lower sidebar layer and closes through the published control', async () => {
+  it('shows no footer in the page base (C2)', () => {
+    renderShell();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+    expect(screen.queryByText(/© \d{4} Mairie360/)).toBeNull();
+  });
+
+  it('opens the real drawer and closes it through the published control', async () => {
     const user = userEvent.setup();
     renderShell();
     const open = screen.getByRole('button', { name: 'Ouvrir la navigation', exact: true });
     await user.click(open);
     const drawer = screen.getByRole('dialog', { name: 'Navigation mobile' });
-    const sidebar = within(drawer).getByRole('complementary', { name: 'Navigation principale' });
-    expect(getComputedStyle(sidebar).zIndex).toBe('0');
+    expect(within(drawer).getByRole('complementary', { name: 'Navigation principale' })).toBeTruthy();
     await user.click(within(drawer).getByRole('button', { name: 'Fermer la navigation', exact: true }));
     expect(screen.queryByRole('dialog', { name: 'Navigation mobile' })).toBeNull();
   });

@@ -40,13 +40,13 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
       : { status: operation === 'create' ? 201 : 200, body: confirmed });
     bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('DETAIL_READ', 'Fiche temporairement indisponible')));
     await view.act(() => {
-      const p = view.props('ProjectDetailModal');
+      const p = view.props('ProjectPage');
       return operation === 'create' ? p.onAddTask(project, draft)
         : operation === 'edit' ? p.onUpdateTask(project.id, task.id, draft)
         : operation === 'status' ? p.onUpdateTaskStatus(project.id, task.id, 'done')
         : p.onDeleteTask(project.id, task.id, task.title);
     });
-    const current = view.props('ProjectDetailModal');
+    const current = view.props('ProjectPage');
     if (operation === 'delete') assert.equal(current.tasks.some(value => value.id === task.id), false, 'confirmed DELETE must remove the target');
     else assert.deepEqual(current.tasks.find(value => value.id === confirmed.id), normalized(confirmed), 'only the actual normalized response becomes visible');
     assert.equal(current.tasks.find(value => value.id === other.id).title, other.title);
@@ -61,9 +61,9 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
     bffProject.on('get', '/projects-page', { body: f.projectsPage([{ ...refreshedProject, taskItems: expected }]) });
     await view.click('Réessayer la fiche');
     await view.waitFor(html => !html.includes('Fiche temporairement indisponible'));
-    assert.deepEqual(view.props('ProjectDetailModal').tasks, expected.map(normalized));
-    assert.deepEqual(view.props('ProjectDetailModal').project.tasks, refreshedProject.tasks);
-    assert.equal(view.props('ProjectDetailModal').project.progress, 37);
+    assert.deepEqual(view.props('ProjectPage').tasks, expected.map(normalized));
+    assert.deepEqual(view.props('ProjectPage').project.tasks, refreshedProject.tasks);
+    assert.equal(view.props('ProjectPage').project.progress, 37);
     assert.equal(bffProject.calls(route, method).length, 1, 'recovery must not repeat the accepted write');
     assert.equal(bffProject.requests.filter(value => value.method !== 'GET').length, 1);
   });
@@ -85,17 +85,17 @@ test('an older task refresh cannot erase a newer independent-task confirmation o
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: first });
   bffProject.on('get', '/projects/{projectId}', { body: f.projectDetails(project, [first, other]) });
   let pending;
-  await view.act(() => { pending = view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, task.id, 'done'); });
+  await view.act(() => { pending = view.props('ProjectPage').onUpdateTaskStatus(project.id, task.id, 'done'); });
   await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'get').length === 2);
   const current = f.projectTask({ id: other.id, title: 'Dernière confirmation', status: 'review' });
   bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', { body: current });
   bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('LATEST_READ', 'Dernière relecture refusée')));
-  await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(project.id, other.id, 'review'));
+  await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(project.id, other.id, 'review'));
   release(); await pending; await view.settle();
-  assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === other.id).title, current.title);
-  assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === task.id).title, first.title);
+  assert.equal(view.props('ProjectPage').tasks.find(value => value.id === other.id).title, current.title);
+  assert.equal(view.props('ProjectPage').tasks.find(value => value.id === task.id).title, first.title);
   assert.equal(view.props('KanbanBoard').projects[0].taskItems.find(value => value.id === other.id).title, current.title);
-  assert.equal(view.props('ProjectDetailModal').refreshError, 'Dernière relecture refusée');
+  assert.equal(view.props('ProjectPage').refreshError, 'Dernière relecture refusée');
   assert.equal(bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length, 2);
 });
 
@@ -104,7 +104,7 @@ test('detail recovery is guarded while pending and a late retry cannot reopen a 
   const confirmed = f.projectTask({ id: 'task-confirmed', title: 'Tâche officielle ajoutée' });
   bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: confirmed });
   bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Reprise nécessaire')));
-  await view.act(() => view.props('ProjectDetailModal').onAddTask(project, draft));
+  await view.act(() => view.props('ProjectPage').onAddTask(project, draft));
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   t.after(() => release());
@@ -118,29 +118,29 @@ test('detail recovery is guarded while pending and a late retry cannot reopen a 
   const before = bffProject.calls('/projects/{projectId}', 'get').length;
   let retry;
   await view.act(() => {
-    const props = view.props('ProjectDetailModal');
+    const props = view.props('ProjectPage');
     retry = props.onRetry();
     void props.onRetry();
   });
   await view.waitFor(() => bffProject.calls('/projects/{projectId}', 'get').length === before + 1);
-  assert.equal(view.props('ProjectDetailModal').refreshPending, true);
-  await view.act(() => view.props('ProjectDetailModal').onClose());
+  assert.equal(view.props('ProjectPage').refreshPending, true);
+  await view.act(() => view.props('ProjectPage').onClose());
   release(); await retry; await view.settle();
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 1);
 });
 
 for (const operation of ['create', 'edit', 'status', 'delete']) {
   test(`a refused task ${operation} leaves all official task rows and counters unchanged`, async () => {
     await loaded();
-    const before = structuredClone(view.props('ProjectDetailModal').tasks);
+    const before = structuredClone(view.props('ProjectPage').tasks);
     const method = operation === 'create' ? 'post' : operation === 'delete' ? 'delete' : 'patch';
     const route = operation === 'create' ? '/projects/{projectId}/tasks'
       : operation === 'status' ? '/projects/{projectId}/tasks/{taskId}/status' : '/projects/{projectId}/tasks/{taskId}';
     bffProject.on(method, route, harness.errorReply(403, f.apiError('REFUSED', 'Écriture refusée')));
     let refused;
     await view.act(() => {
-      const p = view.props('ProjectDetailModal');
+      const p = view.props('ProjectPage');
       const pending = operation === 'create' ? p.onAddTask(project, draft)
         : operation === 'edit' ? p.onUpdateTask(project.id, task.id, draft)
         : operation === 'status' ? p.onUpdateTaskStatus(project.id, task.id, 'done')
@@ -148,10 +148,10 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
       refused = pending.catch(() => undefined);
     });
     await refused; await view.settle();
-    assert.deepEqual(view.props('ProjectDetailModal').tasks, before);
-    assert.deepEqual(view.props('ProjectDetailModal').project.tasks, project.tasks);
+    assert.deepEqual(view.props('ProjectPage').tasks, before);
+    assert.deepEqual(view.props('ProjectPage').project.tasks, project.tasks);
     assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
-    assert.equal(view.props('ProjectDetailModal').refreshError, '');
+    assert.equal(view.props('ProjectPage').refreshError, '');
     assert.match(view.text(), /Écriture refusée/);
   });
 }
@@ -159,7 +159,7 @@ for (const operation of ['create', 'edit', 'status', 'delete']) {
 for (const oldStatus of [200, 503, 401, 403]) {
   test(`an opening respects an old ${oldStatus} response after a task confirmation, without replaying authentication decisions`, async t => {
     await loaded();
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
     const confirmed = f.projectTask({ id: 'task-new', title: 'Nouvelle tâche réellement reçue' });
     bffProject.on('post', '/projects/{projectId}/tasks', { status: 201, body: confirmed });
     let releaseWrite, releaseRead;
@@ -175,7 +175,7 @@ for (const oldStatus of [200, 503, 401, 403]) {
       return response;
     });
     let creating, opening;
-    await view.act(() => { creating = view.props('KanbanBoard').onProjectTaskAdd(project, draft); });
+    await view.act(() => { creating = view.props('ProjectsWorkspace').addProjectTask(project, draft); });
     await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks', 'post').length === 1);
     if (oldStatus !== 200) bffProject.on('get', '/projects/{projectId}', harness.errorReply(oldStatus, f.apiError('OLD_READ', 'Ancienne fiche refusée')));
     await view.act(() => { opening = view.props('KanbanBoard').onProjectOpen(project); });
@@ -184,13 +184,13 @@ for (const oldStatus of [200, 503, 401, 403]) {
     releaseWrite(); await creating; await view.settle();
     releaseRead(); await opening; await view.settle();
     if (oldStatus === 401 || oldStatus === 403) {
-      assert.equal(view.find('ProjectDetailModal').length, 0);
+      assert.equal(view.find('ProjectPage').length, 0);
       assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 3, 'session/permission decisions must not cause an automatic replacement read');
       assert.equal(harness.location.reloads, 0);
       assert.equal(harness.location.assigned.length, oldStatus === 401 ? 1 : 0);
       assert.equal(harness.browserCalls.filter(value => value.path === '/api/auth/logout').length, 0);
     } else {
-      assert.equal(view.props('ProjectDetailModal').tasks.find(value => value.id === confirmed.id).title, confirmed.title);
+      assert.equal(view.props('ProjectPage').tasks.find(value => value.id === confirmed.id).title, confirmed.title);
       assert.doesNotMatch(view.text(), /Ancienne fiche refusée/);
       assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 4, 'one fresh opening GET replaces the stale response; the write is not replayed');
     }
