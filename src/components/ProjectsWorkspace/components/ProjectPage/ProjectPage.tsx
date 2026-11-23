@@ -1,0 +1,387 @@
+'use client';
+
+import React from 'react';
+import { Modal, Panel, Tabs, tabsIds, type TabItem } from '@mairie360/lib-components/primitives';
+import { addProjectComment, getBffProjectErrorMessage } from '@/lib/bffProjectClient';
+import { Activity, CalendarRange, FileText, LayoutGrid, ListChecks, Users } from 'lucide-react';
+import { projectTabFromSearch, writeProjectLocation, type ProjectTab } from '@/lib/projectDeepLink';
+import { getProjectNumber } from '../../project-card-meta';
+import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '@/lib/projectWorkflow';
+import { projectToFormState, taskStatusOptions as taskStatusChoices, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
+import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '@/types/project';
+import { TaskCreationNotice, type TaskCreationState } from '../TaskCreationNotice';
+import { DetailRefreshAlert } from './components/DetailRefreshAlert';
+import { ProjectEditForm } from './components/ProjectEditForm';
+import { ProjectMetrics } from './components/ProjectMetrics';
+import { ProjectOverview } from './components/ProjectOverview';
+import { ProjectActivityTab } from './components/ProjectActivityTab';
+import { ProjectPageHeader } from './components/ProjectPageHeader';
+import { ProjectPlanningTab } from './components/ProjectPlanningTab';
+import { ProjectTasksTab } from './components/ProjectTasksTab';
+import { ProjectTeamTab } from './components/ProjectTeamTab';
+import { ProjectWorkflow } from './components/ProjectWorkflow';
+import { useDetailTaskForm, type TaskColumnStatus } from './use-detail-task-form';
+import { useLinkedTaskScroll } from './use-linked-task-scroll';
+import { categoryOf, projectStatusHelpers } from './status-helpers';
+import { useProjectActivity } from './use-project-activity';
+import { useProjectEdit, type MutationLock } from './use-project-edit';
+import { useProjectMembers } from './use-project-members';
+import { useProjectMilestones } from './use-project-milestones';
+import { useTaskCollaboration } from './use-task-collaboration';
+import { useTaskFilters } from './use-task-filters';
+
+export function ProjectPage({
+  project,
+  workflowPort,
+  onSaveWorkflowStatuses,
+  workflowRole,
+  defaultTaskAssigneeId,
+  readCurrentTaskAssignee,
+  tasks,
+  highlightTaskId,
+  memberOptions,
+  labelOptions,
+  groupOptions,
+  groupsError,
+  statusOptions,
+  priorityOptions,
+  onClose,
+  refreshError = '',
+  refreshPending = false,
+  projectVerificationRequired = false,
+  projectVerificationPending = false,
+  pendingTaskIds,
+  taskWriteErrors,
+  unverifiedTaskIds,
+  taskCreationState,
+  onInspectTaskCreation,
+  onPreserveTaskDraft,
+  onRetry,
+  onUpdateProject,
+  onAddTask,
+  onUpdateTask,
+  onUpdateTaskStatus,
+  onDeleteTask,
+  onCloseProject,
+  onChangeStatus,
+  onDuplicate,
+  duplicationPending = false,
+  duplicationVerificationRequired = false,
+  onDelete,
+  initialTab,
+}: {
+  project: Project;
+  workflowPort?: ProjectWorkflowPort;
+  /** Controller-owned status settings write (MAIR-570); without it the panel writes through the port. */
+  onSaveWorkflowStatuses?: ProjectWorkflowPort['saveProjectStatuses'];
+  workflowRole?: string;
+  defaultTaskAssigneeId?: string | null;
+  readCurrentTaskAssignee?: (signal: AbortSignal) => Promise<string | null>;
+  tasks: ProjectTask[];
+  highlightTaskId?: string | null;
+  memberOptions: FilterOption[];
+  labelOptions: FilterOption[];
+  groupOptions?: FilterOption[];
+  groupsError?: string;
+  statusOptions: FilterOption[];
+  priorityOptions: FilterOption[];
+  onClose: () => void;
+  refreshError?: string;
+  refreshPending?: boolean;
+  projectVerificationRequired?: boolean;
+  projectVerificationPending?: boolean;
+  pendingTaskIds?: ReadonlySet<string>;
+  taskWriteErrors?: ReadonlyMap<string, string>;
+  unverifiedTaskIds?: ReadonlySet<string>;
+  taskCreationState?: TaskCreationState;
+  onInspectTaskCreation?: () => void | Promise<void>;
+  onPreserveTaskDraft?: (patch: Partial<TaskFormState>) => void;
+  onRetry?: () => void | Promise<void>;
+  onUpdateProject: (projectId: string, form: ProjectFormState) => void | Promise<void>;
+  onAddTask: (project: Project, task: ProjectTaskDraft) => void | Promise<void>;
+  onUpdateTask: (projectId: string, taskId: string, task: ProjectTaskDraft) => void | Promise<void>;
+  /** Resolves `true` once the BFF confirmed the status (MAIR-859: the board rolls back otherwise). */
+  onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus, statusId?: string) => void | boolean | Promise<void | boolean>;
+  onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<unknown>;
+  onCloseProject: (projectId: string, status: 'done' | 'on-hold' | 'review') => Promise<void>;
+  /** MAIR-846: the status pill menu, the « … » actions (Dupliquer, Supprimer + confirmation by the workspace). */
+  onChangeStatus?: (project: Project, status: Project['status']) => void | Promise<void>;
+  onDuplicate?: (project: Project) => void | Promise<void>;
+  duplicationPending?: boolean;
+  duplicationVerificationRequired?: boolean;
+  onDelete?: (project: Project) => void | Promise<void>;
+  /** Tab shown first; by default the URL's (`?tab=`), « Tâches » for a linked task, else « Vue d’ensemble ». */
+  initialTab?: ProjectTab;
+}) {
+  const [workflow, setWorkflow] = React.useState<ProjectWorkflowSnapshot | null>(null);
+  const receiveWorkflow = React.useCallback((snapshot: ProjectWorkflowSnapshot) => setWorkflow(snapshot), []);
+  const dynamicStatuses = workflow?.projectId === project.id ? workflow.statuses : undefined;
+  const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? taskStatusChoices(statusOptions);
+  const lockRef: MutationLock = React.useRef({ project: false, task: false });
+  const closeDetail = () => {
+    if (!lockRef.current.project && !lockRef.current.task) onClose();
+  };
+  // MAIR-846: a page, not a dialog — the title takes the focus on open, the opener gets it back on leave.
+  const titleRef = React.useRef<HTMLHeadingElement | null>(null);
+  React.useLayoutEffect(() => {
+    const opener = typeof HTMLElement !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    titleRef.current?.focus({ preventScroll: true });
+    return () => {
+      // The list is shown again in the same commit: give the focus back once it is visible.
+      queueMicrotask(() => {
+        if (opener?.isConnected && (document.activeElement === document.body || !document.activeElement)) opener.focus();
+      });
+    };
+  }, []);
+  const projectEdit = useProjectEdit({ project, lockRef, dialogRef: titleRef, verificationBlocked: projectVerificationRequired || projectVerificationPending, groupCount: groupOptions?.length ?? 0, onUpdateProject });
+  // MAIR-1136 (C13): the saved values the edit compares with (« Modifié », « Enregistrer (n) »).
+  const savedForm = React.useMemo(() => projectToFormState(project), [project]);
+  const [tab, setTab] = React.useState<ProjectTab>(() => initialTab ?? (highlightTaskId ? 'tasks' : projectTabFromSearch(typeof window === 'undefined' ? '' : window.location?.search ?? '')));
+  const showTab = (next: ProjectTab) => {
+    setTab(next);
+    writeProjectLocation(project.id, next, 'replace');
+  };
+  const tabsId = React.useId();
+  // MAIR-1137 (C15): the task whose page is shown in « Tâches » (from the board, the list or « Prochaines tâches »).
+  const [viewedTaskId, setViewedTaskId] = React.useState<string | null>(null);
+  const viewTask = (taskId: string) => {
+    showTab('tasks');
+    setViewedTaskId(taskId);
+  };
+  // The ref stays out of the `taskForm` object so the compiler lint does not read it as a ref access during render.
+  const { noticeRef: taskNoticeRef, ...taskForm } = useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
+  const filters = useTaskFilters({ tasks });
+  // MAIR-1086: the milestones of the page (overview, planning); MAIR-1089: the latest activity, read once the
+  // detail is in (like the statuses below) and again after each confirmed change of the project.
+  const milestones = useProjectMilestones(project);
+  // MAIR-874 (C3): a published comment reads the activity again (overview and tab), from its first page.
+  const [activityRevision, setActivityRevision] = React.useState(0);
+  const activityKey = React.useMemo(() => ({ project, activityRevision }), [project, activityRevision]);
+  const recentActivity = useProjectActivity(project.taskItems ? project.id : null, activityKey);
+  const [activityPage, setActivityPage] = React.useState(1);
+  const [publishing, setPublishing] = React.useState(false);
+  const [publishError, setPublishError] = React.useState('');
+  const members = useProjectMembers(project);
+  const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
+  const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
+  const taskProjectIdRef = React.useRef(project.id);
+  const officialProjectRef = React.useRef<Project | null>(null);
+  const titleId = React.useId();
+  const responsibleOptions = [{ label: 'Choisir un responsable', value: '' }, ...memberOptions];
+  // The current group stays selectable even when the caller cannot link projects to it any more.
+  const editGroupOptions = project.group && !(groupOptions ?? []).some((option) => option.value === project.group?.id)
+    ? [{ value: project.group.id, label: project.group.name }, ...(groupOptions ?? [])]
+    : groupOptions;
+  const { firstStatusOf } = projectStatusHelpers(dynamicStatuses);
+  // MAIR-859: a board column is the first project status of its category; a category without one takes no task.
+  const unavailableColumns = new Set<TaskColumnStatus>(dynamicStatuses ? (['todo', 'in-progress', 'done'] as const).filter((status) => !firstStatusOf(categoryOf(status))) : []);
+  const moveTask = async (task: ProjectTask, status: TaskColumnStatus) =>
+    (await onUpdateTaskStatus(project.id, task.id, status, dynamicStatuses ? firstStatusOf(categoryOf(status)) : undefined)) === true;
+  const team = project.members ? new Set(members.members.map((member) => member.id)) : new Set([project.responsible, ...project.assignees].filter((person) => person.name).map((person) => person.id ?? person.name));
+  // The full history is read once « Activité » is shown (MAIR-874, C3).
+  const activityFeed = useProjectActivity(tab === 'activity' && project.taskItems ? project.id : null, activityKey, { limit: 20, page: activityPage });
+  const publishComment = async (message: string) => {
+    setPublishing(true);
+    setPublishError('');
+    try {
+      await addProjectComment(project.id, message);
+      setActivityPage(1);
+      setActivityRevision((value) => value + 1);
+      return true;
+    } catch (failure) {
+      setPublishError(getBffProjectErrorMessage(failure));
+      return false;
+    } finally {
+      setPublishing(false);
+    }
+  };
+  const canManageTeam = project.permissions?.canAssignMembers ?? project.permissions?.canEdit === true;
+  const tabItems: TabItem<ProjectTab>[] = [
+    { key: 'overview', label: 'Vue d’ensemble', icon: LayoutGrid },
+    { key: 'tasks', label: 'Tâches', icon: ListChecks, count: tasks.length },
+    { key: 'planning', label: 'Planning', icon: CalendarRange },
+    { key: 'team', label: 'Équipe', icon: Users, count: team.size },
+    { key: 'documents', label: 'Documents', icon: FileText },
+    { key: 'activity', label: 'Activité', icon: Activity },
+  ];
+  const panelProps = (key: ProjectTab) => ({ id: tabsIds(tabsId, key).panel, role: 'tabpanel', 'aria-labelledby': tabsIds(tabsId, key).tab, tabIndex: 0, hidden: tab !== key, className: 'focus-visible:outline-none' });
+  const mutationPending = projectEdit.saving || taskForm.saving;
+
+  React.useEffect(() => {
+    // Retained input changes are not a new official project response: do not
+    // reset task searches/filters or unrelated editors on each keystroke.
+    if (officialProjectRef.current === project) return;
+    officialProjectRef.current = project;
+    const projectChanged = taskProjectIdRef.current !== project.id;
+    projectEdit.syncProject(project);
+    if (projectChanged) {
+      taskProjectIdRef.current = project.id;
+      taskForm.resetForProject();
+      collaboration.reset();
+      setViewedTaskId(null);
+      setActivityPage(1);
+      setPublishError('');
+    }
+    if (projectChanged) filters.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the hooks' reset callbacks read the latest props by closure
+  }, [project, taskCreationState?.draft]);
+
+  return (
+    <section aria-labelledby={titleId} className="space-y-8">
+      <ProjectPageHeader
+        project={project}
+        titleId={titleId}
+        titleRef={titleRef}
+        backDisabled={mutationPending}
+        onBack={closeDetail}
+        onChangeStatus={onChangeStatus && project.permissions?.canEdit === true ? (status) => void onChangeStatus(project, status) : undefined}
+        statusDisabled={mutationPending || projectVerificationRequired || projectVerificationPending}
+        onEdit={project.permissions?.canEdit !== false ? projectEdit.toggle : undefined}
+        editDisabled={mutationPending || projectVerificationRequired}
+        onNewTask={project.permissions?.canCreateTask !== false ? () => { showTab('tasks'); taskForm.openCreate(); } : undefined}
+        onDuplicate={onDuplicate && project.permissions?.canDuplicate !== false ? () => void onDuplicate(project) : undefined}
+        duplicateDisabled={duplicationPending || duplicationVerificationRequired}
+        duplicateLabel={duplicationVerificationRequired ? 'Copie à vérifier' : 'Dupliquer'}
+        onDelete={onDelete && project.permissions?.canDelete !== false ? () => void onDelete(project) : undefined}
+      />
+      {refreshError && (
+        <DetailRefreshAlert
+          error={refreshError}
+          verificationRequired={projectVerificationRequired}
+          busy={refreshPending || projectVerificationPending}
+          retryDisabled={refreshPending || projectVerificationPending || mutationPending || !!pendingTaskIds?.size}
+          onRetry={() => void onRetry?.()}
+        />
+      )}
+
+      <ProjectMetrics project={project} tasks={tasks} />
+
+      <Tabs label="Sections du projet" id={tabsId} items={tabItems} value={tab} onChange={showTab} hostPanel />
+
+      <div {...panelProps('overview')}>
+        <ProjectOverview
+          project={project}
+          tasks={tasks}
+          pendingTaskIds={pendingTaskIds}
+          disabled={mutationPending}
+          lifecycleDisabled={projectVerificationRequired || projectVerificationPending}
+          onCompleteTask={(task) => void onUpdateTaskStatus(project.id, task.id, 'done', firstStatusOf('done'))}
+          onShowTab={showTab}
+          onOpenTask={(task) => viewTask(task.id)}
+          onSuspend={() => void onCloseProject(project.id, 'on-hold')}
+          onResume={onChangeStatus && project.permissions?.canEdit === true ? () => void onChangeStatus(project, 'in-progress') : undefined}
+          onCloseProject={() => void onCloseProject(project.id, 'done')}
+          milestones={{
+            milestones: milestones.milestones,
+            total: milestones.total,
+            canManage: project.permissions?.canEdit === true,
+            pendingId: milestones.pendingId,
+            error: milestones.error,
+            onAdd: milestones.add,
+            onUpdate: milestones.update,
+            onRemove: milestones.remove,
+          }}
+          activity={{ items: recentActivity.items, loading: recentActivity.loading, error: recentActivity.error, onRetry: recentActivity.retry }}
+        />
+      </div>
+
+      {/* The tasks stay mounted on every tab: drafts, pending writes and comments survive a tab change. */}
+      <div {...panelProps('tasks')} ref={contentRef}>
+        <ProjectTasksTab
+          key={project.id}
+          project={project}
+          tasks={tasks}
+          filters={filters}
+          taskForm={taskForm}
+          collaboration={collaboration}
+          statusOptions={taskStatusOptions}
+          priorityOptions={priorityOptions}
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
+          unavailableColumns={unavailableColumns}
+          pendingTaskIds={pendingTaskIds}
+          unverifiedTaskIds={unverifiedTaskIds}
+          taskWriteErrors={taskWriteErrors}
+          mutationPending={mutationPending}
+          highlightTaskId={highlightTaskId}
+          highlightedTaskRef={highlightedTaskRef}
+          viewedTaskId={viewedTaskId}
+          onViewTask={setViewedTaskId}
+          onMoveTask={moveTask}
+          onDeleteTask={onDeleteTask}
+          creationNotice={(
+            <div ref={taskNoticeRef} tabIndex={-1} className="mt-4 focus-visible:outline-2 focus-visible:outline-[#cf222e]">
+              <TaskCreationNotice state={taskCreationState} onInspect={onInspectTaskCreation} />
+            </div>
+          )}
+        />
+        {/* Mounted once the detail is in, so its statuses read reuses the detail's tasks (MAIR-567). It reads the
+            project's own statuses (the sheet's « État ») and lets the managers set them up. */}
+        {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
+      </div>
+
+      {/* MAIR-868: a bar opens the task page in « Tâches », like a card of the board. */}
+      <div {...panelProps('planning')}>
+        <ProjectPlanningTab tasks={tasks} milestones={milestones.milestones} onOpenTask={viewTask} />
+      </div>
+      <div {...panelProps('team')}>
+        <ProjectTeamTab
+          members={members.members}
+          ownerId={project.responsible.id}
+          canManage={canManageTeam}
+          memberOptions={memberOptions}
+          pendingId={members.pendingId}
+          error={members.error}
+          notice={members.notice}
+          disabled={mutationPending}
+          onAdd={members.add}
+          onChangeRole={members.changeRole}
+          onRemove={members.remove}
+        />
+      </div>
+      {/* MAIR-874 (C2): the contract has no document storage yet; the tab says so instead of a fake upload. */}
+      <div {...panelProps('documents')}>
+        <Panel title="Documents" state="unavailable" stateProps={{ title: 'Documents non disponibles', description: 'Le dépôt des pièces du projet n’est pas encore fourni par le service Projets.' }} />
+      </div>
+      <div {...panelProps('activity')}>
+        <ProjectActivityTab
+          items={activityFeed.items}
+          page={activityPage}
+          pageSize={activityFeed.pageSize}
+          total={activityFeed.total}
+          loading={activityFeed.loading}
+          error={activityFeed.error}
+          onRetry={activityFeed.retry}
+          onPageChange={setActivityPage}
+          onPublish={project.permissions?.canView !== false ? publishComment : undefined}
+          publishing={publishing}
+          publishError={publishError}
+        />
+      </div>
+
+      {/* MAIR-846 (C7, Figma F5 5.6): « Modifier » opens the project fields only, in a size m modal. */}
+      <Modal open={projectEdit.editing} title={`Modifier le projet · ${getProjectNumber(project)}`} size="m" closeOnBackdrop={!mutationPending} onClose={projectEdit.cancel}>
+        <ProjectEditForm
+          form={projectEdit.form}
+          saving={projectEdit.saving}
+          error={projectEdit.error && (!projectEdit.verificationError || projectVerificationRequired) ? projectEdit.error : undefined}
+          fieldErrors={projectEdit.fieldErrors}
+          disabled={mutationPending}
+          saveDisabled={projectVerificationRequired || projectVerificationPending || project.permissions?.canEdit === false}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
+          responsibleOptions={responsibleOptions}
+          memberOptions={memberOptions}
+          labelOptions={labelOptions}
+          groupOptions={editGroupOptions}
+          groupsError={groupsError}
+          onChange={projectEdit.update}
+          onCancel={projectEdit.cancel}
+          onSubmit={projectEdit.submit}
+          initial={savedForm}
+          onDelete={onDelete && project.permissions?.canDelete !== false ? () => { projectEdit.cancel(); void onDelete(project); } : undefined}
+        />
+      </Modal>
+    </section>
+  );
+}

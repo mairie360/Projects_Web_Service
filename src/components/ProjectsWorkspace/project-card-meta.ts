@@ -1,4 +1,4 @@
-import { statuses, type Status } from '@mairie360/lib-components/primitives';
+import { statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
 import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import type { Project } from '../../types/project';
 
@@ -33,8 +33,19 @@ export const projectStatusBadge = {
   todo: 'todo',
   'in-progress': 'inprogress',
   review: 'review',
+  // MAIR-1084: a project put on hold reads « Suspendu », the lib's `paused` status.
+  'on-hold': 'paused',
   done: 'done',
 } as const satisfies Record<Project['status'], Status>;
+
+/** MAIR-1134: tone of the StatusPill heading a lib `KanbanColumn` of that status. */
+export const projectColumnTone = {
+  todo: 'neutral',
+  'in-progress': 'info',
+  review: 'warning',
+  'on-hold': 'warning',
+  done: 'success',
+} as const satisfies Record<Project['status'], StatusPillTone>;
 
 /** French label of a project or task status, the one the lib `StatusBadge` shows (« En revue »). */
 export const projectStatusLabel = (status: Project['status']) => statuses[projectStatusBadge[status]].label;
@@ -46,5 +57,7 @@ export function instanceToday(now = new Date()) {
 
 /** MAIR-829: « En retard » — the due date is past in the instance time zone and the project is not done. */
 export function isProjectOverdue(project: Pick<Project, 'dueDate' | 'status'>, now = new Date()) {
-  return project.status !== 'done' && /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && project.dueDate < instanceToday(now);
+  // An absent or impossible date (« Sans échéance », « Échéance invalide ») is never late.
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && formatProjectDate(project.dueDate) !== 'Échéance invalide';
+  return project.status !== 'done' && valid && project.dueDate < instanceToday(now);
 }
