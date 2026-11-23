@@ -52,9 +52,9 @@ async function performProjectOperation(operation, component, project) {
   }
   if (operation === 'edit-detail' || operation === 'close' || operation === 'review') {
     await view.act(() => view.props(component).onProjectOpen(project));
-    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectDetailModal').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
+    if (operation !== 'edit-detail') return view.act(() => view.props('ProjectPage').onCloseProject(project.id, operation === 'close' ? 'done' : 'review'));
     const form = requireTs('src/lib/projectPageState.ts').projectToFormState(project);
-    return view.act(() => view.props('ProjectDetailModal').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
+    return view.act(() => view.props('ProjectPage').onUpdateProject(project.id, { ...form, title: 'Brouillon différent du résultat officiel' }));
   }
   if (operation === 'edit-card') await view.act(() => view.props('ProjectsWorkspace').openEditProject(project));
   else await view.click('Nouveau projet');

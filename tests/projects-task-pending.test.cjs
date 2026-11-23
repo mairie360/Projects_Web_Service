@@ -48,7 +48,7 @@ for (const operation of ['status', 'delete', 'edit']) {
         }
         return response;
       });
-      const props = view.props('ProjectDetailModal');
+      const props = view.props('ProjectPage');
       const pending = [];
       try {
         await view.act(() => { pending.push(invoke(props, operation).catch(() => undefined)); });
@@ -58,13 +58,13 @@ for (const operation of ['status', 'delete', 'edit']) {
         });
         await view.settle();
         assert.equal(harness.bffProject.requests.filter(value => value.method !== 'GET').length, 1, 'the first operation owns the task through its follow-up reads');
-        assert.equal(view.props('ProjectDetailModal').pendingTaskIds.has(task.id), true);
-        assert.equal(view.props('ProjectDetailModal').pendingTaskIds.has(other.id), false);
+        assert.equal(view.props('ProjectPage').pendingTaskIds.has(task.id), true);
+        assert.equal(view.props('ProjectPage').pendingTaskIds.has(other.id), false);
         if (operation === 'delete' && phase === 'read') assert.match(view.text(), /Actualisation des tâches en cours…/);
       } finally {
         release(); await Promise.all(pending); await view.settle();
       }
-      assert.equal(view.props('ProjectDetailModal').pendingTaskIds.size, 0);
+      assert.equal(view.props('ProjectPage').pendingTaskIds.size, 0);
     });
   }
 }
@@ -83,7 +83,7 @@ for (const operation of ['status', 'delete', 'edit']) {
       if (input === browserPath && init?.method === method(operation).toUpperCase()) { ++held; await gate; }
       return response;
     });
-    const props = view.props('ProjectDetailModal');
+    const props = view.props('ProjectPage');
     let first, repeated;
     try {
       await view.act(() => { first = invoke(props, operation).catch(() => undefined); });
@@ -92,19 +92,19 @@ for (const operation of ['status', 'delete', 'edit']) {
       await view.settle();
       assert.equal(harness.bffProject.calls(route(operation), method(operation)).length, 1);
     } finally { release(); await Promise.all([first, repeated]); await view.settle(); }
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.size, 0);
-    assert.equal(view.props('ProjectDetailModal').tasks[0].title, task.title);
-    assert.equal(view.props('ProjectDetailModal').taskWriteErrors.get(task.id), 'Action temporairement refusée');
+    assert.equal(view.props('ProjectPage').pendingTaskIds.size, 0);
+    assert.equal(view.props('ProjectPage').tasks[0].title, task.title);
+    assert.equal(view.props('ProjectPage').taskWriteErrors.get(task.id), 'Action temporairement refusée');
     assert.match(view.text(), /Action temporairement refusée/);
     harness.bffProject.on(method(operation), route(operation), operation === 'delete' ? { status: 204 } : { body: f.projectTask({ title: 'Retry confirmé' }) });
     harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Relecture refusée')));
-    await view.act(() => invoke(view.props('ProjectDetailModal'), operation));
+    await view.act(() => invoke(view.props('ProjectPage'), operation));
     assert.equal(harness.bffProject.calls(route(operation), method(operation)).length, 2);
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.size, 0);
-    if (operation === 'delete') assert.equal(view.props('ProjectDetailModal').tasks.some(value => value.id === task.id), false);
-    else assert.equal(view.props('ProjectDetailModal').tasks[0].title, 'Retry confirmé');
-    assert.equal(view.props('ProjectDetailModal').refreshError, 'Relecture refusée');
-    assert.equal(view.props('ProjectDetailModal').taskWriteErrors.has(task.id), false);
+    assert.equal(view.props('ProjectPage').pendingTaskIds.size, 0);
+    if (operation === 'delete') assert.equal(view.props('ProjectPage').tasks.some(value => value.id === task.id), false);
+    else assert.equal(view.props('ProjectPage').tasks[0].title, 'Retry confirmé');
+    assert.equal(view.props('ProjectPage').refreshError, 'Relecture refusée');
+    assert.equal(view.props('ProjectPage').taskWriteErrors.has(task.id), false);
   });
 }
 
@@ -121,14 +121,14 @@ test('different tasks remain independent while the first status confirmation is 
   });
   let first;
   try {
-    await view.act(() => { first = invoke(view.props('ProjectDetailModal'), 'status'); });
+    await view.act(() => { first = invoke(view.props('ProjectPage'), 'status'); });
     await view.waitFor(() => held > 0);
-    await view.act(() => invoke(view.props('ProjectDetailModal'), 'status', other));
+    await view.act(() => invoke(view.props('ProjectPage'), 'status', other));
     assert.equal(harness.bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch').length, 2);
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.has(task.id), true);
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.has(other.id), false);
+    assert.equal(view.props('ProjectPage').pendingTaskIds.has(task.id), true);
+    assert.equal(view.props('ProjectPage').pendingTaskIds.has(other.id), false);
   } finally { release(); await first; await view.settle(); }
-  assert.equal(view.props('ProjectDetailModal').pendingTaskIds.size, 0);
+  assert.equal(view.props('ProjectPage').pendingTaskIds.size, 0);
 });
 
 test('closing and reopening a consultation retains the page-owned pending task guard', async t => {
@@ -143,16 +143,16 @@ test('closing and reopening a consultation retains the page-owned pending task g
   });
   let pending;
   try {
-    await view.act(() => { pending = invoke(view.props('ProjectDetailModal'), 'status'); });
+    await view.act(() => { pending = invoke(view.props('ProjectPage'), 'status'); });
     await view.waitFor(() => held > 0);
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
     await view.act(() => view.props('KanbanBoard').onProjectOpen(project));
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.has(task.id), true);
-    await view.act(() => invoke(view.props('ProjectDetailModal'), 'delete'));
+    assert.equal(view.props('ProjectPage').pendingTaskIds.has(task.id), true);
+    await view.act(() => invoke(view.props('ProjectPage'), 'delete'));
     assert.equal(harness.bffProject.requests.filter(value => value.method !== 'GET').length, 1);
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
   } finally { release(); await pending; await view.settle(); }
-  assert.equal(view.find('ProjectDetailModal').length, 0);
+  assert.equal(view.find('ProjectPage').length, 0);
 });
 
 test('the same task ID in another project does not share a pending guard', async t => {
@@ -170,25 +170,25 @@ test('the same task ID in another project does not share a pending guard', async
   });
   let first;
   try {
-    await view.act(() => { first = invoke(view.props('ProjectDetailModal'), 'status'); });
+    await view.act(() => { first = invoke(view.props('ProjectPage'), 'status'); });
     await view.waitFor(() => held > 0);
-    await view.act(() => view.props('ProjectDetailModal').onUpdateTaskStatus(second.id, task.id, 'review'));
+    await view.act(() => view.props('ProjectPage').onUpdateTaskStatus(second.id, task.id, 'review'));
     const writes = harness.bffProject.calls('/projects/{projectId}/tasks/{taskId}/status', 'patch');
     assert.deepEqual(writes.map(value => value.url.pathname), ['/projects/project-1/tasks/task-1/status', '/projects/project-2/tasks/task-1/status']);
-    await view.act(() => view.props('ProjectDetailModal').onClose());
+    await view.act(() => view.props('ProjectPage').onClose());
     await view.act(() => view.props('KanbanBoard').onProjectOpen(second));
-    assert.equal(view.props('ProjectDetailModal').project.id, second.id);
-    assert.equal(view.props('ProjectDetailModal').pendingTaskIds.size, 0);
+    assert.equal(view.props('ProjectPage').project.id, second.id);
+    assert.equal(view.props('ProjectPage').pendingTaskIds.size, 0);
   } finally { release(); await first; await view.settle(); }
-  assert.equal(view.props('ProjectDetailModal').project.id, second.id, 'finishing the first write cannot reopen its abandoned consultation');
+  assert.equal(view.props('ProjectPage').project.id, second.id, 'finishing the first write cannot reopen its abandoned consultation');
 });
 
 test('a deliberate retry clears only its task refusal and preserves the other row error', async t => {
   await loaded();
   harness.bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}/status', ({ pathParams }) => harness.errorReply(403, f.apiError('REFUSED', `Refus de ${pathParams.taskId}`)));
-  await view.act(() => invoke(view.props('ProjectDetailModal'), 'status'));
-  await view.act(() => invoke(view.props('ProjectDetailModal'), 'status', other));
-  assert.deepEqual([...view.props('ProjectDetailModal').taskWriteErrors], [[task.id, `Refus de ${task.id}`], [other.id, `Refus de ${other.id}`]]);
+  await view.act(() => invoke(view.props('ProjectPage'), 'status'));
+  await view.act(() => invoke(view.props('ProjectPage'), 'status', other));
+  assert.deepEqual([...view.props('ProjectPage').taskWriteErrors], [[task.id, `Refus de ${task.id}`], [other.id, `Refus de ${other.id}`]]);
   let release, held = 0;
   const gate = new Promise(resolve => { release = resolve; });
   const fetch = global.fetch;
@@ -201,11 +201,11 @@ test('a deliberate retry clears only its task refusal and preserves the other ro
   harness.bffProject.on('get', '/projects/{projectId}', harness.errorReply(503, f.apiError('READ', 'Relecture refusée')));
   let pending;
   try {
-    await view.act(() => { pending = invoke(view.props('ProjectDetailModal'), 'status'); });
+    await view.act(() => { pending = invoke(view.props('ProjectPage'), 'status'); });
     await view.waitFor(() => held > 0);
-    assert.equal(view.props('ProjectDetailModal').taskWriteErrors.has(task.id), false);
-    assert.equal(view.props('ProjectDetailModal').taskWriteErrors.get(other.id), `Refus de ${other.id}`);
+    assert.equal(view.props('ProjectPage').taskWriteErrors.has(task.id), false);
+    assert.equal(view.props('ProjectPage').taskWriteErrors.get(other.id), `Refus de ${other.id}`);
   } finally { release(); await pending; await view.settle(); }
-  assert.equal(view.props('ProjectDetailModal').taskWriteErrors.get(other.id), `Refus de ${other.id}`);
+  assert.equal(view.props('ProjectPage').taskWriteErrors.get(other.id), `Refus de ${other.id}`);
   assert.equal(harness.bffProject.requests.filter(value => value.method === 'PATCH').length, 3);
 });

@@ -6,7 +6,7 @@ import React from 'react';
 import { Alert, ConfirmModal, Skeleton, ToastProvider } from '@mairie360/lib-components/primitives';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateProjectModal } from './components/CreateProjectModal';
-import { ProjectDetailModal } from './components/ProjectDetailModal';
+import { ProjectPage } from './components/ProjectPage';
 import { ProjectTemplateManager } from './components/ProjectTemplateManager';
 import { ProjectPagination } from './components/ProjectPagination';
 import { TaskCreationNotice } from './components/TaskCreationNotice';
@@ -26,9 +26,11 @@ import type { ProjectsController } from './use-projects-controller';
 import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
+/** MAIR-1134: the subtitle of the projects page. */
+export const PAGE_SUBTITLE = 'Pilotez les projets de votre mairie';
+
 export function ProjectsWorkspace({
   workflowPort,
-  moveWorkflowTask,
   saveWorkflowStatuses,
   readCurrentTaskAssignee,
   projectsPage,
@@ -123,12 +125,13 @@ export function ProjectsWorkspace({
   selectedProjectTasks,
   canCreateProject,
   pageTitle,
-  pageSubtitle,
   frontHrefs,
+  openEditProject,
   logout,
 }: ProjectsController) {
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
+  const editedProject = editingProjectId ? projects.find(project => project.id === editingProjectId) : undefined;
   return (
     <ToastProvider regionLabel="Notifications des projets">
       <FeedbackToast feedback={feedback} onShown={clearFeedback} />
@@ -156,42 +159,6 @@ export function ProjectsWorkspace({
         onConfirm={() => void confirmBulkProjectDeletion()}
       />
 
-      {selectedProject && (
-        <ProjectDetailModal
-          project={selectedProject}
-          workflowPort={workflowPort}
-          onMoveWorkflowTask={moveWorkflowTask}
-          onSaveWorkflowStatuses={saveWorkflowStatuses}
-          workflowRole={projectsPage?.access.role}
-          readCurrentTaskAssignee={readCurrentTaskAssignee}
-          tasks={selectedProjectTasks}
-          highlightTaskId={linkedTaskId}
-          memberOptions={memberOptions}
-          labelOptions={labelOptions}
-          groupOptions={groupOptions}
-          groupsError={projectGroupsError}
-          statusOptions={projectStatusOptions}
-          priorityOptions={projectPriorityOptions}
-          onClose={closeProjectDetails}
-          refreshError={detailRefreshError}
-          refreshPending={detailRefreshPending}
-          projectVerificationRequired={unverifiedProjectIds.has(selectedProject.id)}
-          projectVerificationPending={projectVerificationPendingIds.has(selectedProject.id)}
-          pendingTaskIds={pendingTaskIds}
-          taskWriteErrors={taskWriteErrors}
-          unverifiedTaskIds={unverifiedTaskIds}
-          taskCreationState={taskCreationStates.get(selectedProject.id)}
-          onInspectTaskCreation={() => inspectTaskCreation(selectedProject.id)}
-          onPreserveTaskDraft={patch => preserveUncertainTaskDraft(selectedProject.id, patch)}
-          onRetry={retryProjectDetails}
-          onUpdateProject={updateProjectFromForm}
-          onAddTask={addProjectTask}
-          onUpdateTask={updateProjectTask}
-          onUpdateTaskStatus={changeProjectTaskStatus}
-          onDeleteTask={deleteProjectTask}
-          onCloseProject={closeProject}
-        />
-      )}
 
       {createProjectOpen && (
         <CreateProjectModal
@@ -208,7 +175,7 @@ export function ProjectsWorkspace({
           verificationLabel={editingProjectId || verifiesCreationDetail ? 'Vérifier le projet' : 'Actualiser le catalogue'}
           verificationPendingLabel={editingProjectId || verifiesCreationDetail ? 'Vérification du projet…' : 'Actualisation du catalogue…'}
           confirmedCreationTitle={!editingProjectId ? verifiedCreation?.title : undefined}
-          canSave={!editingProjectId || projects.find(project => project.id === editingProjectId)?.permissions?.canEdit !== false}
+          canSave={!editingProjectId || editedProject?.permissions?.canEdit !== false}
           onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : verifyNewProjectReceipt('create')}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
@@ -220,6 +187,7 @@ export function ProjectsWorkspace({
           onClose={closeCreateProject}
           onInteract={keepProjectFormCurrent}
           onSubmit={saveProject}
+          onDelete={editedProject && editedProject.permissions?.canDelete !== false ? () => { closeCreateProject(); void deleteProject(editedProject); } : undefined}
         />
       )}
 
@@ -228,10 +196,10 @@ export function ProjectsWorkspace({
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
-        className="projects-shell"
       >
-            {!projectsPage && !pageError && <WorkspaceLoading />}
-            <div hidden={!projectsPage && !pageError} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+            {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
+            {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}
+            <div hidden={!projectsPage && !pageError && !selectedProject} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
               {logoutError && <LogoutErrorNotice message={logoutError} onBackToLogin={returnToLogin} />}
               {[...taskCreationStates].filter(([, state]) => state.uncertainTitle).map(([projectId, state]) => (
                 <TaskCreationNotice key={projectId} state={state} onInspect={() => inspectTaskCreation(projectId)} />
@@ -272,95 +240,147 @@ export function ProjectsWorkspace({
                 </div>
               )}
 
-              <WorkspaceHeader
-                title={pageTitle}
-                subtitle={pageSubtitle}
-                scope={projectsPage?.access?.scope}
-                onCreate={canCreateProject ? () => openCreateProject() : undefined}
-                onSettings={() => navigateToPage('settings')}
-              />
+              {/* MAIR-846: a project opens as a page in place of the list; the list stays mounted (filters, page, drafts). */}
+              {selectedProject && (
+                <ProjectPage
+                  project={selectedProject}
+                  workflowPort={workflowPort}
+                  onSaveWorkflowStatuses={saveWorkflowStatuses}
+                  workflowRole={projectsPage?.access.role}
+                  readCurrentTaskAssignee={readCurrentTaskAssignee}
+                  tasks={selectedProjectTasks}
+                  highlightTaskId={linkedTaskId}
+                  memberOptions={memberOptions}
+                  labelOptions={labelOptions}
+                  groupOptions={groupOptions}
+                  groupsError={projectGroupsError}
+                  statusOptions={projectStatusOptions}
+                  priorityOptions={projectPriorityOptions}
+                  onClose={closeProjectDetails}
+                  refreshError={detailRefreshError}
+                  refreshPending={detailRefreshPending}
+                  projectVerificationRequired={unverifiedProjectIds.has(selectedProject.id)}
+                  projectVerificationPending={projectVerificationPendingIds.has(selectedProject.id)}
+                  pendingTaskIds={pendingTaskIds}
+                  taskWriteErrors={taskWriteErrors}
+                  unverifiedTaskIds={unverifiedTaskIds}
+                  taskCreationState={taskCreationStates.get(selectedProject.id)}
+                  onInspectTaskCreation={() => inspectTaskCreation(selectedProject.id)}
+                  onPreserveTaskDraft={patch => preserveUncertainTaskDraft(selectedProject.id, patch)}
+                  onRetry={retryProjectDetails}
+                  onUpdateProject={updateProjectFromForm}
+                  onAddTask={addProjectTask}
+                  onUpdateTask={updateProjectTask}
+                  onUpdateTaskStatus={changeProjectTaskStatus}
+                  onDeleteTask={deleteProjectTask}
+                  onCloseProject={closeProject}
+                  onChangeStatus={moveProjectStatus}
+                  onDuplicate={duplicateProject}
+                  duplicationPending={duplicatingProjectIds.includes(selectedProject.id)}
+                  duplicationVerificationRequired={unverifiedDuplicationSourceIds.has(selectedProject.id)}
+                  onDelete={deleteProject}
+                />
+              )}
 
-              <ProjectTemplateManager role={projectsPage?.access.role} port={workflowPort} />
+              <div hidden={Boolean(selectedProject)}>
+                <WorkspaceHeader
+                  title={pageTitle}
+                  subtitle={PAGE_SUBTITLE}
+                  scope={projectsPage?.access?.scope}
+                  onCreate={canCreateProject ? () => openCreateProject() : undefined}
+                  onSettings={() => navigateToPage('settings')}
+                />
 
-              <ProjectFiltersBar
-                search={searchTerm}
-                status={statusFilter}
-                priority={priorityFilter}
-                dueBefore={dueBeforeFilter}
-                statusOptions={statusFilterOptions}
-                priorityOptions={priorityFilterOptions}
-                viewMode={viewMode}
-                views={projectsPage?.page.views ?? []}
-                onSearchChange={setSearchTerm}
-                onStatusChange={setStatusFilter}
-                onPriorityChange={setPriorityFilter}
-                onDueBeforeChange={setDueBeforeFilter}
-                onViewModeChange={setViewMode}
-              />
+                <ProjectTemplateManager role={projectsPage?.access.role} port={workflowPort} />
 
-              <section className="pt-8">
-                {duplicatingProjectIds.length > 0 && (
-                  <p role="status" className="mb-4 text-sm font-medium text-[#57606a]">
-                    Duplication du projet en cours…
-                  </p>
-                )}
-                {pageLoading && projects.length === 0 && (
-                  <Skeleton label="Chargement des projets..." className="min-h-32" />
-                )}
+                <ProjectFiltersBar
+                  search={searchTerm}
+                  status={statusFilter}
+                  priority={priorityFilter}
+                  dueBefore={dueBeforeFilter}
+                  statusOptions={statusFilterOptions}
+                  priorityOptions={priorityFilterOptions}
+                  viewMode={viewMode}
+                  views={projectsPage?.page.views ?? []}
+                  onSearchChange={setSearchTerm}
+                  onStatusChange={setStatusFilter}
+                  onPriorityChange={setPriorityFilter}
+                  onDueBeforeChange={setDueBeforeFilter}
+                  onViewModeChange={setViewMode}
+                />
 
-                {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
+                <section className="pt-8">
+                  {duplicatingProjectIds.length > 0 && (
+                    <p role="status" className="mb-4 text-sm font-medium text-[#57606a]">
+                      Duplication du projet en cours…
+                    </p>
+                  )}
+                  {pageLoading && projects.length === 0 && (
+                    <Skeleton label="Chargement des projets..." className="min-h-32" />
+                  )}
 
-                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
-                  <ProjectsEmptyState onReset={resetProjectFilters} />
-                )}
+                  {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
-                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && !(filtersActive && filteredProjects.length === 0) && viewMode === 'kanban' && (
-                  <KanbanBoard
-                    projects={filteredProjects}
-                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
-                    duplicatingProjectIds={duplicatingProjectIds}
-                    columns={projectsPage?.kanban.columns ?? []}
-                    onProjectOpen={openProjectDetails}
-                    onProjectDuplicate={duplicateProject}
-                    onProjectDelete={deleteProject}
-                    onAddProject={canCreateProject ? openCreateProject : undefined}
-                    onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
-                  />
-                )}
+                  {/* MAIR-1134 (C8): the view fades and rises in (260 ms) when it changes; no motion under prefers-reduced-motion. */}
+                  {/* MAIR-487 (RGAA 9.1): the views sit under an h2, between the page h1 and the h3 of the columns or cards. */}
+                  <h2 className="sr-only">{viewMode === 'kanban' ? 'Projets par statut' : viewMode === 'grid' ? 'Projets en grille' : 'Tableau des projets'}</h2>
+                  <div key={viewMode} className="m360-view-enter">
+                  {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
+                    <ProjectsEmptyState onReset={resetProjectFilters} />
+                  )}
 
-                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
-                  <GridView
-                    projects={filteredProjects}
-                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
-                    duplicatingProjectIds={duplicatingProjectIds}
-                    onProjectOpen={openProjectDetails}
-                    onProjectDuplicate={duplicateProject}
-                    onProjectDelete={deleteProject}
-                    onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
-                    onResetFilters={filtersActive ? resetProjectFilters : undefined}
-                  />
-                )}
+                  {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && !(filtersActive && filteredProjects.length === 0) && viewMode === 'kanban' && (
+                    <KanbanBoard
+                      projects={filteredProjects}
+                      unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
+                      duplicatingProjectIds={duplicatingProjectIds}
+                      columns={projectsPage?.kanban.columns ?? []}
+                      onProjectOpen={openProjectDetails}
+                      onProjectDuplicate={duplicateProject}
+                      onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
+                      onAddProject={canCreateProject ? openCreateProject : undefined}
+                      onMoveProject={moveProjectStatus}
+                    />
+                  )}
 
-                {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'table' && (
-                  <TableView
-                    projects={filteredProjects}
-                    unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
-                    duplicatingProjectIds={duplicatingProjectIds}
-                    onProjectOpen={openProjectDetails}
-                    onProjectDuplicate={duplicateProject}
-                    onProjectDelete={deleteProject}
-                    onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
-                    onResetFilters={filtersActive ? resetProjectFilters : undefined}
-                    selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
-                    onSelectionChange={changeProjectSelection}
-                    onClearSelection={clearProjectSelection}
-                    onDeleteSelection={requestBulkProjectDeletion}
-                  />
-                )}
-                {projectsPage && (
-                  <ProjectPagination pagination={projectsPage.pagination} pending={pageLoading} stale={Boolean(pageError)} onChange={changeProjectPage} />
-                )}
-              </section>
+                  {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'grid' && (
+                    <GridView
+                      projects={filteredProjects}
+                      unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
+                      duplicatingProjectIds={duplicatingProjectIds}
+                      onProjectOpen={openProjectDetails}
+                      onProjectDuplicate={duplicateProject}
+                      onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
+                      onProjectStatusChange={moveProjectStatus}
+                      onResetFilters={filtersActive ? resetProjectFilters : undefined}
+                    />
+                  )}
+
+                  {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'table' && (
+                    <TableView
+                      projects={filteredProjects}
+                      unverifiedDuplicationSourceIds={unverifiedDuplicationSourceIds}
+                      duplicatingProjectIds={duplicatingProjectIds}
+                      onProjectOpen={openProjectDetails}
+                      onProjectDuplicate={duplicateProject}
+                      onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
+                      onProjectStatusChange={moveProjectStatus}
+                      onResetFilters={filtersActive ? resetProjectFilters : undefined}
+                      selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
+                      onSelectionChange={changeProjectSelection}
+                      onClearSelection={clearProjectSelection}
+                      onDeleteSelection={requestBulkProjectDeletion}
+                    />
+                  )}
+                  </div>
+                  {projectsPage && (
+                    <ProjectPagination pagination={projectsPage.pagination} pending={pageLoading} stale={Boolean(pageError)} onChange={changeProjectPage} />
+                  )}
+                </section>
+              </div>
             </div>
       </AccessibleShell>
     </ToastProvider>
