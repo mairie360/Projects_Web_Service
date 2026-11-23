@@ -178,14 +178,14 @@ describe("Projects page", () => {
     await user.click(detail.getByRole('button',{name:'Modifier',exact:true}));
     const form=within(detail.getByRole('form',{name:'Modifier le projet'})),title=form.getByLabelText(/^Titre/);
     await user.clear(title);await user.type(title,'Brouillon inline retenu');
-    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
-    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true));
+    await user.click(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}));
+    await waitFor(()=>expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true));
     expect(title.value).toBe('Brouillon inline retenu');
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,permissions:{...project.permissions,canEdit:false,canClose:false}},[]));
     const retry=detail.getByRole('button',{name:'Réessayer la fiche',exact:true});retry.focus();await user.keyboard('{Enter}');
     await waitFor(()=>expect(detail.queryByRole('button',{name:'Réessayer la fiche',exact:true})).toBeNull());
     expect(title.value).toBe('Brouillon inline retenu');expect(form.queryByRole('alert')).toBeNull();
-    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true);
     expect(detail.queryByRole('button',{name:'Clôturer',exact:true})).toBeNull();expect(updateProject).toHaveBeenCalledOnce();
   });
 

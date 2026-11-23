@@ -5,13 +5,16 @@ import { type FilterOption, type ProjectFormState } from '@/lib/projectPageState
 import { CreateProjectFeedback } from './components/CreateProjectFeedback';
 import { CreateProjectFooter } from './components/CreateProjectFooter';
 import { ProjectMainFields } from './components/ProjectMainFields';
+import { ProjectRecap } from './components/ProjectRecap';
 import { ProjectSideFields } from './components/ProjectSideFields';
+import { EditedSection } from '../EditedSection';
 import { ProjectTasksEditor } from '../ProjectTasksEditor';
 import { ProjectTemplatePicker } from './components/ProjectTemplatePicker';
 import type { ProjectTemplate, ProjectWorkflowPort } from '@/lib/projectWorkflow';
 import { PROJECT_VERIFICATION_MESSAGE } from '@/lib/projectReceiptVerification';
-import { IconButton } from '@mairie360/lib-components/primitives';
-import { PROJECT_FIELD_IDS, validateProjectForm, type ProjectFieldErrors } from '../../project-form-validation';
+import { IconButton, StepProgress } from '@mairie360/lib-components/primitives';
+import { changedProjectFields, PROJECT_FIELD_IDS, PROJECT_FORM_SECTIONS, validateProjectForm, type ProjectFieldErrors } from '../../project-form-validation';
+import { CREATION_STEPS, firstStepInError, RECAP_STEP, stepErrors, useCreationSteps } from './use-creation-steps';
 
 export function CreateProjectModal({
   mode,
@@ -38,6 +41,7 @@ export function CreateProjectModal({
   onClose,
   onInteract,
   onSubmit,
+  onDelete,
 }: {
   mode: 'create' | 'edit';
   workflowPort?: ProjectWorkflowPort;
@@ -63,6 +67,8 @@ export function CreateProjectModal({
   onClose: () => void;
   onInteract?: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>, template?: ProjectTemplate) => void;
+  /** MAIR-1136: « Supprimer » of the edit (the deletion asks for its confirmation). */
+  onDelete?: () => void;
 }) {
   const [template, setTemplate] = React.useState<ProjectTemplate | undefined>();
   const [fieldErrors, setFieldErrors] = React.useState<ProjectFieldErrors>({});
@@ -75,6 +81,37 @@ export function CreateProjectModal({
   const titleId = React.useId();
   const feedbackId = React.useId();
   const responsibleOptions = [{ label: 'Choisir un responsable', value: '' }, ...memberOptions];
+  const groupCount = groupOptions?.length ?? 0;
+  // MAIR-1136 (C9): the creation goes step by step; the edit compares with the project it opened on (C13).
+  const creation = useCreationSteps(form, groupCount);
+  const [initialForm] = React.useState(form);
+  const changed = isEditMode ? changedProjectFields(form, initialForm) : [];
+  const sectionChanged = (section: keyof typeof PROJECT_FORM_SECTIONS) => changed.some((key) => (PROJECT_FORM_SECTIONS[section] as readonly string[]).includes(key));
+  const focusRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    // A step shown to explain an error focuses its first field once it is visible.
+    if (!focusRef.current) return;
+    document.getElementById(focusRef.current)?.focus();
+    focusRef.current = null;
+  });
+
+  const showErrors = (errors: ProjectFieldErrors) => {
+    const first = (Object.keys(PROJECT_FIELD_IDS) as (keyof ProjectFieldErrors)[]).find((key) => errors[key]);
+    setFieldErrors(errors);
+    if (!first) return false;
+    if (!isEditMode) creation.setStep(firstStepInError(errors) ?? creation.step);
+    focusRef.current = PROJECT_FIELD_IDS[first];
+    document.getElementById(PROJECT_FIELD_IDS[first])?.focus();
+    return true;
+  };
+
+  // Forward only once the steps before the target are valid; back always.
+  const goToStep = (target: number) => {
+    if (target > creation.step && showErrors(stepErrors(creation.errors, target))) return;
+    creation.setStep(target);
+    dialogRef.current?.focus();
+  };
 
   // A corrected field loses its message at once; the others keep theirs until the next submit.
   const changeForm = (patch: Partial<ProjectFormState>) => {
@@ -89,15 +126,18 @@ export function CreateProjectModal({
     onChange(patch);
   };
 
-  // MAIR-836 (Figma F3 3.3): the messages under Titre, Groupe and Échéance replace the browser bubbles; the
-  // first field in error gets the focus and nothing is sent.
+  const sideFieldProps = { statusOptions, priorityOptions, responsibleOptions, memberOptions, labelOptions, groupOptions, groupsError, groupRequired: !isEditMode, errors: fieldErrors, onChange: changeForm };
+
+  // MAIR-836 (Figma F3 3.3): the messages under the fields replace the browser bubbles; the first field in error
+  // gets the focus and nothing is sent. MAIR-1136: before the recap, Entrée (a submit) moves to the next step.
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    const errors = validateProjectForm(form, { creating: !isEditMode, groupCount: groupOptions?.length ?? 0 });
-    const first = (Object.keys(PROJECT_FIELD_IDS) as (keyof ProjectFieldErrors)[]).find((key) => errors[key]);
-    setFieldErrors(errors);
-    if (first) {
+    if (!isEditMode && creation.step < RECAP_STEP) {
       event.preventDefault();
-      document.getElementById(PROJECT_FIELD_IDS[first])?.focus();
+      goToStep(creation.step + 1);
+      return;
+    }
+    if (showErrors(validateProjectForm(form, { creating: !isEditMode, groupCount }))) {
+      event.preventDefault();
       return;
     }
     onSubmit(event, template);
@@ -188,7 +228,15 @@ export function CreateProjectModal({
           />
         </div>
 
-        <div className="min-h-0 overflow-y-auto p-5">
+        {!isEditMode && (
+          <div className="grid gap-2 border-b border-[var(--mairie-border)] px-5 py-3">
+            <StepProgress steps={CREATION_STEPS.map((label, index) => ({ label, optional: index === 2 }))} current={creation.step} onStepChange={pending ? undefined : goToStep} tone="projects" size="s" label="Étapes de la création" />
+            <p aria-live="polite" className="text-xs font-medium text-[var(--mairie-text-muted)]">Étape {creation.step + 1} sur {CREATION_STEPS.length} · {CREATION_STEPS[creation.step]}</p>
+          </div>
+        )}
+
+        {/* MAIR-1136: every creation step keeps the height of the tallest, so the dialog does not jump. */}
+        <div className={`min-h-0 overflow-y-auto p-5${isEditMode ? '' : ' sm:min-h-[460px]'}`}>
           <CreateProjectFeedback
             feedbackId={feedbackId}
             feedbackRef={verificationFeedbackRef}
@@ -205,34 +253,61 @@ export function CreateProjectModal({
           />
 
           <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-4 border-0 p-0">
-            <ProjectMainFields form={form} errors={fieldErrors} onChange={changeForm} />
-            <ProjectSideFields
-              form={form}
-              statusOptions={statusOptions}
-              priorityOptions={priorityOptions}
-              responsibleOptions={responsibleOptions}
-              memberOptions={memberOptions}
-              labelOptions={labelOptions}
-              groupOptions={groupOptions}
-              groupsError={groupsError}
-              groupRequired={!isEditMode}
-              errors={fieldErrors}
-              onChange={changeForm}
-            />
-            {/* Not in the F3 mockup (MAIR-836 C5, open point): the template and the initial tasks stay after its fields. */}
-            {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
-            <ProjectTasksEditor
-              form={form}
-              memberOptions={memberOptions}
-              labelOptions={labelOptions}
-              statusOptions={statusOptions}
-              priorityOptions={priorityOptions}
-              onChange={onChange}
-            />
+            {isEditMode ? (
+              <>
+                {/* MAIR-1136 (C13): the edit stays on one page, its sections marked « Modifié » once changed. */}
+                <EditedSection title="L’essentiel" modified={sectionChanged('essential')}>
+                  <ProjectMainFields form={form} errors={fieldErrors} onChange={changeForm} />
+                  <ProjectSideFields form={form} part="essential" {...sideFieldProps} />
+                </EditedSection>
+                <EditedSection title="Organisation" modified={sectionChanged('organisation')}>
+                  <ProjectSideFields form={form} part="organisation" {...sideFieldProps} />
+                </EditedSection>
+              </>
+            ) : (
+              <>
+                <div hidden={creation.step !== 0} className="grid gap-4">
+                  <ProjectMainFields form={form} errors={fieldErrors} onChange={changeForm} />
+                  <ProjectSideFields form={form} part="essential" {...sideFieldProps} />
+                </div>
+                <div hidden={creation.step !== 1} className="grid gap-4">
+                  <ProjectSideFields form={form} part="organisation" {...sideFieldProps} />
+                </div>
+              </>
+            )}
+            {/* The template and the initial tasks are the optional « Tâches » step (MAIR-1136, C9). */}
+            <div hidden={!isEditMode && creation.step !== 2} className="grid gap-4">
+              {!isEditMode && <ProjectTemplatePicker port={workflowPort?.createProjectFromTemplate ? workflowPort : undefined} disabled={submitBlocked} onChange={setTemplate} />}
+              <ProjectTasksEditor
+                form={form}
+                memberOptions={memberOptions}
+                labelOptions={labelOptions}
+                statusOptions={statusOptions}
+                priorityOptions={priorityOptions}
+                onChange={onChange}
+              />
+            </div>
+            {!isEditMode && creation.step === RECAP_STEP && (
+              <ProjectRecap form={form} template={template} memberOptions={memberOptions} groupOptions={groupOptions ?? []} statusOptions={statusOptions} priorityOptions={priorityOptions} onEditStep={goToStep} />
+            )}
           </fieldset>
         </div>
 
-        <CreateProjectFooter editing={isEditMode} pending={pending} creationConfirmed={creationConfirmed} submitBlocked={submitBlocked} onClose={onClose} />
+        <CreateProjectFooter
+          editing={isEditMode}
+          pending={pending}
+          creationConfirmed={creationConfirmed}
+          submitBlocked={submitBlocked}
+          onClose={onClose}
+          // Once the creation was sent (verification), the footer keeps its last action, whatever the step shown.
+          step={verificationRequired || creationConfirmed ? RECAP_STEP : creation.step}
+          stepCount={CREATION_STEPS.length}
+          canSkipToRecap={creation.canSkipToRecap}
+          onBack={() => goToStep(creation.step - 1)}
+          onSkipToRecap={() => goToStep(RECAP_STEP)}
+          changeCount={isEditMode ? changed.length : undefined}
+          onDelete={onDelete}
+        />
       </form>
     </div>
   );

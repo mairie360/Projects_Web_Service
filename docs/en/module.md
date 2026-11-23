@@ -27,6 +27,21 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
+## Project creation in steps and single-page edit (MAIR-1136)
+
+- **Creation in four steps**: « L’essentiel » (title, description, group, due date), « Organisation » (responsible,
+  priority, status, team, labels), « Tâches » (optional: template and first tasks) and « Récapitulatif ». A
+  `StepProgress` bar and « Étape n sur 4 » head the dialog; its dashes go back freely and forward only past valid
+  steps. Entrée or « Suivant » moves to the next step after checking its fields, « Précédent » goes back, and
+  « Passer au récapitulatif » appears as soon as « L’essentiel » is valid. The recap shows three blocks, each with a
+  « Modifier » going back to its step; « Créer le projet » is only there. Every step keeps the same height.
+- **Edit on one page**: « L’essentiel » and « Organisation » sections, each marked « Modifié » once one of its fields
+  differs from the saved project; « Enregistrer (n) » counts the changed fields and stays disabled at 0; « Supprimer »
+  (discreet, on the left) closes the edit and asks for the usual confirmation. The rows follow the mock-up: Groupe /
+  Échéance, then Responsable / Priorité / Statut, then Équipe / Étiquettes.
+- **Not done**: the mock-up's start date (« Début ») is not in the BFF contract, so the first step has no such field;
+  the due date stays the native date field of the lib (`DateField`).
+
 ## Project page header and layout (MAIR-1135)
 
 - **Header**: the title comes first, then one meta line — status (clickable, with its chevron), priority, « En

@@ -30,6 +30,22 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
+## Création de projet par étapes et modification sur une page (MAIR-1136)
+
+- **Création en quatre étapes** : « L’essentiel » (titre, description, groupe, échéance), « Organisation »
+  (responsable, priorité, statut, équipe, étiquettes), « Tâches » (facultative : modèle et premières tâches) et
+  « Récapitulatif ». Une barre `StepProgress` et « Étape n sur 4 » ouvrent la fenêtre ; ses traits reviennent
+  librement en arrière et n’avancent qu’au-delà d’étapes valides. Entrée ou « Suivant » passe à l’étape suivante après
+  avoir vérifié ses champs, « Précédent » revient, et « Passer au récapitulatif » apparaît dès que « L’essentiel » est
+  valide. Le récapitulatif montre trois blocs, chacun avec un « Modifier » qui ramène à son étape ; « Créer le
+  projet » n’est que là. Chaque étape garde la même hauteur.
+- **Modification sur une page** : sections « L’essentiel » et « Organisation », chacune marquée « Modifié » dès qu’un
+  de ses champs diffère du projet enregistré ; « Enregistrer (n) » compte les champs modifiés et reste désactivé à 0 ;
+  « Supprimer » (discret, à gauche) ferme la modification et demande la confirmation habituelle. Les lignes suivent la
+  maquette : Groupe / Échéance, puis Responsable / Priorité / Statut, puis Équipe / Étiquettes.
+- **Non fait** : la date de début (« Début ») de la maquette n’est pas dans le contrat du BFF, la première étape n’a
+  donc pas ce champ ; l’échéance reste le champ date natif de la lib (`DateField`).
+
 ## En-tête et mise en page de la page projet (MAIR-1135)
 
 - **En-tête** : le titre en premier, puis une ligne de méta — statut (cliquable, avec son chevron), priorité, « En

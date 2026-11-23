@@ -6,17 +6,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
 import { ProjectActionsMenu } from '@/components/ProjectsWorkspace/components/ProjectCard/components/ProjectActionsMenu';
 import { createProjectFormState } from '@/lib/projectPageState';
+import { completeCreation, creationGroups, goToCreationStep } from './units/creation-steps';
 
-function FormHarness({ mode, onSubmit, fromMenu = false }) {
+function FormHarness({ mode, onSubmit, fromMenu = false, initial = {} }) {
   const [open, setOpen] = React.useState(false);
-  const [form, setForm] = React.useState(createProjectFormState);
+  const [form, setForm] = React.useState(() => ({ ...createProjectFormState(), ...initial }));
   return <>
     {fromMenu
       ? <ProjectActionsMenu project={{ title: 'Projet clavier', permissions: { canEdit: true } }} onEdit={() => setOpen(true)} />
       : <button onClick={() => setOpen(true)}>Ouvrir le formulaire</button>}
     {open && <CreateProjectModal mode={mode} form={form} error=""
       memberOptions={[{ value: '2', name: 'Alice Martin', label: 'Alice Martin' }]}
-      labelOptions={[]} statusOptions={[{ value: 'todo', label: 'À faire' }]}
+      labelOptions={[]} groupOptions={creationGroups} statusOptions={[{ value: 'todo', label: 'À faire' }]}
       priorityOptions={[{ value: 'medium', label: 'Moyenne' }]}
       onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
       onClose={() => setOpen(false)} onSubmit={onSubmit} />}
@@ -29,20 +30,21 @@ describe('project form dialogs', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(), onClose = vi.fn();
     const props = {
-      mode: 'create', form: { ...createProjectFormState(), title: 'Saisie locale conservée' }, error: '',
-      verificationRequired: true, memberOptions: [], labelOptions: [],
+      mode: 'create', form: { ...createProjectFormState(), ...completeCreation, title: 'Saisie locale conservée' }, error: '',
+      verificationRequired: true, memberOptions: [], labelOptions: [], groupOptions: creationGroups,
       statusOptions: [{ value: 'todo', label: 'À faire' }], priorityOptions: [{ value: 'medium', label: 'Moyenne' }],
       onChange: vi.fn(), onSubmit, onClose,
     };
     const { rerender } = render(<CreateProjectModal {...props} />);
     const dialog = screen.getByRole('dialog'), form = within(dialog);
+    await goToCreationStep(user, dialog, 3);
     const nested = form.getByPlaceholderText('Ajouter une tâche...');
     await user.type(nested, 'Tâche non ajoutée encore présente');
     rerender(<CreateProjectModal {...props} verificationRequired={false} confirmedCreationTitle="Titre officiel vérifié" />);
     expect(form.getByRole('status').textContent).toContain('Titre officiel vérifié');
     expect(document.activeElement).toBe(form.getByRole('status'));
     expect(nested.value).toBe('Tâche non ajoutée encore présente');
-    expect(form.getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Saisie locale conservée');
+    expect(form.getByRole('textbox', { name: 'Titre', exact: true, hidden: true }).value).toBe('Saisie locale conservée');
     expect(form.getByRole('button', { name: 'Création vérifiée', exact: true }).disabled).toBe(true);
     await user.click(form.getByRole('button', { name: 'Création vérifiée', exact: true }));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -57,7 +59,7 @@ describe('project form dialogs', () => {
     const user = userEvent.setup();
     const onVerify = vi.fn(), onSubmit = vi.fn(), onClose = vi.fn();
     const props = {
-      mode: 'create', form: { ...createProjectFormState(), title: 'Création incertaine conservée' }, error: '',
+      mode: 'create', form: { ...createProjectFormState(), ...completeCreation, title: 'Création incertaine conservée' }, error: '', groupOptions: creationGroups,
       verificationRequired: true, verificationMessage: 'Identité du nouveau projet non vérifiable.',
       verificationLabel: 'Actualiser le catalogue', verificationPendingLabel: 'Actualisation du catalogue…',
       memberOptions: [], labelOptions: [], statusOptions: [{ value: 'todo', label: 'À faire' }],
@@ -66,6 +68,7 @@ describe('project form dialogs', () => {
     const { rerender } = render(<CreateProjectModal {...props} />);
     const dialog = screen.getByRole('dialog'), form = within(dialog);
     expect(document.activeElement).toBe(form.getByRole('alert'));
+    await goToCreationStep(user, dialog, 3);
     const nested = form.getByPlaceholderText('Ajouter une tâche...');
     await user.type(nested, 'Tâche locale non envoyée');
     expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
@@ -78,7 +81,7 @@ describe('project form dialogs', () => {
     rerender(<CreateProjectModal {...props} verificationError="Lecture du catalogue refusée" />);
     expect(form.getByRole('alert').textContent).toContain('Lecture du catalogue refusée');
     expect(form.getByRole('button', { name: 'Créer le projet', exact: true }).disabled).toBe(true);
-    expect(form.getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Création incertaine conservée');
+    expect(form.getByRole('textbox', { name: 'Titre', exact: true, hidden: true }).value).toBe('Création incertaine conservée');
     expect(nested.value).toBe('Tâche locale non envoyée');
     const results = await axe(dialog);
     expect(results.violations.filter(({ impact }) => impact === 'serious' || impact === 'critical')).toEqual([]);
@@ -90,11 +93,13 @@ describe('project form dialogs', () => {
     const user = userEvent.setup();
     const onInteract = vi.fn();
     const onChange = vi.fn();
-    render(<CreateProjectModal mode="create" form={createProjectFormState()} error=""
-      memberOptions={[]} labelOptions={[]}
+    render(<CreateProjectModal mode="create" form={{ ...createProjectFormState(), ...completeCreation }} error=""
+      memberOptions={[]} labelOptions={[]} groupOptions={creationGroups}
       statusOptions={[{ value: 'todo', label: 'À faire' }, { value: 'review', label: 'En revue' }]}
       priorityOptions={[{ value: 'medium', label: 'Moyenne' }]}
       onChange={onChange} onClose={vi.fn()} onSubmit={vi.fn()} onInteract={onInteract} />);
+    await goToCreationStep(user, screen.getByRole('dialog'), 3);
+    onInteract.mockClear();
     const title = screen.getByPlaceholderText('Ajouter une tâche...');
     await user.type(title, 'Brouillon local de tâche');
     expect(title.value).toBe('Brouillon local de tâche');
@@ -152,7 +157,8 @@ describe('project form dialogs', () => {
       expect(dialog.getAttribute('aria-modal')).toBe('true');
       expect(document.activeElement).toBe(dialog);
       const first = within(dialog).getByRole('button', { name: mode === 'create' ? 'Fermer la création de projet' : 'Fermer la modification de projet' });
-      const last = within(dialog).getByRole('button', { name: mode === 'create' ? 'Créer le projet' : 'Enregistrer', exact: true });
+      // MAIR-1136: the creation opens on its first step (« Suivant »); the edit has nothing to save yet (« Annuler »).
+      const last = within(dialog).getByRole('button', { name: mode === 'create' ? 'Suivant' : 'Annuler', exact: true });
       await user.tab({ shift: true });
       expect(document.activeElement).toBe(last);
       await user.tab();
@@ -174,10 +180,11 @@ describe('project form dialogs', () => {
 
   it('MAIR-828 the lib MultiSelect keeps a chosen assignee and Escape still closes the dialog to its opener', async () => {
     const user = userEvent.setup();
-    render(<FormHarness mode="create" onSubmit={vi.fn()} />);
+    render(<FormHarness mode="create" onSubmit={vi.fn()} initial={completeCreation} />);
     const opener = screen.getByRole('button', { name: 'Ouvrir le formulaire' });
     await user.click(opener);
     const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
+    await goToCreationStep(user, dialog, 3);
     const [assignees] = within(dialog).getAllByRole('group', { name: 'Options : Assignés' });
     await user.click(within(assignees).getByRole('checkbox', { name: 'Alice Martin' }));
     expect(within(dialog).getByRole('button', { name: 'Retirer Alice Martin' })).toBeTruthy();

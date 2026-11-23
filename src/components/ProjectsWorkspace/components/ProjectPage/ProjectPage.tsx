@@ -6,7 +6,7 @@ import { Activity, CalendarRange, FileText, LayoutGrid, ListChecks, Users } from
 import { projectTabFromSearch, writeProjectLocation, type ProjectTab } from '@/lib/projectDeepLink';
 import { getProjectNumber } from '../../project-card-meta';
 import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '@/lib/projectWorkflow';
-import type { FilterOption, ProjectFormState, TaskFormState } from '@/lib/projectPageState';
+import { projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '@/types/project';
 import { TaskCreationNotice, type TaskCreationState } from '../TaskCreationNotice';
 import { DetailRefreshAlert } from './components/DetailRefreshAlert';
@@ -127,6 +127,8 @@ export function ProjectPage({
     };
   }, []);
   const projectEdit = useProjectEdit({ project, lockRef, dialogRef: titleRef, verificationBlocked: projectVerificationRequired || projectVerificationPending, groupCount: groupOptions?.length ?? 0, onUpdateProject });
+  // MAIR-1136 (C13): the saved values the edit compares with (« Modifié », « Enregistrer (n) »).
+  const savedForm = React.useMemo(() => projectToFormState(project), [project]);
   const [tab, setTab] = React.useState<ProjectTab>(() => initialTab ?? (highlightTaskId ? 'tasks' : projectTabFromSearch(typeof window === 'undefined' ? '' : window.location?.search ?? '')));
   const showTab = (next: ProjectTab) => {
     setTab(next);
@@ -283,6 +285,8 @@ export function ProjectPage({
           onChange={projectEdit.update}
           onCancel={projectEdit.cancel}
           onSubmit={projectEdit.submit}
+          initial={savedForm}
+          onDelete={onDelete && project.permissions?.canDelete !== false ? () => { projectEdit.cancel(); void onDelete(project); } : undefined}
         />
       </Modal>
     </section>

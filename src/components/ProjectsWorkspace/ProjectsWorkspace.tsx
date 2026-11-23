@@ -131,6 +131,7 @@ export function ProjectsWorkspace({
 }: ProjectsController) {
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
+  const editedProject = editingProjectId ? projects.find(project => project.id === editingProjectId) : undefined;
   return (
     <ToastProvider regionLabel="Notifications des projets">
       <FeedbackToast feedback={feedback} onShown={clearFeedback} />
@@ -174,7 +175,7 @@ export function ProjectsWorkspace({
           verificationLabel={editingProjectId || verifiesCreationDetail ? 'Vérifier le projet' : 'Actualiser le catalogue'}
           verificationPendingLabel={editingProjectId || verifiesCreationDetail ? 'Vérification du projet…' : 'Actualisation du catalogue…'}
           confirmedCreationTitle={!editingProjectId ? verifiedCreation?.title : undefined}
-          canSave={!editingProjectId || projects.find(project => project.id === editingProjectId)?.permissions?.canEdit !== false}
+          canSave={!editingProjectId || editedProject?.permissions?.canEdit !== false}
           onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : verifyNewProjectReceipt('create')}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
@@ -186,6 +187,7 @@ export function ProjectsWorkspace({
           onClose={closeCreateProject}
           onInteract={keepProjectFormCurrent}
           onSubmit={saveProject}
+          onDelete={editedProject && editedProject.permissions?.canDelete !== false ? () => { closeCreateProject(); void deleteProject(editedProject); } : undefined}
         />
       )}
 

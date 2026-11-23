@@ -42,8 +42,13 @@ test.describe('project manager', () => {
     // MAIR-836: the description is optional in the V2 dialog.
     await dialog.getByLabel('Description', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
     await dialog.getByLabel('Échéance*', { exact: true }).fill(dueDateInputValue(30));
+    // MAIR-1136: the creation goes step by step; « Suivant » moves to « Organisation ».
+    await dialog.getByRole('button', { name: 'Suivant', exact: true }).click();
+    await expect(dialog.getByText('Étape 2 sur 4 · Organisation')).toBeVisible();
     // A project needs a responsible or at least one team member: the manager picks themselves (« Responsable », MAIR-836).
     await dialog.getByLabel('Responsable').selectOption({ label: 'Perf Tester' });
+    await dialog.getByRole('button', { name: 'Passer au récapitulatif' }).click();
+    await expect(dialog.getByRole('region', { name: 'L’essentiel' })).toContainText(projectTitle);
     await dialog.getByRole('button', { name: 'Créer le projet' }).click();
 
     await expect(dialog).toBeHidden();
@@ -108,7 +113,8 @@ test.describe('project manager', () => {
     const form = page.getByRole('dialog', { name: /^Modifier le projet/ }).getByRole('form', { name: 'Modifier le projet' });
     await expect(form).toBeVisible();
     await form.getByLabel('Titre*', { exact: true }).fill(renamedTitle);
-    await form.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    // MAIR-1136: the button counts the changed fields.
+    await form.getByRole('button', { name: /^Enregistrer \(\d+\)$/ }).click();
 
     await expect(form).toBeHidden();
     await expect(page.getByText('Modifications enregistrées')).toBeVisible();

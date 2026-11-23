@@ -38,3 +38,19 @@ export function validateProjectForm(form: ProjectFormState, { creating, groupCou
   if (!form.dueDate) errors.dueDate = 'La date d’échéance est obligatoire.';
   return errors;
 }
+
+/** MAIR-1136: the edited fields, by section of the single-page edit (« L’essentiel », « Organisation »). */
+export const PROJECT_FORM_SECTIONS = {
+  essential: ['title', 'description', 'groupId', 'dueDate'],
+  organisation: ['responsible', 'priority', 'status', 'assignees', 'labels'],
+} as const satisfies Record<string, readonly (keyof ProjectFormState)[]>;
+
+const sameValue = (left: unknown, right: unknown) => JSON.stringify(left ?? '') === JSON.stringify(right ?? '');
+
+/** MAIR-1136 (C13): the fields that differ from the shown project, for « Enregistrer (n) » and the « Modifié » markers. */
+export function changedProjectFields(form: ProjectFormState, initial: ProjectFormState): (keyof ProjectFormState)[] {
+  return [...PROJECT_FORM_SECTIONS.essential, ...PROJECT_FORM_SECTIONS.organisation].filter((key) => !sameValue(form[key], initial[key]));
+}
+
+/** MAIR-1136 (C9): the fields each creation step checks before the next one. */
+export const CREATION_STEP_FIELDS: readonly (keyof ProjectFieldErrors)[][] = [['title', 'description', 'groupId', 'dueDate'], ['responsible'], [], []];
