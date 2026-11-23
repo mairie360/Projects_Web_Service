@@ -160,6 +160,9 @@ services:
       # and rate-limits each account (MAIR-425): the scan / load test hammer it as one user.
       JWT_ALLOW_WEAK_SECRET: "true"
       RATE_LIMIT_ENABLED: "false"
+      # Project API >= MAIR-688 (lib rate_limit_middleware) ignores RATE_LIMIT_ENABLED and limits each
+      # account to RATE_LIMIT_PER_SECOND (default 20, burst 50): 0 turns it off, like its own stacks.
+      RATE_LIMIT_PER_SECOND: "0"
       JWT_SECRET: b"secret"
       JWT_TIMEOUT: 3600
     depends_on:

@@ -271,6 +271,23 @@ test('MAIR-769: no docker stack passes backslash-escaped quotes to a service', (
   }
 });
 
+test('MAIR-688: every stack turns off the per-account rate limit of Project API', () => {
+  // Project API >= MAIR-688 limits each account through the lib's rate_limit_middleware, which reads
+  // RATE_LIMIT_PER_SECOND (default 20, burst 50) and ignores RATE_LIMIT_ENABLED. The k6 stack hammers it
+  // as user 2: on the dev images, POST /projects, DELETE /projects/{id} and /projects-page then got
+  // 429s, relayed by BFF Project as 502s, and the k6 thresholds failed.
+  const { readdirSync } = require('node:fs');
+  const stacks = readdirSync(join(__dirname, '..')).filter(file => /^docker-compose.*\.ya?ml$/.test(file));
+  let checked = 0;
+  for (const file of stacks) {
+    const projectApi = yaml.load(read(file)).services?.['project-api'];
+    if (!projectApi) continue;
+    checked += 1;
+    assert.equal(String(projectApi.environment?.RATE_LIMIT_PER_SECOND), '0', file);
+  }
+  assert.ok(checked >= 5, `project-api found in ${checked} stacks`);
+});
+
 test('GHSA-mrwp-f3q8-3g9p: the lock resolves follow-redirects to a patched release', () => {
   // follow-redirects 1.16.0 - 1.16.1 (through axios) let custom credentials follow cross-origin
   // redirects; npm audit --omit=dev fails on it.
