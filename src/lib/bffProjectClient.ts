@@ -17,6 +17,8 @@ import type {
   ActivityItem,
   Milestone,
   Project,
+  ProjectMember,
+  ProjectMemberRole,
   ProjectPriority,
   ProjectStatus,
   ProjectTask,
@@ -385,6 +387,30 @@ export async function bulkDeleteProjects(projectIds: string[]): Promise<BulkDele
   const { data } = await bffProject.postProjectsBulkDelete({ projectIds });
 
   return data.results;
+}
+
+/** MAIR-1088: the team of a project; every write answers the whole team as re-read (a removal answers 204). */
+export async function addProjectMember(projectId: string, userId: string, role?: ProjectMemberRole) {
+  const { data } = await bffProject.postProjectsProjectIdMembers(encodeURIComponent(projectId), role ? { userId, role } : { userId });
+
+  return (data as { members: ProjectMember[] }).members;
+}
+
+export async function updateProjectMemberRole(projectId: string, userId: string, role: ProjectMemberRole) {
+  const { data } = await bffProject.patchProjectsProjectIdMembersUserId(encodeURIComponent(projectId), encodeURIComponent(userId), { role });
+
+  return (data as { members: ProjectMember[] }).members;
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  await bffProject.deleteProjectsProjectIdMembersUserId(encodeURIComponent(projectId), encodeURIComponent(userId));
+}
+
+/** MAIR-1089: a comment on the project (1 to 2000 characters once trimmed, no `<` or `>`), answered as an activity item. */
+export async function addProjectComment(projectId: string, message: string) {
+  const { data } = await bffProject.postProjectsProjectIdComments(encodeURIComponent(projectId), { message });
+
+  return data as ActivityItem;
 }
 
 export function mergeProjectDetails(details: ProjectDetailsResponse): Project {

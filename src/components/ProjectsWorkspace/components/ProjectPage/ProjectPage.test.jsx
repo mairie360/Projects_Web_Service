@@ -36,7 +36,7 @@ describe('ProjectPage', () => {
     const search = within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' });
     await user.type(search, 'Brouillon gardé');
     await user.click(screen.getByRole('tab', { name: 'Équipe2' }));
-    expect(within(screen.getByRole('tabpanel')).getByText('L’onglet « Équipe » arrive avec son propre ticket.')).toBeTruthy();
+    expect(within(screen.getByRole('tabpanel')).getByText('Aucun membre')).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: /^Tâches/ }));
     expect(within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' }).value).toBe('Brouillon gardé');
     await user.click(screen.getByRole('button', { name: 'Projets' }));

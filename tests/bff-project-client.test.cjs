@@ -306,6 +306,33 @@ describe('écritures sur les projets', () => {
     assert.deepEqual(results, [{ projectId: 'project-1', status: 'deleted' }, { projectId: 'project-2', status: 'forbidden' }]);
   });
 
+  test('MAIR-1088: the team is added to, given roles and removed from under its project', async () => {
+    const team = (role) => ({ members: [{ ...fixtures.people.marie, role: 'manager', load: { tasksOpen: 1, tasksTotal: 2 } }, { ...fixtures.people.admin, role, load: { tasksOpen: 0, tasksTotal: 0 } }] });
+    bffProject.on('post', '/projects/{projectId}/members', ({ body }) => ({ status: 201, body: team(body.role ?? 'contributor') }));
+    bffProject.on('patch', '/projects/{projectId}/members/{userId}', ({ body }) => ({ body: team(body.role) }));
+    bffProject.on('delete', '/projects/{projectId}/members/{userId}', { status: 204 });
+
+    const added = await client.addProjectMember('project-1', 'user-1', 'reader');
+    const changed = await client.updateProjectMemberRole('project-1', 'user-1', 'manager');
+    assert.equal(await client.removeProjectMember('project-1', 'user-1'), undefined);
+    await client.addProjectMember('project-1', 'user-1');
+
+    assert.deepEqual(bffProject.calls('/projects/{projectId}/members', 'post').map((call) => call.body), [{ userId: 'user-1', role: 'reader' }, { userId: 'user-1' }]);
+    assert.deepEqual(onlyCall('/projects/{projectId}/members/{userId}', 'patch').body, { role: 'manager' });
+    assert.deepEqual(onlyCall('/projects/{projectId}/members/{userId}', 'delete').pathParams, { projectId: 'project-1', userId: 'user-1' });
+    assert.equal(added[1].role, 'reader');
+    assert.equal(changed[1].role, 'manager');
+  });
+
+  test('MAIR-1089: POST /projects/{projectId}/comments answers the activity item', async () => {
+    bffProject.on('post', '/projects/{projectId}/comments', ({ body }) => ({ status: 201, body: fixtures.activityItem({ message: body.message }) }));
+
+    const item = await client.addProjectComment('project-1', 'Réunion fixée.');
+
+    assert.deepEqual(onlyCall('/projects/{projectId}/comments', 'post').body, { message: 'Réunion fixée.' });
+    assert.equal(item.message, 'Réunion fixée.');
+  });
+
   test('DELETE /projects/{projectId} résout sur un 204 sans corps', async () => {
     bffProject.on('delete', '/projects/{projectId}', { status: 204 });
 
