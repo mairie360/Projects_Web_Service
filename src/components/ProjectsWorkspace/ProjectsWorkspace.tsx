@@ -274,7 +274,7 @@ export function ProjectsWorkspace({
                   onUpdateTaskStatus={changeProjectTaskStatus}
                   onDeleteTask={deleteProjectTask}
                   onCloseProject={closeProject}
-                  onChangeStatus={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                  onChangeStatus={moveProjectStatus}
                   onDuplicate={duplicateProject}
                   duplicationPending={duplicatingProjectIds.includes(selectedProject.id)}
                   duplicationVerificationRequired={unverifiedDuplicationSourceIds.has(selectedProject.id)}
@@ -338,7 +338,7 @@ export function ProjectsWorkspace({
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
                       onAddProject={canCreateProject ? openCreateProject : undefined}
-                      onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onMoveProject={moveProjectStatus}
                     />
                   )}
 
@@ -351,7 +351,7 @@ export function ProjectsWorkspace({
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                     />
                   )}
@@ -365,7 +365,7 @@ export function ProjectsWorkspace({
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
                       onProjectEdit={openEditProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                       selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
                       onSelectionChange={changeProjectSelection}

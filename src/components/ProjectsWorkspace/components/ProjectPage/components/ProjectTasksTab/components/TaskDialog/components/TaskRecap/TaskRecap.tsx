@@ -21,6 +21,7 @@ export const TaskRecap = ({ form, memberOptions, priorityOptions, statusValue, s
       labelWidth={120}
       items={[
         { label: 'Titre', value: form.title.trim() || '—' },
+        { label: 'Début', value: form.startDate ? formatProjectDate(form.startDate) : '—' },
         { label: 'Échéance', value: form.dueDate ? formatProjectDate(form.dueDate) : '—' },
         { label: 'Étiquettes', value: form.labels.length ? <TagList label="Étiquettes de la tâche" items={form.labels} size="s" /> : '—' },
         { label: 'Assignée à', value: form.assignees.length ? form.assignees.map((value) => labelOf(memberOptions, value)).join(', ') : '—' },

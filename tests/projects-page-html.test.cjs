@@ -64,7 +64,7 @@ test('the first pass renders the loading state, the next one the projects of GET
   assert.match(view.text(), /Remplacement des candélabres du centre-ville\./);
   assert.match(view.text(), /Nouveau projet/);
   assert.equal(view.find('KanbanBoard').length, 1);
-  assert.deepEqual(view.props('KanbanBoard').columns.map((column) => column.label), ['À faire', 'En cours', 'En revue', 'Terminé']);
+  assert.deepEqual(view.props('KanbanBoard').columns.map((column) => column.label), ['À faire', 'En cours', 'En revue', 'Suspendu', 'Terminé']);
   assert.deepEqual(view.props('ProjectFiltersBar').views.map((option) => option.value), ['kanban', 'grid', 'table']);
   assert.equal(view.props('Header').isAdmin, false);
   // MAIR-1133: lib-components 2.3 page base, white frame without footer.
@@ -244,12 +244,11 @@ test('Kanban ignores control-origin and foreign drags, and prevents a post-drag 
   assert.equal(stopped, 1);
 });
 
-test('Kanban disables dragging when project management access is absent', async () => {
-  const page = fixtures.projectsPage();
+test('Kanban disables dragging when the project rights refuse its edition (MAIR-1088: the project decides)', async () => {
+  const page = fixtures.projectsPage([fixtures.projectListItem({ permissions: { ...fixtures.projectListItem().permissions, canEdit: false } })]);
   page.access = { ...page.access, canManageProjects: false };
   await renderLoadedPage(page);
 
-  assert.equal(view.props('KanbanBoard').onMoveProject, undefined);
   assert.equal(view.hostElements((props) => props['data-project-id'] === 'project-1')[0].props.draggable, false);
 });
 
@@ -877,7 +876,7 @@ test('filter controls show and restore the actual unfiltered BFF query', async (
 
   assert.equal(pageCalls()[0].status, 'all');
   assert.equal(pageCalls()[0].priority, 'all');
-  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.deepEqual(view.props('ProjectFiltersBar').priorityOptions.map((option) => option.value), ['all', 'high', 'medium', 'low']);
   assert.match(view.text(), /Tous les statuts/);
   assert.match(view.text(), /Toutes les priorités/);
@@ -908,7 +907,7 @@ test('filter controls do not duplicate all when the BFF already supplies it', as
   page.filters.priorities.unshift({ value: 'all', label: 'Toutes' });
   await renderLoadedPage(page);
 
-  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'done']);
+  assert.deepEqual(view.props('ProjectFiltersBar').statusOptions.map((option) => option.value), ['all', 'todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.deepEqual(view.props('ProjectFiltersBar').priorityOptions.map((option) => option.value), ['all', 'high', 'medium', 'low']);
   assert.match(view.text(), /Tous les statuts/);
   assert.match(view.text(), /Toutes les priorités/);
@@ -1413,7 +1412,7 @@ test('the project page edits the project in its modal, adds a task from its shee
   bffProject.on('patch', '/projects/{projectId}/close', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ status: body.status })) }));
   await view.click((props, text, tag) => tag === 'button' && text === 'Suspendre');
   await view.waitFor(() => alertText() === 'Projet "Rénovation de l’éclairage public" suspendu.');
-  assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[0].body, { status: 'review' });
+  assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[0].body, { status: 'on-hold' }, 'MAIR-1084: « Suspendre » puts the project on hold');
   await view.click((props, text, tag) => tag === 'button' && text === 'Clôturer');
   await view.waitFor(() => alertText() === 'Projet "Rénovation de l’éclairage public" clôturé.');
   assert.deepEqual(bffProject.calls('/projects/{projectId}/close', 'patch')[1].body, { status: 'done' });

@@ -13,14 +13,14 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   Supprimer with the confirmation, then back to the list). A duplication of a project without group shows the
   BFF error (400).
 - **Indicators**: Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » or the delay, in the
-  instance time zone), Budget engagé (« Budget non renseigné »: not in the contract yet), Tâches en retard.
+  instance time zone), Budget engagé (committed amount, « Sur <voted> votés (n %) »; « Budget non renseigné » without one, MAIR-1085), Tâches en retard.
 - **Tabs**: Vue d’ensemble, Tâches (count), Planning, Équipe (count), Documents, Activité. The tasks stay mounted
   on every tab, so drafts and pending writes survive a tab change; Planning, Équipe, Documents and Activité have
   their own tickets and show a notice meanwhile. A task link (`&task=<id>`) opens « Tâches » and centres the task.
 - **Overview**: « Prochaines tâches » (the three open tasks closest to their due date; checking one marks it
-  done), « Jalons » and « Activité récente » (not provided by the contract yet: they say so), « Informations »
-  (responsible, start, due date, priority, team, group, budget; a project without group shows « Sans groupe » and
-  « Choisissez un groupe dans « Modifier » »), with the lifecycle actions (Suspendre, Clôturer).
+  done), « Jalons » (MAIR-1086), « Activité récente » (MAIR-1089), « Informations »
+  (responsible, start, due date, priority, team, group, budget, « Votre rôle »; a project without group shows « Sans groupe » and
+  « Choisissez un groupe dans « Modifier » »), with the lifecycle actions (Suspendre puts the project on hold, Reprendre, Clôturer).
 - **Edit** (C7): « Modifier » opens the project fields in a size m modal (« Modifier le projet · #12 »); the group
   is required as soon as one can be chosen and cannot be removed. Messages show under the fields before anything
   is sent; only the changed fields are sent (`PATCH`), nothing when nothing changed. The success is the toast
@@ -41,8 +41,8 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   continuer »). The « + » of a column keeps its quick add.
 - **Edit on one page**: « L’essentiel » and « Attribution » sections marked « Modifié », « Enregistrer (n) »,
   « Supprimer ».
-- **Not done**: the task description and start date, and a project activity filtered per task, are not in the BFF
-  contract (MAIR-1089); the page shows the description as unavailable and the period as « Jusqu’au <échéance> ». The
+- **Not done**: the task description and a project activity filtered per task are not in the BFF contract; the page
+  shows the description as unavailable and the period as « Du <début> au <échéance> » (« Jusqu’au <échéance> » without a start date, MAIR-1087). The
   deletion keeps its confirmation (the BFF has no undo), and the task page has no URL of its own yet.
 
 ## Project creation in steps and single-page edit (MAIR-1136)
@@ -57,8 +57,8 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   differs from the saved project; « Enregistrer (n) » counts the changed fields and stays disabled at 0; « Supprimer »
   (discreet, on the left) closes the edit and asks for the usual confirmation. The rows follow the mock-up: Groupe /
   Échéance, then Responsable / Priorité / Statut, then Équipe / Étiquettes.
-- **Not done**: the mock-up's start date (« Début ») is not in the BFF contract, so the first step has no such field;
-  the due date stays the native date field of the lib (`DateField`).
+- **Not done**: the project creation has no start date (« Début »): the contract has none for a project; the due date
+  stays the native date field of the lib (`DateField`).
 
 ## Project page header and layout (MAIR-1135)
 
@@ -99,7 +99,7 @@ assignee) always stay last, whatever the direction. The state follows the busine
 revue) < Terminé, the priority Haute < Moyenne < Basse.
 
 - **Task list** of a project (« Tâches » › Liste): Tâche, État, Priorité, Assignée à, Échéance; sorted by due date
-  first. No « Début » column: the published contract has no task start date yet (MAIR-1087).
+  first. No « Début » column yet: the start date is shown on the task page and edited in the task window (MAIR-1087).
 - **Projects table**: every column but the selection and the actions, with the same rendering and rules.
 - The « Équipe » tab does not exist yet (MAIR-874): its sort comes with it.
 
@@ -124,8 +124,8 @@ The « Tâches » tab of the project page (Figma F6, 6.1 to 6.13) shows the proj
 - **Task sheet** (C4, C5): a size m `Drawer` opened by a card (« Ouvrir la tâche »), a list row, or « Nouvelle tâche »
   of the page header (empty sheet). Fields: Titre (required: « Donnez un titre à la tâche » under the field before
   any write), État, Priorité, Assignée à, Échéance, Étiquettes; then the follow-up (comments and history) and
-  « Supprimer la tâche » with its confirmation. The published contract has no task description nor start date
-  (MAIR-1087 is in progress on the back): the sheet shows neither. A refused save keeps every field.
+  « Supprimer la tâche » with its confirmation. The published contract has no task description; the start date
+  (« Début », MAIR-1087) sits next to the due date and may not follow it. A refused save keeps every field.
 - **List** (C6): a lib `DataTable` — done checkbox (completes or reopens), task, state, priority, assignee, due date.
 - **Search and filters** (C7): search on the title and the labels, « Tous les assignés », « Toutes les priorités »,
   and the Tableau / Liste switch; they filter the loaded tasks (the contract has no task query).
@@ -168,7 +168,7 @@ Figma F1 1.2 to 1.5 of the Projects mockup.
   filter, the search or the view changes.
 - « Supprimer » asks « Les n projets sélectionnés et leurs x tâches seront supprimés. Cette action
   est irréversible. » (« Confirmer la suppression »). The front then sends one
-  `DELETE /projects/{projectId}` per project (no bulk route in the contract), shows the toast
+  `POST /projects/bulk-delete` for the selection (MAIR-1089, one result per project), shows the toast
   « n projets supprimés » naming them and reloads the page. A refused project stays on the page
   and selected, with an error naming it and the BFF reason.
 
@@ -185,9 +185,9 @@ Figma F1 (Kanban), F2 (grid), F4 (card menu) of the Projects mockup.
   opens the creation form with that status. Dropping a card highlights the target column
   and dims the dragged card.
 - **Card menu** (« … »): Ouvrir le projet, Dupliquer, « Changer le statut » (single choice
-  among À faire / En cours / En revue / Terminé, same PATCH as a drop), Supprimer (with
-  confirmation). « Modifier » is gone: the project sheet edits the project. The mockup's
-  « Suspendu » status is not in the BFF_Project contract and is not offered.
+  among À faire / En cours / En revue / Suspendu / Terminé, same PATCH as a drop), Supprimer (with
+  confirmation). « Suspendu » is the `on-hold` status of the contract (MAIR-1084), with its own
+  Kanban column and filter.
 - A successful status change is confirmed by the lib toast « Statut mis à jour »; a refusal
   keeps the card in place and shows the error.
 - A search or a filter without result shows « Aucun projet à afficher » with
@@ -781,3 +781,22 @@ The [technical guide](technical.md) covers architecture, configuration, routes, 
 ## Shared visual direction — MAIR-547
 
 Approved light option 1: shared tokens and font, accessible navigation, and preserved business layouts. See the [visual QA](../qa/design-qa.md) for evidence, checks, and RGAA limitations.
+
+## Projects V2 contract (MAIR-880)
+
+The BFF_Project contract of the epic MAIR-822 is mounted on the existing screens:
+
+- **On hold** (MAIR-1084): the `on-hold` project status reads « Suspendu » (lib `paused`): its Kanban column, its
+  filter, the status menus; « Suspendre » of the project page puts the project on hold (`PATCH …/close`
+  `{ status: 'on-hold' }`) and « Reprendre » puts it back in progress. A task never takes `review` nor `on-hold`.
+- **Budget** (MAIR-1085): voted and committed amounts (cents in the contract, euros on screen) in « Budget engagé » and
+  « Informations »; the project edit has a « Budget » section (empty = no budget, a negative or non-amount is
+  refused under the field). The creation does not ask for it.
+- **Milestones** (MAIR-1086): the « Jalons » panel of the overview lists them by date with « Atteint », « En retard »
+  or « À venir »; a manager of the project adds, edits, marks reached and deletes them (with confirmation).
+- **Task start date** (MAIR-1087): « Début » in the task window (at or before the due date) and the period of the
+  task page.
+- **Rights** (MAIR-1088): the project's own `permissions` decide (a member with the `manager` role manages it);
+  « Informations » shows the caller's role.
+- **Activity** (MAIR-1089): « Activité récente » shows the five latest comments and task changes; the bulk deletion
+  of the table goes through `POST /projects/bulk-delete`.

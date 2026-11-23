@@ -95,7 +95,7 @@ describe('project form dialogs', () => {
     const onChange = vi.fn();
     render(<CreateProjectModal mode="create" form={{ ...createProjectFormState(), ...completeCreation }} error=""
       memberOptions={[]} labelOptions={[]} groupOptions={creationGroups}
-      statusOptions={[{ value: 'todo', label: 'À faire' }, { value: 'review', label: 'En revue' }]}
+      statusOptions={[{ value: 'todo', label: 'À faire' }, { value: 'in-progress', label: 'En cours' }, { value: 'review', label: 'En revue' }]}
       priorityOptions={[{ value: 'medium', label: 'Moyenne' }]}
       onChange={onChange} onClose={vi.fn()} onSubmit={vi.fn()} onInteract={onInteract} />);
     await goToCreationStep(user, screen.getByRole('dialog'), 3);
@@ -106,7 +106,7 @@ describe('project form dialogs', () => {
     expect(onInteract).toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
     onInteract.mockClear();
-    await user.selectOptions(document.getElementById('project-form-task-status'), 'review');
+    await user.selectOptions(document.getElementById('project-form-task-status'), 'in-progress');
     expect(onInteract).toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });

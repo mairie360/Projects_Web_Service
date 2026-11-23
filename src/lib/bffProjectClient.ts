@@ -3,6 +3,7 @@ import { sessionFetch } from '@mairie360/lib-components/browser';
 import axios, { type AxiosAdapter } from 'axios';
 import { getBffProject } from '@mairie360/bff-project-openapi/endpoints/bffProject';
 import { describeBffProjectError } from './text-constraints';
+import { parseBudgetInput } from './projectBudget';
 import type {
   GetProjectsPageParams,
   CreateProjectBody as ContractCreateProjectBody,
@@ -13,6 +14,8 @@ import type {
   UpdateTaskBody as ContractUpdateTaskBody,
 } from '@mairie360/bff-project-openapi/model';
 import type {
+  ActivityItem,
+  Milestone,
   Project,
   ProjectPriority,
   ProjectStatus,
@@ -27,7 +30,7 @@ import {
   navigateToLogin,
   storeAuthJwtToken,
 } from './auth-token';
-import { getPersonValue, type ProjectFormState, type ViewMode } from './projectPageState';
+import { getPersonValue, taskStatusOf, type ProjectFormState, type ViewMode } from './projectPageState';
 
 export type BffSelectOption = {
   label: string;
@@ -102,6 +105,8 @@ function normalizeProjectTask<T extends ProjectTask>(task: T): T {
   return {
     ...task,
     dueDate: toDateInputValue(task.dueDate),
+    // MAIR-1087: the start date is shown and edited as a day, like the due date.
+    startDate: task.startDate ? toDateInputValue(task.startDate) : null,
     createdAt: toDateInputValue(task.createdAt),
     updatedAt: task.updatedAt ? toDateInputValue(task.updatedAt) : undefined,
   };
@@ -313,7 +318,7 @@ export async function updateProjectTask(projectId: string, taskId: string, body:
 }
 
 export async function updateProjectTaskStatus(projectId: string, taskId: string, status: ProjectStatus, statusId?: string) {
-  const { data } = await bffProject.patchProjectsProjectIdTasksTaskIdStatus(encodeURIComponent(projectId), encodeURIComponent(taskId), statusId ? { statusId } : { status });
+  const { data } = await bffProject.patchProjectsProjectIdTasksTaskIdStatus(encodeURIComponent(projectId), encodeURIComponent(taskId), statusId ? { statusId } : { status: taskStatusOf(status) });
 
   return normalizeProjectTask(data as ProjectTask);
 }
@@ -322,7 +327,8 @@ export async function deleteProjectTask(projectId: string, taskId: string) {
   await bffProject.deleteProjectsProjectIdTasksTaskId(encodeURIComponent(projectId), encodeURIComponent(taskId));
 }
 
-export async function closeProject(projectId: string, status: 'done' | 'review') {
+/** `done` closes the project, `on-hold` puts it on hold (MAIR-1084), `review` puts it in review. */
+export async function closeProject(projectId: string, status: 'done' | 'on-hold' | 'review') {
   const { data } = await bffProject.patchProjectsProjectIdClose(encodeURIComponent(projectId), { status });
 
   return normalizeProjectDetails(data as ProjectDetailsResponse);
@@ -338,6 +344,47 @@ export async function addTaskComment(projectId: string, taskId: string, message:
   const { data } = await bffProject.postProjectsProjectIdTasksTaskIdComments(encodeURIComponent(projectId), encodeURIComponent(taskId), { message });
 
   return data as TaskComment;
+}
+
+/** MAIR-1086: milestones of a project; the writes are the managers' (BFF 403 otherwise). */
+export type MilestoneInput = { title: string; dueDate: string; reached?: boolean };
+
+export async function createProjectMilestone(projectId: string, milestone: MilestoneInput) {
+  const { data } = await bffProject.postProjectsProjectIdMilestones(encodeURIComponent(projectId), milestone);
+
+  return data as Milestone;
+}
+
+export async function updateProjectMilestone(projectId: string, milestoneId: string, patch: Partial<MilestoneInput>) {
+  const { data } = await bffProject.patchProjectsProjectIdMilestonesMilestoneId(encodeURIComponent(projectId), encodeURIComponent(milestoneId), patch);
+
+  return data as Milestone;
+}
+
+export async function deleteProjectMilestone(projectId: string, milestoneId: string) {
+  await bffProject.deleteProjectsProjectIdMilestonesMilestoneId(encodeURIComponent(projectId), encodeURIComponent(milestoneId));
+}
+
+export type ProjectActivityPage = { items: ActivityItem[]; pagination: { page: number; limit: number; total: number; hasNextPage: boolean } };
+
+/** MAIR-1089: the activity of a project (its comments and the history of its tasks), newest first. */
+export async function getProjectActivity(projectId: string, query: { page?: number; limit?: number } = {}, signal?: AbortSignal): Promise<ProjectActivityPage> {
+  try {
+    const { data } = await bffProject.getProjectsProjectIdActivity(encodeURIComponent(projectId), query, { signal });
+    return data as ProjectActivityPage;
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw error;
+  }
+}
+
+export type BulkDeletionResult = { projectId: string; status: 'deleted' | 'not_found' | 'forbidden' };
+
+/** MAIR-1089: one call for the selection, one result per project (a refusal does not stop the others). */
+export async function bulkDeleteProjects(projectIds: string[]): Promise<BulkDeletionResult[]> {
+  const { data } = await bffProject.postProjectsBulkDelete({ projectIds });
+
+  return data.results;
 }
 
 export function mergeProjectDetails(details: ProjectDetailsResponse): Project {
@@ -363,7 +410,7 @@ export function createProjectBodyFromForm(form: ProjectFormState): CreateProject
     groupId: form.groupId,
     taskItems: form.taskItems.map((task) => ({
       title: task.title.trim(),
-      status: task.status,
+      status: taskStatusOf(task.status),
       priority: task.priority,
       assigneeIds: uniquePreservingOrder(task.assignees.map(getPersonValue)),
       labels: uniquePreservingOrder(task.labels),
@@ -375,7 +422,15 @@ export function createProjectBodyFromForm(form: ProjectFormState): CreateProject
 export function updateProjectBodyFromForm(form: ProjectFormState): UpdateProjectBody {
   // The contract refuses `groupId: null`; a project without a group keeps it unchanged by omitting the field.
   const { groupId, ...body } = createProjectBodyFromForm(form);
-  return groupId ? { ...body, groupId } : body;
+  // MAIR-1085: the budgets are only set by the update (`null` clears one); the form refuses a non-amount first.
+  // A form that never held the budgets (an older draft) leaves them unchanged.
+  const budgetVoted = form.budgetVoted === undefined ? undefined : parseBudgetInput(form.budgetVoted);
+  const budgetCommitted = form.budgetCommitted === undefined ? undefined : parseBudgetInput(form.budgetCommitted);
+  const budgets = {
+    ...(budgetVoted !== undefined ? { budgetVoted } : {}),
+    ...(budgetCommitted !== undefined ? { budgetCommitted } : {}),
+  };
+  return groupId ? { ...body, ...budgets, groupId } : { ...body, ...budgets };
 }
 
 export type ProjectGroup = { id: string; name: string };
@@ -404,5 +459,7 @@ export function taskBodyFromDraft(task: ProjectTaskDraft): CreateTaskBody {
     assigneeIds: uniquePreservingOrder([responsibleId, ...assigneeIds]),
     labels: uniquePreservingOrder(task.labels),
     dueDate: task.dueDate,
+    // MAIR-1087: an empty start date is « none » (on update the BFF clears it).
+    ...(task.startDate !== undefined ? { startDate: task.startDate || null } : {}),
   };
 }

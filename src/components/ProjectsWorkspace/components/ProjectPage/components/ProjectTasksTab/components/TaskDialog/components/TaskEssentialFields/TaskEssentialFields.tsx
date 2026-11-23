@@ -1,6 +1,6 @@
 import { DateField, MultiSelect, TextField, WarningAlert } from '@mairie360/lib-components/primitives';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
-import type { FilterOption, TaskFormState } from '@/lib/projectPageState';
+import { TASK_START_AFTER_DUE, taskStartAfterDue, type FilterOption, type TaskFormState } from '@/lib/projectPageState';
 import { dueAfterProject, taskDelayLabel } from '../../../../task-board-model';
 
 export interface TaskEssentialFieldsProps {
@@ -14,8 +14,9 @@ export interface TaskEssentialFieldsProps {
 }
 
 /**
- * MAIR-1137 (C12, Figma F6 6.10): « L’essentiel » of a task — Titre (required), Échéance with the time left and the
- * « Après la fin du projet » alert, Étiquettes. The contract has no task description nor start date.
+ * MAIR-1137 (C12, Figma F6 6.10): « L’essentiel » of a task — Titre (required), Début (MAIR-1087, at or before the
+ * due date), Échéance with the time left and the « Après la fin du projet » alert, Étiquettes. The contract has no
+ * task description.
  */
 export const TaskEssentialFields = ({ form, titleError, projectDueDate, labelOptions, titleRef, onChange }: TaskEssentialFieldsProps) => {
   const delay = taskDelayLabel(form.dueDate);
@@ -34,7 +35,17 @@ export const TaskEssentialFields = ({ form, titleError, projectDueDate, labelOpt
         aria-invalid={titleError ? true : undefined}
         onChange={(event) => onChange({ title: event.target.value })}
       />
-      <DateField id="task-sheet-due-date" label="Échéance" value={form.dueDate} hint={delay || undefined} onChange={(event) => onChange({ dueDate: event.target.value })} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <DateField
+          id="task-sheet-start-date"
+          label="Début"
+          value={form.startDate ?? ''}
+          max={form.dueDate || undefined}
+          error={taskStartAfterDue(form) ? TASK_START_AFTER_DUE : undefined}
+          onChange={(event) => onChange({ startDate: event.target.value })}
+        />
+        <DateField id="task-sheet-due-date" label="Échéance" value={form.dueDate} min={form.startDate || undefined} hint={delay || undefined} onChange={(event) => onChange({ dueDate: event.target.value })} />
+      </div>
       {dueAfterProject(form.dueDate, projectDueDate) && (
         <WarningAlert title="Après la fin du projet" description="Cette échéance tombe après celle du projet." />
       )}

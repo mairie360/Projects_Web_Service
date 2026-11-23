@@ -76,7 +76,7 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
       <p id={instructionsId} className="sr-only">
         Glissez une carte vers une autre colonne pour changer son statut. Au clavier ou sur mobile, utilisez « Changer le statut » dans le menu Actions du projet.
       </p>

@@ -139,8 +139,8 @@ ce qui fait le retour arrière d’un refus. Les confirmations sont des `Feedbac
 à jour », « Tâche terminée », « Statut mis à jour », « Tâche supprimée » ; « Statut non modifié » avec
 `tone: 'error'`). `use-detail-task-form.ts` porte la fiche (`open`, `openCreate(status)`, `edit(task)`,
 `quickAdd(title, status)`, `titleError` « Donnez un titre à la tâche ») ; `use-task-filters.ts` la recherche et les
-filtres par personne assignée et priorité. Ni description ni date de début de tâche : le contrat publié n’en a pas
-(MAIR-1087 en cours).
+filtres par personne assignée et priorité. Pas de description de tâche (absente du contrat) ; la date de début (`startDate`, MAIR-1087) se
+modifie à côté de l’échéance.
 
 ## Architecture et traitement des requêtes
 

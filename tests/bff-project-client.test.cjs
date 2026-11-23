@@ -254,6 +254,58 @@ describe('écritures sur les projets', () => {
     assert.equal(details.project.status, 'review');
   });
 
+  test('MAIR-1084: PATCH /projects/{projectId}/close puts a project on hold', async () => {
+    bffProject.on('patch', '/projects/{projectId}/close', { body: fixtures.projectDetails(fixtures.projectListItem({ status: 'on-hold' })) });
+
+    const details = await client.closeProject('project-1', 'on-hold');
+
+    assert.deepEqual(onlyCall('/projects/{projectId}/close', 'patch').body, { status: 'on-hold' });
+    assert.equal(details.project.status, 'on-hold');
+  });
+
+  test('MAIR-1085: the edit sends the budgets in cents, an empty one as null, an untouched form none', async () => {
+    bffProject.on('patch', '/projects/{projectId}', { body: fixtures.projectDetails(fixtures.projectListItem({ budgetVoted: 1250050, budgetCommitted: null })) });
+
+    const details = await client.updateProject('project-1', client.updateProjectBodyFromForm(projectForm({ budgetVoted: '12 500,5', budgetCommitted: '' })));
+
+    const body = onlyCall('/projects/{projectId}', 'patch').body;
+    assert.equal(body.budgetVoted, 1250050);
+    assert.equal(body.budgetCommitted, null);
+    assert.equal(details.project.budgetVoted, 1250050);
+    const untouched = client.updateProjectBodyFromForm(projectForm());
+    assert.equal('budgetVoted' in untouched || 'budgetCommitted' in untouched, false);
+    assert.equal('budgetVoted' in client.createProjectBodyFromForm(projectForm({ budgetVoted: '10' })), false, 'the creation sends no budget');
+  });
+
+  test('MAIR-1086: the milestones are created, updated and deleted under their project', async () => {
+    bffProject.on('post', '/projects/{projectId}/milestones', ({ body }) => ({ status: 201, body: fixtures.milestone({ id: 'milestone-2', ...body }) }));
+    bffProject.on('patch', '/projects/{projectId}/milestones/{milestoneId}', ({ body }) => ({ body: fixtures.milestone({ ...body }) }));
+    bffProject.on('delete', '/projects/{projectId}/milestones/{milestoneId}', { status: 204 });
+
+    const created = await client.createProjectMilestone('project-1', { title: 'Réception', dueDate: '2027-03-01' });
+    const reached = await client.updateProjectMilestone('project-1', 'milestone-1', { reached: true });
+    assert.equal(await client.deleteProjectMilestone('project-1', 'milestone-1'), undefined);
+
+    assert.deepEqual(onlyCall('/projects/{projectId}/milestones', 'post').body, { title: 'Réception', dueDate: '2027-03-01' });
+    assert.deepEqual(onlyCall('/projects/{projectId}/milestones/{milestoneId}', 'patch').body, { reached: true });
+    assert.deepEqual(onlyCall('/projects/{projectId}/milestones/{milestoneId}', 'delete').pathParams, { projectId: 'project-1', milestoneId: 'milestone-1' });
+    assert.equal(created.id, 'milestone-2');
+    assert.equal(reached.reached, true);
+  });
+
+  test('MAIR-1089: GET /projects/{projectId}/activity pages the activity, POST /projects/bulk-delete answers per project', async () => {
+    bffProject.on('get', '/projects/{projectId}/activity', { body: fixtures.projectActivity([fixtures.activityItem()], { limit: 5 }) });
+    bffProject.on('post', '/projects/bulk-delete', ({ body }) => ({ body: { results: body.projectIds.map((projectId, index) => ({ projectId, status: index ? 'forbidden' : 'deleted' })) } }));
+
+    const activity = await client.getProjectActivity('project-1', { page: 1, limit: 5 });
+    const results = await client.bulkDeleteProjects(['project-1', 'project-2']);
+
+    assert.equal(onlyCall('/projects/{projectId}/activity', 'get').url.search, '?page=1&limit=5');
+    assert.equal(activity.items[0].kind, 'comment');
+    assert.deepEqual(onlyCall('/projects/bulk-delete', 'post').body, { projectIds: ['project-1', 'project-2'] });
+    assert.deepEqual(results, [{ projectId: 'project-1', status: 'deleted' }, { projectId: 'project-2', status: 'forbidden' }]);
+  });
+
   test('DELETE /projects/{projectId} résout sur un 204 sans corps', async () => {
     bffProject.on('delete', '/projects/{projectId}', { status: 204 });
 
@@ -283,6 +335,18 @@ describe('écritures sur les tâches', () => {
       assigneeIds: ['user-3', 'user-2'], labels: ['achat'], dueDate: '2026-11-01',
     });
     assert.equal(task.dueDate, '2026-10-01');
+  });
+
+  test('MAIR-1087: the start date is sent as typed, an emptied one as null, and read back as a day', async () => {
+    bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}', { body: fixtures.projectTask({ startDate: '2026-09-15T00:00:00.000Z' }) });
+
+    assert.equal(client.taskBodyFromDraft({ ...draft, startDate: '2026-09-15' }).startDate, '2026-09-15');
+    assert.equal(client.taskBodyFromDraft({ ...draft, startDate: '' }).startDate, null);
+    assert.equal('startDate' in client.taskBodyFromDraft(draft), false);
+    const task = await client.updateProjectTask('project-1', 'task-1', { startDate: '2026-09-15' });
+
+    assert.deepEqual(onlyCall('/projects/{projectId}/tasks/{taskId}', 'patch').body, { startDate: '2026-09-15' });
+    assert.equal(task.startDate, '2026-09-15');
   });
 
   test('un brouillon sans responsable prend le premier participant', () => {

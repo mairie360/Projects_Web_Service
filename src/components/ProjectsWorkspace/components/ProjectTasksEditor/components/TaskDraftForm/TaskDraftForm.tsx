@@ -2,7 +2,7 @@
 
 import { Button, DateField, MultiSelect, SelectField } from '@mairie360/lib-components/primitives';
 import { NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
-import type { FilterOption, TaskFormState } from '@/lib/projectPageState';
+import { taskStatusOf, type FilterOption, type TaskFormState } from '@/lib/projectPageState';
 import type { Project } from '@/types/project';
 
 export function TaskDraftForm({
@@ -59,7 +59,7 @@ export function TaskDraftForm({
             label="Statut"
             value={form.status}
             options={statusOptions} placeholder={null}
-            onChange={(status) => onChange({ status: status as Project['status'] })}
+            onChange={(status) => onChange({ status: taskStatusOf(status as Project['status']) })}
           />
           <SelectField
             id="project-form-task-priority"

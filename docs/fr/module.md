@@ -14,15 +14,15 @@ sa page.
   (Dupliquer ; Supprimer avec confirmation, puis retour à la liste). Dupliquer un projet sans groupe affiche
   l’erreur du BFF (400).
 - **Indicateurs** : Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » ou le retard, dans le fuseau
-  de l’instance), Budget engagé (« Budget non renseigné » : absent du contrat pour l’instant), Tâches en retard.
+  de l’instance), Budget engagé (montant engagé, « Sur <voté> votés (n %) » ; « Budget non renseigné » sans budget, MAIR-1085), Tâches en retard.
 - **Onglets** : Vue d’ensemble, Tâches (compteur), Planning, Équipe (compteur), Documents, Activité. Les tâches
   restent montées sur tous les onglets : brouillons et écritures en attente survivent à un changement d’onglet ;
   Planning, Équipe, Documents et Activité ont leurs propres tickets et affichent un avis en attendant. Un lien de
   tâche (`&task=<id>`) ouvre « Tâches » et centre la tâche.
 - **Vue d’ensemble** : « Prochaines tâches » (les trois tâches ouvertes les plus proches de leur échéance ; la
-  cocher la termine), « Jalons » et « Activité récente » (pas encore fournis par le contrat : ils le disent),
-  « Informations » (responsable, début, échéance, priorité, équipe, groupe, budget ; un projet sans groupe affiche
-  « Sans groupe » et « Choisissez un groupe dans « Modifier » »), avec les actions Suspendre et Clôturer.
+  cocher la termine), « Jalons » (MAIR-1086), « Activité récente » (MAIR-1089),
+  « Informations » (responsable, début, échéance, priorité, équipe, groupe, budget, « Votre rôle » ; un projet sans groupe affiche
+  « Sans groupe » et « Choisissez un groupe dans « Modifier » »), avec les actions Suspendre (mise en pause), Reprendre et Clôturer.
 - **Modification** (C7) : « Modifier » ouvre les seuls champs du projet dans une modale de taille m (« Modifier le
   projet · #12 ») ; le groupe est obligatoire dès qu’un groupe peut être choisi et ne peut pas être retiré. Les
   messages s’affichent sous les champs avant tout envoi ; seuls les champs modifiés sont envoyés (`PATCH`), rien
@@ -45,9 +45,9 @@ sa page.
   continuer »). Le « + » d’une colonne garde son ajout rapide.
 - **Modification sur une page** : sections « L’essentiel » et « Attribution » marquées « Modifié »,
   « Enregistrer (n) », « Supprimer ».
-- **Non fait** : la description et la date de début d’une tâche, et une activité de projet filtrée par tâche, ne sont
-  pas dans le contrat du BFF (MAIR-1089) ; la page affiche la description comme indisponible et la période comme
-  « Jusqu’au <échéance> ». La suppression garde sa confirmation (le BFF n’a pas d’annulation), et la page de la tâche
+- **Non fait** : la description d’une tâche et une activité de projet filtrée par tâche ne sont pas dans le contrat
+  du BFF ; la page affiche la description comme indisponible et la période comme « Du <début> au <échéance> »
+  (« Jusqu’au <échéance> » sans date de début, MAIR-1087). La suppression garde sa confirmation (le BFF n’a pas d’annulation), et la page de la tâche
   n’a pas encore d’URL propre.
 
 ## Création de projet par étapes et modification sur une page (MAIR-1136)
@@ -63,8 +63,7 @@ sa page.
   de ses champs diffère du projet enregistré ; « Enregistrer (n) » compte les champs modifiés et reste désactivé à 0 ;
   « Supprimer » (discret, à gauche) ferme la modification et demande la confirmation habituelle. Les lignes suivent la
   maquette : Groupe / Échéance, puis Responsable / Priorité / Statut, puis Équipe / Étiquettes.
-- **Non fait** : la date de début (« Début ») de la maquette n’est pas dans le contrat du BFF, la première étape n’a
-  donc pas ce champ ; l’échéance reste le champ date natif de la lib (`DateField`).
+- **Non fait** : la création de projet n’a pas de date de début (« Début ») : le contrat n’en a pas pour un projet ; l’échéance reste le champ date natif de la lib (`DateField`).
 
 ## En-tête et mise en page de la page projet (MAIR-1135)
 
@@ -109,8 +108,8 @@ liste, quel que soit le sens. L’état suit l’ordre métier À faire < En cou
 Haute < Moyenne < Basse.
 
 - **Liste des tâches** d’un projet (« Tâches » › Liste) : Tâche, État, Priorité, Assignée à, Échéance ; triée par
-  échéance par défaut. Pas de colonne « Début » : le contrat publié n’a pas encore de date de début de tâche
-  (MAIR-1087).
+  échéance par défaut. Pas encore de colonne « Début » : la date de début s’affiche sur la page de la tâche et se
+  modifie dans la fenêtre de la tâche (MAIR-1087).
 - **Tableau des projets** : toutes les colonnes sauf la sélection et les actions, avec le même rendu et les mêmes
   règles.
 - L’onglet « Équipe » n’existe pas encore (MAIR-874) : son tri viendra avec lui.
@@ -137,8 +136,8 @@ L’onglet « Tâches » de la page projet (Figma F6, 6.1 à 6.13) montre les t�
 - **Fiche de la tâche** (C4, C5) : un `Drawer` de taille m ouvert par une carte (« Ouvrir la tâche »), une ligne de
   la liste, ou « Nouvelle tâche » de l’en-tête (fiche vide). Champs : Titre (obligatoire : « Donnez un titre à la
   tâche » sous le champ avant tout envoi), État, Priorité, Assignée à, Échéance, Étiquettes ; puis le suivi
-  (commentaires et historique) et « Supprimer la tâche » avec sa confirmation. Le contrat publié n’a ni description
-  ni date de début de tâche (MAIR-1087 est en cours côté back) : la fiche n’affiche ni l’une ni l’autre. Un
+  (commentaires et historique) et « Supprimer la tâche » avec sa confirmation. Le contrat publié n’a pas de description
+  de tâche ; la date de début (« Début », MAIR-1087) est à côté de l’échéance et ne peut pas la suivre. Un
   enregistrement refusé garde tous les champs.
 - **Liste** (C6) : un `DataTable` de la lib — case « terminée » (termine ou rouvre), tâche, état, priorité, personne
   assignée, échéance.
@@ -184,7 +183,7 @@ Maquette Projets, écrans F1 1.2 à 1.5.
   réinitialisée au changement de page, de filtre, de recherche ou de vue.
 - « Supprimer » demande « Les n projets sélectionnés et leurs x tâches seront supprimés. Cette
   action est irréversible. » (« Confirmer la suppression »). Le front envoie alors un
-  `DELETE /projects/{projectId}` par projet (pas de route groupée dans le contrat), affiche le
+  `POST /projects/bulk-delete` pour la sélection (MAIR-1089, un résultat par projet), affiche le
   toast « n projets supprimés » qui les nomme et recharge la page. Un projet refusé reste sur la
   page et sélectionné, avec une erreur qui le nomme et donne la raison du BFF.
 
@@ -202,10 +201,9 @@ Maquette Projets, écrans F1 (Kanban), F2 (grille), F4 (menu de carte).
   ouvre la création avec ce statut. Le glisser-déposer met en évidence la colonne cible et
   estompe la carte déplacée.
 - **Menu de carte** (« … ») : Ouvrir le projet, Dupliquer, « Changer le statut » (choix
-  unique parmi À faire / En cours / En revue / Terminé, même PATCH qu’un dépôt), Supprimer
-  (avec confirmation). « Modifier » disparaît : la fiche du projet sert à le modifier. Le
-  statut « Suspendu » de la maquette n’existe pas dans le contrat de BFF_Project et n’est pas
-  proposé.
+  unique parmi À faire / En cours / En revue / Suspendu / Terminé, même PATCH qu’un dépôt), Supprimer
+  (avec confirmation). « Suspendu » est le statut `on-hold` du contrat (MAIR-1084), avec sa
+  colonne Kanban et son filtre.
 - Un changement de statut réussi est confirmé par le toast de la lib « Statut mis à jour » ;
   un refus laisse la carte en place et affiche l’erreur.
 - Une recherche ou un filtre sans résultat affiche « Aucun projet à afficher » avec
@@ -818,3 +816,22 @@ Le [guide technique](technical.md) détaille architecture, configuration, routes
 ## Direction visuelle commune — MAIR-547
 
 DA claire option 1 : tokens et police communs, navigation accessible et contenu métier conservé. Voir la [recette visuelle](../qa/design-qa.md) pour les preuves, vérifications et limites RGAA.
+
+## Contrat Projets V2 (MAIR-880)
+
+Le contrat BFF_Project de l’epic MAIR-822 est branché sur les écrans existants :
+
+- **En pause** (MAIR-1084) : le statut de projet `on-hold` s’affiche « Suspendu » (statut `paused` de la lib) : sa
+  colonne Kanban, son filtre, les menus de statut ; « Suspendre » sur la page du projet le met en pause
+  (`PATCH …/close` `{ status: 'on-hold' }`) et « Reprendre » le remet en cours. Une tâche n’est jamais `review` ni `on-hold`.
+- **Budget** (MAIR-1085) : montants voté et engagé (centimes dans le contrat, euros à l’écran) dans « Budget engagé »
+  et « Informations » ; la modification du projet a une section « Budget » (vide = pas de budget, un montant négatif ou
+  illisible est refusé sous le champ). La création ne le demande pas.
+- **Jalons** (MAIR-1086) : le panneau « Jalons » de la vue d’ensemble les liste par date avec « Atteint », « En retard »
+  ou « À venir » ; un responsable du projet les ajoute, les modifie, les marque atteints et les supprime (avec confirmation).
+- **Date de début des tâches** (MAIR-1087) : « Début » dans la fenêtre de la tâche (au plus tard l’échéance) et la
+  période de la page de la tâche.
+- **Droits** (MAIR-1088) : les `permissions` du projet décident (un membre au rôle `manager` le gère) ; « Informations »
+  affiche le rôle de l’appelant.
+- **Activité** (MAIR-1089) : « Activité récente » montre les cinq derniers commentaires et changements de tâches ; la
+  suppression groupée du tableau passe par `POST /projects/bulk-delete`.

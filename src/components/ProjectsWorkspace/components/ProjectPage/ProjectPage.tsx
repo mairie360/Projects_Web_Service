@@ -6,7 +6,7 @@ import { Activity, CalendarRange, FileText, LayoutGrid, ListChecks, Users } from
 import { projectTabFromSearch, writeProjectLocation, type ProjectTab } from '@/lib/projectDeepLink';
 import { getProjectNumber } from '../../project-card-meta';
 import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '@/lib/projectWorkflow';
-import { projectToFormState, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
+import { projectToFormState, taskStatusOptions as taskStatusChoices, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '@/types/project';
 import { TaskCreationNotice, type TaskCreationState } from '../TaskCreationNotice';
 import { DetailRefreshAlert } from './components/DetailRefreshAlert';
@@ -19,7 +19,9 @@ import { ProjectWorkflow } from './components/ProjectWorkflow';
 import { useDetailTaskForm, type TaskColumnStatus } from './use-detail-task-form';
 import { useLinkedTaskScroll } from './use-linked-task-scroll';
 import { categoryOf, projectStatusHelpers } from './status-helpers';
+import { useProjectActivity } from './use-project-activity';
 import { useProjectEdit, type MutationLock } from './use-project-edit';
+import { useProjectMilestones } from './use-project-milestones';
 import { useTaskCollaboration } from './use-task-collaboration';
 import { useTaskFilters } from './use-task-filters';
 
@@ -96,7 +98,7 @@ export function ProjectPage({
   /** Resolves `true` once the BFF confirmed the status (MAIR-859: the board rolls back otherwise). */
   onUpdateTaskStatus: (projectId: string, taskId: string, status: ProjectStatus, statusId?: string) => void | boolean | Promise<void | boolean>;
   onDeleteTask: (projectId: string, taskId: string, taskTitle: string) => Promise<unknown>;
-  onCloseProject: (projectId: string, status: 'done' | 'review') => Promise<void>;
+  onCloseProject: (projectId: string, status: 'done' | 'on-hold' | 'review') => Promise<void>;
   /** MAIR-846: the status pill menu, the « … » actions (Dupliquer, Supprimer + confirmation by the workspace). */
   onChangeStatus?: (project: Project, status: Project['status']) => void | Promise<void>;
   onDuplicate?: (project: Project) => void | Promise<void>;
@@ -109,7 +111,7 @@ export function ProjectPage({
   const [workflow, setWorkflow] = React.useState<ProjectWorkflowSnapshot | null>(null);
   const receiveWorkflow = React.useCallback((snapshot: ProjectWorkflowSnapshot) => setWorkflow(snapshot), []);
   const dynamicStatuses = workflow?.projectId === project.id ? workflow.statuses : undefined;
-  const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? statusOptions;
+  const taskStatusOptions = dynamicStatuses?.map(status => ({ value: status.id, label: status.name })) ?? taskStatusChoices(statusOptions);
   const lockRef: MutationLock = React.useRef({ project: false, task: false });
   const closeDetail = () => {
     if (!lockRef.current.project && !lockRef.current.task) onClose();
@@ -144,6 +146,10 @@ export function ProjectPage({
   // The ref stays out of the `taskForm` object so the compiler lint does not read it as a ref access during render.
   const { noticeRef: taskNoticeRef, ...taskForm } = useDetailTaskForm({ project, lockRef, memberOptions, defaultTaskAssigneeId, readCurrentTaskAssignee, taskCreationState, onPreserveTaskDraft, pendingTaskIds, unverifiedTaskIds, dynamicStatuses, onAddTask, onUpdateTask });
   const filters = useTaskFilters({ tasks });
+  // MAIR-1086: the milestones of the page (overview, planning); MAIR-1089: the latest activity, read once the
+  // detail is in (like the statuses below) and again after each confirmed change of the project.
+  const milestones = useProjectMilestones(project);
+  const recentActivity = useProjectActivity(project.taskItems ? project.id : null, project);
   const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
   const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
   const taskProjectIdRef = React.useRef(project.id);
@@ -231,8 +237,20 @@ export function ProjectPage({
           onCompleteTask={(task) => void onUpdateTaskStatus(project.id, task.id, 'done', firstStatusOf('done'))}
           onShowTab={showTab}
           onOpenTask={(task) => viewTask(task.id)}
-          onSuspend={() => void onCloseProject(project.id, 'review')}
+          onSuspend={() => void onCloseProject(project.id, 'on-hold')}
+          onResume={onChangeStatus && project.permissions?.canEdit === true ? () => void onChangeStatus(project, 'in-progress') : undefined}
           onCloseProject={() => void onCloseProject(project.id, 'done')}
+          milestones={{
+            milestones: milestones.milestones,
+            total: milestones.total,
+            canManage: project.permissions?.canEdit === true,
+            pendingId: milestones.pendingId,
+            error: milestones.error,
+            onAdd: milestones.add,
+            onUpdate: milestones.update,
+            onRemove: milestones.remove,
+          }}
+          activity={{ items: recentActivity.items, loading: recentActivity.loading, error: recentActivity.error, onRetry: recentActivity.retry }}
         />
       </div>
 

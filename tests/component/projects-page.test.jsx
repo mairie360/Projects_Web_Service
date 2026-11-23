@@ -40,6 +40,8 @@ async function leaveProject(user) {
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   ...(await importOriginal()),
+  // MAIR-1089: the project page reads its latest activity once the detail is in.
+  getProjectActivity: vi.fn(async () => ({ items: [], pagination: { page: 1, limit: 5, total: 0, hasNextPage: false } })),
   // MAIR-880: the creation form reads the linkable groups once.
   getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
   getProjectDetails: vi.fn(),
@@ -122,7 +124,7 @@ describe("Projects page", () => {
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
-  });
+  }, 15_000); // The longest journey of the file: close to the default 5 s under coverage.
   it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
     const user = userEvent.setup(), first = fixtures.projectListItem();
     const created = fixtures.projectListItem({ id: 'new-distinct-id', title: 'Copie canonique vérifiée' });
