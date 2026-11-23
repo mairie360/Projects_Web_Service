@@ -6,10 +6,10 @@ const { formatProjectDate, getProjectNumber, projectStatusBadge, projectStatusLa
 
 // MAIR-828: the statuses take the lib colours and French labels, no local colour table any more.
 test('each published project status maps to its lib status and label', () => {
-  assert.deepEqual(Object.keys(projectStatusBadge).sort(), ['done', 'in-progress', 'review', 'todo']);
+  assert.deepEqual(Object.keys(projectStatusBadge).sort(), ['done', 'in-progress', 'on-hold', 'review', 'todo']);
   for (const [status, badge, label] of [
     ['todo', 'todo', 'À faire'], ['in-progress', 'inprogress', 'En cours'],
-    ['review', 'review', 'En revue'], ['done', 'done', 'Terminé'],
+    ['review', 'review', 'En revue'], ['on-hold', 'paused', 'Suspendu'], ['done', 'done', 'Terminé'],
   ]) {
     assert.equal(projectStatusBadge[status], badge);
     assert.ok(statuses[badge], badge);

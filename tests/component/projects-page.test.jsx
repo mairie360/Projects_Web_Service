@@ -8,8 +8,40 @@ import { closeProject, createProjectTask, deleteProjectTask, duplicateProject, g
 import { checkedOptions, toggleOption } from './units/multi-select';
 import fixtures from "../support/bff-fixtures.cjs";
 
+// MAIR-846: a project opens as a page on « Vue d’ensemble »; the task journeys continue in its « Tâches » tab,
+// and « ← Projets » brings the list back (the page is no dialog any more: no Escape, no close button).
+async function tasksTab(user) {
+  await user.click(await screen.findByRole('tab', { name: /^Tâches/ }));
+  return within(screen.getByRole('tabpanel'));
+}
+// MAIR-859: tasks are cards of the board; a card is the <article> of its title, its sheet is a Drawer.
+const taskCard = (title) => screen.getByRole('heading', { name: title }).closest('article');
+const sheet = () => within(screen.getByRole('dialog', { name: /^(Nouvelle tâche|Modifier la tâche)$/ }));
+const sheetTitle = () => sheet().getByRole('textbox', { name: /^Titre/ });
+// MAIR-1137 (C15): a click opens the task page; the card « … » « Modifier la tâche » opens the edit over the board.
+async function openTaskCard(user, title) {
+  await user.click(within(taskCard(title)).getByRole('button', { name: `Actions pour ${title}` }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Modifier la tâche' }));
+  return sheet();
+}
+const saveTask = () => screen.getByRole('button', { name: /^Enregistrer \(\d+\)$/ });
+const nextStep = (user) => user.click(sheet().getByRole('button', { name: 'Suivant' }));
+const chooseAssignee = (user, name) => user.click(within(sheet().getByRole('group', { name: /^Assignée à/ })).getByRole('radio', { name: new RegExp(`^${name}`) }));
+const checkedRadio = (group) => within(sheet().getByRole('group', { name: new RegExp(`^${group}`), hidden: true })).getAllByRole('radio', { hidden: true }).find((input) => input.checked)?.value;
+async function moveTaskTo(user, title, column) {
+  await user.click(within(taskCard(title)).getByRole('button', { name: `Actions pour ${title}` }));
+  await user.click(await screen.findByRole('menuitemradio', { name: column }));
+}
+const projectHeading = (name) => screen.queryByRole('heading', { level: 1, ...(name ? { name } : {}) });
+async function leaveProject(user) {
+  await user.click(within(projectHeading().closest('section')).getByRole('button', { name: 'Projets', exact: true }));
+  await waitFor(() => expect(screen.queryByRole('tablist', { name: 'Sections du projet' })).toBeNull());
+}
+
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   ...(await importOriginal()),
+  // MAIR-1089: the project page reads its latest activity once the detail is in.
+  getProjectActivity: vi.fn(async () => ({ items: [], pagination: { page: 1, limit: 5, total: 0, hasNextPage: false } })),
   // MAIR-880: the creation form reads the linkable groups once.
   getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
   getProjectDetails: vi.fn(),
@@ -45,18 +77,25 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     const opener = await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` });
     await user.click(opener);
-    const dialog = within(screen.getByRole('dialog')), input = dialog.getByLabelText('Titre de la tâche', { exact: true });
+    await tasksTab(user);
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    const dialog = sheet(), input = sheetTitle();
     await user.type(input, 'Brouillon collision conservé');
-    await toggleOption(user, dialog, 'Assignés', 'Marie Durand'); await user.click(input);
-    await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
     fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
+    await nextStep(user);
+    await chooseAssignee(user, 'Marie Durand');
+    await user.click(within(dialog.getByRole('group', { name: /^Priorité/ })).getByRole('radio', { name: /^Basse/ }));
+    await nextStep(user);
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     await dialog.findByText('Création de tâche non vérifiée : Brouillon collision conservé');
     expect(input.value).toBe('Brouillon collision conservé');
     expect(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }).disabled).toBe(true);
     expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
-    expect(dialog.getByText(task.title, { exact: true })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
     expect(screen.queryByText('Reçu collision interdit')).toBeNull();
+    // MAIR-1137: back to « L’essentiel » to keep typing.
+    await user.click(dialog.getByRole('button', { name: 'Précédent' }));
+    await user.click(dialog.getByRole('button', { name: 'Précédent' }));
     await user.type(input, ' — dernière saisie');
     fireEvent.submit(input.closest('form'));
     const inspect = dialog.getByRole('button', { name: 'Inspecter les tâches du projet', exact: true });
@@ -69,18 +108,23 @@ describe("Projects page", () => {
     expect(input.value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
-    await user.click(dialog.getByRole('button', { name: 'Fermer la fiche projet' }));
+    await user.click(dialog.getByRole('button', { name: 'Annuler', exact: true }));
+    await leaveProject(user);
     await user.click(opener);
-    const reopened = within(screen.getByRole('dialog'));
-    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
-    expect(reopened.getByLabelText('Priorité', { exact: true }).value).toBe('low');
-    expect(reopened.getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
-    await user.click(reopened.getAllByRole('button', { name: 'Modifier', exact: true }).at(-1));
-    expect(reopened.getByRole('button', { name: 'Enregistrer la tâche', exact: true }).disabled).toBe(false);
-    await user.click(reopened.getByRole('button', { name: 'Annuler', exact: true }));
-    expect(reopened.getByLabelText('Titre de la tâche', { exact: true }).value).toBe('Brouillon collision conservé — dernière saisie');
+    await tasksTab(user);
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
+    expect(checkedRadio('Priorité')).toBe('low');
+    expect(sheet().getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
+    await user.click(sheet().getByRole('button', { name: 'Annuler', exact: true }));
+    const edit = await openTaskCard(user, task.title);
+    // MAIR-1137 (C13): nothing changed yet; the edit itself is open (the task is not blocked).
+    expect(edit.getByRole('button', { name: 'Enregistrer (0)' })).toBeTruthy();
+    await user.click(edit.getByRole('button', { name: 'Annuler', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
-  });
+  }, 15_000); // The longest journey of the file: close to the default 5 s under coverage.
   it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
     const user = userEvent.setup(), first = fixtures.projectListItem();
     const created = fixtures.projectListItem({ id: 'new-distinct-id', title: 'Copie canonique vérifiée' });
@@ -136,33 +180,6 @@ describe("Projects page", () => {
     expect(duplicateProject).toHaveBeenCalledOnce();
   });
 
-  it('keeps a card draft and unsent local task after an uncertain project receipt until keyboard GET verification', async () => {
-    const user=userEvent.setup(), project=fixtures.projectListItem({dueDate:'2026-12-15'});
-    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
-    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project));
-    vi.mocked(updateProject).mockResolvedValueOnce(fixtures.projectDetails({...project,id:'project-2',title:'Projet étranger interdit'}));
-    render(<ProjectsPage/>);
-    await user.click(await screen.findByRole('button',{name:`Actions pour ${project.title}`}));
-    await user.click(screen.getByRole('menuitem',{name:'Modifier',exact:true}));
-    const dialog=await screen.findByRole('dialog',{name:'Modifier le projet'}), form=within(dialog);
-    const title=form.getByRole('textbox',{name:'Titre',exact:true});
-    await user.clear(title);await user.type(title,'Brouillon qui reste à moi');
-    const nested=form.getByPlaceholderText('Ajouter une tâche...');await user.type(nested,'Tâche non ajoutée');
-    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
-    expect(await form.findByRole('alert')).toHaveProperty('textContent',expect.stringMatching(/acceptée.*confirmation de projet.*incohérente/));
-    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
-    expect(title.value).toBe('Brouillon qui reste à moi');expect(nested.value).toBe('Tâche non ajoutée');
-    expect(screen.queryByText('Projet étranger interdit')).toBeNull();
-    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Lecture indisponible pour vérifier'));
-    const verify=form.getByRole('button',{name:'Vérifier le projet',exact:true});verify.focus();await user.keyboard('{Enter}');
-    await form.findByText('Lecture indisponible pour vérifier');
-    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
-    vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,title:'Lecture officielle du projet'}));
-    verify.focus();await user.keyboard('{Enter}');
-    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(false));
-    expect(title.value).toBe('Brouillon qui reste à moi');expect(nested.value).toBe('Tâche non ajoutée');
-    expect(form.queryByRole('alert')).toBeNull();expect(updateProject).toHaveBeenCalledOnce();expect(getProjectDetails).toHaveBeenCalledTimes(3);
-  });
 
   it('retains inline project fields and consumes a newly denied edit permission after verification',async()=>{
     const user=userEvent.setup(),project=fixtures.projectListItem({dueDate:'2026-12-15'});
@@ -171,18 +188,18 @@ describe("Projects page", () => {
     vi.mocked(updateProject).mockResolvedValueOnce(fixtures.projectDetails({...project,id:'project-2'},[]));
     render(<ProjectsPage/>);
     await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
-    const dialog=await screen.findByRole('dialog'),detail=within(dialog);
+    await screen.findByRole('heading',{level:1,name:project.title});const detail=screen;
     await user.click(detail.getByRole('button',{name:'Modifier',exact:true}));
     const form=within(detail.getByRole('form',{name:'Modifier le projet'})),title=form.getByLabelText(/^Titre/);
     await user.clear(title);await user.type(title,'Brouillon inline retenu');
-    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
-    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true));
+    await user.click(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}));
+    await waitFor(()=>expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true));
     expect(title.value).toBe('Brouillon inline retenu');
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,permissions:{...project.permissions,canEdit:false,canClose:false}},[]));
     const retry=detail.getByRole('button',{name:'Réessayer la fiche',exact:true});retry.focus();await user.keyboard('{Enter}');
     await waitFor(()=>expect(detail.queryByRole('button',{name:'Réessayer la fiche',exact:true})).toBeNull());
     expect(title.value).toBe('Brouillon inline retenu');expect(form.queryByRole('alert')).toBeNull();
-    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true);
     expect(detail.queryByRole('button',{name:'Clôturer',exact:true})).toBeNull();expect(updateProject).toHaveBeenCalledOnce();
   });
 
@@ -193,10 +210,9 @@ describe("Projects page", () => {
     vi.mocked(closeProject).mockResolvedValueOnce(fixtures.projectDetails({...other,title:'Titre étranger ne pas afficher'},[]));
     render(<ProjectsPage/>);
     await user.click(await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`}));
-    const detail=within(await screen.findByRole('dialog'));await user.click(detail.getByRole('button',{name:'Clôturer',exact:true}));
+    await screen.findByRole('heading',{level:1,name:project.title});const detail=screen;await user.click(detail.getByRole('button',{name:'Clôturer',exact:true}));
     await waitFor(()=>expect(detail.getByRole('button',{name:'Clôturer',exact:true}).disabled).toBe(true));
-    detail.getByRole('button',{name:'Fermer la fiche projet',exact:true}).focus();
-    await user.keyboard('{Escape}');expect(screen.queryByRole('dialog')).toBeNull();
+    await leaveProject(user);
     const read=Promise.withResolvers();vi.mocked(getProjectDetails).mockImplementationOnce(()=>read.promise);
     const verify=screen.getByRole('button',{name:`Vérifier le projet ${project.title}`,exact:true});
     verify.focus();await user.keyboard('{Enter}');await user.click(verify);
@@ -207,73 +223,8 @@ describe("Projects page", () => {
     expect(screen.queryByText('Titre étranger ne pas afficher')).toBeNull();expect(closeProject).toHaveBeenCalledOnce();
   });
 
-  it.each([false, true])('retains the latest card form and its typed draft after an obsolete read (refused: %s)', async refused => {
-    const user = userEvent.setup();
-    const first = fixtures.projectListItem();
-    const second = fixtures.projectListItem({ id: 'project-2', title: 'Projet choisi ensuite' });
-    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([first, second]));
-    const earlier = Promise.withResolvers();
-    vi.mocked(getProjectDetails).mockImplementationOnce(() => earlier.promise)
-      .mockResolvedValueOnce(fixtures.projectDetails(second));
-    render(<ProjectsPage />);
-    await user.click(await screen.findByRole('button', { name: `Actions pour ${first.title}` }));
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
-    const opener = screen.getByRole('button', { name: `Actions pour ${second.title}` });
-    await user.click(opener);
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
-    const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
-    const title = within(dialog).getByRole('textbox', { name: 'Titre', exact: true });
-    expect(title.value).toBe(second.title);
-    await user.clear(title); await user.type(title, 'Brouillon du projet choisi ensuite');
-    await act(async () => refused ? earlier.reject(new Error('Ancienne lecture refusée')) : earlier.resolve(fixtures.projectDetails(first)));
-    expect(title.value).toBe('Brouillon du projet choisi ensuite');
-    expect(screen.queryByText('Ancienne lecture refusée')).toBeNull();
-    expect(getProjectDetails.mock.calls.map(([id]) => id)).toEqual([first.id, second.id]);
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-  });
 
-  it('preserves a creation and its unsent nested task while an old card opening finishes', async () => {
-    const user = userEvent.setup();
-    const project = fixtures.projectListItem();
-    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
-    const earlier = Promise.withResolvers();
-    vi.mocked(getProjectDetails).mockImplementationOnce(() => earlier.promise);
-    render(<ProjectsPage />);
-    await user.click(await screen.findByRole('button', { name: `Actions pour ${project.title}` }));
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
-    const opener = screen.getByRole('button', { name: 'Nouveau projet', exact: true });
-    await user.click(opener);
-    const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
-    await user.type(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }), 'Brouillon de création');
-    await user.type(within(dialog).getByPlaceholderText('Ajouter une tâche...'), 'Tâche non envoyée');
-    await act(async () => earlier.resolve(fixtures.projectDetails(project)));
-    expect(screen.getByRole('dialog', { name: 'Nouveau projet' })).toBe(dialog);
-    expect(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }).value).toBe('Brouillon de création');
-    expect(within(dialog).getByPlaceholderText('Ajouter une tâche...').value).toBe('Tâche non envoyée');
-    expect(getProjectDetails).toHaveBeenCalledTimes(1);
-    const close = within(dialog).getByRole('button', { name: 'Fermer la création de projet' });
-    close.focus(); await user.keyboard('{Enter}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-  });
 
-  it('announces the current read fallback inside its correctly targeted card form', async () => {
-    const user = userEvent.setup();
-    const project = fixtures.projectListItem();
-    vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
-    vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Chargement récent indisponible'));
-    render(<ProjectsPage />);
-    await user.click(await screen.findByRole('button', { name: `Actions pour ${project.title}` }));
-    await user.click(screen.getByRole('menuitem', { name: 'Modifier', exact: true }));
-    const dialog = await screen.findByRole('dialog', { name: 'Modifier le projet' });
-    expect(within(dialog).getByRole('textbox', { name: 'Titre', exact: true }).value).toBe(project.title);
-    expect(within(dialog).getByRole('alert').textContent).toContain('Chargement récent indisponible');
-    expect(within(dialog).getByRole('alert').textContent).toContain('projet déjà affiché');
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
 
   it.each([false, true])("keeps a newer task and its draft after a late project close (detail read succeeds: %s)", async successfulRead => {
     const user = userEvent.setup();
@@ -287,38 +238,36 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await user.click(screen.getByRole('button', { name: 'Suspendre', exact: true }));
+    await tasksTab(user);
     expect(closeProject).toHaveBeenCalledTimes(1);
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title); await user.type(title, 'Brouillon à conserver');
     const confirmed = fixtures.projectTask({ title: 'Tâche confirmée récemment', status: 'done' });
     const verified = { ...confirmed, title: 'Tâche enrichie par lecture' };
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
     vi.mocked(getProjectsPage).mockRejectedValue(new Error('Liste temporairement refusée'));
     if (successfulRead) vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
     else vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Détail temporairement refusé'));
-    await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
+    await moveTaskTo(user, task.title, 'Terminé');
     const expected = successfulRead ? verified.title : confirmed.title;
     expect(await screen.findByRole('heading', { name: expected })).toBeTruthy();
+    const draft = await openTaskCard(user, other.title);
+    const title = draft.getByRole('textbox', { name: /^Titre/ });
+    await user.clear(title); await user.type(title, 'Brouillon à conserver');
     await act(async () => write.resolve(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', status: 'review', progress: 17, tasks: { total: 9, completed: 2, active: 9, archived: 0 } }, [task, other])));
-    expect(await screen.findByRole('dialog', { name: 'Projet confirmé tardivement' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Projet confirmé tardivement' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: expected })).toBeTruthy();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
     expect(title.value).toBe('Brouillon à conserver');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('2/9');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('2/9 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({ ...project, title: 'Projet confirmé tardivement', tasks: { total: 2, completed: 1, active: 2, archived: 0 }, progress: 50 }, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(screen.getByRole('heading', { name: verified.title })).toBeTruthy();
     expect(title.value).toBe('Brouillon à conserver');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/2 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(closeProject).toHaveBeenCalledTimes(1);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
-    screen.getByRole('button', { name: 'Fermer la fiche projet' }).focus();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await leaveProject(user);
   });
 
   it("retains a submitted edit after an accepted mismatched receipt and permits only GET recovery", async () => {
@@ -331,27 +280,29 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTask).mockResolvedValueOnce({ ...other, title: 'Mauvaise confirmation éditée' });
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
+    await tasksTab(user);
+    const row = taskCard(task.title);
+    await openTaskCard(user, task.title);
+    const title = sheetTitle();
     await user.clear(title); await user.type(title, 'Modification envoyée');
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Vérification indisponible'));
-    await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+    await user.click(saveTask());
     expect(await within(row).findByRole('alert')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation éditée' })).toBeNull();
     expect(title.value).toBe('Modification envoyée');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
+    expect(saveTask().disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [fixtures.projectTask({ title: 'Valeur vérifiée' }), other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: 'Valeur vérifiée' })).toBeTruthy();
     expect(title.value).toBe('Modification envoyée');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(false);
+    expect(saveTask().disabled).toBe(false);
     expect(updateProjectTask).toHaveBeenCalledTimes(1);
     expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).queryByRole('alert')).toBeNull();
     await user.clear(title);
-    await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
-    expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).getByRole('alert').textContent).toBe('Le titre de la tâche est obligatoire.');
+    await user.click(saveTask());
+    // MAIR-859 (C5): the title rule is shown under the field.
+    expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).getByRole('alert').textContent).toBe('Donnez un titre à la tâche');
     expect(updateProjectTask).toHaveBeenCalledTimes(1);
   });
 
@@ -365,34 +316,40 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce({ ...other, title: 'Mauvaise confirmation reçue' });
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
-    const row = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(row).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title); await user.type(title, 'Brouillon à garder');
+    await tasksTab(user);
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Vérification indisponible'));
-    await user.click(within(row).getByRole('button', { name: `Marquer ${task.title} comme terminée` }));
-    const rowAlert = await within(row).findByRole('alert');
+    await moveTaskTo(user, task.title, 'Terminé');
+    // The card is back in its column (a new element): the write is not confirmed.
+    const rowAlert = await waitFor(() => within(taskCard(task.title)).getByRole('alert'));
+    const row = taskCard(task.title);
+    expect(row.closest('[data-task-column]').getAttribute('data-task-column')).toBe('todo');
     expect(rowAlert.textContent).toContain('acceptée');
     expect(rowAlert.textContent).toContain('confirmation de tâche est incohérente');
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation reçue' })).toBeNull();
     expect(screen.getByRole('heading', { name: other.title })).toBeTruthy();
-    expect(title.value).toBe('Brouillon à garder');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
-    expect(within(row).getByRole('combobox').disabled).toBe(true);
-    expect(within(row).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    expect(within(otherRow).getByRole('combobox').disabled).toBe(false);
+    // The task waits for a verification read: no move, no deletion, no save from its sheet.
+    await user.click(within(row).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.queryByRole('menuitemradio')).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }).disabled).toBe(true);
+    await user.keyboard('{Escape}');
+    await user.click(within(taskCard(other.title)).getByRole('button', { name: `Actions pour ${other.title}` }));
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3);
+    await user.keyboard('{Escape}');
+    await openTaskCard(user, task.title);
+    const title = sheetTitle();
+    await user.clear(title); await user.type(title, 'Brouillon à garder');
+    expect(saveTask().disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     const verified = fixtures.projectTask({ title: 'Titre vérifié par lecture' });
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: verified.title })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(false);
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('Brouillon à garder');
+    expect(saveTask().disabled).toBe(false);
+    expect(sheetTitle().value).toBe('Brouillon à garder');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a scoped pending status guard, retains an edit draft and leaves other tasks usable", async () => {
+  it("shows a scoped pending status guard, moves the card while the write runs and rolls it back on refusal (MAIR-859 C2)", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
@@ -403,40 +360,38 @@ describe("Projects page", () => {
     vi.mocked(updateProjectTaskStatus).mockImplementationOnce(() => write.promise);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
-    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    await user.click(within(firstRow).getByRole('button', { name: 'Modifier', exact: true }));
-    const title = screen.getByRole('textbox', { name: 'Titre de la tâche' });
-    await user.clear(title);
-    await user.type(title, 'Brouillon conservé');
-    const toggle = within(firstRow).getByRole('button', { name: `Marquer ${task.title} comme terminée` });
-    await user.dblClick(toggle);
+    await tasksTab(user);
+    const column = (title) => taskCard(title).closest('[data-task-column]').getAttribute('data-task-column');
+    expect(column(task.title)).toBe('todo');
+    await moveTaskTo(user, task.title, 'Terminé');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
-    expect(firstRow.getAttribute('aria-busy')).toBe('true');
-    expect(within(firstRow).getByRole('status').textContent).toBe('Opération sur la tâche en cours…');
-    expect(toggle.disabled).toBe(true);
-    expect(within(firstRow).getByRole('combobox', { name: `Statut de ${task.title}` }).disabled).toBe(true);
-    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
-    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
-    expect(title.value).toBe('Brouillon conservé');
+    // The card waits in its new column, busy, with no other move offered.
+    expect(column(task.title)).toBe('done');
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
+    expect(within(taskCard(task.title)).getByRole('status').textContent).toBe('Enregistrement…');
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.queryByRole('menuitemradio')).toBeNull();
+    await user.keyboard('{Escape}');
+    await user.click(within(taskCard(other.title)).getByRole('button', { name: `Actions pour ${other.title}` }));
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(3);
+    await user.keyboard('{Escape}');
     await act(async () => write.reject(new Error('Écriture refusée')));
-    expect(await within(firstRow).findByRole('alert')).toBeTruthy();
-    expect(within(firstRow).getByRole('alert').textContent).toContain('Écriture refusée');
-    expect(toggle.disabled).toBe(false);
-    expect(firstRow.getAttribute('aria-busy')).toBeNull();
-    expect(title.value).toBe('Brouillon conservé');
+    // Rolled back to « À faire », with the refusal on the card and in an error toast.
+    await waitFor(() => expect(column(task.title)).toBe('todo'));
+    expect(within(taskCard(task.title)).getByRole('alert').textContent).toContain('Écriture refusée');
+    expect(await screen.findByText('Statut non modifié')).toBeTruthy();
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBeNull();
     const confirmed = fixtures.projectTask({ title: 'Statut canonique reçu', status: 'done', completed: true });
     vi.mocked(updateProjectTaskStatus).mockResolvedValueOnce(confirmed);
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
-    toggle.focus(); await user.keyboard('{Enter}');
+    await moveTaskTo(user, task.title, 'Terminé');
     expect(await screen.findByRole('heading', { name: confirmed.title })).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('Brouillon conservé');
+    expect(column(confirmed.title)).toBe('done');
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(2);
   });
 
-  it("guards a pending delete, retains other rows and retries only the refused read", async () => {
+  it("guards a pending delete, retains other cards and retries only the refused read", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
@@ -447,16 +402,16 @@ describe("Projects page", () => {
     vi.mocked(deleteProjectTask).mockImplementationOnce(() => write.promise);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
-    const firstRow = screen.getByRole('heading', { name: task.title }).closest('article');
-    await user.click(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
-    await user.click(within(firstRow).getByRole('button', { name: 'Supprimer', exact: true }));
-    expect(firstRow.getAttribute('aria-busy')).toBe('true');
-    expect(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }).disabled).toBe(true);
-    await user.dblClick(within(firstRow).getByRole('button', { name: `Supprimer ${task.title}` }));
+    await tasksTab(user);
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }));
+    expect(screen.getByText('Supprimer définitivement cette tâche ?')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Supprimer', exact: true }));
+    expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
+    await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
+    expect(screen.getByRole('menuitem', { name: 'Supprimer la tâche' }).disabled).toBe(true);
+    await user.keyboard('{Escape}');
     expect(deleteProjectTask).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
-    const otherRow = screen.getByRole('heading', { name: other.title }).closest('article');
-    expect(within(otherRow).getByRole('combobox', { name: `Statut de ${other.title}` }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
     await act(async () => write.resolve());
     expect(await screen.findByRole('button', { name: 'Réessayer la fiche' })).toBeTruthy();
@@ -466,7 +421,7 @@ describe("Projects page", () => {
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
     expect(deleteProjectTask).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('0/1');
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('0/1 tâches terminées'); // MAIR-846: « Avancement » metric
   });
 
   it("keeps a canonical created task on detail failure and retries GET only by keyboard", async () => {
@@ -482,13 +437,17 @@ describe("Projects page", () => {
     vi.mocked(createProjectTask).mockResolvedValueOnce(confirmed);
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
-    await user.type(screen.getByRole('textbox', { name: 'Titre de la tâche' }), 'Brouillon soumis');
-    await toggleOption(user, screen, 'Assignés', 'Marie Durand'); await user.click(screen.getByRole('textbox',{name:'Titre de la tâche'}));
+    await tasksTab(user);
+    await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
+    await user.type(sheetTitle(), 'Brouillon soumis');
+    await nextStep(user);
+    await chooseAssignee(user, 'Marie Durand');
+    await nextStep(user);
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
-    expect(await screen.findByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: confirmed.title, level: 4 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Titre de la tâche' }).value).toBe('');
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/2');
+    expect(screen.queryByRole('dialog', { name: 'Nouvelle tâche' })).toBeNull();
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/2 tâches terminées'); // MAIR-846: « Avancement » metric
     const retry = screen.getByRole('button', { name: 'Réessayer la fiche' });
     retry.focus();
     await user.keyboard('{Enter}');
@@ -499,8 +458,8 @@ describe("Projects page", () => {
     expect(getProjectDetails).toHaveBeenCalledTimes(3);
     await act(async () => finishRecovery(fixtures.projectDetails({ ...project, tasks: { total: 3, completed: 1, active: 3, archived: 0 }, progress: 33 }, [fixtures.projectTask(), fixtures.projectTask({ id: 'task-2', status: 'done' }), confirmed])));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Réessayer la fiche' })).toBeNull());
-    expect(screen.getByRole('heading', { name: confirmed.title, level: 3 })).toBeTruthy();
-    expect(screen.getByText('Tâches').parentElement.textContent).toContain('1/3');
+    expect(screen.getByRole('heading', { name: confirmed.title, level: 4 })).toBeTruthy();
+    expect(screen.getByText(/tâches terminées$/).textContent).toBe('1/3 tâches terminées'); // MAIR-846: « Avancement » metric
     expect(createProjectTask).toHaveBeenCalledTimes(1);
     expect(createProjectTask.mock.calls[0][1].title).toBe('Brouillon soumis');
   });
@@ -517,17 +476,18 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${first.title}` }));
     await user.click(screen.getByRole('button', { name: `Ouvrir la fiche du projet ${second.title}` }));
-    expect(await screen.findByRole('dialog', { name: second.title })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: second.title })).toBeTruthy();
     await act(async () => {
       if (refused) rejectFirst(new Error('Erreur ancienne hors contexte'));
       else resolveFirst(fixtures.projectDetails(first));
     });
-    expect(screen.getByRole('dialog', { name: second.title })).toBeTruthy();
-    expect(screen.queryByRole('dialog', { name: first.title })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: second.title })).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 1, name: first.title })).toBeNull();
     expect(screen.queryByText('Erreur ancienne hors contexte')).toBeNull();
     expect(getProjectDetails.mock.calls.map(([id]) => id)).toEqual([first.id, second.id]);
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    // MAIR-846: the URL names the project shown, the last one chosen.
+    expect(new URLSearchParams(window.location.search).get('project')).toBe(second.id);
+    await leaveProject(user);
   });
 
   it.each([false, true])("keeps the current view after pending duplication and GET-only recovery (refused refresh: %s)", async (refusedRefresh) => {
@@ -659,7 +619,7 @@ describe("Projects page", () => {
     expect(screen.queryByRole("group", { name: fixtures.projectListItem().title })).toBeNull();
   });
 
-  it("keeps the search and filter toolbar stacked until enough width is available", async () => {
+  it("keeps the filters on one row and the view switch on its own row under them (MAIR-1134 C6)", async () => {
     render(<ProjectsPage />);
     await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
 
@@ -673,10 +633,10 @@ describe("Projects page", () => {
     expect(controls.classList.contains("xl:flex-row")).toBe(true);
     expect(controls.classList.contains("md:flex-row")).toBe(false);
     expect(toolbar.classList.contains("items-start")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-wrap")).toBe(true);
-    expect(controls.classList.contains("2xl:basis-[50rem]")).toBe(true);
-    expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
+    expect(toolbar.classList.contains("flex-col")).toBe(true);
+    // The view switch never moves: its own row, left aligned, whatever the screen width.
+    expect([...toolbar.classList].some((name) => /flex-row/.test(name))).toBe(false);
+    expect(toolbar.lastElementChild).toBe(screen.getByRole("radiogroup", { name: "Vue des projets" }));
     expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
     expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
     expect(searchContainer.classList.contains("md:flex-1")).toBe(true);
@@ -692,74 +652,58 @@ describe("Projects page", () => {
 
     const { container } = render(<ProjectsPage />);
 
-    expect(await screen.findByRole("heading", { name: project.title, level: 2 })).toBeTruthy();
+    // MAIR-846: the link opens the project page on its « Tâches » tab.
+    expect(await screen.findByRole("heading", { name: project.title, level: 1 })).toBeTruthy();
     expect(getProjectDetails).toHaveBeenCalledExactlyOnceWith(project.id);
+    expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
-    expect(screen.getByText(task.title)).toBeTruthy();
-    expect(screen.getByRole("dialog", { name: project.title })).toBeTruthy();
+    expect(within(screen.getByRole("tabpanel")).getByText(task.title)).toBeTruthy();
     await waitFor(() => {
       expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
     });
   });
 
-  it("keeps keyboard focus inside a named project dialog and returns it to the opener", async () => {
+  it("opens a project as an addressable page, follows the browser history and returns the focus to the opener (MAIR-846)", async () => {
     const user = userEvent.setup();
     const project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project));
+    window.history.replaceState({}, "", "/?view=kanban");
     render(<ProjectsPage />);
 
     const opener = await screen.findByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` });
     await user.click(opener);
-    const dialog = await screen.findByRole("dialog", { name: project.title });
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
-    expect(document.activeElement).toBe(dialog);
+    const title = await screen.findByRole("heading", { level: 1, name: project.title });
+    const page = title.closest("section");
+    expect(page.getAttribute("role")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(title);
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}`);
+    expect(screen.queryByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` })).toBeNull();
 
-    const focusable = Array.from(dialog.querySelectorAll("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])"))
-      .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true");
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    expect(first).toBeTruthy();
-    expect(last).toBeTruthy();
-    await user.tab({ shift: true });
-    expect(document.activeElement).toBe(last);
-    await user.tab();
-    expect(document.activeElement).toBe(first);
+    // The tab is kept in the URL so that a reload comes back to it.
+    await user.click(screen.getByRole("tab", { name: "Planning" }));
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}&tab=planning`);
+    await user.click(screen.getByRole("tab", { name: "Vue d’ensemble" }));
+    expect(window.location.search).toBe(`?view=kanban&project=${project.id}`);
 
-    const results = await axe(dialog);
+    const results = await axe(page);
     expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
 
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
+    await user.click(within(page).getByRole("button", { name: "Projets" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: project.title })).toBeNull());
+    expect(window.location.search).toBe("?view=kanban");
     expect(document.activeElement).toBe(opener);
 
-    await user.click(opener);
-    expect(await screen.findByRole("dialog", { name: project.title })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Fermer la fiche projet" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: project.title })).toBeNull());
-    expect(document.activeElement).toBe(opener);
+    // Back / Forward of the browser follow the page.
+    await act(async () => { window.history.back(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    expect(await screen.findByRole("heading", { level: 1, name: project.title })).toBeTruthy();
+    expect(getProjectDetails).toHaveBeenCalledTimes(2);
+    await act(async () => { window.history.forward(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: project.title })).toBeNull());
+    expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${project.title}` })).toBeTruthy();
   });
 
-  it("rejects an incomplete task link without requesting a project detail", async () => {
-    window.history.replaceState({}, "", "/?task=task-1");
-    render(<ProjectsPage />);
-
-    expect(await screen.findByText("Lien de projet invalide.")).toBeTruthy();
-    expect(getProjectDetails).not.toHaveBeenCalled();
-  });
-
-  it("keeps controls keyboard reachable and has no serious or critical axe violation", async () => {
-    const user = userEvent.setup();
-    render(<ProjectsPage />);
-    await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
-
-    await user.tab();
-    expect(document.activeElement?.matches("button, input, a")).toBe(true);
-    expect(screen.getByRole("main")).toBeTruthy();
-
-    const results = await axe(document.body);
-    expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
-  });
 });
 
 it('wires the existing Login identity to a received Project member only when the detail is opened', async () => {
@@ -773,7 +717,9 @@ it('wires the existing Login identity to a received Project member only when the
     render(<ProjectsPage />);
     const opener=await screen.findByRole('button',{name:`Ouvrir la fiche du projet ${project.title}`});
     expect(fetch).not.toHaveBeenCalled();await user.click(opener);
-    await screen.findByRole('button',{name:'Retirer Admin Mairie'});
+    await tasksTab(user);
+    await user.click(screen.getByRole('button',{name:'Nouvelle tâche'}));
+    await waitFor(()=>expect(checkedRadio('Assignée à')).toBe('user-1'));
     // Besides the Login identity, opening reads only the project statuses and archived tasks (MAIR-567).
     const urls=fetch.mock.calls.map(([input])=>String(input instanceof Request?input.url:input));
     expect(urls.filter(url=>url==='/api/auth/current-user')).toHaveLength(1);

@@ -112,7 +112,8 @@ criteria:
   # 13.12: no device motion.
 
 states:
-  # Board of a Responsable: Kanban view (default), the other views, filters and empty result.
+  # Board of a Responsable: Kanban view (default), the other views, filters and empty result. The view switch is the
+  # lib SegmentedControl (radios), the filters are native selects (MAIR-828): a filtered board replaces an open list.
   - id: board-kanban
     as: manager
     route: /
@@ -123,43 +124,36 @@ states:
     route: /
     steps:
       - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
-      - click: { role: tab, name: Grille }
+      - click: { role: radio, name: Grille }
       - wait_for: { text: 1/3 tâches }
   - id: board-table
     as: manager
     route: /
     steps:
       - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
-      - click: { role: tab, name: Tableau }
+      - click: { role: radio, name: Tableau }
       - wait_for: { role: columnheader, name: Progression }
-  - id: status-filter-open
+  - id: status-filter-applied
+    description: Board filtered on one status
     as: manager
-    route: /
+    route: /?status=in-progress
     steps:
-      - click: { role: button, name: Tous les statuts }
-      - wait_for: { role: listbox, name: Filtrer par statut }
-  - id: priority-filter-open
+      - wait_for: { role: combobox, name: Statut }
+  - id: priority-filter-applied
+    description: Board filtered on one priority
     as: manager
-    route: /
+    route: /?priority=high
     steps:
-      - click: { role: button, name: Toutes les priorités }
-      - wait_for: { role: listbox, name: Filtrer par priorité }
+      - wait_for: { role: combobox, name: Priorité }
   - id: search-no-result
     description: Grid view with a search that matches no project (empty state)
     as: manager
     route: /
     steps:
       - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
-      - click: { role: tab, name: Grille }
+      - click: { role: radio, name: Grille }
       - fill: { role: searchbox, value: introuvable }
-      - wait_for: { text: Aucun projet ne correspond aux filtres sélectionnés. }
-  - id: task-composer
-    description: Inline task form of a card opened
-    as: manager
-    route: /
-    steps:
-      - click: { selector: '[data-project-id="project-102"] button:has-text("Ajouter une tâche")' }
-      - wait_for: { selector: '[data-project-id="project-102"] form' }
+      - wait_for: { text: Aucun projet ne correspond à la recherche ou aux filtres sélectionnés. }
   # Card menu and the dialogs it opens (the deletion stops at the confirmation).
   - id: card-menu-open
     as: manager
@@ -181,67 +175,67 @@ states:
       - click: { role: button, name: Actions pour Plan de mobilité douce }
       - click: { role: menuitem, name: Modifier }
       - wait_for: { role: heading, name: Modifier le projet }
-  # New project dialog: empty, submitted empty (browser validation), then without an assignee.
+  # New project dialog in four steps (MAIR-1136): empty, then « Suivant » on an empty first step.
   - id: new-project-dialog
     as: manager
     route: /
     steps:
       - click: { role: button, name: Nouveau projet }
       - wait_for: { role: heading, name: Nouveau projet }
-  - id: new-project-empty-submit
-    description: Submitted empty (browser validation of the required fields)
-    as: manager
-    route: /
-    steps:
-      - click: { role: button, name: Nouveau projet }
-      - click: { role: button, name: Créer le projet }
   - id: new-project-errors
-    description: Required fields filled but no assignee (error message of the form)
+    description: « Suivant » on an empty first step (messages under the fields)
     as: manager
     route: /
     steps:
       - click: { role: button, name: Nouveau projet }
-      - fill: { selector: "#project-title", value: Réfection du gymnase }
-      - fill: { selector: "#project-description", value: Remplacement du sol sportif. }
-      - fill: { selector: "#project-due-date", value: "2026-05-01" }
-      - click: { role: button, name: Créer le projet }
-      - wait_for: { text: Les champs obligatoires doivent être renseignés. }
-  # Detail dialog of a project.
+      - click: { role: button, name: Suivant }
+      - wait_for: { text: Le titre est obligatoire. }
+  # Project page (MAIR-846) and its tabs.
   - id: project-detail
     as: manager
-    route: /
+    route: /?project=project-101
     steps:
-      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      - wait_for: { role: button, name: Fermer la fiche projet }
+      - wait_for: { role: navigation, name: Fil d’Ariane }
   - id: project-detail-edit
-    description: Inline edition of the project in the detail dialog
+    description: « Modifier » of the project page (modal)
     as: manager
-    route: /
+    route: /?project=project-101
     steps:
-      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      # The first "Modifier" of the dialog is the one of its header (the next ones edit a task).
-      - click: { selector: '[role="dialog"] button:text-is("Modifier") >> nth=0' }
+      - click: { role: button, name: Modifier }
       - wait_for: { role: heading, name: Modifier le projet }
-  - id: task-delete-confirmation
-    description: Inline confirmation of a task deletion (stops there)
+  - id: project-tasks
+    description: « Tâches » tab of the project page (board of the tasks)
     as: manager
-    route: /
+    route: /?project=project-101&tab=tasks
     steps:
-      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      - click: { role: button, name: Supprimer Remplacement des fenêtres }
-      - wait_for: { text: Supprimer définitivement cette tâche ? }
+      - wait_for: { role: button, name: Ouvrir la tâche Remplacement des fenêtres }
+  - id: new-task-dialog
+    description: « Nouvelle tâche » window, first step
+    as: manager
+    route: /?project=project-101&tab=tasks
+    steps:
+      - click: { role: button, name: Nouvelle tâche }
+      - wait_for: { role: dialog, name: Nouvelle tâche }
+  - id: task-delete-confirmation
+    description: Confirmation of a task deletion from its « … » menu (stops there)
+    as: manager
+    route: /?project=project-101&tab=tasks
+    steps:
+      - click: { role: button, name: Actions pour Remplacement des fenêtres }
+      - click: { role: menuitem, name: Supprimer la tâche }
+      - wait_for: { role: dialog, name: "Supprimer la tâche ?" }
   - id: deep-link-task
-    description: Link to a task (?project=&task=), the detail opens on the highlighted task
+    description: Link to a task (?project=&task=), the board highlights the task
     as: manager
     route: /?project=project-101&task=task-1002
     steps:
       - wait_for: { selector: 'article[aria-current="true"]' }
   - id: task-collaboration
-    description: Comments and history of a task
+    description: Page of a task with its comments and history
     as: manager
-    route: /?project=project-101&task=task-1002
+    route: /?project=project-101&tab=tasks
     steps:
-      - click: { selector: 'article[aria-current="true"] button:has-text("Suivi")' }
+      - click: { role: button, name: Ouvrir la tâche Remplacement des fenêtres }
       - wait_for: { text: Aucun commentaire. }
   - id: deep-link-invalid
     description: Invalid project link (error alert)
@@ -257,8 +251,8 @@ states:
     steps:
       - click: { role: button, name: Actions pour Marché de Noël }
       - click: { role: menuitem, name: Dupliquer }
-      - wait_for: { text: dupliqué. }
-  # Role User: read-only board and detail.
+      - wait_for: { text: dupliqué }
+  # Role User: read-only board and project page.
   - id: agent-board
     as: agent
     route: /
@@ -266,14 +260,13 @@ states:
       - wait_for: { role: button, name: Ouvrir la fiche du projet Plan de mobilité douce }
   - id: agent-project-detail
     as: agent
-    route: /
+    route: /?project=project-101
     steps:
-      - click: { role: button, name: Ouvrir la fiche du projet Rénovation }
-      - wait_for: { role: button, name: Fermer la fiche projet }
+      - wait_for: { role: navigation, name: Fil d’Ariane }
   # No project at all.
   - id: empty-board
     as: newcomer
     route: /
     steps:
-      - click: { role: tab, name: Grille }
-      - wait_for: { text: Aucun projet ne correspond aux filtres sélectionnés. }
+      - click: { role: radio, name: Grille }
+      - wait_for: { text: Aucun projet ne correspond à la recherche ou aux filtres sélectionnés. }

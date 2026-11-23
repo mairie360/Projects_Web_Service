@@ -121,7 +121,8 @@ describe('route catch-all : exactement le contrat BFF_Project', () => {
       const concrete = template.replace(/\{[^}]+\}/g, 'id-1');
       for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
         forwarded.length = 0;
-        const request = new NextRequest(`http://projects.test${concrete}`, { method, ...(['GET', 'DELETE'].includes(method) ? {} : { body: '{}' }) });
+        // lib-components 2.3 (MAIR-1133): a body must carry the content type the contract declares (415 otherwise).
+        const request = new NextRequest(`http://projects.test${concrete}`, { method, ...(['GET', 'DELETE'].includes(method) ? {} : { body: '{}', headers: { 'content-type': 'application/json' } }) });
         const response = await proxyBffRequest(request, { params: Promise.resolve({ path: concrete.split('/').filter(Boolean) }) });
         if (methods[method.toLowerCase()]) {
           assert.deepEqual([response.status, forwarded], [204, [`${method} ${concrete}`]], `${method} ${template}`);
@@ -130,6 +131,10 @@ describe('route catch-all : exactement le contrat BFF_Project', () => {
         }
       }
     }
+    forwarded.length = 0;
+    const untyped = new NextRequest('http://projects.test/projects', { method: 'POST', body: '{}' });
+    const refused = await proxyBffRequest(untyped, { params: Promise.resolve({ path: ['projects'] }) });
+    assert.deepEqual([refused.status, forwarded], [415, []], 'a body without its declared JSON type is refused without network');
     delete process.env.BFF_PROJECT_BASE_URL;
   });
 });

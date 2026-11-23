@@ -32,7 +32,7 @@ for (const [name, View] of [['grid', GridView], ['table', TableView]]) {
     const heading = document.getElementById(section.getAttribute('aria-labelledby'));
     assert.equal(heading.tagName, 'H3');
     assert.equal(heading.textContent, 'Aucun projet à afficher');
-    assert.match(section.textContent, /Aucun projet ne correspond aux filtres sélectionnés/);
+    assert.match(section.textContent, /Aucun projet ne correspond à la recherche ou aux filtres sélectionnés/);
     assert.equal(section.querySelectorAll('button, a').length, 0, 'An empty view cannot invent a creation permission');
     assert.equal(document.querySelectorAll('[role="alert"], [role="status"]').length, 0, 'An empty success is not a loading or error announcement');
   });

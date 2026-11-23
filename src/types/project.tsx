@@ -1,4 +1,7 @@
 import type {
+  ActivityItem as ContractActivityItem,
+  Milestone as ContractMilestone,
+  ProjectMemberRole as ContractProjectMemberRole,
   ProjectPriority as ContractProjectPriority,
   ProjectStatus as ContractProjectStatus,
   TaskCollaborationResponse,
@@ -7,6 +10,14 @@ import type {
 } from '@mairie360/bff-project-openapi/model';
 
 export type ProjectStatus = ContractProjectStatus;
+/** MAIR-1084: a task has three status categories; `review` and `on-hold` are project statuses only. */
+export type TaskStatus = Exclude<ProjectStatus, 'review' | 'on-hold'>;
+/** MAIR-1088: role of a member in the project (the owner always reads `manager`). */
+export type ProjectMemberRole = ContractProjectMemberRole;
+/** MAIR-1086: a milestone of the project (`dueDate` is a day, `YYYY-MM-DD`). */
+export type Milestone = ContractMilestone;
+/** MAIR-1089: an entry of the project activity (a project comment or the history of one of its tasks). */
+export type ActivityItem = ContractActivityItem;
 export type ProjectPriority = ContractProjectPriority;
 
 export interface Person {
@@ -29,6 +40,8 @@ export interface ProjectTask {
   priorityLabel?: string;
   labels: string[];
   dueDate: string;
+  /** MAIR-1087: start date (`YYYY-MM-DD` once normalized), `null` or absent without one. */
+  startDate?: string | null;
   completed: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -49,13 +62,15 @@ export type TaskCollaboration = TaskCollaborationResponse;
 
 export interface ProjectTaskDraft {
   title: string;
-  status: ProjectStatus;
+  status: TaskStatus;
   statusId?: string;
   responsible: Person;
   assignees: Person[];
   priority: ProjectPriority;
   labels: string[];
   dueDate: string;
+  /** MAIR-1087: start date (`YYYY-MM-DD`), empty for none. */
+  startDate?: string;
 }
 
 export interface Project {
@@ -91,4 +106,23 @@ export interface Project {
     canClose?: boolean;
   };
   createdAt: string;
+  /** MAIR-1088: members with their role (first 5 on the page, all of them with their load in the detail). */
+  members?: ProjectMember[];
+  /** MAIR-1088: role of the caller in the project, `null` when they are not a member. */
+  myRole?: ProjectMemberRole | null;
+  /** MAIR-1085: budgets in cents of euro, `null` when not filled in. */
+  budgetVoted?: number | null;
+  budgetCommitted?: number | null;
+  /** MAIR-1086: the first 100 milestones (detail only) and their total. */
+  milestones?: Milestone[];
+  milestonesTotal?: number;
+}
+
+export interface ProjectMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  role: ProjectMemberRole;
+  /** Detail only: active tasks of the project assigned to the member, and the open ones among them. */
+  load?: { tasksOpen: number; tasksTotal: number };
 }

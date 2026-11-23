@@ -8,9 +8,10 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { AppShell, Footer } = require('@mairie360/lib-components/shell');
 
+// lib-components 2.3 (MAIR-1092): the footer is no longer part of the page base; these checks opt into it.
 function shellDocument(t, props = {}) {
   const dom = new JSDOM(renderToStaticMarkup(React.createElement(AppShell, {
-    user: { name: '' }, hrefs: { projects: 'https://projects.example/' }, ...props,
+    user: { name: '' }, hrefs: { projects: 'https://projects.example/' }, showFooter: true, ...props,
   }, React.createElement('p', null, 'Contenu du module'))));
   t.after(() => dom.window.close());
   return dom.window.document;
@@ -31,6 +32,13 @@ test('the shared shell keeps sidebar information distinct from a contentinfo lan
   assert.equal(skip.length, 1);
   assert.equal(document.querySelector(skip[0].getAttribute('href')), document.querySelector('main'));
   assert.equal(document.querySelector('main').tabIndex, -1);
+});
+
+test('MAIR-1133: the page base has no footer unless asked for (lib-components 2.3)', t => {
+  const document = shellDocument(t, { showFooter: undefined, footerProps: { year: 2026 } });
+  assert.doesNotMatch(document.body.textContent, /© 2026 Mairie360/);
+  assert.equal(document.querySelectorAll('footer, [role="contentinfo"]').length, 0);
+  assert.match(document.body.textContent, /Contenu du module/);
 });
 
 test('standalone Footer retains its horizontal contentinfo landmark', () => {
