@@ -16,12 +16,12 @@ function sources(dir) {
   });
 }
 
-test('MAIR-1133: lib-components is pinned to exactly 2.3.0, installed and locked', () => {
+test('MAIR-1133: lib-components is pinned to exactly 2.3.2, installed and locked', () => {
   const manifest = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(manifest.dependencies['@mairie360/lib-components'], '2.3.0');
-  assert.equal(lock.packages['node_modules/@mairie360/lib-components'].version, '2.3.0');
-  assert.equal(JSON.parse(read('node_modules/@mairie360/lib-components/package.json')).version, '2.3.0');
+  assert.equal(manifest.dependencies['@mairie360/lib-components'], '2.3.2');
+  assert.equal(lock.packages['node_modules/@mairie360/lib-components'].version, '2.3.2');
+  assert.equal(JSON.parse(read('node_modules/@mairie360/lib-components/package.json')).version, '2.3.2');
 });
 
 test('MAIR-1133: no local stylesheet rule targets a lib component', () => {
