@@ -14,9 +14,9 @@ test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-
     [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectPage', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     // MAIR-846: the project page — header, metrics, tabs (overview, tasks) and the edit modal.
-    [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'ProjectTasksTab', 'ProjectEditForm', 'ProjectWorkflow'],
+    [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'ProjectTasksTab', 'ProjectPlanningTab', 'ProjectEditForm', 'ProjectWorkflow'],
     [`${workspace}/components/ProjectPage/components/ProjectPageHeader/ProjectPageHeader.tsx`]: ['ProjectStatusMenu', 'ProjectMoreMenu'],
-    [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'ProjectLifecycle', 'ProjectSummary'],
+    [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'MilestonesPanel', 'ProjectLifecycle', 'ProjectSummary', 'RecentActivityPanel'],
     // MAIR-859, MAIR-1137: the « Tâches » tab — toolbar, board (cards, quick add), list, task page, task window (Modal)
     // and deletion confirmation; the « … » of a task (`TaskActionsMenu`) is shared by the cards, the rows and the page.
     [`${workspace}/components/ProjectPage/components/ProjectTasksTab/ProjectTasksTab.tsx`]: ['TaskToolbar', 'TaskBoard', 'TaskListView', 'TaskPage', 'TaskDialog', 'TaskDeleteConfirm'],

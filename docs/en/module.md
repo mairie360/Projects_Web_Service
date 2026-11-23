@@ -15,7 +15,7 @@ follow it; the list stays mounted behind it, with its filters, view and page.
 - **Indicators**: Avancement (x/y tâches terminées), Échéance (J-xx, « Aujourd’hui » or the delay, in the
   instance time zone), Budget engagé (committed amount, « Sur <voted> votés (n %) »; « Budget non renseigné » without one, MAIR-1085), Tâches en retard.
 - **Tabs**: Vue d’ensemble, Tâches (count), Planning, Équipe (count), Documents, Activité. The tasks stay mounted
-  on every tab, so drafts and pending writes survive a tab change; Planning, Équipe, Documents and Activité have
+  on every tab, so drafts and pending writes survive a tab change; Équipe, Documents and Activité have
   their own tickets and show a notice meanwhile. A task link (`&task=<id>`) opens « Tâches » and centres the task.
 - **Overview**: « Prochaines tâches » (the three open tasks closest to their due date; checking one marks it
   done), « Jalons » (MAIR-1086), « Activité récente » (MAIR-1089), « Informations »
@@ -800,3 +800,12 @@ The BFF_Project contract of the epic MAIR-822 is mounted on the existing screens
   « Informations » shows the caller's role.
 - **Activity** (MAIR-1089): « Activité récente » shows the five latest comments and task changes; the bulk deletion
   of the table goes through `POST /projects/bulk-delete`.
+
+## Planning (MAIR-868)
+
+The « Planning » tab is the lib `Gantt` (lib-components 2.3, MAIR-891): months header, milestones line (diamond, tooltip
+« titre · date · état »), one bar per task from its start date to its due date (a task without start date is a
+one-day bar on its due date) coloured À faire / En cours / Terminé / En retard with the assignee's initials, the
+« aujourd'hui » marker and the legend. The period covers whole months around the tasks, the milestones and today and
+scrolls horizontally. A bar (a button, named « tâche, état, du … au … ») opens the task page in « Tâches ». Tasks
+without due date are counted under the chart; nothing dated gives « Rien à planifier ».

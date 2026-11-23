@@ -14,6 +14,7 @@ import { ProjectEditForm } from './components/ProjectEditForm';
 import { ProjectMetrics } from './components/ProjectMetrics';
 import { ProjectOverview } from './components/ProjectOverview';
 import { ProjectPageHeader } from './components/ProjectPageHeader';
+import { ProjectPlanningTab } from './components/ProjectPlanningTab';
 import { ProjectTasksTab } from './components/ProjectTasksTab';
 import { ProjectWorkflow } from './components/ProjectWorkflow';
 import { useDetailTaskForm, type TaskColumnStatus } from './use-detail-task-form';
@@ -289,7 +290,10 @@ export function ProjectPage({
         {project.taskItems && <ProjectWorkflow projectId={project.id} role={canManageWorkflow(workflowRole) && project.permissions?.canEdit === true ? workflowRole : undefined} port={workflowPort} refreshKey={project} loadedTasks={project.taskItems} onSnapshot={receiveWorkflow} onSaveStatuses={onSaveWorkflowStatuses} onMutation={onSaveWorkflowStatuses ? undefined : () => void onRetry?.()} />}
       </div>
 
-      <div {...panelProps('planning')}>{pendingFeature('Planning')}</div>
+      {/* MAIR-868: a bar opens the task page in « Tâches », like a card of the board. */}
+      <div {...panelProps('planning')}>
+        <ProjectPlanningTab tasks={tasks} milestones={milestones.milestones} onOpenTask={viewTask} />
+      </div>
       <div {...panelProps('team')}>{pendingFeature('Équipe')}</div>
       <div {...panelProps('documents')}>{pendingFeature('Documents')}</div>
       <div {...panelProps('activity')}>{pendingFeature('Activité')}</div>

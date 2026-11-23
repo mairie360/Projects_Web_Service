@@ -17,7 +17,7 @@ sa page.
   de l’instance), Budget engagé (montant engagé, « Sur <voté> votés (n %) » ; « Budget non renseigné » sans budget, MAIR-1085), Tâches en retard.
 - **Onglets** : Vue d’ensemble, Tâches (compteur), Planning, Équipe (compteur), Documents, Activité. Les tâches
   restent montées sur tous les onglets : brouillons et écritures en attente survivent à un changement d’onglet ;
-  Planning, Équipe, Documents et Activité ont leurs propres tickets et affichent un avis en attendant. Un lien de
+  Équipe, Documents et Activité ont leurs propres tickets et affichent un avis en attendant. Un lien de
   tâche (`&task=<id>`) ouvre « Tâches » et centre la tâche.
 - **Vue d’ensemble** : « Prochaines tâches » (les trois tâches ouvertes les plus proches de leur échéance ; la
   cocher la termine), « Jalons » (MAIR-1086), « Activité récente » (MAIR-1089),
@@ -835,3 +835,13 @@ Le contrat BFF_Project de l’epic MAIR-822 est branché sur les écrans existan
   affiche le rôle de l’appelant.
 - **Activité** (MAIR-1089) : « Activité récente » montre les cinq derniers commentaires et changements de tâches ; la
   suppression groupée du tableau passe par `POST /projects/bulk-delete`.
+
+## Planning (MAIR-868)
+
+L’onglet « Planning » est le `Gantt` de la lib (lib-components 2.3, MAIR-891) : en-tête des mois, ligne des jalons
+(losange, info-bulle « titre · date · état »), une barre par tâche de sa date de début à son échéance (une tâche sans
+date de début est une barre d’un jour à son échéance) colorée À faire / En cours / Terminé / En retard avec les
+initiales de l’assigné, le repère « aujourd’hui » et la légende. La période couvre des mois entiers autour des tâches,
+des jalons et du jour, et défile horizontalement. Une barre (un bouton nommé « tâche, état, du … au … ») ouvre la page
+de la tâche dans « Tâches ». Les tâches sans échéance sont comptées sous le diagramme ; rien de daté donne « Rien à
+planifier ».
