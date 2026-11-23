@@ -1,6 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ProjectWorkflow } from '@/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow';
 import { ProjectTemplateManager } from '@/components/ProjectsWorkspace/components/ProjectTemplateManager';
 import { ProjectTemplatePicker } from '@/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker';
@@ -16,13 +16,14 @@ const port = (overrides = {}) => ({ readProject: async id => snapshot(id), readT
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
 describe('project task workflow', () => {
-  it('renders project columns and keyboard status selection from the real snapshot', async () => {
-    render(<ProjectWorkflow projectId="p1" role="User" port={port()} />);
-    const column = await screen.findByRole('region', { name: 'Validation municipale' });
-    expect(within(column).getByText('Dossier scolaire')).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'Archivé' })).toBeTruthy();
+  it('reads the project statuses for the page without a second task board (MAIR-859)', async () => {
+    const onSnapshot = vi.fn();
+    render(<ProjectWorkflow projectId="p1" role="User" port={port()} onSnapshot={onSnapshot} />);
+    await waitFor(() => expect(onSnapshot).toHaveBeenCalledWith(snapshot()));
+    // The tasks are moved on the three-column board of the « Tâches » tab, no longer here.
+    expect(screen.queryByRole('region', { name: 'Validation municipale' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Statut de Dossier scolaire' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Paramétrer les statuts' })).toBeNull();
-    expect(screen.getByRole('combobox', { name: 'Statut de Dossier scolaire' }).disabled).toBe(true);
   });
 
   it('keeps legacy operation unavailable without inventing persistence', () => {
@@ -46,29 +47,16 @@ describe('project task workflow', () => {
     expect(screen.queryByText('Statuts enregistrés.')).toBeNull();
   });
 
-  it('rejects a write receipt for another project and never shows saved success', async () => {
-    render(<ProjectWorkflow projectId="p1" role="Admin" port={port({ moveTask: async () => snapshot('p2') })} />);
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Statut de Dossier scolaire' }), { target: { value: 'queued' } });
-    expect((await screen.findByRole('alert')).textContent).toMatch(/vérifi/i);
-    expect(screen.getByRole('region', { name: 'Validation municipale' }).textContent).toContain('Dossier scolaire');
-  });
-
   it('ignores a late response from the previous project', async () => {
     const old = deferred();
+    const onSnapshot = vi.fn();
     const adapter = port({ readProject: id => id === 'p1' ? old.promise : Promise.resolve({ ...snapshot('p2'), tasks: [{ id: 't2', title: 'Nouveau dossier', statusId: 'queued', canUpdateStatus: false }] }) });
-    const view = render(<ProjectWorkflow projectId="p1" role="Admin" port={adapter} />);
-    view.rerender(<ProjectWorkflow projectId="p2" role="Admin" port={adapter} />);
-    await screen.findByText('Nouveau dossier');
+    const view = render(<ProjectWorkflow projectId="p1" role="Admin" port={adapter} onSnapshot={onSnapshot} />);
+    view.rerender(<ProjectWorkflow projectId="p2" role="Admin" port={adapter} onSnapshot={onSnapshot} />);
+    await waitFor(() => expect(onSnapshot).toHaveBeenCalledTimes(1));
     await act(async () => old.resolve(snapshot('p1')));
-    expect(screen.queryByText('Dossier scolaire')).toBeNull();
-    expect(screen.getByText('Nouveau dossier')).toBeTruthy();
-  });
-
-  it('accepts a status update only after matching task and revision are confirmed', async () => {
-    render(<ProjectWorkflow projectId="p1" role="User" port={port({ moveTask: async () => ({ ...snapshot(), revision: 'v2', tasks: [{ ...snapshot().tasks[0], statusId: 'queued' }] }) })} />);
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Statut de Dossier scolaire' }), { target: { value: 'queued' } });
-    await screen.findByText('Modification vérifiée.');
-    expect(within(screen.getByRole('region', { name: 'À instruire' })).getByText('Dossier scolaire')).toBeTruthy();
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(onSnapshot.mock.calls[0][0].projectId).toBe('p2');
   });
 });
 
@@ -76,7 +64,9 @@ describe('project templates', () => {
   it('shows the selected template status preview and passes its verified revision', async () => {
     let selected;
     render(<ProjectTemplatePicker port={port()} onChange={value => { selected = value; }} />);
-    fireEvent.change(await screen.findByLabelText('Modèle de projet'), { target: { value: 'model1' } });
+    // The catalogue is read after mount: choose once its option is in.
+    await screen.findByRole('option', { name: 'Dossier municipal' });
+    fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'model1' } });
     expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Validation municipale');
     expect(selected).toEqual(template);
   });

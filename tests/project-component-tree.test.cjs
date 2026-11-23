@@ -14,10 +14,17 @@ test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-
     [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectPage', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     // MAIR-846: the project page — header, metrics, tabs (overview, tasks) and the edit modal.
-    [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'DetailTaskList', 'ProjectEditForm', 'ProjectWorkflow', 'TaskFormPanel'],
+    [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'ProjectTasksTab', 'ProjectPlanningTab', 'ProjectTeamTab', 'ProjectActivityTab', 'ProjectEditForm', 'ProjectWorkflow'],
     [`${workspace}/components/ProjectPage/components/ProjectPageHeader/ProjectPageHeader.tsx`]: ['ProjectStatusMenu', 'ProjectMoreMenu'],
-    [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'ProjectLifecycle', 'ProjectSummary'],
-    [`${workspace}/components/ProjectPage/components/DetailTaskList/DetailTaskList.tsx`]: ['TaskFilters', 'TaskRow', 'TaskDeleteConfirm', 'TaskFollowUp'],
+    [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'MilestonesPanel', 'ProjectLifecycle', 'ProjectSummary', 'RecentActivityPanel'],
+    // MAIR-859, MAIR-1137: the « Tâches » tab — toolbar, board (cards, quick add), list, task page, task window (Modal)
+    // and deletion confirmation; the « … » of a task (`TaskActionsMenu`) is shared by the cards, the rows and the page.
+    [`${workspace}/components/ProjectPage/components/ProjectTasksTab/ProjectTasksTab.tsx`]: ['TaskToolbar', 'TaskBoard', 'TaskListView', 'TaskPage', 'TaskDialog', 'TaskDeleteConfirm'],
+    [`${workspace}/components/ProjectPage/components/ProjectTasksTab/components/TaskBoard/TaskBoard.tsx`]: ['TaskCard', 'QuickAddTask'],
+    [`${workspace}/components/ProjectPage/components/ProjectTasksTab/components/TaskPage/TaskPage.tsx`]: ['TaskFollowUp'],
+    [`${workspace}/components/ProjectPage/components/ProjectTasksTab/components/TaskDialog/TaskDialog.tsx`]: ['TaskEssentialFields', 'TaskAttributionFields', 'TaskRecap'],
+    [`${workspace}/components/ProjectPage/components/ProjectTeamTab/ProjectTeamTab.tsx`]: ['AddMemberForm'],
+    [`${workspace}/components/ProjectPage/components/ProjectActivityTab/ProjectActivityTab.tsx`]: ['ProjectCommentForm'],
     [`${workspace}/components/ProjectCard/ProjectCard.tsx`]: ['ProjectActionsMenu'],
     [`${workspace}/components/ProjectTasksEditor/ProjectTasksEditor.tsx`]: ['TaskDraftForm', 'DraftTaskRow'],
   };
@@ -74,10 +81,18 @@ test('MAIR-828 no local copy of a lib-components primitive comes back', () => {
   for (const file of [`${components}/TableView/TableView.tsx`, `${components}/ProjectPagination/ProjectPagination.tsx`,
     `${components}/WorkspaceHeader/WorkspaceHeader.tsx`, `${components}/ProjectFiltersBar/ProjectFiltersBar.tsx`,
     `${components}/ProjectCard/components/ProjectActionsMenu/ProjectActionsMenu.tsx`, `${components}/VerificationNotice/VerificationNotice.tsx`,
-    `${components}/ProjectPage/components/DetailTaskList/components/TaskDeleteConfirm/TaskDeleteConfirm.tsx`]) {
+    `${components}/ProjectPage/components/ProjectTasksTab/components/TaskDeleteConfirm/TaskDeleteConfirm.tsx`,
+    `${components}/ProjectPage/components/ProjectTasksTab/components/TaskDialog/TaskDialog.tsx`, `${components}/ProjectPage/components/ProjectTasksTab/components/TaskListView/TaskListView.tsx`]) {
     assert.ok(lib(file), `${file} composes lib-components primitives`);
   }
   assert.match(read(`${components}/TableView/TableView.tsx`), /<DataTable\b/);
+  // MAIR-1137: the task window is the lib Modal (the Drawer sheet is gone), the task list the lib DataTable.
+  assert.match(read(`${components}/ProjectPage/components/ProjectTasksTab/components/TaskDialog/TaskDialog.tsx`), /<Modal\b/);
+  assert.equal(fs.existsSync(path.join(root, components, 'ProjectPage/components/ProjectTasksTab/components/TaskSheet')), false, 'the Drawer sheet is superseded');
+  assert.match(read(`${components}/ProjectPage/components/ProjectTasksTab/components/TaskListView/TaskListView.tsx`), /<DataTable\b/);
+  for (const removed of ['TaskFormPanel', 'DetailTaskList', 'ProjectWorkflow/components/TaskStatusKanban']) {
+    assert.equal(fs.existsSync(path.join(root, components, 'ProjectPage/components', removed)), false, `${removed} is superseded`);
+  }
   assert.match(read(`${components}/ProjectPagination/ProjectPagination.tsx`), /<Pagination\b/);
   assert.match(read(`${workspace}/ProjectsWorkspace.tsx`), /<ConfirmModal\b/);
 });

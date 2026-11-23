@@ -10,7 +10,7 @@ describe('ProjectActionsMenu', () => {
     render(<ProjectActionsMenu project={project} onOpen={vi.fn()} onDuplicate={vi.fn()} onDelete={vi.fn()} onChangeStatus={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Actions pour Projet clavier' }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Ouvrir le projet', 'Dupliquer', 'Supprimer']);
-    expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['À faire', 'En cours', 'En revue', 'Terminé']);
+    expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['À faire', 'En cours', 'En revue', 'Suspendu', 'Terminé']);
     expect(screen.getByRole('menuitemradio', { name: 'En cours' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.queryByRole('menuitem', { name: 'Modifier' })).toBeNull();
   });

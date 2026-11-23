@@ -10,6 +10,8 @@ export type ProjectCardProps = {
   onOpen?: (project: Project) => void;
   onDuplicate?: (project: Project) => void;
   onDelete?: (project: Project) => void;
+  /** MAIR-1134: « Modifier » of the card menu. */
+  onEdit?: (project: Project) => void;
   /** « Changer le statut » of the card menu (MAIR-829). */
   onChangeStatus?: (project: Project, status: Project['status']) => void | Promise<void>;
 };

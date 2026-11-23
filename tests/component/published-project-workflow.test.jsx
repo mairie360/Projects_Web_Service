@@ -21,13 +21,6 @@ describe('published project workflow adapter', () => {
     const adapter = createPublishedProjectWorkflowPort(service({ getProjectsProjectId: async () => ({ data: { project: { id: 'project-2' }, taskItems: [task] } }) }));
     await expect(adapter.readProject('project-1', new AbortController().signal)).rejects.toThrow(/vérifi/i);
   });
-  it('uses the statusId mutation and verifies its receipt before accepting the refreshed board', async () => {
-    let currentTask = task;
-    const adapter = createPublishedProjectWorkflowPort(service({ getProjectsProjectId: async () => ({ data: { project: { id: 'project-1' }, taskItems: [currentTask] } }), patchProjectsProjectIdTasksTaskIdStatus: async (_p, _t, body) => { currentTask = { ...task, statusId: body.statusId }; return { data: currentTask }; } }));
-    const before = await adapter.readProject('project-1', new AbortController().signal);
-    const after = await adapter.moveTask({ projectId: 'project-1', revision: before.revision, taskId: 'task-1', statusId: 'status-1' }, new AbortController().signal);
-    expect(after.tasks[0].statusId).toBe('status-1');
-  });
   it('refuses to overwrite a changed service snapshot before any status mutation', async () => {
     let changed = false;
     const adapter = createPublishedProjectWorkflowPort(service({ getProjectsProjectIdStatuses: async () => ({ data: { statuses: changed ? statuses.map(s => ({ ...s, name: `${s.name} modifié` })) : statuses } }), postProjectsProjectIdStatuses: async () => { throw new Error('Unexpected mutation'); } }));

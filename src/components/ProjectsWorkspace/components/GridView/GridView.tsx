@@ -11,6 +11,7 @@ export function GridView({
   onProjectOpen,
   onProjectDuplicate,
   onProjectDelete,
+  onProjectEdit,
   onProjectStatusChange,
   onResetFilters,
 }: {
@@ -20,6 +21,7 @@ export function GridView({
   onProjectOpen: (project: Project) => void;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  onProjectEdit?: (project: Project) => void;
   onProjectStatusChange?: (project: Project, status: Project['status']) => void | Promise<void>;
   /** Shown in the empty state when a search or a filter hides every project (MAIR-829). */
   onResetFilters?: () => void;
@@ -38,6 +40,7 @@ export function GridView({
           onOpen={onProjectOpen}
           onDuplicate={onProjectDuplicate}
           onDelete={onProjectDelete}
+          onEdit={onProjectEdit}
           onChangeStatus={onProjectStatusChange}
         />
       ))}

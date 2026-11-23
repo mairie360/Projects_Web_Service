@@ -13,10 +13,10 @@ describe('ProjectSideFields', () => {
     expect(onChange.mock.calls.map(([patch]) => patch)).toEqual([{ dueDate: '2026-12-01' }, { responsible: 'user-3' }]);
   });
 
-  it('MAIR-836: lays the fields out in the F3 order, without progress nor task counts', () => {
+  it('MAIR-1136: lays the fields out in the C16 rows, without progress nor task counts', () => {
     render(<ProjectSideFields form={createProjectFormState()} statusOptions={statusOptions} priorityOptions={priorityOptions} responsibleOptions={memberOptions} memberOptions={memberOptions} labelOptions={[]} onChange={vi.fn()} />);
     const ids = [...document.querySelectorAll('select[id], input[id]')].map((field) => field.id).filter((id) => id.startsWith('project-'));
-    expect(ids.slice(0, 5)).toEqual(['project-status', 'project-priority', 'project-group', 'project-responsible', 'project-due-date']);
+    expect(ids.slice(0, 5)).toEqual(['project-group', 'project-due-date', 'project-responsible', 'project-priority', 'project-status']);
     expect(screen.getByText('Tous les membres du groupe verront le projet. Seuls vos groupes sont proposés.')).toBeTruthy();
     expect(screen.queryByText('Terminées')).toBeNull();
     expect(screen.queryByText('Progression')).toBeNull();
@@ -55,5 +55,15 @@ describe('ProjectSideFields', () => {
     rerender(<ProjectSideFields form={createProjectFormState()} groupOptions={[]} groupsError="Groupes indisponibles" groupRequired={false} {...props} />);
     expect(document.getElementById('project-group').required).toBe(false);
     expect(screen.getByText('Groupes indisponibles')).toBeTruthy();
+  });
+
+  it('MAIR-1136: shows one step at a time', () => {
+    const props = { form: createProjectFormState(), statusOptions, priorityOptions, responsibleOptions: memberOptions, memberOptions, labelOptions: [], onChange: vi.fn() };
+    const { rerender } = render(<ProjectSideFields part="essential" {...props} />);
+    const shown = () => [...document.querySelectorAll('select[id], input[id]')].map((field) => field.id).filter((id) => id.startsWith('project-'));
+    expect(shown()).toEqual(['project-group', 'project-due-date']);
+    rerender(<ProjectSideFields part="organisation" {...props} />);
+    expect(shown().slice(0, 3)).toEqual(['project-responsible', 'project-priority', 'project-status']);
+    expect(shown()).not.toContain('project-group');
   });
 });

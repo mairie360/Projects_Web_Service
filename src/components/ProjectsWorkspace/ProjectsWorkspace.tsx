@@ -26,9 +26,11 @@ import type { ProjectsController } from './use-projects-controller';
 import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
 
+/** MAIR-1134: the subtitle of the projects page. */
+export const PAGE_SUBTITLE = 'Pilotez les projets de votre mairie';
+
 export function ProjectsWorkspace({
   workflowPort,
-  moveWorkflowTask,
   saveWorkflowStatuses,
   readCurrentTaskAssignee,
   projectsPage,
@@ -123,12 +125,13 @@ export function ProjectsWorkspace({
   selectedProjectTasks,
   canCreateProject,
   pageTitle,
-  pageSubtitle,
   frontHrefs,
+  openEditProject,
   logout,
 }: ProjectsController) {
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
+  const editedProject = editingProjectId ? projects.find(project => project.id === editingProjectId) : undefined;
   return (
     <ToastProvider regionLabel="Notifications des projets">
       <FeedbackToast feedback={feedback} onShown={clearFeedback} />
@@ -172,7 +175,7 @@ export function ProjectsWorkspace({
           verificationLabel={editingProjectId || verifiesCreationDetail ? 'Vérifier le projet' : 'Actualiser le catalogue'}
           verificationPendingLabel={editingProjectId || verifiesCreationDetail ? 'Vérification du projet…' : 'Actualisation du catalogue…'}
           confirmedCreationTitle={!editingProjectId ? verifiedCreation?.title : undefined}
-          canSave={!editingProjectId || projects.find(project => project.id === editingProjectId)?.permissions?.canEdit !== false}
+          canSave={!editingProjectId || editedProject?.permissions?.canEdit !== false}
           onVerify={() => editingProjectId ? verifyProjectReceipt(editingProjectId) : verifyNewProjectReceipt('create')}
           memberOptions={memberOptions}
           labelOptions={labelOptions}
@@ -184,6 +187,7 @@ export function ProjectsWorkspace({
           onClose={closeCreateProject}
           onInteract={keepProjectFormCurrent}
           onSubmit={saveProject}
+          onDelete={editedProject && editedProject.permissions?.canDelete !== false ? () => { closeCreateProject(); void deleteProject(editedProject); } : undefined}
         />
       )}
 
@@ -192,7 +196,6 @@ export function ProjectsWorkspace({
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
-        className="projects-shell"
       >
             {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
             {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}
@@ -242,7 +245,6 @@ export function ProjectsWorkspace({
                 <ProjectPage
                   project={selectedProject}
                   workflowPort={workflowPort}
-                  onMoveWorkflowTask={moveWorkflowTask}
                   onSaveWorkflowStatuses={saveWorkflowStatuses}
                   workflowRole={projectsPage?.access.role}
                   readCurrentTaskAssignee={readCurrentTaskAssignee}
@@ -272,7 +274,7 @@ export function ProjectsWorkspace({
                   onUpdateTaskStatus={changeProjectTaskStatus}
                   onDeleteTask={deleteProjectTask}
                   onCloseProject={closeProject}
-                  onChangeStatus={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                  onChangeStatus={moveProjectStatus}
                   onDuplicate={duplicateProject}
                   duplicationPending={duplicatingProjectIds.includes(selectedProject.id)}
                   duplicationVerificationRequired={unverifiedDuplicationSourceIds.has(selectedProject.id)}
@@ -283,7 +285,7 @@ export function ProjectsWorkspace({
               <div hidden={Boolean(selectedProject)}>
                 <WorkspaceHeader
                   title={pageTitle}
-                  subtitle={pageSubtitle}
+                  subtitle={PAGE_SUBTITLE}
                   scope={projectsPage?.access?.scope}
                   onCreate={canCreateProject ? () => openCreateProject() : undefined}
                   onSettings={() => navigateToPage('settings')}
@@ -319,6 +321,10 @@ export function ProjectsWorkspace({
 
                   {pageError && <PageReadError error={pageError} stale={projects.length > 0} loading={pageLoading} onRetry={() => void retryProjectsPage()} />}
 
+                  {/* MAIR-1134 (C8): the view fades and rises in (260 ms) when it changes; no motion under prefers-reduced-motion. */}
+                  {/* MAIR-487 (RGAA 9.1): the views sit under an h2, between the page h1 and the h3 of the columns or cards. */}
+                  <h2 className="sr-only">{viewMode === 'kanban' ? 'Projets par statut' : viewMode === 'grid' ? 'Projets en grille' : 'Tableau des projets'}</h2>
+                  <div key={viewMode} className="m360-view-enter">
                   {(!pageLoading || projects.length > 0) && (!pageError || projects.length > 0) && viewMode === 'kanban' && filtersActive && filteredProjects.length === 0 && (
                     <ProjectsEmptyState onReset={resetProjectFilters} />
                   )}
@@ -332,8 +338,9 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
+                      onProjectEdit={openEditProject}
                       onAddProject={canCreateProject ? openCreateProject : undefined}
-                      onMoveProject={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onMoveProject={moveProjectStatus}
                     />
                   )}
 
@@ -345,7 +352,8 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectEdit={openEditProject}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                     />
                   )}
@@ -358,7 +366,8 @@ export function ProjectsWorkspace({
                       onProjectOpen={openProjectDetails}
                       onProjectDuplicate={duplicateProject}
                       onProjectDelete={deleteProject}
-                      onProjectStatusChange={projectsPage?.access?.canManageProjects ? moveProjectStatus : undefined}
+                      onProjectEdit={openEditProject}
+                      onProjectStatusChange={moveProjectStatus}
                       onResetFilters={filtersActive ? resetProjectFilters : undefined}
                       selectedProjectIds={new Set(selectedProjects.map((project) => project.id))}
                       onSelectionChange={changeProjectSelection}
@@ -366,6 +375,7 @@ export function ProjectsWorkspace({
                       onDeleteSelection={requestBulkProjectDeletion}
                     />
                   )}
+                  </div>
                   {projectsPage && (
                     <ProjectPagination pagination={projectsPage.pagination} pending={pageLoading} stale={Boolean(pageError)} onChange={changeProjectPage} />
                   )}

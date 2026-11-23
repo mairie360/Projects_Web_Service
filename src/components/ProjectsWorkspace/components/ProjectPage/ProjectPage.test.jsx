@@ -26,16 +26,19 @@ describe('ProjectPage', () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(<ProjectPage project={project({ permissions: editable })} {...base} onClose={onClose} {...handlers()} />);
-    const taskTitle = document.querySelector('input[aria-label="Titre de la tâche"]');
-    expect(taskTitle).toBeTruthy();
+    // MAIR-859 (C5): « Nouvelle tâche » opens « Tâches » and the empty task sheet, focused on its title.
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     expect(screen.getByRole('tab', { name: /^Tâches/ }).getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(taskTitle);
-    await user.type(taskTitle, 'Brouillon gardé');
+    const sheet = screen.getByRole('dialog', { name: 'Nouvelle tâche' });
+    expect(document.activeElement).toBe(within(sheet).getByLabelText(/^Titre/));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Nouvelle tâche' })).toBeNull();
+    const search = within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' });
+    await user.type(search, 'Brouillon gardé');
     await user.click(screen.getByRole('tab', { name: 'Équipe2' }));
-    expect(within(screen.getByRole('tabpanel')).getByText('L’onglet « Équipe » arrive avec son propre ticket.')).toBeTruthy();
+    expect(within(screen.getByRole('tabpanel')).getByText('Aucun membre')).toBeTruthy();
     await user.click(screen.getByRole('tab', { name: /^Tâches/ }));
-    expect(document.querySelector('input[aria-label="Titre de la tâche"]').value).toBe('Brouillon gardé');
+    expect(within(screen.getByRole('tabpanel')).getByRole('searchbox', { name: 'Rechercher une tâche' }).value).toBe('Brouillon gardé');
     await user.click(screen.getByRole('button', { name: 'Projets' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -68,14 +71,19 @@ describe('ProjectPage', () => {
     expect(screen.getByText('Sans groupe')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Modifier' }));
     const dialog = screen.getByRole('dialog', { name: /^Modifier le projet · #/ });
-    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    // MAIR-1136 (C13): nothing changed yet, nothing to save.
+    expect(within(dialog).getByRole('button', { name: 'Enregistrer (0)' }).disabled).toBe(true);
+    await user.type(within(dialog).getByLabelText(/^Titre/), ' bis');
+    expect(within(dialog).getByRole('region', { name: 'L’essentiel' }).textContent).toContain('Modifié');
+    expect(within(dialog).getByRole('region', { name: 'Organisation' }).textContent).not.toContain('Modifié');
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer (1)' }));
     expect(within(dialog).getByText('Le groupe est obligatoire.')).toBeTruthy();
     expect(document.activeElement).toBe(document.getElementById('detail-project-group'));
     expect(onUpdateProject).not.toHaveBeenCalled();
     await user.selectOptions(within(dialog).getByLabelText(/^Groupe/), 'group-1');
     expect(within(dialog).queryByText('Le groupe est obligatoire.')).toBeNull();
     expect(within(dialog).getByLabelText(/^Groupe/).querySelector('option[value=""]')).toBeNull();
-    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Enregistrer (2)' }));
     expect(onUpdateProject).toHaveBeenCalledWith('project-1', expect.objectContaining({ groupId: 'group-1' }));
   });
 });

@@ -42,8 +42,13 @@ test.describe('project manager', () => {
     // MAIR-836: the description is optional in the V2 dialog.
     await dialog.getByLabel('Description', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
     await dialog.getByLabel('Échéance*', { exact: true }).fill(dueDateInputValue(30));
+    // MAIR-1136: the creation goes step by step; « Suivant » moves to « Organisation ».
+    await dialog.getByRole('button', { name: 'Suivant', exact: true }).click();
+    await expect(dialog.getByText('Étape 2 sur 4 · Organisation')).toBeVisible();
     // A project needs a responsible or at least one team member: the manager picks themselves (« Responsable », MAIR-836).
     await dialog.getByLabel('Responsable').selectOption({ label: 'Perf Tester' });
+    await dialog.getByRole('button', { name: 'Passer au récapitulatif' }).click();
+    await expect(dialog.getByRole('region', { name: 'L’essentiel' })).toContainText(projectTitle);
     await dialog.getByRole('button', { name: 'Créer le projet' }).click();
 
     await expect(dialog).toBeHidden();
@@ -52,48 +57,58 @@ test.describe('project manager', () => {
     await expect(page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` })).toBeVisible();
   });
 
+  // MAIR-859, MAIR-1137: tasks are cards of the « Tâches » board; « Nouvelle tâche » opens the creation in three steps,
+  // a card opens the task page, whose « Modifier » opens the edit window.
   test('adds a task to the project', async ({ page }) => {
     await page.goto('/');
     const details = await openProjectTasks(page, projectTitle);
-    const taskForm = details.getByRole('form', { name: 'Créer une tâche' });
-    await taskForm.getByLabel('Titre de la tâche').fill(taskTitle);
-    // A task needs at least one assignee: the "Assignés" picker lists the seeded users.
-    await taskForm.getByRole('button', { name: 'Assignés' }).click();
-    await taskForm.getByRole('listbox', { name: 'Assignés' }).getByRole('option', { name: 'Perf Tester' }).click();
-    await taskForm.getByRole('button', { name: 'Ajouter la tâche' }).click();
-    // The task row offers its completion toggle: the task is listed, not only echoed in the form.
-    await expect(details.getByRole('button', { name: `Marquer ${taskTitle} comme terminée` })).toBeVisible();
+    await page.getByRole('button', { name: 'Nouvelle tâche', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Nouvelle tâche' });
+    await sheet.getByLabel(/^Titre/).fill(taskTitle);
+    await sheet.getByRole('button', { name: 'Suivant' }).click();
+    // A task needs an assignee: the « Assignée à » cards list the seeded users.
+    await sheet.getByRole('group', { name: /^Assignée à/ }).getByRole('radio', { name: /^Perf Tester/ }).check();
+    await sheet.getByRole('button', { name: 'Suivant' }).click();
+    await sheet.getByRole('button', { name: 'Ajouter la tâche' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByText(`Tâche « ${taskTitle} » ajoutée à « ${projectTitle} ».`)).toBeVisible();
+    await expect(details.getByRole('region', { name: 'À faire' }).getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` })).toBeVisible();
   });
 
   test('edits the task', async ({ page }) => {
     await page.goto('/');
     const details = await openProjectTasks(page, projectTitle);
-    const row = details.locator('article').filter({ has: page.getByRole('heading', { name: taskTitle, exact: true }) });
-    await row.getByRole('button', { name: 'Modifier', exact: true }).click();
-    const editForm = details.getByRole('form', { name: 'Modifier une tâche' });
-    await expect(editForm.getByLabel('Titre de la tâche')).toHaveValue(taskTitle);
-    await editForm.getByLabel('Titre de la tâche').fill(editedTaskTitle);
-    await editForm.getByRole('button', { name: 'Enregistrer la tâche' }).click();
+    await details.getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` }).click();
+    const taskPage = page.getByRole('article', { name: taskTitle });
+    await expect(taskPage).toBeVisible();
+    await taskPage.getByRole('button', { name: 'Modifier', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Modifier la tâche' });
+    await expect(sheet.getByLabel(/^Titre/)).toHaveValue(taskTitle);
+    await sheet.getByLabel(/^Titre/).fill(editedTaskTitle);
+    await sheet.getByRole('button', { name: 'Enregistrer (1)' }).click();
 
-    await expect(details.getByRole('button', { name: `Marquer ${editedTaskTitle} comme terminée` })).toBeVisible();
-    await expect(details.getByRole('heading', { name: taskTitle, exact: true })).toHaveCount(0);
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('heading', { level: 2, name: editedTaskTitle })).toBeVisible();
+    await page.getByRole('button', { name: `Retour aux tâches de ${projectTitle}` }).click();
+    await expect(details.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` })).toBeVisible();
+    await expect(details.getByRole('button', { name: `Ouvrir la tâche ${taskTitle}`, exact: true })).toHaveCount(0);
   });
 
   test('deletes the task', async ({ page }) => {
     await page.goto('/');
     const details = await openProjectTasks(page, projectTitle);
-    await details.getByRole('button', { name: `Supprimer ${editedTaskTitle}` }).click();
-    // The confirmation opens in the task row, in place of its delete button.
-    const confirmation = details.getByText('Supprimer définitivement cette tâche ?', { exact: true }).locator('xpath=..');
-    await expect(confirmation).toBeVisible();
-    await confirmation.getByRole('button', { name: 'Supprimer', exact: true }).click();
+    await details.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` }).click();
+    await page.getByRole('article', { name: editedTaskTitle }).getByRole('button', { name: `Actions pour ${editedTaskTitle}` }).click();
+    await page.getByRole('menuitem', { name: 'Supprimer la tâche' }).click();
+    await expect(page.getByText('Supprimer définitivement cette tâche ?', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Supprimer', exact: true }).click();
 
-    await expect(details.getByRole('heading', { name: editedTaskTitle, exact: true })).toHaveCount(0);
+    await expect(details.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` })).toHaveCount(0);
     // Gone from the server too: the page URL reloads the project page itself (MAIR-846), on its « Tâches » tab.
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Tâches/ })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('heading', { name: editedTaskTitle, exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` })).toHaveCount(0);
   });
 
   test('renames the project', async ({ page }) => {
@@ -106,7 +121,8 @@ test.describe('project manager', () => {
     const form = page.getByRole('dialog', { name: /^Modifier le projet/ }).getByRole('form', { name: 'Modifier le projet' });
     await expect(form).toBeVisible();
     await form.getByLabel('Titre*', { exact: true }).fill(renamedTitle);
-    await form.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    // MAIR-1136: the button counts the changed fields.
+    await form.getByRole('button', { name: /^Enregistrer \(\d+\)$/ }).click();
 
     await expect(form).toBeHidden();
     await expect(page.getByText('Modifications enregistrées')).toBeVisible();
