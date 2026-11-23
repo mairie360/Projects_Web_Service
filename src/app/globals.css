@@ -39,3 +39,25 @@ textarea,
 select {
   font: inherit;
 }
+
+/* MAIR-1134 (C8): a list view fades and rises in when the view changes (our content, not a lib component). */
+@keyframes m360-view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.m360-view-enter {
+  animation: m360-view-enter 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m360-view-enter {
+    animation: none;
+  }
+}

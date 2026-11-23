@@ -2,6 +2,8 @@
 // réponse de succès contre ce contrat : une fixture qui en dérive fait échouer le test qui l'utilise.
 
 const STATUS_LABELS = { todo: 'À faire', 'in-progress': 'En cours', review: 'En revue', done: 'Terminé' };
+// MAIR-1084: a project may also be put on hold (`on-hold`, Project API `Suspended`); a task never is.
+const PROJECT_STATUS_LABELS = { todo: 'À faire', 'in-progress': 'En cours', review: 'En revue', 'on-hold': 'Suspendu', done: 'Terminé' };
 const PRIORITY_LABELS = { high: 'Haute', medium: 'Moyenne', low: 'Basse' };
 
 // BFF_Project identifie les personnes par `user-<id Core>` (schémas CreateProjectBody.assigneeIds / responsibleId).
@@ -30,6 +32,8 @@ function projectTask(overrides = {}) {
     priorityLabel: PRIORITY_LABELS[priority],
     labels: ['voirie'],
     dueDate: '2026-10-01T00:00:00.000Z',
+    // MAIR-1087: the start date of the task, `null` without one.
+    startDate: null,
     completed: status === 'done',
     createdAt: '2026-09-01T08:30:00.000Z',
     updatedAt: '2026-09-02T10:00:00.000Z',
@@ -46,7 +50,7 @@ function projectListItem(overrides = {}) {
     title: 'Rénovation de l’éclairage public',
     description: 'Remplacement des candélabres du centre-ville.',
     status,
-    statusLabel: STATUS_LABELS[status],
+    statusLabel: PROJECT_STATUS_LABELS[status],
     priority,
     priorityLabel: PRIORITY_LABELS[priority],
     responsible: people.marie,
@@ -55,6 +59,12 @@ function projectListItem(overrides = {}) {
     progress: 50,
     dueDate: '2026-12-15T00:00:00.000Z',
     createdAt: '2026-09-01T08:30:00.000Z',
+    // MAIR-1088: the first members with their role, and the caller's role (`null` when not a member).
+    members: [{ ...people.marie, role: 'manager' }, { ...people.alice, role: 'contributor' }],
+    myRole: null,
+    // MAIR-1085: budgets in cents of euro, `null` when not filled in.
+    budgetVoted: null,
+    budgetCommitted: null,
     tasks: { total: 2, completed: 1, active: 2, archived: 0 },
     permissions: { canView: true, canEdit: true, canDuplicate: true, canDelete: true, canCreateTask: true, canAssignMembers: true, canClose: true },
     ...overrides,
@@ -63,12 +73,32 @@ function projectListItem(overrides = {}) {
 
 // MAIR-880: the detail names the project's group (`null` for a project created before groups).
 const DEFAULT_GROUP = { id: 'group-1', name: 'Services techniques' };
+// MAIR-1088: the detail gives every member their load (active tasks assigned to them, open ones).
+const memberLoad = (member, taskItems) => {
+  const assigned = taskItems.filter((task) => task.assignees.some((person) => person.id === member.id));
+  return { tasksOpen: assigned.filter((task) => !task.completed).length, tasksTotal: assigned.length };
+};
+function milestone(overrides = {}) {
+  return { id: 'milestone-1', title: 'Validation du devis', dueDate: '2026-11-15', reached: false, ...overrides };
+}
 function projectDetails(project = projectListItem(), taskItems = [projectTask(), projectTask({ id: 'task-2', status: 'done' })]) {
-  return { project: { group: DEFAULT_GROUP, ...project }, taskItems };
+  const members = (project.members ?? []).map((member) => ({ ...member, load: member.load ?? memberLoad(member, taskItems) }));
+  const milestones = project.milestones ?? [];
+  return { project: { group: DEFAULT_GROUP, ...project, members, milestones, milestonesTotal: project.milestonesTotal ?? milestones.length }, taskItems };
 }
 
+// MAIR-1089: a page of the project activity (comments and the history of its tasks, newest first).
+function activityItem(overrides = {}) {
+  return {
+    kind: 'comment', id: 'comment-1', taskId: null, taskTitle: null, author: { id: people.alice.id, name: people.alice.name },
+    message: 'Réunion de chantier fixée.', changes: null, label: 'Comment', createdAt: '2026-09-04T09:00:00.000Z', ...overrides,
+  };
+}
+const projectActivity = (items = [], pagination = {}) => ({ items, pagination: { page: 1, limit: 20, total: items.length, hasNextPage: false, ...pagination } });
+const projectMilestones = (milestones = [], pagination = {}) => ({ milestones, pagination: { page: 1, limit: 100, total: milestones.length, hasNextPage: false, ...pagination } });
+
 function projectsPage(projects = [projectListItem()], overrides = {}) {
-  const byStatus = Object.fromEntries(Object.keys(STATUS_LABELS).map((status) => [status, projects.filter((project) => project.status === status).length]));
+  const byStatus = Object.fromEntries(Object.keys(PROJECT_STATUS_LABELS).map((status) => [status, projects.filter((project) => project.status === status).length]));
   return {
     access: { role: 'Responsable', scope: 'team', canCreateProject: true, canManageProjects: true, canManageTasks: true, canUpdateAssignedTaskStatus: true, canCommentTasks: true },
     page: {
@@ -81,7 +111,7 @@ function projectsPage(projects = [projectListItem()], overrides = {}) {
       search: null,
       status: 'all',
       priority: 'all',
-      statuses: Object.entries(STATUS_LABELS).map(([value, label]) => ({ label, value })),
+      statuses: Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({ label, value })),
       priorities: Object.entries(PRIORITY_LABELS).map(([value, label]) => ({ label, value })),
     },
     options: {
@@ -90,7 +120,7 @@ function projectsPage(projects = [projectListItem()], overrides = {}) {
     },
     summary: { totalProjects: projects.length, projectsByStatus: byStatus, projectsByPriority: { high: projects.length, medium: 0, low: 0 } },
     kanban: {
-      columns: Object.entries(STATUS_LABELS).map(([status, label]) => {
+      columns: Object.entries(PROJECT_STATUS_LABELS).map(([status, label]) => {
         const projectIds = projects.filter((project) => project.status === status).map((project) => project.id);
         return { status, label, projectIds, count: projectIds.length };
       }),
@@ -153,4 +183,4 @@ const archivedTasks = (tasks = []) => ({ tasks, pagination: { page: 1, limit: 10
 // MAIR-880: groups the caller may link a project to (`GET /project-groups`); one group by default.
 const projectGroups = (groups = [{ id: 'group-1', name: 'Services techniques' }]) => ({ groups });
 
-module.exports = { projectGroups, projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };
+module.exports = { milestone, activityItem, projectActivity, projectMilestones, projectGroups, projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };

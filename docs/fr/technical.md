@@ -99,7 +99,19 @@ peut être résolue. Aucun contrat API/BFF ni variable de déploiement ajouté.
 
 [Présentation du module](module.md) · [English](../en/technical.md) · [README](../../README.md)
 
-## Listes triables — MAIR-1138
+## Colonnes repliables et transitions de vue — MAIR-1134
+
+`KanbanBoard` et `TaskBoard` affichent un `KanbanColumn` de la lib par colonne (`collapsible`, `collapsed` /
+`onCollapsedChange` contrôlés, `dropActive`, `onAdd` pour le « + », `tone` tiré de `projectColumnTone`).
+`use-collapsed-columns.ts` garde les colonnes repliées dans `localStorage` (`m360-collapsed-projects` /
+`m360-collapsed-tasks`, lu après le montage, chaque accès en try/catch : sans stockage, le repli ne dure que le temps de
+la page). Les gestionnaires de glisser-déposer sont sur la section du `KanbanColumn` : une colonne repliée accepte
+toujours un dépôt. Les vues sont enveloppées dans `<div key={view} className="m360-view-enter">` (`globals.css` :
+fondu et montée en 260 ms, `animation: none` avec `prefers-reduced-motion` ; une classe de ce front, pas une surcharge de
+la lib). `ProjectActionsMenu` (cartes, lignes du tableau) et `ProjectMoreMenu` (en-tête de la page) reçoivent
+« Modifier » : `openEditProject` du contrôleur, ou la fenêtre de modification de la page.
+
+
 
 `src/components/ProjectsWorkspace/table-sort.ts` porte le tri côté front partagé par `TableView` et `TaskListView` :
 `sortRows(rows, sort, valueOf)` (stable, ordre alphabétique français, nombres comparés comme nombres, valeurs vides en
@@ -127,8 +139,8 @@ ce qui fait le retour arrière d’un refus. Les confirmations sont des `Feedbac
 à jour », « Tâche terminée », « Statut mis à jour », « Tâche supprimée » ; « Statut non modifié » avec
 `tone: 'error'`). `use-detail-task-form.ts` porte la fiche (`open`, `openCreate(status)`, `edit(task)`,
 `quickAdd(title, status)`, `titleError` « Donnez un titre à la tâche ») ; `use-task-filters.ts` la recherche et les
-filtres par personne assignée et priorité. Ni description ni date de début de tâche : le contrat publié n’en a pas
-(MAIR-1087 en cours).
+filtres par personne assignée et priorité. Pas de description de tâche (absente du contrat) ; la date de début (`startDate`, MAIR-1087) se
+modifie à côté de l’échéance.
 
 ## Architecture et traitement des requêtes
 

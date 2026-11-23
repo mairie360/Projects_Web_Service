@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { IconButton, StatusBadge } from '@mairie360/lib-components/primitives';
-import { Plus } from 'lucide-react';
+import { KanbanColumn } from '@mairie360/lib-components/primitives';
 
 import type { ProjectTask } from '@/types/project';
 import type { TaskColumnStatus } from '@/components/ProjectsWorkspace/components/ProjectPage/use-detail-task-form';
-import { projectStatusBadge } from '@/components/ProjectsWorkspace/project-card-meta';
+import { projectColumnTone } from '@/components/ProjectsWorkspace/project-card-meta';
+import { COLLAPSED_TASK_COLUMNS_KEY, useCollapsedColumns } from '@/components/ProjectsWorkspace/use-collapsed-columns';
 import { QuickAddTask } from './components/QuickAddTask';
 import { TaskCard } from './components/TaskCard';
 
@@ -31,6 +31,8 @@ export interface TaskBoardProps {
   highlightedTaskRef?: React.Ref<HTMLElement>;
   quickAddPending?: boolean;
   onOpenTask: (task: ProjectTask) => void;
+  /** « Modifier la tâche » (MAIR-1137); absent without the right to edit tasks. */
+  onEditTask?: (task: ProjectTask) => void;
   onMoveTask: (task: ProjectTask, status: TaskColumnStatus) => void;
   onDeleteTask: (task: ProjectTask) => void;
   /** C3: the « + » of a column; absent without the right to create a task. Resolves `true` once the field may close. */
@@ -44,13 +46,15 @@ export interface TaskBoardProps {
  */
 export function TaskBoard({
   columns, items, archivedLabel, isOverdue, canMove, canDelete, blocked, pendingTaskIds, taskWriteErrors, highlightTaskId, highlightedTaskRef,
-  quickAddPending = false, onOpenTask, onMoveTask, onDeleteTask, onQuickAdd,
+  quickAddPending = false, onOpenTask, onEditTask, onMoveTask, onDeleteTask, onQuickAdd,
 }: TaskBoardProps) {
   const [draggedId, setDraggedId] = React.useState<string | null>(null);
   const [target, setTarget] = React.useState<TaskColumnStatus | null>(null);
   const [adding, setAdding] = React.useState<TaskColumnStatus | null>(null);
   const startedOnControl = React.useRef(false);
   const instructionsId = React.useId();
+  // MAIR-1134: a column folds from its header chevron (« Terminé » too); remembered per browser. A folded column still takes a drop.
+  const { collapsed, setColumnCollapsed } = useCollapsedColumns(COLLAPSED_TASK_COLUMNS_KEY);
   const dragged = items.find((item) => item.task.id === draggedId);
   const accepts = (status: TaskColumnStatus) => Boolean(dragged && !dragged.archived && canMove(dragged.task) && dragged.column !== status
     && !columns.find((column) => column.status === status)?.disabled);
@@ -71,7 +75,7 @@ export function TaskBoard({
   const closeQuickAdd = () => {
     const column = adding;
     setAdding(null);
-    if (column) queueMicrotask(() => document.querySelector<HTMLButtonElement>(`[data-quick-add="${column}"]`)?.focus());
+    if (column) queueMicrotask(() => document.querySelector<HTMLButtonElement>(`[data-task-column="${column}"] header button[aria-label^="Ajouter dans"]`)?.focus());
   };
 
   return (
@@ -82,11 +86,22 @@ export function TaskBoard({
       {columns.map((column) => {
         const columnItems = items.filter((item) => item.column === column.status);
         return (
-          <section
+          <KanbanColumn
             key={column.status}
-            aria-label={column.label}
+            title={column.label}
+            tone={projectColumnTone[column.status]}
+            count={columnItems.length}
+            onAdd={onQuickAdd && !quickAddPending && !column.disabled ? () => {
+              setColumnCollapsed(column.status, false);
+              setAdding(column.status);
+            } : undefined}
+            collapsible
+            collapsed={collapsed.has(column.status) && adding !== column.status}
+            onCollapsedChange={(folded) => setColumnCollapsed(column.status, folded)}
+            dropActive={target === column.status}
+            emptyLabel="Aucune tâche"
+            footer={column.status === 'done' && archivedLabel ? <p className="text-center text-sm text-[var(--mairie-muted)]">{archivedLabel}</p> : undefined}
             data-task-column={column.status}
-            className={`min-w-0 rounded-lg border border-[var(--mairie-border)] bg-[var(--mairie-background)] p-3 transition-colors ${target === column.status ? 'bg-[var(--mairie-accent-surface)] ring-2 ring-[var(--mairie-accent)]' : ''}`}
             onDragOver={(event) => {
               if (!accepts(column.status)) return;
               event.preventDefault();
@@ -98,23 +113,6 @@ export function TaskBoard({
             }}
             onDrop={(event) => drop(event, column.status)}
           >
-            <div className="mb-3 flex h-9 items-center justify-between gap-2">
-              <h3 className="flex min-w-0 items-center gap-2">
-                <StatusBadge status={projectStatusBadge[column.status]} label={column.label} />
-                <span className="text-sm text-[var(--mairie-muted)]" aria-label={`${columnItems.length} tâche${columnItems.length > 1 ? 's' : ''}`}>{columnItems.length}</span>
-              </h3>
-              {onQuickAdd && (
-                <IconButton
-                  icon={Plus}
-                  label={`Ajouter une tâche dans ${column.label}`}
-                  size="s"
-                  data-quick-add={column.status}
-                  disabled={quickAddPending || column.disabled}
-                  onClick={() => setAdding(column.status)}
-                />
-              )}
-            </div>
-            <div className="min-h-[120px] space-y-2.5">
               {adding === column.status && onQuickAdd && (
                 <QuickAddTask
                   columnLabel={column.label}
@@ -125,7 +123,6 @@ export function TaskBoard({
                   }}
                 />
               )}
-              {columnItems.length === 0 && adding !== column.status && <p className="py-6 text-center text-sm text-[var(--mairie-muted)]">Aucune tâche</p>}
               {columnItems.map(({ task, column: status, archived, moving }) => {
                 const movable = !archived && canMove(task);
                 const linked = highlightTaskId === task.id;
@@ -163,15 +160,14 @@ export function TaskBoard({
                       linked={linked}
                       articleRef={linked ? highlightedTaskRef : undefined}
                       onOpen={() => onOpenTask(task)}
+                      onEdit={onEditTask && task.permissions?.canEdit !== false ? () => onEditTask(task) : undefined}
                       onMove={movable ? (next) => onMoveTask(task, next) : undefined}
                       onDelete={canDelete(task) ? () => onDeleteTask(task) : undefined}
                     />
                   </div>
                 );
               })}
-              {column.status === 'done' && archivedLabel && <p className="text-center text-sm text-[var(--mairie-muted)]">{archivedLabel}</p>}
-            </div>
-          </section>
+          </KanbanColumn>
         );
       })}
     </div>

@@ -32,4 +32,10 @@ describe('NextTasksPanel (MAIR-846)', () => {
     rerender(<NextTasksPanel tasks={[tasks[2]]} onComplete={vi.fn()} onShowAll={vi.fn()} />);
     expect(screen.getByText('Aucune tâche ouverte')).toBeTruthy();
   });
+
+  it('shows the priority of a task only when it is high (MAIR-1135)', () => {
+    render(<NextTasksPanel tasks={[task({ id: 'h', title: 'Urgente', priority: 'high', dueDate: '2026-12-01' }), task({ id: 'l', title: 'Plus tard', priority: 'low', dueDate: '2026-12-02' })]} onComplete={vi.fn()} onShowAll={vi.fn()} />);
+    expect(screen.getByText('Haute')).toBeTruthy();
+    expect(screen.queryByText('Basse')).toBeNull();
+  });
 });

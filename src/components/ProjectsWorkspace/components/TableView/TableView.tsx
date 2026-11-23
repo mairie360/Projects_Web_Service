@@ -59,6 +59,7 @@ export function TableView({
   onProjectStatusChange,
   onProjectDuplicate,
   onProjectDelete,
+  onProjectEdit,
   onSelectionChange,
   onClearSelection,
   onDeleteSelection,
@@ -73,6 +74,8 @@ export function TableView({
   onProjectStatusChange?: (project: Project, status: Project['status']) => void | Promise<void>;
   onProjectDuplicate: (project: Project) => void;
   onProjectDelete: (project: Project) => void;
+  /** MAIR-1134: « Modifier » of the row menu. */
+  onProjectEdit?: (project: Project) => void;
   onSelectionChange?: (projectIds: string[], selected: boolean) => void;
   onClearSelection?: () => void;
   onDeleteSelection?: () => void;
@@ -177,6 +180,7 @@ export function TableView({
           onChangeStatus={onProjectStatusChange}
           onDuplicate={onProjectDuplicate}
           onDelete={onProjectDelete}
+          onEdit={onProjectEdit}
         />
       ),
     },

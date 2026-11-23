@@ -32,7 +32,7 @@ async function renderPage(body = f.projectsPage([project])) {
 
 test('MAIR-829: the « + » of a column opens the creation with that status', async () => {
   await renderPage();
-  await view.click((props) => props['aria-label'] === 'Ajouter un projet En revue');
+  await view.click((props) => props['aria-label'] === 'Ajouter dans En revue');
   await view.waitFor(() => view.find('CreateProjectModal').length === 1);
 
   assert.equal(view.props('CreateProjectModal').form.status, 'review');

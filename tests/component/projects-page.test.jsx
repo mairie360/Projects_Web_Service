@@ -18,10 +18,16 @@ async function tasksTab(user) {
 const taskCard = (title) => screen.getByRole('heading', { name: title }).closest('article');
 const sheet = () => within(screen.getByRole('dialog', { name: /^(Nouvelle tâche|Modifier la tâche)$/ }));
 const sheetTitle = () => sheet().getByRole('textbox', { name: /^Titre/ });
+// MAIR-1137 (C15): a click opens the task page; the card « … » « Modifier la tâche » opens the edit over the board.
 async function openTaskCard(user, title) {
-  await user.click(within(taskCard(title)).getByRole('button', { name: `Ouvrir la tâche ${title}` }));
+  await user.click(within(taskCard(title)).getByRole('button', { name: `Actions pour ${title}` }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Modifier la tâche' }));
   return sheet();
 }
+const saveTask = () => screen.getByRole('button', { name: /^Enregistrer \(\d+\)$/ });
+const nextStep = (user) => user.click(sheet().getByRole('button', { name: 'Suivant' }));
+const chooseAssignee = (user, name) => user.click(within(sheet().getByRole('group', { name: /^Assignée à/ })).getByRole('radio', { name: new RegExp(`^${name}`) }));
+const checkedRadio = (group) => within(sheet().getByRole('group', { name: new RegExp(`^${group}`), hidden: true })).getAllByRole('radio', { hidden: true }).find((input) => input.checked)?.value;
 async function moveTaskTo(user, title, column) {
   await user.click(within(taskCard(title)).getByRole('button', { name: `Actions pour ${title}` }));
   await user.click(await screen.findByRole('menuitemradio', { name: column }));
@@ -34,6 +40,8 @@ async function leaveProject(user) {
 
 vi.mock("@/lib/bffProjectClient", async (importOriginal) => ({
   ...(await importOriginal()),
+  // MAIR-1089: the project page reads its latest activity once the detail is in.
+  getProjectActivity: vi.fn(async () => ({ items: [], pagination: { page: 1, limit: 5, total: 0, hasNextPage: false } })),
   // MAIR-880: the creation form reads the linkable groups once.
   getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
   getProjectDetails: vi.fn(),
@@ -73,9 +81,11 @@ describe("Projects page", () => {
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     const dialog = sheet(), input = sheetTitle();
     await user.type(input, 'Brouillon collision conservé');
-    await toggleOption(user, dialog, 'Assignée à', 'Marie Durand'); await user.click(input);
-    await user.selectOptions(dialog.getByLabelText('Priorité', { exact: true }), 'low');
     fireEvent.change(dialog.getByLabelText('Échéance', { exact: true }), { target: { value: '2026-11-17' } });
+    await nextStep(user);
+    await chooseAssignee(user, 'Marie Durand');
+    await user.click(within(dialog.getByRole('group', { name: /^Priorité/ })).getByRole('radio', { name: /^Basse/ }));
+    await nextStep(user);
     await user.click(dialog.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     await dialog.findByText('Création de tâche non vérifiée : Brouillon collision conservé');
     expect(input.value).toBe('Brouillon collision conservé');
@@ -83,6 +93,9 @@ describe("Projects page", () => {
     expect(document.activeElement.textContent).toMatch(/Création de tâche non vérifiée/);
     expect(screen.getByRole('heading', { name: task.title })).toBeTruthy();
     expect(screen.queryByText('Reçu collision interdit')).toBeNull();
+    // MAIR-1137: back to « L’essentiel » to keep typing.
+    await user.click(dialog.getByRole('button', { name: 'Précédent' }));
+    await user.click(dialog.getByRole('button', { name: 'Précédent' }));
     await user.type(input, ' — dernière saisie');
     fireEvent.submit(input.closest('form'));
     const inspect = dialog.getByRole('button', { name: 'Inspecter les tâches du projet', exact: true });
@@ -101,16 +114,17 @@ describe("Projects page", () => {
     await tasksTab(user);
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
-    expect(sheet().getByLabelText('Priorité', { exact: true }).value).toBe('low');
+    expect(checkedRadio('Priorité')).toBe('low');
     expect(sheet().getByLabelText('Échéance', { exact: true }).value).toBe('2026-11-17');
     await user.click(sheet().getByRole('button', { name: 'Annuler', exact: true }));
     const edit = await openTaskCard(user, task.title);
-    expect(edit.getByRole('button', { name: 'Enregistrer la tâche', exact: true }).disabled).toBe(false);
+    // MAIR-1137 (C13): nothing changed yet; the edit itself is open (the task is not blocked).
+    expect(edit.getByRole('button', { name: 'Enregistrer (0)' })).toBeTruthy();
     await user.click(edit.getByRole('button', { name: 'Annuler', exact: true }));
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     expect(sheetTitle().value).toBe('Brouillon collision conservé — dernière saisie');
     expect(createProjectTask).toHaveBeenCalledOnce();
-  });
+  }, 15_000); // The longest journey of the file: close to the default 5 s under coverage.
   it('verifies only a distinct malformed copy by keyboard GET and re-enables its source without a replay', async () => {
     const user = userEvent.setup(), first = fixtures.projectListItem();
     const created = fixtures.projectListItem({ id: 'new-distinct-id', title: 'Copie canonique vérifiée' });
@@ -178,14 +192,14 @@ describe("Projects page", () => {
     await user.click(detail.getByRole('button',{name:'Modifier',exact:true}));
     const form=within(detail.getByRole('form',{name:'Modifier le projet'})),title=form.getByLabelText(/^Titre/);
     await user.clear(title);await user.type(title,'Brouillon inline retenu');
-    await user.click(form.getByRole('button',{name:'Enregistrer',exact:true}));
-    await waitFor(()=>expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true));
+    await user.click(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}));
+    await waitFor(()=>expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true));
     expect(title.value).toBe('Brouillon inline retenu');
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails({...project,permissions:{...project.permissions,canEdit:false,canClose:false}},[]));
     const retry=detail.getByRole('button',{name:'Réessayer la fiche',exact:true});retry.focus();await user.keyboard('{Enter}');
     await waitFor(()=>expect(detail.queryByRole('button',{name:'Réessayer la fiche',exact:true})).toBeNull());
     expect(title.value).toBe('Brouillon inline retenu');expect(form.queryByRole('alert')).toBeNull();
-    expect(form.getByRole('button',{name:'Enregistrer',exact:true}).disabled).toBe(true);
+    expect(form.getByRole('button',{name:/^Enregistrer \(\d+\)$/}).disabled).toBe(true);
     expect(detail.queryByRole('button',{name:'Clôturer',exact:true})).toBeNull();expect(updateProject).toHaveBeenCalledOnce();
   });
 
@@ -272,21 +286,21 @@ describe("Projects page", () => {
     const title = sheetTitle();
     await user.clear(title); await user.type(title, 'Modification envoyée');
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Vérification indisponible'));
-    await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+    await user.click(saveTask());
     expect(await within(row).findByRole('alert')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation éditée' })).toBeNull();
     expect(title.value).toBe('Modification envoyée');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
+    expect(saveTask().disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [fixtures.projectTask({ title: 'Valeur vérifiée' }), other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: 'Valeur vérifiée' })).toBeTruthy();
     expect(title.value).toBe('Modification envoyée');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(false);
+    expect(saveTask().disabled).toBe(false);
     expect(updateProjectTask).toHaveBeenCalledTimes(1);
     expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).queryByRole('alert')).toBeNull();
     await user.clear(title);
-    await user.click(screen.getByRole('button', { name: 'Enregistrer la tâche' }));
+    await user.click(saveTask());
     // MAIR-859 (C5): the title rule is shown under the field.
     expect(within(screen.getByRole('form', { name: 'Modifier une tâche' })).getByRole('alert').textContent).toBe('Donnez un titre à la tâche');
     expect(updateProjectTask).toHaveBeenCalledTimes(1);
@@ -308,7 +322,7 @@ describe("Projects page", () => {
     // The card is back in its column (a new element): the write is not confirmed.
     const rowAlert = await waitFor(() => within(taskCard(task.title)).getByRole('alert'));
     const row = taskCard(task.title);
-    expect(row.closest('section').getAttribute('aria-label')).toBe('À faire');
+    expect(row.closest('[data-task-column]').getAttribute('data-task-column')).toBe('todo');
     expect(rowAlert.textContent).toContain('acceptée');
     expect(rowAlert.textContent).toContain('confirmation de tâche est incohérente');
     expect(screen.queryByRole('heading', { name: 'Mauvaise confirmation reçue' })).toBeNull();
@@ -324,13 +338,13 @@ describe("Projects page", () => {
     await openTaskCard(user, task.title);
     const title = sheetTitle();
     await user.clear(title); await user.type(title, 'Brouillon à garder');
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(true);
+    expect(saveTask().disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     const verified = fixtures.projectTask({ title: 'Titre vérifié par lecture' });
     vi.mocked(getProjectDetails).mockResolvedValueOnce(fixtures.projectDetails(project, [verified, other]));
     screen.getByRole('button', { name: 'Réessayer la fiche' }).focus(); await user.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: verified.title })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Enregistrer la tâche' }).disabled).toBe(false);
+    expect(saveTask().disabled).toBe(false);
     expect(sheetTitle().value).toBe('Brouillon à garder');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
   });
@@ -347,12 +361,12 @@ describe("Projects page", () => {
     render(<ProjectsPage />);
     await user.click(await screen.findByRole('button', { name: `Ouvrir la fiche du projet ${project.title}` }));
     await tasksTab(user);
-    const column = (title) => taskCard(title).closest('section').getAttribute('aria-label');
-    expect(column(task.title)).toBe('À faire');
+    const column = (title) => taskCard(title).closest('[data-task-column]').getAttribute('data-task-column');
+    expect(column(task.title)).toBe('todo');
     await moveTaskTo(user, task.title, 'Terminé');
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(1);
     // The card waits in its new column, busy, with no other move offered.
-    expect(column(task.title)).toBe('Terminé');
+    expect(column(task.title)).toBe('done');
     expect(taskCard(task.title).getAttribute('aria-busy')).toBe('true');
     expect(within(taskCard(task.title)).getByRole('status').textContent).toBe('Enregistrement…');
     await user.click(within(taskCard(task.title)).getByRole('button', { name: `Actions pour ${task.title}` }));
@@ -363,7 +377,7 @@ describe("Projects page", () => {
     await user.keyboard('{Escape}');
     await act(async () => write.reject(new Error('Écriture refusée')));
     // Rolled back to « À faire », with the refusal on the card and in an error toast.
-    await waitFor(() => expect(column(task.title)).toBe('À faire'));
+    await waitFor(() => expect(column(task.title)).toBe('todo'));
     expect(within(taskCard(task.title)).getByRole('alert').textContent).toContain('Écriture refusée');
     expect(await screen.findByText('Statut non modifié')).toBeTruthy();
     expect(taskCard(task.title).getAttribute('aria-busy')).toBeNull();
@@ -372,7 +386,7 @@ describe("Projects page", () => {
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Relecture refusée'));
     await moveTaskTo(user, task.title, 'Terminé');
     expect(await screen.findByRole('heading', { name: confirmed.title })).toBeTruthy();
-    expect(column(confirmed.title)).toBe('Terminé');
+    expect(column(confirmed.title)).toBe('done');
     expect(screen.getByRole('button', { name: 'Réessayer la fiche' }).disabled).toBe(false);
     expect(updateProjectTaskStatus).toHaveBeenCalledTimes(2);
   });
@@ -426,7 +440,9 @@ describe("Projects page", () => {
     await tasksTab(user);
     await user.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     await user.type(sheetTitle(), 'Brouillon soumis');
-    await toggleOption(user, sheet(), 'Assignée à', 'Marie Durand'); await user.click(sheetTitle());
+    await nextStep(user);
+    await chooseAssignee(user, 'Marie Durand');
+    await nextStep(user);
     await user.click(screen.getByRole('button', { name: 'Ajouter la tâche', exact: true }));
     expect(await screen.findByRole('heading', { name: confirmed.title, level: 4 })).toBeTruthy();
     expect(screen.getByText('Les tâches confirmées restent affichées. Les compteurs et la progression restent ceux de la dernière réponse projet reçue.')).toBeTruthy();
@@ -603,7 +619,7 @@ describe("Projects page", () => {
     expect(screen.queryByRole("group", { name: fixtures.projectListItem().title })).toBeNull();
   });
 
-  it("keeps the search and filter toolbar stacked until enough width is available", async () => {
+  it("keeps the filters on one row and the view switch on its own row under them (MAIR-1134 C6)", async () => {
     render(<ProjectsPage />);
     await waitFor(() => expect(screen.queryByText("Chargement des projets...")).toBeNull());
 
@@ -617,10 +633,10 @@ describe("Projects page", () => {
     expect(controls.classList.contains("xl:flex-row")).toBe(true);
     expect(controls.classList.contains("md:flex-row")).toBe(false);
     expect(toolbar.classList.contains("items-start")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-row")).toBe(true);
-    expect(toolbar.classList.contains("2xl:flex-wrap")).toBe(true);
-    expect(controls.classList.contains("2xl:basis-[50rem]")).toBe(true);
-    expect(toolbar.classList.contains("xl:flex-row")).toBe(false);
+    expect(toolbar.classList.contains("flex-col")).toBe(true);
+    // The view switch never moves: its own row, left aligned, whatever the screen width.
+    expect([...toolbar.classList].some((name) => /flex-row/.test(name))).toBe(false);
+    expect(toolbar.lastElementChild).toBe(screen.getByRole("radiogroup", { name: "Vue des projets" }));
     expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
     expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
     expect(searchContainer.classList.contains("md:flex-1")).toBe(true);
@@ -703,7 +719,7 @@ it('wires the existing Login identity to a received Project member only when the
     expect(fetch).not.toHaveBeenCalled();await user.click(opener);
     await tasksTab(user);
     await user.click(screen.getByRole('button',{name:'Nouvelle tâche'}));
-    await screen.findByRole('button',{name:'Retirer Admin Mairie'});
+    await waitFor(()=>expect(checkedRadio('Assignée à')).toBe('user-1'));
     // Besides the Login identity, opening reads only the project statuses and archived tasks (MAIR-567).
     const urls=fetch.mock.calls.map(([input])=>String(input instanceof Request?input.url:input));
     expect(urls.filter(url=>url==='/api/auth/current-user')).toHaveLength(1);
