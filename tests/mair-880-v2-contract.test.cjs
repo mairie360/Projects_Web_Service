@@ -161,3 +161,15 @@ test('MAIR-1087: a task created with a start date sends it, a start after the du
   assert.doesNotMatch(view.text(), /Le début doit précéder l’échéance\./);
   assert.equal(bffProject.calls('/projects/{projectId}/tasks', 'post').length, 0);
 });
+
+test('MAIR-880: the lab page of the performance report is a page the front accepts (new fields, on-hold column)', () => {
+  const lab = require('./fixtures/performance.json').routes['/projects-page'];
+  const { parseProjectsPageReceipt } = requireTs('src/lib/project-page-receipt.ts');
+  const parsed = parseProjectsPageReceipt(lab, 1);
+  assert.equal(parsed.projects[0].title, require('./fixtures/performance.json').readyText);
+  assert.ok(parsed.kanban.columns.some((column) => column.status === 'on-hold'));
+  const contract = bffProject.contract;
+  const operation = contract.match('GET', '/projects-page').operation;
+  const schema = (operation.responses['2XX'] ?? operation.responses['200']).content['application/json'].schema;
+  assert.deepEqual(contract.validate(schema, lab, '$lab'), []);
+});
