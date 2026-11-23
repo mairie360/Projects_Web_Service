@@ -103,7 +103,7 @@ test('MAIR-846: a shared page URL opens the project and its tab directly', async
   await view.waitFor(() => view.find('ProjectPage').length === 1);
   await view.settle();
   assert.equal(view.props('Tabs').value, 'team');
-  assert.match(view.text(), /L’onglet « Équipe » arrive avec son propre ticket\./);
+  assert.match(view.text(), /Responsable du projet/, 'MAIR-874: the « Équipe » tab lists the members');
 });
 
 test('MAIR-846: the status pill changes the project status with the existing PATCH', async () => {
