@@ -38,7 +38,8 @@ export const NextTasksPanel = ({ tasks, pendingTaskIds, disabled = false, onComp
           return (
             <li key={task.id} className="flex flex-wrap items-center gap-3 rounded-[var(--mairie-radius-m,8px)] bg-[var(--mairie-surface-muted,#f6f4f1)] px-3 py-2">
               <Checkbox label={task.title} checked={false} disabled={locked} aria-busy={pendingTaskIds?.has(task.id) || undefined} onChange={() => onComplete(task)} className="min-w-0 flex-1" />
-              <PriorityPill level={task.priority} size="s" />
+              {/* MAIR-1135 (C5): only a high priority is worth the space here. */}
+              {task.priority === 'high' && <PriorityPill level={task.priority} size="s" />}
               <span className="inline-flex items-center gap-1 text-sm text-[var(--mairie-text-muted)]"><CalendarDays aria-hidden className="h-4 w-4" />{formatLongDate(task.dueDate)}</span>
               {task.responsible.name && <Avatar alt={task.responsible.name} size="xs" />}
             </li>

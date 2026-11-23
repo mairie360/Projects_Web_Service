@@ -30,7 +30,19 @@ sa page.
   le projet que par le groupe qu’il vient de remplacer) est aussi une modification enregistrée : retour à la
   liste avec la même notification.
 
-## Colonnes repliables, sélecteur de vue fixe, transitions (MAIR-1134)
+## En-tête et mise en page de la page projet (MAIR-1135)
+
+- **En-tête** : le titre en premier, puis une ligne de méta — statut (cliquable, avec son chevron), priorité, « En
+  retard », un séparateur, le responsable et l’échéance — puis la description. À droite, trois actions en taille m :
+  « Modifier » (contour), « Nouvelle tâche » (plein) et « … ». Sur mobile elles prennent toute la largeur. Les
+  étiquettes quittent l’en-tête.
+- **Mise en page** : 32 px entre les blocs de la page, 20 px entre les indicateurs (grille de 2 sur mobile) ; la
+  colonne latérale de la vue d’ensemble fait de 320 à 380 px. « Informations » est un `DescriptionList` de la lib qui
+  porte désormais les étiquettes. « Prochaines tâches » n’affiche la priorité que si elle est haute. « Activité
+  récente » listerait 3 éléments, mais le contrat n’a pas encore d’activité de projet : elle garde son état « Activité
+  non disponible ».
+
+
 
 - Chaque colonne du Kanban des projets et du tableau des tâches se replie avec le chevron de son en-tête (« Replier la
   colonne Terminé »), « Terminé » comprise : le `KanbanColumn` de la lib garde la largeur et l’en-tête et replie le

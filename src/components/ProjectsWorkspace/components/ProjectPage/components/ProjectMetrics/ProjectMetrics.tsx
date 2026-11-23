@@ -13,7 +13,7 @@ export const ProjectMetrics = ({ project, tasks }: { project: Project; tasks: Pr
   const due = dueMetric(project);
   const overdue = overdueTasksMetric(tasks);
   return (
-    <section aria-label="Indicateurs du projet" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Indicateurs du projet" className="grid grid-cols-2 gap-5 xl:grid-cols-4">
       <MetricCard label="Avancement" value={progress.value} icon={TrendingUp} trend="none" trendLabel={progress.detail} />
       <MetricCard label="Échéance" value={due.value} icon={CalendarDays} trend="none" trendLabel={due.detail} />
       <MetricCard label="Budget engagé" value="—" icon={ChartColumn} trend="none" trendLabel="Budget non renseigné" />

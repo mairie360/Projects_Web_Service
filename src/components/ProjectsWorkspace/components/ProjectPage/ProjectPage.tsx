@@ -181,7 +181,7 @@ export function ProjectPage({
   }, [project, taskCreationState?.draft]);
 
   return (
-    <section aria-labelledby={titleId} className="space-y-6">
+    <section aria-labelledby={titleId} className="space-y-8">
       <ProjectPageHeader
         project={project}
         titleId={titleId}

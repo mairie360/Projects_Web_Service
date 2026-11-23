@@ -25,8 +25,8 @@ export interface ProjectOverviewProps {
 export const ProjectOverview = ({
   project, tasks, pendingTaskIds, disabled = false, lifecycleDisabled = false, onCompleteTask, onShowTab, onSuspend, onCloseProject,
 }: ProjectOverviewProps) => (
-  <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-    <div className="min-w-0 space-y-5">
+  <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_clamp(320px,28vw,380px)]">
+    <div className="min-w-0 space-y-8">
       <NextTasksPanel tasks={tasks} pendingTaskIds={pendingTaskIds} disabled={disabled} onComplete={onCompleteTask} onShowAll={() => onShowTab('tasks')} />
       <Panel
         title="Jalons"
@@ -35,7 +35,7 @@ export const ProjectOverview = ({
         stateProps={{ title: 'Jalons non disponibles', description: 'Les jalons du projet ne sont pas encore fournis par le service Projets.' }}
       />
     </div>
-    <aside className="min-w-0 space-y-5" aria-label="Informations du projet">
+    <aside className="min-w-0 space-y-8" aria-label="Informations du projet">
       <Panel title="Informations">
         <ProjectSummary project={project} />
         {project.permissions?.canClose !== false && (

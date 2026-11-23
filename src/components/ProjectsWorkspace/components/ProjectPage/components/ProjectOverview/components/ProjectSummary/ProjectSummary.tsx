@@ -1,4 +1,4 @@
-import { AvatarStack, DescriptionList, PriorityPill, ProgressMeter, StatusPill, UserIdentity } from '@mairie360/lib-components/primitives';
+import { AvatarStack, DescriptionList, PriorityPill, ProgressMeter, StatusPill, TagList, UserIdentity } from '@mairie360/lib-components/primitives';
 import { CalendarDays } from 'lucide-react';
 import type React from 'react';
 
@@ -10,7 +10,7 @@ const Day = ({ date }: { date: string }) => (
 );
 
 /**
- * MAIR-846 (C6, Figma F5 5.2 / 5.11) « Informations »: responsible, dates, priority, team, group and budget.
+ * MAIR-846 (C6, Figma F5 5.2 / 5.11) « Informations »: responsible, dates, priority, team, group, labels (MAIR-1135) and budget.
  * A project without group (created before groups, or whose group was deleted) gets the « Sans groupe » warning.
  */
 export const ProjectSummary = ({ project }: { project: Project }) => {
@@ -33,6 +33,8 @@ export const ProjectSummary = ({ project }: { project: Project }) => {
           </span>
         ),
     },
+    // MAIR-1135 (C5): the labels left the header for « Informations ».
+    { id: 'labels', label: 'Étiquettes', value: project.labels.length ? <TagList label="Étiquettes du projet" items={project.labels} size="s" /> : <span className="text-[var(--mairie-text-muted)]">Aucune</span> },
     { id: 'budget', label: 'Budget', value: <span className="text-[var(--mairie-text-muted)]">Non renseigné</span> },
   ];
   return (

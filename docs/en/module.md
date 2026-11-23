@@ -27,7 +27,18 @@ follow it; the list stays mounted behind it, with its filters, view and page.
   « Modifications enregistrées ». A `204` (the caller saw the project only through the group just replaced) is a
   saved edit too: back to the list with the same toast.
 
-## Collapsible columns, fixed view switch, transitions (MAIR-1134)
+## Project page header and layout (MAIR-1135)
+
+- **Header**: the title comes first, then one meta line — status (clickable, with its chevron), priority, « En
+  retard », a separator, the responsible and the due date — then the description. On the right, three size m actions:
+  « Modifier » (outline), « Nouvelle tâche » (solid) and « … ». On a phone they take the whole width. The labels left
+  the header.
+- **Layout**: 32 px between the blocks of the page, 20 px between the indicators (a grid of 2 on a phone); the
+  overview side column is 320 to 380 px wide. « Informations » is a lib `DescriptionList` that now holds the labels.
+  « Prochaines tâches » shows the priority only when it is high. « Activité récente » would list 3 items, but the
+  contract has no project activity yet: it keeps its « Activité non disponible » state.
+
+
 
 - Every column of the projects Kanban and of the task board folds from the chevron of its header (« Replier la colonne
   Terminé »), « Terminé » included: the lib `KanbanColumn` keeps the width and the header and folds the content in

@@ -17,4 +17,11 @@ describe('ProjectSummary', () => {
     expect(screen.getByText('Sans groupe')).toBeTruthy();
     expect(screen.getByText('Choisissez un groupe dans « Modifier »')).toBeTruthy();
   });
+
+  it('shows the labels of the project in « Informations » (MAIR-1135)', () => {
+    const { rerender } = render(<ProjectSummary project={{ ...project(), labels: ['Énergie', 'Voirie'] }} />);
+    expect(screen.getByRole('list', { name: 'Étiquettes du projet' }).textContent).toContain('Énergie');
+    rerender(<ProjectSummary project={{ ...project(), labels: [] }} />);
+    expect(screen.getByText('Aucune')).toBeTruthy();
+  });
 });
