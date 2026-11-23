@@ -8,7 +8,7 @@ import { getProjectDetails, getProjectsPage } from '@/lib/bffProjectClient';
 import fixtures from '../support/bff-fixtures.cjs';
 
 vi.mock('@/lib/bffProjectClient', async importOriginal => ({
-  ...(await importOriginal()), getProjectDetails: vi.fn(), getProjectsPage: vi.fn(), getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]),
+  ...(await importOriginal()), getProjectDetails: vi.fn(), getProjectsPage: vi.fn(), getProjectGroups: vi.fn(async () => [{ id: 'group-1', name: 'Services techniques' }]), getProjectActivity: vi.fn(async () => ({ items: [], pagination: { page: 1, limit: 5, total: 0, hasNextPage: false } })),
 }));
 
 beforeEach(() => {
@@ -30,7 +30,7 @@ describe('Project Table detail entry', () => {
     expect(document.activeElement.textContent).toMatch(/^Clé/);
     opener.focus();
     expect(document.activeElement).toBe(opener);
-    expect(opener.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(opener.getAttribute('aria-haspopup')).toBeNull(); // MAIR-846: it opens a page, not a dialog
     expect(opener.className).toMatch(/focus-visible:outline/);
     await user.keyboard(key);
     expect(props.onProjectOpen).toHaveBeenCalledOnce();
@@ -62,7 +62,8 @@ describe('Project Table detail entry', () => {
     expect(props.onProjectOpen).not.toHaveBeenCalled();
   });
 
-  it.each(['{Enter}', ' '])('uses the existing detail GET and restores the Table opener after %s and Escape', async key => {
+  // MAIR-846: the row opens the project page (URL `?project=<id>`); « ← Projets » brings back the Table and its opener.
+  it.each(['{Enter}', ' '])('uses the existing detail GET to open the project page with %s and restores the Table opener', async key => {
     const user = userEvent.setup(), project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockResolvedValue(fixtures.projectDetails(project));
@@ -71,19 +72,24 @@ describe('Project Table detail entry', () => {
     const table = await screen.findByRole('table');
     const opener = within(table).getByRole('button', { name: openerName(project), exact: true });
     opener.focus(); await user.keyboard(key);
-    const dialog = await screen.findByRole('dialog', { name: project.title, exact: true });
-    expect(dialog.contains(document.activeElement)).toBe(true);
+    const title = await screen.findByRole('heading', { level: 1, name: project.title });
+    const page = title.closest('section');
+    expect(document.activeElement).toBe(title);
+    expect(window.location.search).toBe(`?view=table&project=${project.id}`);
+    expect(screen.queryByRole('table')).toBeNull();
     expect(getProjectDetails).toHaveBeenCalledOnce();
     expect(getProjectDetails).toHaveBeenCalledWith(project.id);
-    const check = await axe(dialog);
+    const check = await axe(page);
     expect(check.violations.filter(item => ['serious', 'critical'].includes(item.impact))).toEqual([]);
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(within(page).getByRole('button', { name: 'Projets' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { level: 1, name: project.title })).toBeNull());
+    expect(window.location.search).toBe('?view=table');
+    expect(screen.getByRole('table')).toBeTruthy();
     expect(document.activeElement).toBe(opener);
     expect(getProjectDetails).toHaveBeenCalledOnce();
   });
 
-  it('leaves a refused Table read without fabricating a detail and permits a deliberate keyboard retry', async () => {
+  it('leaves a refused Table read without fabricating a page and permits a deliberate keyboard retry', async () => {
     const user = userEvent.setup(), project = fixtures.projectListItem();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
     vi.mocked(getProjectDetails).mockRejectedValueOnce(new Error('Fiche du tableau indisponible')).mockResolvedValueOnce(fixtures.projectDetails(project));
@@ -92,14 +98,14 @@ describe('Project Table detail entry', () => {
     const opener = within(await screen.findByRole('table')).getByRole('button', { name: openerName(project), exact: true });
     opener.focus(); await user.keyboard('{Enter}');
     await screen.findByText('Fiche du tableau indisponible');
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: project.title })).toBeNull();
     expect(getProjectDetails).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(opener);
     await user.keyboard(' ');
-    await screen.findByRole('dialog', { name: project.title, exact: true });
+    const title = await screen.findByRole('heading', { level: 1, name: project.title });
     expect(getProjectDetails).toHaveBeenCalledTimes(2);
-    await user.click(screen.getByRole('button', { name: 'Fermer la fiche projet', exact: true }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(within(title.closest('section')).getByRole('button', { name: 'Projets', exact: true }));
+    await waitFor(() => expect(screen.queryByRole('heading', { level: 1, name: project.title })).toBeNull());
     expect(document.activeElement).toBe(opener);
   });
 });

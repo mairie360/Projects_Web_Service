@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { ProjectDetailModal } from '@/components/ProjectsWorkspace/components/ProjectDetailModal';
+import { ProjectPage } from '@/components/ProjectsWorkspace/components/ProjectPage';
 import { CreateProjectModal } from '@/components/ProjectsWorkspace/components/CreateProjectModal';
 import { projectToFormState } from '@/lib/projectPageState';
 import fixtures from '../support/bff-fixtures.cjs';
@@ -16,19 +16,22 @@ const port = { readProject: async projectId => ({ projectId, statuses, tasks: []
 const page = fixtures.projectsPage();
 const project = fixtures.projectListItem();
 // The sheet shows its statuses once the project detail (with its tasks) is loaded (MAIR-567).
-const props = { project: { ...project, taskItems: [] }, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
+const props = { initialTab: 'tasks', project: { ...project, taskItems: [] }, tasks: [], memberOptions: page.options.members, defaultTaskAssigneeId: 'user-3', labelOptions: [], statusOptions: page.filters.statuses, priorityOptions: page.filters.priorities, onClose() {}, onUpdateProject() {}, onAddTask() {}, onUpdateTask() {}, onUpdateTaskStatus() {}, onDeleteTask: async () => undefined, onCloseProject: async () => undefined };
 
 describe('workflow adoption by existing project forms', () => {
   it('submits a custom project task status ID with its category from the detailed task form', async () => {
     function Detail() {
       const [saved, setSaved] = React.useState();
-      return <><ProjectDetailModal {...props} workflowPort={port} workflowRole="User" onAddTask={(_project, draft) => setSaved(draft)} /><output data-testid="saved">{JSON.stringify(saved)}</output></>;
+      return <><ProjectPage {...props} workflowPort={port} workflowRole="User" onAddTask={(_project, draft) => setSaved(draft)} /><output data-testid="saved">{JSON.stringify(saved)}</output></>;
     }
     render(<Detail />);
-    await screen.findByRole('region', { name: 'Conseil municipal' });
+    fireEvent.click(screen.getByRole('button', { name: 'Nouvelle tâche' }));
     const form = screen.getByRole('form', { name: 'Créer une tâche' });
-    fireEvent.change(within(form).getByLabelText('Titre de la tâche'), { target: { value: 'Plan communal' } });
-    fireEvent.change(within(form).getByLabelText('Statut', { exact: true }), { target: { value: 'status-2' } });
+    fireEvent.change(within(form).getByLabelText(/^Titre/), { target: { value: 'Plan communal' } });
+    fireEvent.submit(form);
+    // The « Colonne de départ » cards list the project's own statuses once they are read (MAIR-567, MAIR-1137).
+    fireEvent.click(await within(form).findByRole('radio', { name: /^Conseil municipal/ }));
+    fireEvent.submit(form);
     fireEvent.submit(form);
     const saved = JSON.parse((await screen.findByTestId('saved')).textContent);
     expect(saved.title).toBe('Plan communal');
@@ -43,10 +46,14 @@ describe('workflow adoption by existing project forms', () => {
       return <><CreateProjectModal mode="create" workflowPort={port} form={projectToFormState(project)} error="" memberOptions={page.options.members} labelOptions={[]} groupOptions={[{ value: 'group-1', label: 'Services techniques' }]} statusOptions={page.filters.statuses} priorityOptions={page.filters.priorities} onChange={() => undefined} onClose={() => undefined} onSubmit={(event, selected) => { event.preventDefault(); setSelection(selected); }} /><output data-testid="selection">{JSON.stringify(selection)}</output></>;
     }
     render(<Creation />);
+    // MAIR-1136: the template is chosen at the « Tâches » step; the creation is sent from the recap.
+    fireEvent.click(screen.getByRole('button', { name: 'Étape 3 sur 4 : Tâches (facultative)' }));
     await screen.findByRole('option', { name: 'Instruction municipale' });
     fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'template-1' } });
+    expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Conseil municipal');
+    fireEvent.submit(screen.getByRole('dialog'));
+    expect(screen.getByRole('region', { name: 'Tâches' }).textContent).toContain('Instruction municipale');
     fireEvent.submit(screen.getByRole('dialog'));
     expect(JSON.parse(screen.getByTestId('selection').textContent)).toEqual(template);
-    expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Conseil municipal');
   });
 });

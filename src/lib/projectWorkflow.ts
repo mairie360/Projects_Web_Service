@@ -16,7 +16,6 @@ export type ProjectWorkflowPort = {
   readStatuses?: (projectId: string, signal: AbortSignal) => Promise<TaskStatusDefinition[]>;
   readTemplates: (signal: AbortSignal) => Promise<ProjectTemplate[]>;
   saveProjectStatuses?: (draft: { projectId: string; revision: string; statuses: TaskStatusDefinition[]; migrations: StatusMigration[] }, signal: AbortSignal) => Promise<ProjectWorkflowSnapshot>;
-  moveTask?: (draft: { projectId: string; revision: string; taskId: string; statusId: string }, signal: AbortSignal) => Promise<ProjectWorkflowSnapshot>;
   saveTemplate?: (draft: { id?: string; revision?: string; name: string; statuses: TaskStatusDefinition[] }, signal: AbortSignal) => Promise<ProjectTemplate>;
   createProjectFromTemplate?: (template: Pick<ProjectTemplate, 'id' | 'revision'>, body: CreateProjectBody) => Promise<ProjectDetailsResponse>;
 };
