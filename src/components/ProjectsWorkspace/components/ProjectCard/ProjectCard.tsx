@@ -24,6 +24,7 @@ export function ProjectCard({
   onChangeStatus,
 }: ProjectCardProps) {
   const overdue = isProjectOverdue(project);
+  const Heading = variant === 'grid' ? 'h3' : 'h4';
 
   return (
     <article
@@ -47,7 +48,8 @@ export function ProjectCard({
 
       {variant === 'grid' && <StatusBadge status={projectStatusBadge[project.status]} className="mb-2" />}
 
-      <h3 className="text-base font-semibold leading-snug text-[var(--mairie-text)]">
+      {/* MAIR-487 (RGAA 9.1): under a Kanban column (lib h3) the card is an h4, in the grid an h3 under the h2 of the view. */}
+      <Heading className="text-base font-semibold leading-snug text-[var(--mairie-text)]">
         <button
           type="button"
           aria-label={`Ouvrir la fiche du projet ${project.title}`}
@@ -57,8 +59,9 @@ export function ProjectCard({
         >
           {project.title}
         </button>
-      </h3>
-      <p className="mt-1 line-clamp-2 text-sm text-[var(--mairie-muted)]">{project.description}</p>
+      </Heading>
+      {/* MAIR-487 (RGAA 10.4, 10.12): the whole description, never cut at 200 % or with the WCAG spacing. */}
+      <p className="mt-1 whitespace-pre-line break-words text-sm text-[var(--mairie-muted)]">{project.description}</p>
 
       {project.labels.length > 0 && (
         <TagList label="Étiquettes du projet" items={project.labels} size="s" className="mt-3" />
