@@ -4,11 +4,11 @@
 version: 1
 target: http://projects-front:5001
 
-# Same JWT_SECRET as the services of docker-compose-accessibility.yml: the engine signs an
-# accessToken for the user of the state (as:), the front relays it to bff-project, which resolves
-# the user through bff-user / core-api. The role claim is ignored: roles come from the database.
+# Sessions (MAIR-680): the engine signs an EdDSA accessToken for the user of a state (as:), like Core
+# API, with the run's JWT_PRIVATE_KEY that docker-compose-accessibility.yml hands to the runner
+# (accessibility_test.sh generates the key pair). No secret is committed here.
 session:
-  jwt_secret: b"secret"
+  jwt_timeout: 3600
 
 users:
   # Responsable (init-accessibility.sql): owns the projects of the board, can create and manage
