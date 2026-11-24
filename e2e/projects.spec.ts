@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { cookieHeader, signInAs, users } from './support/session';
 
 // Critical journeys of the Projects front (MAIR-603), on the real stack of docker-compose-e2e.yml:
-// a user allowed to manage projects creates a project, adds a task, edits and deletes that task, renames and deletes the project; a user
+// a user allowed to manage projects creates a project, adds a task, edits and deletes that task, closes and reopens the project,
+// renames and deletes it; a user
 // with the "User" role only does not see the action and is refused by the BFF; no session is
 // sent back to Login. The texts asserted are the French ones displayed on screen.
 
@@ -178,6 +179,34 @@ test.describe('project manager', () => {
     await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Tâches/ })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` })).toHaveCount(0);
+  });
+
+  // MAIR-1200: a closed project is read-only until its manager reopens it; the rename below then proves edits are back.
+  test('closes the project, reads it read-only, then reopens it', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+    await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
+    await page.getByRole('button', { name: 'Clôturer', exact: true }).click();
+
+    const banner = page.getByRole('status').filter({ hasText: 'Projet clôturé — lecture seule.' });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Rouvrez le projet pour le modifier.');
+    await expect(page.getByRole('button', { name: 'Modifier', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nouvelle tâche', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Plus d’actions/ }).click();
+    await expect(page.getByRole('menuitem', { name: 'Modifier' })).toHaveCount(0);
+    await expect(page.getByRole('menuitem', { name: 'Dupliquer' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Rouvrir', exact: true }).click();
+    const reopen = page.getByRole('menu', { name: 'Rouvrir le projet en' });
+    await expect(reopen.getByRole('menuitem')).toHaveText(['À faire', 'En cours', 'En revue', 'Suspendu']);
+    await reopen.getByRole('menuitem', { name: 'En cours' }).click();
+
+    await expect(page.getByText('Projet rouvert')).toBeVisible();
+    await expect(banner).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Modifier', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rouvrir', exact: true })).toHaveCount(0);
   });
 
   test('renames the project', async ({ page }) => {

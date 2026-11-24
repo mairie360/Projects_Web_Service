@@ -191,7 +191,7 @@
             "canDelete": true,
             "canCreateTask": true,
             "canAssignMembers": true,
-            "canClose": true
+            "canClose": true, "canReopen": false
           },
           "members": [
             {

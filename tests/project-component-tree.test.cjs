@@ -15,7 +15,7 @@ test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     // MAIR-846: the project page — header, metrics, tabs (overview, tasks) and the edit modal.
     [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'ProjectTasksTab', 'ProjectPlanningTab', 'ProjectTeamTab', 'ProjectActivityTab', 'ProjectEditForm', 'ProjectWorkflow'],
-    [`${workspace}/components/ProjectPage/components/ProjectPageHeader/ProjectPageHeader.tsx`]: ['ProjectStatusMenu', 'ProjectMoreMenu'],
+    [`${workspace}/components/ProjectPage/components/ProjectPageHeader/ProjectPageHeader.tsx`]: ['ProjectStatusMenu', 'ProjectReopenMenu', 'ProjectMoreMenu'],
     [`${workspace}/components/ProjectPage/components/ProjectOverview/ProjectOverview.tsx`]: ['NextTasksPanel', 'MilestonesPanel', 'ProjectLifecycle', 'ProjectSummary', 'RecentActivityPanel'],
     // MAIR-859, MAIR-1137: the « Tâches » tab — toolbar, board (cards, quick add), list, task page, task window (Modal)
     // and deletion confirmation; the « … » of a task (`TaskActionsMenu`) is shared by the cards, the rows and the page.

@@ -1419,6 +1419,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -1430,7 +1433,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -1798,6 +1802,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -1809,7 +1816,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -2534,6 +2542,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -2545,7 +2556,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -3134,6 +3146,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -3145,7 +3160,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -4178,6 +4194,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -4189,7 +4208,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -4805,6 +4825,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -4816,7 +4839,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -5674,6 +5698,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -5685,7 +5712,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -5961,6 +5989,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -5972,7 +6003,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -6422,6 +6454,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -6433,7 +6468,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -7556,6 +7592,9 @@
           "canEdit": {
             "type": "boolean"
           },
+          "canReopen": {
+            "type": "boolean"
+          },
           "canView": {
             "type": "boolean"
           }
@@ -7567,7 +7606,8 @@
           "canDelete",
           "canCreateTask",
           "canAssignMembers",
-          "canClose"
+          "canClose",
+          "canReopen"
         ],
         "type": "object"
       },
@@ -8286,7 +8326,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.b10dfc7faf0c991f2f9a1538e8ecd49a50585916"
+    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.5aaf23d390bad9aef084b8207a082a0adb234cac"
   },
   "openapi": "3.1.0",
   "paths": {

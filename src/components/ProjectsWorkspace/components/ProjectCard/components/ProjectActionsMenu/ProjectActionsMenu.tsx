@@ -16,13 +16,12 @@ import {
 import { Copy, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 
 import type { Project } from '@/types/project';
-import { projectStatusLabel } from '../../../../project-card-meta';
-
-const STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold', 'done'];
+import { isProjectReopenable, projectStatusLabel, projectStatusTargets } from '../../../../project-card-meta';
 
 /**
  * « … » menu of a project (MAIR-829, Figma F4): Ouvrir le projet, Modifier (MAIR-1134), Dupliquer, Changer le statut (single choice),
- * Supprimer (confirmed by the page). Items are `asChild` buttons so they keep `role`, `disabled` and keyboard activation.
+ * Supprimer (confirmed by the page). A closed project's managers get « Rouvrir le projet en » and its open statuses instead
+ * of « Changer le statut ». Items are `asChild` buttons so they keep `role`, `disabled` and keyboard activation.
  */
 export function ProjectActionsMenu({
   project,
@@ -46,7 +45,9 @@ export function ProjectActionsMenu({
 }) {
   const canOpen = project.permissions?.canView !== false && Boolean(onOpen);
   const canDuplicate = project.permissions?.canDuplicate !== false && Boolean(onDuplicate);
-  const canChangeStatus = project.permissions?.canEdit === true && Boolean(onChangeStatus);
+  const statusTargets = onChangeStatus ? projectStatusTargets(project) : [];
+  const canChangeStatus = statusTargets.length > 0;
+  const statusTitle = isProjectReopenable(project) && project.permissions?.canEdit !== true ? 'Rouvrir le projet en' : 'Changer le statut';
   const canDelete = project.permissions?.canDelete !== false && Boolean(onDelete);
   const canEdit = project.permissions?.canEdit !== false && Boolean(onEdit);
   const [open, setOpen] = React.useState(false);
@@ -114,9 +115,9 @@ export function ProjectActionsMenu({
           {canChangeStatus && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Changer le statut</DropdownMenuLabel>
+              <DropdownMenuLabel>{statusTitle}</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={project.status} onValueChange={(status) => chooseStatus(status as Project['status'])}>
-                {STATUSES.map((status) => (
+                {statusTargets.map((status) => (
                   // The lib radio item is a bare div (lib-components 2.1.0): role, state and keyboard activation are added here.
                   <DropdownMenuRadioItem
                     key={status}

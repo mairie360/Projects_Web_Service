@@ -4,7 +4,7 @@ import React from 'react';
 import { KanbanColumn } from '@mairie360/lib-components/primitives';
 
 import { ProjectCard } from '../ProjectCard';
-import { projectColumnTone } from '../../project-card-meta';
+import { projectColumnTone, projectStatusTargets } from '../../project-card-meta';
 import { COLLAPSED_PROJECT_COLUMNS_KEY, useCollapsedColumns } from '../../use-collapsed-columns';
 import type { Project } from '@/types/project';
 
@@ -45,8 +45,9 @@ export function KanbanBoard({
   // MAIR-1134: a column folds from its header chevron; the choice is remembered per browser.
   const { collapsed, setColumnCollapsed } = useCollapsedColumns(COLLAPSED_PROJECT_COLUMNS_KEY);
   const dragged = projects.find((project) => project.id === draggedId);
-  const canMove = (project: Project) => Boolean(onMoveProject && movingId === null && project.permissions?.canEdit === true);
-  const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status);
+  // A closed project's managers may only drag it out of « Terminé » (reopening it); `projectStatusTargets` says where.
+  const canMove = (project: Project) => Boolean(onMoveProject && movingId === null && projectStatusTargets(project).length > 0);
+  const acceptsDrop = (status: Project['status']) => Boolean(dragged && canMove(dragged) && dragged.status !== status && projectStatusTargets(dragged).includes(status));
 
   const endDrag = () => {
     setDraggedId(null);

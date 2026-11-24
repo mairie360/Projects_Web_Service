@@ -68,7 +68,8 @@ function projectListItem(overrides = {}) {
     budgetVoted: null,
     budgetCommitted: null,
     tasks: { total: 2, completed: 1, active: 2, archived: 0 },
-    permissions: { canView: true, canEdit: true, canDuplicate: true, canDelete: true, canCreateTask: true, canAssignMembers: true, canClose: true },
+    // MAIR-1200: `canReopen` is true only for the managers of a closed (`done`) project.
+    permissions: { canView: true, canEdit: true, canDuplicate: true, canDelete: true, canCreateTask: true, canAssignMembers: true, canClose: true, canReopen: false },
     ...overrides,
   };
 }

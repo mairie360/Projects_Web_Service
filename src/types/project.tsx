@@ -108,6 +108,8 @@ export interface Project {
     canCreateTask?: boolean;
     canAssignMembers?: boolean;
     canClose?: boolean;
+    /** A closed project's managers may reopen it (`PATCH` with a status other than `done`). */
+    canReopen?: boolean;
   };
   createdAt: string;
   /** MAIR-1088: members with their role (first 5 on the page, all of them with their load in the detail). */
