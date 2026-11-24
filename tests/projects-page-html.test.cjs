@@ -417,6 +417,29 @@ test('a task deep link makes the selected BFF task visible and identifiable', as
   assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
 });
 
+test('mair_1197 a messaging link with bare ids opens the project and its task through their public ids', async () => {
+  harness.location.search = '?project=1&task=2';
+  bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
+  await renderLoadedPage();
+  await view.waitFor(() => view.find('ProjectPage').length === 1 && view.props('ProjectPage').highlightTaskId === 'task-2');
+
+  const reads = bffProject.calls('/projects/{projectId}', 'get');
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].pathParams.projectId, 'project-1');
+  assert.match(view.html, /data-linked-task="task-2"/);
+  assert.doesNotMatch(view.text(), /Lien de projet invalide|La tâche demandée est introuvable/);
+});
+
+test('mair_1197 a messaging link to a project the caller may not see is refused', async () => {
+  harness.location.search = '?project=7';
+  bffProject.on('get', '/projects/{projectId}', harness.errorReply(403, fixtures.apiError('FORBIDDEN', 'Projet inaccessible')));
+  await renderLoadedPage();
+  await view.waitFor((html) => html.includes('Projet inaccessible'));
+
+  assert.equal(view.find('ProjectPage').length, 0);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get')[0].pathParams.projectId, 'project-7');
+});
+
 test('invalid, missing and unauthorized deep-link targets never create a fake detail', async () => {
   harness.location.search = '?task=task-2';
   await renderLoadedPage();

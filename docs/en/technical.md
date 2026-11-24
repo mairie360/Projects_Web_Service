@@ -251,6 +251,8 @@ These data paths are exposed at the same origin through the proxy; Next.js pages
 | `/` | [src/app/page.tsx](../../src/app/page.tsx) |
 | `/profile` and subpaths | [src/middleware.ts](../../src/middleware.ts) redirects to Settings |
 
+`/?project=<id>&task=<id>` opens a project page, on its « Tâches » tab with the task highlighted when `task` is given ([src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Both forms of id are accepted: the public ids of the BFF (`project-38`, `task-79`, used by the Dashboard) and the bare numbers of the messaging `#` links (`38`, `79`), which get their prefix before the BFF is called; a bare number that is not a positive id answers « Lien de projet invalide ».
+
 | Method | Local route | Source |
 | --- | --- | --- |
 | POST | `/api/auth/logout` | [src/app/api/auth/logout/route.ts](../../src/app/api/auth/logout/route.ts) |
