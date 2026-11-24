@@ -52,7 +52,8 @@ describe('ProjectPageHeader (MAIR-846)', () => {
       expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Nouvelle tâche' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: /^Plus d’actions/ }));
-      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Dupliquer', 'Supprimer']);
+      // « Envoyer un message » depends on the messaging front being configured; it is not an edit action.
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent).filter((name) => name !== 'Envoyer un message')).toEqual(['Dupliquer', 'Supprimer']);
       await userEvent.keyboard('{Escape}');
       await userEvent.click(screen.getByRole('button', { name: 'Rouvrir' }));
       await userEvent.click(screen.getByRole('menuitem', { name: 'En cours' }));
