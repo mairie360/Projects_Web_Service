@@ -16,12 +16,16 @@ function sources(dir) {
   });
 }
 
-test('MAIR-1133: lib-components is pinned to an exact 2.3.x release, installed and locked', () => {
+test('MAIR-1133: lib-components is pinned to an exact release at or above 2.3.2, installed and locked', () => {
   const manifest = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
   const pin = manifest.dependencies['@mairie360/lib-components'];
-  assert.match(pin, /^2\.3\.\d+$/, 'an exact pin on the lib 2.3 line');
-  assert.ok(Number(pin.split('.')[2]) >= 2, 'at least 2.3.2, the first release the module was reviewed on');
+  assert.match(pin, /^\d+\.\d+\.\d+$/, 'an exact pin, no range');
+  const [major, minor, patch] = pin.split('.').map(Number);
+  assert.ok(
+    major > 2 || (major === 2 && (minor > 3 || (minor === 3 && patch >= 2))),
+    'at least 2.3.2, the first release the module was reviewed on',
+  );
   assert.equal(lock.packages['node_modules/@mairie360/lib-components'].version, pin);
   assert.equal(JSON.parse(read('node_modules/@mairie360/lib-components/package.json')).version, pin);
 });
