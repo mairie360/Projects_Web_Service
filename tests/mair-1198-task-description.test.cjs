@@ -31,9 +31,9 @@ beforeEach(() => {
   bffProject.on('get', '/projects-page', { body: f.projectsPage([project]) });
   // The detail is read again after a write: it answers the tasks as they are now.
   bffProject.on('get', '/projects/{projectId}', () => ({ body: f.projectDetails(project, tasks) }));
-  bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}', ({ body, params }) => {
-    const index = tasks.findIndex((task) => task.id === params.taskId);
-    tasks[index] = f.projectTask({ ...tasks[index], ...body, id: params.taskId, responsible: tasks[index].responsible, assignees: tasks[index].assignees });
+  bffProject.on('patch', '/projects/{projectId}/tasks/{taskId}', ({ body, pathParams }) => {
+    const index = tasks.findIndex((task) => task.id === pathParams.taskId);
+    tasks[index] = f.projectTask({ ...tasks[index], ...body, id: pathParams.taskId, responsible: tasks[index].responsible, assignees: tasks[index].assignees });
     return { body: tasks[index] };
   });
 });
