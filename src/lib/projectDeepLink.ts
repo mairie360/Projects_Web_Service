@@ -3,6 +3,17 @@ export type ProjectDeepLink =
   | { error: string }
   | null;
 
+/**
+ * Public id of a linked project or task. Links built by the messaging carry the bare number (`?project=38&task=79`),
+ * the Dashboard the public id (`project-38`): a bare number gets the prefix, `null` when it is not a positive one.
+ * Any other value is kept as is, and BFF_Project refuses it if it names nothing.
+ */
+function publicId(prefix: 'project' | 'task', id: string): string | null {
+  if (!/^\d+$/.test(id)) return id;
+  const number = Number(id);
+  return Number.isSafeInteger(number) && number > 0 ? `${prefix}-${number}` : null;
+}
+
 export function parseProjectDeepLink(search: string): ProjectDeepLink {
   const params = new URLSearchParams(search);
   if (!params.has('project') && !params.has('task')) return null;
@@ -16,7 +27,10 @@ export function parseProjectDeepLink(search: string): ProjectDeepLink {
     return { error: 'Lien de projet invalide.' };
   }
 
-  return { projectId, taskId };
+  const linkedProject = publicId('project', projectId);
+  const linkedTask = taskId === null ? null : publicId('task', taskId);
+  if (!linkedProject || (taskId !== null && !linkedTask)) return { error: 'Lien de projet invalide.' };
+  return { projectId: linkedProject, taskId: linkedTask };
 }
 
 /** MAIR-846: tabs of the project page, kept in the URL (`?project=<id>&tab=<tab>`). */

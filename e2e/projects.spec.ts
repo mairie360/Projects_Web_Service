@@ -75,6 +75,39 @@ test.describe('project manager', () => {
     await expect(details.getByRole('region', { name: 'À faire' }).getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` })).toBeVisible();
   });
 
+  // The `#` links of the messaging carry bare ids (`?project=38&task=79`), the Dashboard the public ids.
+  test('opens the project and its task from a messaging link, and from a Dashboard link', async ({ page, browser, baseURL }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` }).click();
+    await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
+    const projectId = new URL(page.url()).searchParams.get('project') ?? '';
+    expect(projectId).toMatch(/^project-\d+$/);
+    const detail = await page.request.get(`/projects/${projectId}`, { headers: { Accept: 'application/json' } });
+    expect(detail.status()).toBe(200);
+    const taskId: string = (await detail.json()).taskItems.find((task: { title: string }) => task.title === taskTitle).id;
+    const bare = (id: string) => id.replace(/^[a-z]+-/, '');
+
+    await page.goto(`/?project=${bare(projectId)}&task=${bare(taskId)}`);
+    await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Tâches/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(`[data-linked-task="${taskId}"]`)).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByText('Lien de projet invalide.')).toHaveCount(0);
+
+    await page.goto(`/?project=${projectId}`);
+    await expect(page.getByRole('heading', { level: 1, name: projectTitle })).toBeVisible();
+
+    // A colleague who is not a member of the project is refused: no project page opens.
+    const outsider = await browser.newContext();
+    await signInAs(outsider, baseURL!, users.member);
+    const outsiderPage = await outsider.newPage();
+    const refusal = outsiderPage.waitForResponse((response) => new URL(response.url()).pathname === `/projects/${projectId}`);
+    await outsiderPage.goto(`/?project=${bare(projectId)}&task=${bare(taskId)}`);
+    expect([403, 404]).toContain((await refusal).status());
+    await expect(outsiderPage.getByRole('button', { name: 'Paramètres' })).toBeVisible();
+    await expect(outsiderPage.getByRole('heading', { level: 1, name: projectTitle })).toHaveCount(0);
+    await outsider.close();
+  });
+
   test('edits the task', async ({ page }) => {
     await page.goto('/');
     const details = await openProjectTasks(page, projectTitle);

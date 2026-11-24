@@ -257,6 +257,8 @@ Ces chemins de données sont exposés à la même origine par le proxy; les page
 | `/` | [src/app/page.tsx](../../src/app/page.tsx) |
 | `/profile` et sous-chemins | [src/middleware.ts](../../src/middleware.ts) redirige vers Settings |
 
+`/?project=<id>&task=<id>` ouvre la page d’un projet, sur son onglet « Tâches » avec la tâche mise en avant quand `task` est donné ([src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Les deux formes d’identifiant sont acceptées : les identifiants publics du BFF (`project-38`, `task-79`, utilisés par le Dashboard) et les nombres seuls des liens `#` de la messagerie (`38`, `79`), qui reçoivent leur préfixe avant l’appel au BFF ; un nombre seul qui n’est pas un identifiant positif donne « Lien de projet invalide ».
+
 | Méthode | Route locale | Source |
 | --- | --- | --- |
 | POST | `/api/auth/logout` | [src/app/api/auth/logout/route.ts](../../src/app/api/auth/logout/route.ts) |
