@@ -106,7 +106,9 @@ access in try/catch: without storage the fold only lasts for the page). The colu
 `KanbanColumn` section, so a folded column still takes a drop. The views are wrapped in `<div key={view}
 className="m360-view-enter">` (`globals.css`: 260 ms fade and rise, `animation: none` under `prefers-reduced-motion`; a
 class of this front, not an override of the lib). `ProjectActionsMenu` (cards, table rows) and `ProjectMoreMenu` (page
-header) get « Modifier »: `openEditProject` of the controller, or the page edit modal.
+header) get « Modifier »: `openEditProject` of the controller, or the page edit modal. `ProjectMoreMenu` also links
+« Envoyer un message » to `<MESSAGE_FRONT_URL>/?context=project-<n>` (`src/lib/project-message-url.ts`; only the id
+travels, the messaging front reads the title from its BFF); the entry is left out when `MESSAGE_FRONT_URL` is not set.
 
 
 

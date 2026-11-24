@@ -3,6 +3,7 @@ import { Button, PriorityPill, StatusPill, UserIdentity } from '@mairie360/lib-c
 import { CalendarDays, ChevronLeft, Pencil, Plus } from 'lucide-react';
 
 import { formatProjectDate, getProjectNumber, isProjectOverdue } from '../../../../project-card-meta';
+import { projectMessageHref } from '@/lib/project-message-url';
 import type { Project } from '@/types/project';
 import { ProjectMoreMenu } from './components/ProjectMoreMenu';
 import { ProjectStatusMenu } from './components/ProjectStatusMenu';
@@ -62,7 +63,7 @@ export const ProjectPageHeader = ({
       <div className="flex w-full shrink-0 items-center gap-2 md:w-auto [&>button]:flex-1 md:[&>button]:flex-none">
         {onEdit && <Button variant="outline" tone="neutral" size="m" icon={Pencil} label="Modifier" disabled={editDisabled} onClick={onEdit} />}
         {onNewTask && <Button variant="solid" tone="primary" size="m" icon={Plus} label="Nouvelle tâche" onClick={onNewTask} />}
-        <ProjectMoreMenu title={project.title} onEdit={onEdit} editDisabled={editDisabled} onDuplicate={onDuplicate} duplicateDisabled={duplicateDisabled} duplicateLabel={duplicateLabel} onDelete={onDelete} />
+        <ProjectMoreMenu title={project.title} onEdit={onEdit} editDisabled={editDisabled} onDuplicate={onDuplicate} duplicateDisabled={duplicateDisabled} duplicateLabel={duplicateLabel} messageHref={projectMessageHref(project.id)} onDelete={onDelete} />
       </div>
     </div>
   </header>
