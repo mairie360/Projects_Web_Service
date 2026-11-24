@@ -3,7 +3,7 @@ const { test, before, after, beforeEach, afterEach } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
 const { installReactRuntime, mount } = require('./support/server-view.cjs');
 
-// MAIR-1198: a task has a description — typed in the task window (creation and edit), sent to BFF_Project, shown on
+// A task has a description — typed in the task window (creation and edit), sent to BFF_Project, shown on
 // the task page with its line breaks, or « Aucune description pour l’instant. » with « Ajouter une description ».
 
 installReactRuntime();

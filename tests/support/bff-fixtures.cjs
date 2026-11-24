@@ -23,7 +23,7 @@ function projectTask(overrides = {}) {
   return {
     id: 'task-1',
     title: 'Relevé des candélabres',
-    // MAIR-1198: the description of the task, an empty string without one.
+    // The description of the task, an empty string without one.
     description: '',
     status,
     statusId: STATUS_IDS[status],
