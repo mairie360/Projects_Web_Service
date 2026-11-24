@@ -109,7 +109,9 @@ la page). Les gestionnaires de glisser-déposer sont sur la section du `KanbanCo
 toujours un dépôt. Les vues sont enveloppées dans `<div key={view} className="m360-view-enter">` (`globals.css` :
 fondu et montée en 260 ms, `animation: none` avec `prefers-reduced-motion` ; une classe de ce front, pas une surcharge de
 la lib). `ProjectActionsMenu` (cartes, lignes du tableau) et `ProjectMoreMenu` (en-tête de la page) reçoivent
-« Modifier » : `openEditProject` du contrôleur, ou la fenêtre de modification de la page.
+« Modifier » : `openEditProject` du contrôleur, ou la fenêtre de modification de la page. `ProjectMoreMenu` propose
+aussi « Envoyer un message », un lien vers `<MESSAGE_FRONT_URL>/?context=project-<n>` (`src/lib/project-message-url.ts` ;
+seul l’identifiant passe, la messagerie lit le titre auprès de son BFF) ; l’entrée disparaît sans `MESSAGE_FRONT_URL`.
 
 
 

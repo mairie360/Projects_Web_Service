@@ -1,6 +1,6 @@
 import React from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MoreIconButton, ToolTip } from '@mairie360/lib-components/primitives';
-import { Copy, Pencil, Trash2 } from 'lucide-react';
+import { Copy, MessageSquarePlus, Pencil, Trash2 } from 'lucide-react';
 
 export interface ProjectMoreMenuProps {
   title: string;
@@ -10,14 +10,16 @@ export interface ProjectMoreMenuProps {
   onDuplicate?: () => void;
   duplicateDisabled?: boolean;
   duplicateLabel?: string;
+  /** « Envoyer un message »: page of the messaging front with the project as context. */
+  messageHref?: string;
   onDelete?: () => void;
 }
 
-/** MAIR-846 (Figma F5 5.8): « Plus d’actions » of the project page — Modifier (MAIR-1134), Dupliquer, Supprimer. */
-export const ProjectMoreMenu = ({ title, onEdit, editDisabled = false, onDuplicate, duplicateDisabled = false, duplicateLabel = 'Dupliquer', onDelete }: ProjectMoreMenuProps) => {
+/** MAIR-846 (Figma F5 5.8): « Plus d’actions » of the project page — Modifier (MAIR-1134), Dupliquer, Envoyer un message, Supprimer. */
+export const ProjectMoreMenu = ({ title, onEdit, editDisabled = false, onDuplicate, duplicateDisabled = false, duplicateLabel = 'Dupliquer', messageHref, onDelete }: ProjectMoreMenuProps) => {
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
-  if (!onEdit && !onDuplicate && !onDelete) return null;
+  if (!onEdit && !onDuplicate && !messageHref && !onDelete) return null;
   const run = (action?: () => void) => () => {
     setOpen(false);
     triggerRef.current?.focus();
@@ -46,7 +48,14 @@ export const ProjectMoreMenu = ({ title, onEdit, editDisabled = false, onDuplica
             </button>
           </DropdownMenuItem>
         )}
-        {(onEdit || onDuplicate) && onDelete && <DropdownMenuSeparator />}
+        {messageHref && (
+          <DropdownMenuItem asChild>
+            <a role="menuitem" href={messageHref} className="flex w-full items-center gap-2 text-left" onClick={() => setOpen(false)}>
+              <MessageSquarePlus aria-hidden className="h-4 w-4" />Envoyer un message
+            </a>
+          </DropdownMenuItem>
+        )}
+        {(onEdit || onDuplicate || messageHref) && onDelete && <DropdownMenuSeparator />}
         {onDelete && (
           <DropdownMenuItem asChild variant="destructive">
             <button type="button" role="menuitem" className="flex w-full items-center gap-2 text-left" onClick={run(onDelete)}>
