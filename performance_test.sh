@@ -3,6 +3,15 @@
 COMPOSE_FILE="docker-compose-performance.yml"
 SERVICE_NAME="k6-perf-test"
 
+# Fresh Ed25519 key pair for this run (MAIR-680): Core signs the session JWTs with it, the other
+# services only get the public key; ACCESS_TOKEN (sub=2, 4 hours) is signed like Core signs it.
+# Nothing is committed.
+# shellcheck source=stack_secrets.sh
+source ./stack_secrets.sh || exit 1
+# The load test writes as the role init-test.sql gives user 2: the BFF reads it from this claim.
+ACCESS_TOKEN="$(sign_jwt 2 Admin 14400)" || exit 1
+export ACCESS_TOKEN
+
 echo "==> [1/4] Démarrage de la stack et lancement du test k6..."
 # TARGET_IMAGE (CI, MAIR-516): test the published front image instead of rebuilding it here.
 # `up --build` would rebuild and retag it locally, so the build is skipped and the image pulled.
