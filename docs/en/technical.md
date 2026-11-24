@@ -135,7 +135,7 @@ Writes reuse the existing operations of the controller: `postProjectsProjectIdTa
 is the rollback of a refusal. Confirmations are `FeedbackToast`s (« Tâche ajoutée », « Tâche mise à jour »,
 « Tâche terminée », « Statut mis à jour », « Tâche supprimée »; « Statut non modifié » with `tone: 'error'`).
 `use-detail-task-form.ts` owns the sheet (`open`, `openCreate(status)`, `edit(task)`, `quickAdd(title, status)`,
-`titleError` « Donnez un titre à la tâche »); `use-task-filters.ts` the search, assignee and priority filters.
+`titleError` « Donnez un titre à la tâche »); `use-task-filters.ts` the search, assignee, priority, status (« Tous les statuts », one option per board column) and due-date (« Toutes les échéances »: En retard / Ce mois-ci / Plus tard / Sans échéance, in the instance day) filters, cleared together by « Réinitialiser les filtres » (toolbar button while a filter is set, and `TaskFiltersEmptyState` when no task matches).
 The task description (`description`, optional, 5000 characters at most, line breaks kept) is typed under the title of the task window, sent on `POST` / `PATCH` (empty clears it) and shown in the « Description » panel of the task page; the start date (`startDate`, MAIR-1087) is edited next to the due date.
 
 ## Architecture and request handling
