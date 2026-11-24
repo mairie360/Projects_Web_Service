@@ -58,7 +58,7 @@ test('MAIR-1137 C15: a card opens the task page (breadcrumb, meta line, « Infor
   assert.match(view.html, /aria-label="Fil d’Ariane de la tâche"/);
   assert.match(view.html, /aria-label="Résumé de la tâche"/);
   assert.match(view.text(), /Informations/);
-  assert.match(view.text(), /Description non disponible/);
+  assert.match(view.text(), /Aucune description pour l’instant\./);
   await view.waitFor(() => bffProject.calls('/projects/{projectId}/tasks/{taskId}/collaboration', 'get').length === 1);
   assert.equal(writes().length, 0);
   await view.act(() => view.props('TaskPage').onBack());

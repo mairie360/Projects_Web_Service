@@ -12,4 +12,14 @@ describe('TaskRecap (MAIR-1137 C12)', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Créer une autre tâche ensuite' }));
     expect(onContinueChange).toHaveBeenCalledWith(true);
   });
+
+  it('MAIR-1198 shows the description, or « Non renseignée » without one', () => {
+    const form = { title: 'Audit', status: 'todo', priority: 'high', assignees: [], labels: [], dueDate: '' };
+    const props = { memberOptions: [], priorityOptions: [], statusValue: 'todo', statusOptions: [], continueAfter: false, onContinueChange: vi.fn() };
+    const { rerender } = render(<TaskRecap form={{ ...form, description: '' }} {...props} />);
+    expect(screen.getByText('Non renseignée')).toBeTruthy();
+    rerender(<TaskRecap form={{ ...form, description: 'Trois devis' }} {...props} />);
+    expect(screen.getByText('Trois devis')).toBeTruthy();
+    expect(screen.queryByText('Non renseignée')).toBeNull();
+  });
 });

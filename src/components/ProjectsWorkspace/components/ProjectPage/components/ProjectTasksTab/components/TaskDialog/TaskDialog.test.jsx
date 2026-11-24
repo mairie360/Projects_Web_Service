@@ -54,5 +54,8 @@ describe('TaskDialog (MAIR-1137)', () => {
     const initial = { title: 'A', status: 'todo', statusId: 's-1', priority: 'low', assignees: ['u'], labels: [], dueDate: '' };
     expect(changedTaskFields(initial, initial)).toEqual([]);
     expect(changedTaskFields({ ...initial, title: 'B', status: 'done', labels: ['x'] }, initial)).toEqual(['title', 'labels', 'status']);
+    // MAIR-1198: the description counts in « Enregistrer (n) », an absent one equals an empty one.
+    expect(changedTaskFields({ ...initial, description: 'Trois devis' }, { ...initial, description: '' })).toEqual(['description']);
+    expect(changedTaskFields({ ...initial, description: '' }, initial)).toEqual([]);
   });
 });

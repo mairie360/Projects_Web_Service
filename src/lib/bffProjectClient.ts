@@ -478,6 +478,8 @@ export function taskBodyFromDraft(task: ProjectTaskDraft): CreateTaskBody {
 
   return {
     title: task.title.trim(),
+    // Sent as typed (line breaks kept); a blank one is empty, which clears it on an edit.
+    ...(task.description !== undefined ? { description: task.description.trim() ? task.description : '' } : {}),
     status: task.status,
     ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,

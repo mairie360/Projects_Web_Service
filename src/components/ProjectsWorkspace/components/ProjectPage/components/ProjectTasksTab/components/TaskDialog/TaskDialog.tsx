@@ -17,14 +17,14 @@ export const TASK_CREATION_STEPS = [{ label: 'L’essentiel' }, { label: 'Attrib
 const RECAP = TASK_CREATION_STEPS.length - 1;
 export const TASK_ASSIGNEE_REQUIRED = 'Choisissez au moins un agent assigné à cette tâche.';
 
-type TaskField = 'title' | 'startDate' | 'dueDate' | 'labels' | 'assignees' | 'priority' | 'status';
-const ESSENTIAL: readonly TaskField[] = ['title', 'startDate', 'dueDate', 'labels'];
+type TaskField = 'title' | 'description' | 'startDate' | 'dueDate' | 'labels' | 'assignees' | 'priority' | 'status';
+const ESSENTIAL: readonly TaskField[] = ['title', 'description', 'startDate', 'dueDate', 'labels'];
 const statusOf = (form: TaskFormState) => [form.statusId ?? '', form.status];
 const fieldValue = (form: TaskFormState, field: TaskField) => JSON.stringify(field === 'status' ? statusOf(form) : form[field] ?? '');
 
 /** MAIR-1137 (C13): the fields of the edit that differ from the saved task. */
 export function changedTaskFields(form: TaskFormState, initial: TaskFormState): TaskField[] {
-  return (['title', 'startDate', 'dueDate', 'labels', 'assignees', 'priority', 'status'] as const).filter((field) => fieldValue(form, field) !== fieldValue(initial, field));
+  return (['title', 'description', 'startDate', 'dueDate', 'labels', 'assignees', 'priority', 'status'] as const).filter((field) => fieldValue(form, field) !== fieldValue(initial, field));
 }
 
 export interface TaskDialogProps {
