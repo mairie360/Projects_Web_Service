@@ -68,7 +68,7 @@ export function ProjectTasksTab({
   const canMove = (task: ProjectTask) => task.permissions?.canUpdateStatus !== false && !blocked(task);
   const canDelete = (task: ProjectTask) => task.permissions?.canDelete !== false;
   const columns = TASK_COLUMNS.map((column) => ({ ...column, disabled: unavailableColumns?.has(column.status) }));
-  const items = board.boardTasks.filter((item) => filters.matches(item.task));
+  const items = board.boardTasks.filter((item) => filters.matches(item.task, item.column));
   const editedTask = taskForm.editingTaskId ? tasks.find((task) => task.id === taskForm.editingTaskId) ?? null : null;
   const move = (task: ProjectTask, status: TaskColumnStatus) => {
     if (canMove(task) && !unavailableColumns?.has(status)) void board.move(task, status);

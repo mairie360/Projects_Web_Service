@@ -30,16 +30,17 @@ export function useTaskFilters({ tasks }: { tasks: ProjectTask[] }) {
     return [...options].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
   }, [tasks]);
 
-  const matches = React.useCallback((task: ProjectTask) => {
+  const matches = React.useCallback((task: ProjectTask, column = taskColumn(task)) => {
     const text = search.trim().toLowerCase();
     const matchesSearch = !text || task.title.toLowerCase().includes(text) || task.labels.some((label) => label.toLowerCase().includes(text));
     const matchesAssignee = !assignee || taskAssignees(task).some((person) => getPersonValue(person) === assignee);
     const matchesPriority = !priority || task.priority === priority;
-    const matchesStatus = !status || taskColumn(task) === status;
+    // The board passes the column a card is shown in, its target while a move is pending.
+    const matchesStatus = !status || column === status;
     return matchesSearch && matchesAssignee && matchesPriority && matchesStatus && matchesTaskDue(task, due);
   }, [assignee, due, priority, search, status]);
 
-  const filteredTasks = React.useMemo(() => tasks.filter(matches), [matches, tasks]);
+  const filteredTasks = React.useMemo(() => tasks.filter((task) => matches(task)), [matches, tasks]);
   const active = Boolean(search.trim() || assignee || priority || status || due);
 
   const reset = () => {

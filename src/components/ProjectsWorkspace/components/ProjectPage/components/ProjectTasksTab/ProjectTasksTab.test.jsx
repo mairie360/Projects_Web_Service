@@ -76,6 +76,19 @@ describe('ProjectTasksTab (MAIR-859)', () => {
     expect(shown()).toEqual(['task-3']);
   });
 
+  it('MAIR-1178: the status filter follows the column a card is shown in while its move is pending', async () => {
+    const user = userEvent.setup();
+    let resolve;
+    const onUpdateTaskStatus = vi.fn(() => new Promise((done) => { resolve = done; }));
+    render(<ProjectPage {...props({ onUpdateTaskStatus })} />);
+    await user.selectOptions(screen.getByRole('combobox', { name: /Statut/ }), 'todo');
+    expect(screen.getByRole('heading', { name: todo.title })).toBeTruthy();
+    await moveTo(user, todo.title, 'En cours');
+    expect(screen.queryByRole('heading', { name: todo.title })).toBeNull();
+    await act(async () => resolve(false));
+    expect(screen.getByRole('heading', { name: todo.title })).toBeTruthy();
+  });
+
   it('moves a card with the project statuses, keeps it in « Terminé » once archived, and rolls back a refusal', async () => {
     const user = userEvent.setup();
     let resolve;
