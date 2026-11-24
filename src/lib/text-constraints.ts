@@ -51,7 +51,12 @@ export function describeValidationDetail(detail: unknown): string | null {
 }
 
 /** The BFF message followed by its validation details, for a 400 with `error.details[]`. */
+/** The BFF's `409` for a write on a closed project, which is read-only until one of its managers reopens it. */
+export const PROJECT_CLOSED_BFF_MESSAGE = 'Project is closed.';
+export const PROJECT_CLOSED_MESSAGE = 'Ce projet est clôturé : il est en lecture seule. Rouvrez-le pour le modifier.';
+
 export function describeBffProjectError(error: unknown, fallback: string): string {
+  if (error instanceof BffProjectError && error.status === 409 && error.message === PROJECT_CLOSED_BFF_MESSAGE) return PROJECT_CLOSED_MESSAGE;
   if (error instanceof BffProjectError && error.status === 400 && Array.isArray(error.details) && error.details.length > 0) {
     // Details that only repeat the BFF message point at fields without adding anything: keep that message.
     const informative = error.details.filter((detail) => (detail as { message?: unknown } | null)?.message !== error.message);

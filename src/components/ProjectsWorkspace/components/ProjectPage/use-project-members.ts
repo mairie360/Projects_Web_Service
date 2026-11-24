@@ -1,11 +1,14 @@
 import React from 'react';
 import { addProjectMember, BffProjectError, getBffProjectErrorMessage, removeProjectMember, updateProjectMemberRole } from '@/lib/bffProjectClient';
+import { PROJECT_CLOSED_BFF_MESSAGE } from '@/lib/text-constraints';
 import type { Project, ProjectMember, ProjectMemberRole } from '@/types/project';
 
 /** MAIR-1088: the owner of a project keeps it: neither removed nor given another role (BFF 409). */
 export const OWNER_KEPT = 'Le responsable du projet reste dans l’équipe avec le rôle Responsable : il ne peut être ni retiré ni changé de rôle.';
 
-const refusal = (failure: unknown) => (failure instanceof BffProjectError && failure.status === 409 ? OWNER_KEPT : getBffProjectErrorMessage(failure));
+// A closed project answers its own 409 (read-only), whose message `getBffProjectErrorMessage` translates.
+const refusal = (failure: unknown) => (failure instanceof BffProjectError && failure.status === 409 && failure.message !== PROJECT_CLOSED_BFF_MESSAGE
+  ? OWNER_KEPT : getBffProjectErrorMessage(failure));
 
 /**
  * MAIR-874 (C1) / MAIR-1088: the team of the project page. The detail gives every member with their role and load;

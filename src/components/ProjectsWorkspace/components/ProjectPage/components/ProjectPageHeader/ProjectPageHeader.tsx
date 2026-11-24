@@ -1,11 +1,12 @@
 import React from 'react';
-import { Button, PriorityPill, StatusPill, UserIdentity } from '@mairie360/lib-components/primitives';
+import { Button, PriorityPill, StatusPill, SuccessAlert, UserIdentity } from '@mairie360/lib-components/primitives';
 import { CalendarDays, ChevronLeft, Pencil, Plus } from 'lucide-react';
 
-import { formatProjectDate, getProjectNumber, isProjectOverdue } from '../../../../project-card-meta';
+import { formatProjectDate, getProjectNumber, isProjectOverdue, isProjectReadOnly } from '../../../../project-card-meta';
 import { projectMessageHref } from '@/lib/project-message-url';
 import type { Project } from '@/types/project';
 import { ProjectMoreMenu } from './components/ProjectMoreMenu';
+import { ProjectReopenMenu } from './components/ProjectReopenMenu';
 import { ProjectStatusMenu } from './components/ProjectStatusMenu';
 
 export interface ProjectPageHeaderProps {
@@ -23,6 +24,9 @@ export interface ProjectPageHeaderProps {
   duplicateDisabled?: boolean;
   duplicateLabel?: string;
   onDelete?: () => void;
+  /** Reopens a closed project in the chosen status; without it, « Rouvrir » is not offered. */
+  onReopen?: (status: Project['status']) => void;
+  reopenDisabled?: boolean;
 }
 
 /**
@@ -30,10 +34,12 @@ export interface ProjectPageHeaderProps {
  * line — status (clickable, with its chevron), priority, « En retard », separator, responsible, due date — and the
  * description; on the right three size m actions: « Modifier » (outline), « Nouvelle tâche » (solid), « … ». The labels
  * moved to « Informations ».
+ * A closed project (`done`) is read-only: a banner says so under the description, and its managers get « Rouvrir »
+ * instead of the edit actions, which the BFF permissions already remove.
  */
 export const ProjectPageHeader = ({
   project, titleId, titleRef, backDisabled = false, onBack, onChangeStatus, statusDisabled, onEdit, editDisabled = false, onNewTask,
-  onDuplicate, duplicateDisabled, duplicateLabel, onDelete,
+  onDuplicate, duplicateDisabled, duplicateLabel, onDelete, onReopen, reopenDisabled = false,
 }: ProjectPageHeaderProps) => (
   <header className="space-y-4">
     <nav aria-label="Fil d’Ariane" className="flex items-center gap-1 text-sm text-[var(--mairie-text-muted)]">
@@ -59,8 +65,16 @@ export const ProjectPageHeader = ({
           )}
         </div>
         {project.description && <p className="max-w-3xl text-sm text-[var(--mairie-text-muted)]">{project.description}</p>}
+        {isProjectReadOnly(project) && (
+          <SuccessAlert
+            className="max-w-3xl"
+            title="Projet clôturé — lecture seule."
+            description="Les tâches, l’activité et les jalons restent consultables. Rouvrez le projet pour le modifier."
+          />
+        )}
       </div>
       <div className="flex w-full shrink-0 items-center gap-2 md:w-auto [&>button]:flex-1 md:[&>button]:flex-none">
+        {onReopen && <ProjectReopenMenu onReopen={onReopen} disabled={reopenDisabled} />}
         {onEdit && <Button variant="outline" tone="neutral" size="m" icon={Pencil} label="Modifier" disabled={editDisabled} onClick={onEdit} />}
         {onNewTask && <Button variant="solid" tone="primary" size="m" icon={Plus} label="Nouvelle tâche" onClick={onNewTask} />}
         <ProjectMoreMenu title={project.title} onEdit={onEdit} editDisabled={editDisabled} onDuplicate={onDuplicate} duplicateDisabled={duplicateDisabled} duplicateLabel={duplicateLabel} messageHref={projectMessageHref(project.id)} onDelete={onDelete} />

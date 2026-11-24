@@ -5,7 +5,7 @@ import { Modal, Panel, Tabs, tabsIds, type TabItem } from '@mairie360/lib-compon
 import { addProjectComment, getBffProjectErrorMessage } from '@/lib/bffProjectClient';
 import { Activity, CalendarRange, FileText, LayoutGrid, ListChecks, Users } from 'lucide-react';
 import { projectTabFromSearch, writeProjectLocation, type ProjectTab } from '@/lib/projectDeepLink';
-import { getProjectNumber } from '../../project-card-meta';
+import { getProjectNumber, isProjectReopenable } from '../../project-card-meta';
 import { canManageWorkflow, type ProjectWorkflowPort, type ProjectWorkflowSnapshot } from '@/lib/projectWorkflow';
 import { projectToFormState, taskStatusOptions as taskStatusChoices, type FilterOption, type ProjectFormState, type TaskFormState } from '@/lib/projectPageState';
 import type { Project, ProjectStatus, ProjectTask, ProjectTaskDraft } from '@/types/project';
@@ -243,6 +243,8 @@ export function ProjectPage({
         duplicateDisabled={duplicationPending || duplicationVerificationRequired}
         duplicateLabel={duplicationVerificationRequired ? 'Copie à vérifier' : 'Dupliquer'}
         onDelete={onDelete && project.permissions?.canDelete !== false ? () => void onDelete(project) : undefined}
+        onReopen={onChangeStatus && isProjectReopenable(project) ? (status) => void onChangeStatus(project, status) : undefined}
+        reopenDisabled={mutationPending || projectVerificationRequired || projectVerificationPending}
       />
       {refreshError && (
         <DetailRefreshAlert

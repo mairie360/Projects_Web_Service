@@ -61,3 +61,23 @@ export function isProjectOverdue(project: Pick<Project, 'dueDate' | 'status'>, n
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(project.dueDate) && formatProjectDate(project.dueDate) !== 'Échéance invalide';
   return project.status !== 'done' && valid && project.dueDate < instanceToday(now);
 }
+
+const ALL_PROJECT_STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold', 'done'];
+/** Statuses a closed project can be reopened in (« Rouvrir le projet en »). */
+export const REOPEN_STATUSES: Project['status'][] = ['todo', 'in-progress', 'review', 'on-hold'];
+
+/** A closed project (`done`) is read-only: the BFF turns its edit rights off and grants `canReopen` to its managers. */
+export const isProjectReadOnly = (project: Pick<Project, 'status'>) => project.status === 'done';
+
+/** The caller reopens this closed project rather than editing it. */
+export const isProjectReopenable = (project: Pick<Project, 'status' | 'permissions'>) =>
+  isProjectReadOnly(project) && project.permissions?.canReopen === true;
+
+/**
+ * Statuses the caller may move the project to: every one with `canEdit`, the open ones when they may only reopen it,
+ * none otherwise. The current status is included; callers ignore it.
+ */
+export function projectStatusTargets(project: Pick<Project, 'status' | 'permissions'>): Project['status'][] {
+  if (project.permissions?.canEdit === true) return ALL_PROJECT_STATUSES;
+  return isProjectReopenable(project) ? REOPEN_STATUSES : [];
+}

@@ -2,7 +2,7 @@
 import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow';
 import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '../../lib/page-return';
-import { projectStatusLabel } from './project-card-meta';
+import { projectStatusLabel, projectStatusTargets } from './project-card-meta';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -527,7 +527,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     }
   };
 
-  const requireVerifiedProject = (projectId: string, permission: 'canEdit' | 'canClose' = 'canEdit') => {
+  const requireVerifiedProject = (projectId: string, permission: 'canEdit' | 'canClose' | 'canReopen' = 'canEdit') => {
     if (projectVerificationsRef.current.has(projectId)) throw new ProjectReceiptVerificationRequiredError();
     if (projects.find(project => project.id === projectId)?.permissions?.[permission] === false) {
       throw new Error('Cette opération sur le projet est non autorisée.');
@@ -1094,13 +1094,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 
   const moveProjectStatus = async (project: Project, status: ProjectStatus) => {
     // MAIR-1088: the project's own rights decide (a member with the `manager` role manages it whatever their role).
-    if (project.status === status || project.permissions?.canEdit !== true) return;
+    // A closed project is read-only: its managers may only reopen it in an open status (`canReopen`).
+    if (project.status === status || !projectStatusTargets(project).includes(status)) return;
+    const reopening = project.status === 'done' && project.permissions?.canEdit !== true;
     setAlert(null);
 
     const selection = detailSelectionRef.current;
     const taskRevision = taskConfirmationsRef.current.get(project.id)?.revision ?? 0;
     try {
-      requireVerifiedProject(project.id);
+      requireVerifiedProject(project.id, reopening ? 'canReopen' : 'canEdit');
       const details = await updateProject(project.id, { status });
       if (!details) {
         await forgetMovedProject(project.id, project.title);
@@ -1110,7 +1112,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       const confirmed = applyConfirmedProject(details, false, taskRevision);
       updateSelectedProject(confirmed, selection);
       await refreshProjectsPage({ silent: true });
-      setFeedback({ title: 'Statut mis à jour', message: `« ${project.title} » est maintenant « ${projectStatusLabel(status)} ».` });
+      setFeedback(reopening
+        ? { title: 'Projet rouvert', message: `« ${project.title} » est rouvert en « ${projectStatusLabel(status)} ».` }
+        : { title: 'Statut mis à jour', message: `« ${project.title} » est maintenant « ${projectStatusLabel(status)} ».` });
     } catch (error) {
       showError(error);
     }

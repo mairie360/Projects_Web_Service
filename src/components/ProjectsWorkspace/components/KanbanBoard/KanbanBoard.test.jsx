@@ -82,3 +82,33 @@ describe('KanbanBoard V2 (MAIR-829)', () => {
     expect(onProjectEdit).toHaveBeenCalledWith(item);
   });
 });
+
+describe('KanbanBoard on a closed project (MAIR-1200)', () => {
+  const drag = (item) => {
+    const payload = new Map();
+    const dataTransfer = { setData: (type, value) => payload.set(type, value), getData: (type) => payload.get(type) ?? '' };
+    fireEvent.dragStart(screen.getByRole('group', { name: item.title }), { dataTransfer });
+    return dataTransfer;
+  };
+
+  it('lets its managers drag it out of « Terminé » to reopen it', async () => {
+    const onMoveProject = vi.fn().mockResolvedValue(undefined);
+    const item = fixtures.projectListItem({ status: 'done', permissions: { ...fixtures.projectListItem().permissions, canEdit: false, canReopen: true } });
+    render(<KanbanBoard projects={[item]} columns={columns} onMoveProject={onMoveProject} />);
+    const dataTransfer = drag(item);
+    fireEvent.drop(screen.getByRole('region', { name: /^En cours/ }), { dataTransfer });
+    await waitFor(() => expect(onMoveProject).toHaveBeenCalledWith(item, 'in-progress'));
+  });
+
+  it('does not move it for whoever may not reopen it', () => {
+    const onMoveProject = vi.fn().mockResolvedValue(undefined);
+    const item = fixtures.projectListItem({ status: 'done', permissions: { ...fixtures.projectListItem().permissions, canEdit: false, canReopen: false } });
+    render(<KanbanBoard projects={[item]} columns={columns} onMoveProject={onMoveProject} />);
+    const dataTransfer = drag(item);
+    const todo = screen.getByRole('region', { name: /^À faire/ });
+    fireEvent.dragOver(todo, { dataTransfer });
+    expect(todo.getAttribute('data-drop-active')).not.toBe('true');
+    fireEvent.drop(todo, { dataTransfer });
+    expect(onMoveProject).not.toHaveBeenCalled();
+  });
+});

@@ -59,3 +59,26 @@ describe('ProjectActionsMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Copie à vérifier' }).disabled).toBe(true);
   });
 });
+
+describe('ProjectActionsMenu on a closed project (MAIR-1200)', () => {
+  const closed = { ...project, status: 'done', permissions: { canView: true, canEdit: false, canDuplicate: true, canDelete: true, canReopen: true } };
+
+  it('offers « Rouvrir le projet en » with the open statuses instead of « Modifier » and « Changer le statut »', async () => {
+    const onChangeStatus = vi.fn();
+    render(<ProjectActionsMenu project={closed} onOpen={vi.fn()} onEdit={vi.fn()} onDuplicate={vi.fn()} onDelete={vi.fn()} onChangeStatus={onChangeStatus} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Actions pour Projet clavier' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Ouvrir le projet', 'Dupliquer', 'Supprimer']);
+    expect(screen.getByText('Rouvrir le projet en')).toBeTruthy();
+    expect(screen.queryByText('Changer le statut')).toBeNull();
+    expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['À faire', 'En cours', 'En revue', 'Suspendu']);
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Suspendu' }));
+    expect(onChangeStatus).toHaveBeenCalledWith(closed, 'on-hold');
+  });
+
+  it('offers no status at all to whoever may not reopen it', async () => {
+    const readOnly = { ...closed, permissions: { ...closed.permissions, canReopen: false } };
+    render(<ProjectActionsMenu project={readOnly} onOpen={vi.fn()} onChangeStatus={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Actions pour Projet clavier' }));
+    expect(screen.queryAllByRole('menuitemradio')).toEqual([]);
+  });
+});
