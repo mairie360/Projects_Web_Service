@@ -15,4 +15,19 @@ describe('TaskEssentialFields (MAIR-1137 C12)', () => {
     rerender(<TaskEssentialFields form={{ ...form, dueDate: '2027-01-10' }} projectDueDate="2026-12-15" labelOptions={[]} onChange={onChange} />);
     expect(screen.getByText('Après la fin du projet')).toBeTruthy();
   });
+
+  it('MAIR-1198 offers an optional « Description » of 5000 characters at most, line breaks kept', () => {
+    const onChange = vi.fn();
+    render(<TaskEssentialFields form={{ ...form, description: 'Avant' }} projectDueDate="2026-12-15" labelOptions={[]} onChange={onChange} />);
+    const field = screen.getByLabelText(/^Description/);
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field.value).toBe('Avant');
+    expect(field.getAttribute('maxlength')).toBe('5000');
+    expect(field.required).toBe(false);
+    expect(field.getAttribute('placeholder')).toBe('Précisions, livrables attendus…');
+    fireEvent.change(field, { target: { value: 'Ligne 1\nLigne 2' } });
+    expect(onChange).toHaveBeenCalledWith({ description: 'Ligne 1\nLigne 2' });
+    fireEvent.change(field, { target: { value: '<b>' } });
+    expect(field.validationMessage).toBe('Les caractères < et > ne sont pas autorisés.');
+  });
 });

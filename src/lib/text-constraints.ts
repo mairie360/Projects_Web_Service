@@ -8,6 +8,8 @@ import { BffProjectError } from './bffProjectClient';
 export const NO_MARKUP_PATTERN = '[^<>]*';
 export const NO_MARKUP_HINT = 'Les caractères < et > ne sont pas autorisés.';
 export const COMMENT_MAX_LENGTH = 2000;
+/** A task description is at most 5 000 characters (contract and database). */
+export const TASK_DESCRIPTION_MAX_LENGTH = 5000;
 
 /** Custom validity for a `<textarea>` (which has no `pattern` attribute), or any field on change. */
 export function reportMarkupValidity(target: { value: string; setCustomValidity?: (message: string) => void }) {

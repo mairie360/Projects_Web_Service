@@ -187,6 +187,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -239,6 +242,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -702,6 +706,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
           },
           "dueDate": {
             "type": "string"
@@ -1882,6 +1890,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -1934,6 +1945,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -2614,6 +2626,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -2666,6 +2681,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -3210,6 +3226,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -3262,6 +3281,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -3454,6 +3474,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -3506,6 +3529,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -3619,6 +3643,10 @@
             },
             "type": "array"
           },
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -3687,6 +3715,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -3739,6 +3770,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -4238,6 +4270,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -4290,6 +4325,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -4861,6 +4897,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -4913,6 +4952,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -5103,6 +5143,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -5155,6 +5198,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -5267,6 +5311,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
           },
           "dueDate": {
             "type": "string"
@@ -6005,6 +6053,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -6057,6 +6108,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -6602,6 +6654,9 @@
           "createdAt": {
             "type": "string"
           },
+          "description": {
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -6654,6 +6709,7 @@
         "required": [
           "id",
           "title",
+          "description",
           "status",
           "statusLabel",
           "responsible",
@@ -8138,6 +8194,10 @@
             },
             "type": "array"
           },
+          "description": {
+            "pattern": "^[^<>]*$",
+            "type": "string"
+          },
           "dueDate": {
             "type": "string"
           },
@@ -8226,7 +8286,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.c6b822d3ef7fb93153c2787c7817ee0cf1d3ed49"
+    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.b10dfc7faf0c991f2f9a1538e8ecd49a50585916"
   },
   "openapi": "3.1.0",
   "paths": {

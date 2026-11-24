@@ -36,7 +36,8 @@ export interface TaskPageProps {
  * MAIR-1137 (C15, Figma F6 6.7 / 6.7b): the page of a task, on the base of the project page — breadcrumb, title, a
  * meta line (clickable state, priority, « En retard », assignee, due date), « Modifier », « Marquer comme terminée »
  * or « Rouvrir », « … »; the follow-up (comments and history) on the left, « Informations » on the right. A click on a
- * task opens this page, never the edit. The contract has no task description nor start date.
+ * task opens this page, never the edit. « Description » shows the text of the task (line breaks kept), or « Aucune
+ * description pour l’instant. » with « Ajouter une description » (the edit) for whoever may edit it.
  */
 export function TaskPage({ task, project, column, columns, overdue, blocked, collaboration, onBack, onEdit, onMove, onDuplicate, onDelete }: TaskPageProps) {
   const titleRef = React.useRef<HTMLHeadingElement>(null);
@@ -86,11 +87,16 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_clamp(280px,26vw,360px)]">
         <div className="min-w-0 space-y-8">
-          <Panel
-            title="Description"
-            state="unavailable"
-            stateProps={{ title: 'Description non disponible', description: 'Le service Projets ne fournit pas encore de description pour les tâches.' }}
-          />
+          <Panel title="Description">
+            {task.description?.trim() ? (
+              <p data-task-description className="max-w-[72ch] whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--mairie-text)] [overflow-wrap:anywhere]">{task.description}</p>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm text-[var(--mairie-text-muted)]">Aucune description pour l’instant.</span>
+                {onEdit && <Button variant="outline" tone="neutral" size="s" icon={Pencil} label="Ajouter une description" type="button" onClick={onEdit} />}
+              </div>
+            )}
+          </Panel>
           <section aria-label="Activité de la tâche" className="space-y-3">
             <h3 className="text-base font-semibold text-[var(--mairie-text)]">Activité</h3>
             {followUpShown ? (

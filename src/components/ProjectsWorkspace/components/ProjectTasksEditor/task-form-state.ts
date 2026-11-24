@@ -44,6 +44,7 @@ export function taskToFormState(task: ProjectTask): TaskFormState {
 
   return {
     title: task.title,
+    description: task.description ?? '',
     status: taskStatusOf(task.status),
     ...(task.statusId ? { statusId: task.statusId } : {}),
     priority: task.priority,

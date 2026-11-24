@@ -21,6 +21,12 @@ export const TaskRecap = ({ form, memberOptions, priorityOptions, statusValue, s
       labelWidth={120}
       items={[
         { label: 'Titre', value: form.title.trim() || '—' },
+        {
+          label: 'Description',
+          value: form.description?.trim()
+            ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{form.description}</span>
+            : <span className="text-[var(--mairie-text-muted)]">Non renseignée</span>,
+        },
         { label: 'Début', value: form.startDate ? formatProjectDate(form.startDate) : '—' },
         { label: 'Échéance', value: form.dueDate ? formatProjectDate(form.dueDate) : '—' },
         { label: 'Étiquettes', value: form.labels.length ? <TagList label="Étiquettes de la tâche" items={form.labels} size="s" /> : '—' },

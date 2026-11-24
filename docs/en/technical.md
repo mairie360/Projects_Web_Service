@@ -136,7 +136,7 @@ is the rollback of a refusal. Confirmations are `FeedbackToast`s (« Tâche ajou
 « Tâche terminée », « Statut mis à jour », « Tâche supprimée »; « Statut non modifié » with `tone: 'error'`).
 `use-detail-task-form.ts` owns the sheet (`open`, `openCreate(status)`, `edit(task)`, `quickAdd(title, status)`,
 `titleError` « Donnez un titre à la tâche »); `use-task-filters.ts` the search, assignee and priority filters.
-No task description (not in the contract); the start date (`startDate`, MAIR-1087) is edited next to the due date.
+The task description (`description`, optional, 5000 characters at most, line breaks kept) is typed under the title of the task window, sent on `POST` / `PATCH` (empty clears it) and shown in the « Description » panel of the task page; the start date (`startDate`, MAIR-1087) is edited next to the due date.
 
 ## Architecture and request handling
 

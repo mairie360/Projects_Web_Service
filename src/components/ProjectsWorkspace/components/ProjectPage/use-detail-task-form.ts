@@ -124,6 +124,7 @@ export function useDetailTaskForm({ project, lockRef, memberOptions, defaultTask
     const assignees = assigneeValues.map((value) => createPersonFromOptionValue(value, memberOptions));
     const taskDraft: ProjectTaskDraft = {
       title,
+      ...(submitted.description !== undefined ? { description: submitted.description } : {}),
       status: dynamicStatuses ? categoryStatus(formStatusId ?? '') : taskStatusOf(submitted.status),
       ...(dynamicStatuses ? { statusId: formStatusId } : {}),
       responsible: assignees[0],

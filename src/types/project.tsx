@@ -30,6 +30,8 @@ export interface Person {
 export interface ProjectTask {
   id: string;
   title: string;
+  /** Description of the task, line breaks kept; empty without one. */
+  description?: string;
   status: ProjectStatus;
   statusId?: string;
   statusName?: string;
@@ -62,6 +64,8 @@ export type TaskCollaboration = TaskCollaborationResponse;
 
 export interface ProjectTaskDraft {
   title: string;
+  /** Description (5000 characters at most); empty clears it on an edit. */
+  description?: string;
   status: TaskStatus;
   statusId?: string;
   responsible: Person;

@@ -34,6 +34,8 @@ export type ProjectFormState = {
 
 export type TaskFormState = {
   title: string;
+  /** Description of the task, empty for none. */
+  description?: string;
   status: TaskStatus;
   statusId?: string;
   priority: Project['priority'];

@@ -22,7 +22,7 @@ describe('TaskPage (MAIR-1137 C15)', () => {
     expect(within(meta).getByText('En retard')).toBeTruthy();
     expect(within(meta).getByText('Marie Durand')).toBeTruthy();
     expect(page.getByRole('complementary', { name: 'Informations de la tâche' }).textContent).toContain(project.title);
-    expect(page.getByText('Description non disponible')).toBeTruthy();
+    expect(page.getByText('Aucune description pour l’instant.')).toBeTruthy();
     await user.click(page.getByRole('button', { name: 'Marquer comme terminée' }));
     expect(handlers.onMove).toHaveBeenCalledWith('done');
     await user.click(page.getByRole('button', { name: 'Modifier', exact: true }));
@@ -32,6 +32,30 @@ describe('TaskPage (MAIR-1137 C15)', () => {
     expect(handlers.onDuplicate).toHaveBeenCalled();
     await user.click(page.getByRole('button', { name: `Retour aux tâches de ${project.title}` }));
     expect(handlers.onBack).toHaveBeenCalled();
+  });
+
+  it('MAIR-1198 shows the description of the task with its line breaks, and no empty state', () => {
+    const task = { ...fixtures.projectTask(), description: 'Trois devis.\nAvant le conseil.' };
+    const { container } = render(<TaskPage task={task} project={fixtures.projectListItem()} column="todo" columns={columns} overdue={false} blocked={false} collaboration={collaboration(task.id)} onBack={vi.fn()} onEdit={vi.fn()} />);
+    const text = container.querySelector('[data-task-description]');
+    expect(text.textContent).toBe('Trois devis.\nAvant le conseil.');
+    expect(text.className).toContain('whitespace-pre-wrap');
+    expect(screen.queryByText('Aucune description pour l’instant.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ajouter une description' })).toBeNull();
+  });
+
+  it('MAIR-1198 « Ajouter une description » opens the edit, and is not offered without the right to edit', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const task = { ...fixtures.projectTask(), description: '   ' };
+    const props = { task, project: fixtures.projectListItem(), column: 'todo', columns, overdue: false, blocked: false, collaboration: collaboration(task.id), onBack: vi.fn() };
+    const { rerender } = render(<TaskPage {...props} onEdit={onEdit} />);
+    expect(screen.getByText('Aucune description pour l’instant.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Ajouter une description' }));
+    expect(onEdit).toHaveBeenCalled();
+    rerender(<TaskPage {...props} />);
+    expect(screen.getByText('Aucune description pour l’instant.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ajouter une description' })).toBeNull();
   });
 
   it('offers « Rouvrir » for a done task and the state behind its pill', async () => {
