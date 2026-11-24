@@ -12,7 +12,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { matchesTaskDue, TASK_DUE_OPTIONS, TASK_STATUS_OPTIONS } = requireTs('src/components/ProjectsWorkspace/components/ProjectPage/use-task-filters.ts');
+const { matchesTaskDue, TASK_DUE_OPTIONS, TASK_STATUS_OPTIONS } = requireTs('src/components/ProjectsWorkspace/components/ProjectPage/components/ProjectTasksTab/task-board-model.ts');
 
 const harness = createFrontHarness();
 const { bffProject } = harness;

@@ -5,7 +5,7 @@ import type { FilterOption } from '@/lib/projectPageState';
 import type { Project, ProjectTask } from '@/types/project';
 import type { TaskColumnStatus, useDetailTaskForm } from '../../use-detail-task-form';
 import type { TaskCollaborationState } from '../../use-task-collaboration';
-import { TASK_DUE_OPTIONS, TASK_STATUS_OPTIONS, type TaskDueFilter, type TaskFiltersState } from '../../use-task-filters';
+import type { TaskFiltersState } from '../../use-task-filters';
 import { TaskBoard } from './components/TaskBoard';
 import { TaskDeleteConfirm } from './components/TaskDeleteConfirm';
 import { TaskListView } from './components/TaskListView';
@@ -13,7 +13,9 @@ import { TaskDialog } from './components/TaskDialog';
 import { TaskPage } from './components/TaskPage';
 import { TaskFiltersEmptyState } from './components/TaskFiltersEmptyState';
 import { TaskToolbar, type TaskView } from './components/TaskToolbar';
-import { archivedTasksMore, assigneeLoads, isTaskOverdue, TASK_COLUMNS } from './task-board-model';
+import {
+  archivedTasksMore, assigneeLoads, isTaskOverdue, TASK_COLUMNS, TASK_DUE_OPTIONS, TASK_STATUS_OPTIONS, type TaskDueFilter,
+} from './task-board-model';
 import { useTaskBoard } from './use-task-board';
 
 type TaskForm = Omit<ReturnType<typeof useDetailTaskForm>, 'noticeRef'>;

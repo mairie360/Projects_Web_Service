@@ -21,6 +21,37 @@ export function taskColumn(task: Pick<ProjectTask, 'status' | 'completed'>): Tas
 export const isTaskOverdue = (task: Pick<ProjectTask, 'dueDate' | 'status' | 'completed'>, now = new Date()) =>
   taskColumn(task) !== 'done' && isProjectOverdue({ dueDate: task.dueDate, status: 'todo' }, now);
 
+/** « Toutes les échéances »: the due-date ranges of the tasks toolbar, read in the instance day. */
+export type TaskDueFilter = '' | 'overdue' | 'this-month' | 'later' | 'none';
+
+export const TASK_DUE_OPTIONS: ReadonlyArray<{ value: Exclude<TaskDueFilter, ''>; label: string }> = [
+  { value: 'overdue', label: 'En retard' },
+  { value: 'this-month', label: 'Ce mois-ci' },
+  { value: 'later', label: 'Plus tard' },
+  { value: 'none', label: 'Sans échéance' },
+];
+
+/** « Tous les statuts »: one option per column of the board (the workflow categories of the project). */
+export const TASK_STATUS_OPTIONS = TASK_COLUMNS.map((column) => ({ value: column.status, label: column.label }));
+
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether a task falls in a due-date range: « En retard » is the overdue badge rule; « Ce mois-ci » is a due date
+ * in the current instance month that is not overdue; « Plus tard » is after that month; « Sans échéance » has no date.
+ */
+export function matchesTaskDue(task: Pick<ProjectTask, 'dueDate' | 'status' | 'completed'>, due: TaskDueFilter, now = new Date()) {
+  if (!due) return true;
+  const dated = DAY_PATTERN.test(task.dueDate ?? '');
+  if (due === 'none') return !dated;
+  if (!dated) return false;
+  const overdue = isTaskOverdue(task, now);
+  if (due === 'overdue') return overdue;
+  const month = instanceToday(now).slice(0, 7);
+  const dueMonth = task.dueDate.slice(0, 7);
+  return due === 'this-month' ? !overdue && dueMonth === month : dueMonth > month;
+}
+
 /** A task placed on the board: its column (the one it is moving to while the write runs) and whether it left the detail. */
 export type BoardTask = { task: ProjectTask; column: TaskColumnStatus; archived: boolean; moving: boolean };
 
