@@ -141,7 +141,10 @@ ce qui fait le retour arrière d’un refus. Les confirmations sont des `Feedbac
 à jour », « Tâche terminée », « Statut mis à jour », « Tâche supprimée » ; « Statut non modifié » avec
 `tone: 'error'`). `use-detail-task-form.ts` porte la fiche (`open`, `openCreate(status)`, `edit(task)`,
 `quickAdd(title, status)`, `titleError` « Donnez un titre à la tâche ») ; `use-task-filters.ts` la recherche et les
-filtres par personne assignée et priorité. La description de la tâche (`description`, facultative, 5000 caractères au plus, retours à la ligne gardés) se saisit sous le titre dans la fenêtre de tâche, part sur `POST` / `PATCH` (vide, elle est effacée) et s’affiche dans le panneau « Description » de la page de la tâche ; la date de début (`startDate`, MAIR-1087) se
+filtres par personne assignée, priorité, statut (« Tous les statuts », une option par colonne du tableau) et échéance
+(« Toutes les échéances » : En retard / Ce mois-ci / Plus tard / Sans échéance, au jour de l’instance), vidés ensemble par
+« Réinitialiser les filtres » (bouton de la barre tant qu’un filtre est actif, et `TaskFiltersEmptyState` quand aucune tâche ne
+correspond). La description de la tâche (`description`, facultative, 5000 caractères au plus, retours à la ligne gardés) se saisit sous le titre dans la fenêtre de tâche, part sur `POST` / `PATCH` (vide, elle est effacée) et s’affiche dans le panneau « Description » de la page de la tâche ; la date de début (`startDate`, MAIR-1087) se
 modifie à côté de l’échéance.
 
 ## Architecture et traitement des requêtes

@@ -75,6 +75,42 @@ test.describe('project manager', () => {
     await expect(details.getByRole('region', { name: 'À faire' }).getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` })).toBeVisible();
   });
 
+  // MAIR-1178 (ATP F33): search, then status, priority and due-date filters, alone and together; « Réinitialiser les
+  // filtres » brings the full list back. The new task is « À faire », due with the project (in 30 days), so never late.
+  test('filters the tasks by status and due date, then resets them', async ({ page }) => {
+    await page.goto('/');
+    const details = await openProjectTasks(page, projectTitle);
+    const card = details.getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` });
+    const empty = details.getByText('Aucune tâche ne correspond aux filtres');
+    const status = details.getByRole('combobox', { name: /Statut/ });
+    const due = details.getByRole('combobox', { name: /Échéance/ });
+    await expect(card).toBeVisible();
+    await expect(details.getByRole('button', { name: 'Réinitialiser les filtres' })).toHaveCount(0);
+
+    await details.getByRole('searchbox', { name: 'Rechercher une tâche' }).fill(taskTitle);
+    await status.selectOption({ label: 'À faire' });
+    await details.getByRole('combobox', { name: /Priorité/ }).selectOption({ label: 'Moyenne' });
+    await expect(card).toBeVisible();
+
+    await due.selectOption({ label: 'En retard' });
+    await expect(card).toBeHidden();
+    await expect(empty).toBeVisible();
+    await due.selectOption({ label: 'Sans échéance' });
+    await expect(empty).toBeVisible();
+    await due.selectOption({ label: 'Toutes les échéances' });
+    await status.selectOption({ label: 'Terminé' });
+    await expect(empty).toBeVisible();
+
+    await details.getByRole('radio', { name: 'Liste' }).click();
+    await expect(empty).toBeVisible();
+    await details.getByRole('button', { name: 'Réinitialiser les filtres' }).last().click();
+    await expect(empty).toBeHidden();
+    await expect(details.getByRole('searchbox', { name: 'Rechercher une tâche' })).toHaveValue('');
+    await expect(details.getByRole('button', { name: 'Réinitialiser les filtres' })).toHaveCount(0);
+    await details.getByRole('radio', { name: 'Tableau' }).click();
+    await expect(card).toBeVisible();
+  });
+
   // The `#` links of the messaging carry bare ids (`?project=38&task=79`), the Dashboard the public ids.
   test('opens the project and its task from a messaging link, and from a Dashboard link', async ({ page, browser, baseURL }) => {
     await page.goto('/');

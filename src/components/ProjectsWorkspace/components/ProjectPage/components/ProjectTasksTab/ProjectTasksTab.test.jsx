@@ -40,6 +40,42 @@ describe('ProjectTasksTab (MAIR-859)', () => {
     expect(screen.getByRole('table', { name: 'Tâches du projet' })).toBeTruthy();
   });
 
+  it('MAIR-1178: combines the status and due-date filters with the others, shows the filtered empty state and resets', async () => {
+    const user = userEvent.setup();
+    const undated = fixtures.projectTask({ id: 'task-3', title: 'Affichage en mairie', status: 'review', dueDate: '' });
+    render(<ProjectPage {...props({ tasks: [todo, other, undated] })} />);
+    const heading = (title) => screen.queryByRole('heading', { name: title });
+    const shown = () => [todo, other, undated].filter((task) => heading(task.title)).map((task) => task.id);
+    expect(shown()).toEqual(['task-1', 'task-2', 'task-3']);
+    expect(screen.queryByRole('button', { name: 'Réinitialiser les filtres' })).toBeNull();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /Échéance/ }), 'overdue');
+    expect(shown()).toEqual(['task-1']);
+    await user.selectOptions(screen.getByRole('combobox', { name: /Échéance/ }), 'none');
+    expect(shown()).toEqual(['task-3']);
+    await user.selectOptions(screen.getByRole('combobox', { name: /Échéance/ }), 'later');
+    await user.selectOptions(screen.getByRole('combobox', { name: /Priorité/ }), 'high');
+    expect(shown()).toEqual(['task-2']);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /Statut/ }), 'in-progress');
+    expect(shown()).toEqual([]);
+    expect(screen.getByText('Aucune tâche ne correspond aux filtres')).toBeTruthy();
+    await user.click(screen.getByRole('radio', { name: 'Liste' }));
+    expect(screen.getByText('Aucune tâche ne correspond aux filtres')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Réinitialiser les filtres' })).toHaveLength(2);
+
+    await user.type(screen.getByRole('searchbox', { name: 'Rechercher une tâche' }), 'mairie');
+    await user.click(screen.getAllByRole('button', { name: 'Réinitialiser les filtres' })[1]);
+    expect(screen.getByRole('searchbox', { name: 'Rechercher une tâche' }).value).toBe('');
+    expect(screen.queryByRole('button', { name: 'Réinitialiser les filtres' })).toBeNull();
+    expect(screen.getByRole('table', { name: 'Tâches du projet' })).toBeTruthy();
+    await user.click(screen.getByRole('radio', { name: 'Tableau' }));
+    expect(shown()).toEqual(['task-1', 'task-2', 'task-3']);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /Statut/ }), 'in-progress');
+    expect(shown()).toEqual(['task-3']);
+  });
+
   it('moves a card with the project statuses, keeps it in « Terminé » once archived, and rolls back a refusal', async () => {
     const user = userEvent.setup();
     let resolve;

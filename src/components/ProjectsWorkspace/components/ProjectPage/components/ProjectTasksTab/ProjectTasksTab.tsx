@@ -5,12 +5,13 @@ import type { FilterOption } from '@/lib/projectPageState';
 import type { Project, ProjectTask } from '@/types/project';
 import type { TaskColumnStatus, useDetailTaskForm } from '../../use-detail-task-form';
 import type { TaskCollaborationState } from '../../use-task-collaboration';
-import type { TaskFiltersState } from '../../use-task-filters';
+import { TASK_DUE_OPTIONS, TASK_STATUS_OPTIONS, type TaskDueFilter, type TaskFiltersState } from '../../use-task-filters';
 import { TaskBoard } from './components/TaskBoard';
 import { TaskDeleteConfirm } from './components/TaskDeleteConfirm';
 import { TaskListView } from './components/TaskListView';
 import { TaskDialog } from './components/TaskDialog';
 import { TaskPage } from './components/TaskPage';
+import { TaskFiltersEmptyState } from './components/TaskFiltersEmptyState';
 import { TaskToolbar, type TaskView } from './components/TaskToolbar';
 import { archivedTasksMore, assigneeLoads, isTaskOverdue, TASK_COLUMNS } from './task-board-model';
 import { useTaskBoard } from './use-task-board';
@@ -46,7 +47,7 @@ export interface ProjectTasksTabProps {
 }
 
 /**
- * MAIR-859 (Figma F6): the « Tâches » tab — toolbar (search, assignee and priority filters, Tableau / Liste), the
+ * MAIR-859 (Figma F6): the « Tâches » tab — toolbar (search, assignee, priority, status and due-date filters, Tableau / Liste), the
  * three-column board or the list, the task window and the deletion confirmation. MAIR-1137: a click on a task opens its
  * page (`TaskPage`) in place of the board; « Modifier » opens the window (`TaskDialog`, which replaced the Drawer
  * sheet). Writes go through the page controller (task create / patch / status / delete operations of BFF_Project).
@@ -104,10 +105,18 @@ export function ProjectTasksTab({
         priority={filters.priority}
         assigneeOptions={filters.assigneeOptions}
         priorityOptions={priorityOptions}
+        status={filters.status}
+        due={filters.due}
+        statusOptions={TASK_STATUS_OPTIONS}
+        dueOptions={TASK_DUE_OPTIONS}
+        active={filters.active}
         view={view}
         onSearchChange={filters.setSearch}
         onAssigneeChange={filters.setAssignee}
         onPriorityChange={filters.setPriority}
+        onStatusChange={filters.setStatus}
+        onDueChange={(value) => filters.setDue(value as TaskDueFilter)}
+        onReset={filters.reset}
         onViewChange={setView}
       />
 
@@ -117,7 +126,9 @@ export function ProjectTasksTab({
 
       {/* MAIR-1134 (C8): the view fades and rises in when it changes (260 ms, none under prefers-reduced-motion). */}
       <div key={view} className="m360-view-enter">
-      {view === 'board' ? (
+      {filters.active && items.length === 0 ? (
+        <TaskFiltersEmptyState onReset={filters.reset} />
+      ) : view === 'board' ? (
         <TaskBoard
           columns={columns}
           items={items}
