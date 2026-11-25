@@ -39,10 +39,10 @@ test.describe('project manager', () => {
     const dialog = page.getByRole('dialog', { name: 'Nouveau projet' });
     await expect(dialog).toBeVisible();
     // Required fields are labelled with a star on screen ("Titre*").
-    await dialog.getByLabel('Titre*', { exact: true }).fill(projectTitle);
+    await dialog.getByLabel('Titre', { exact: true }).fill(projectTitle);
     // MAIR-836: the description is optional in the V2 dialog.
     await dialog.getByLabel('Description', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
-    await dialog.getByLabel('Échéance*', { exact: true }).fill(dueDateInputValue(30));
+    await dialog.getByLabel('Échéance', { exact: true }).fill(dueDateInputValue(30));
     // MAIR-1136: the creation goes step by step; « Suivant » moves to « Organisation ».
     await dialog.getByRole('button', { name: 'Suivant', exact: true }).click();
     await expect(dialog.getByText('Étape 2 sur 4 · Organisation')).toBeVisible();
@@ -218,7 +218,7 @@ test.describe('project manager', () => {
 
     const form = page.getByRole('dialog', { name: /^Modifier le projet/ }).getByRole('form', { name: 'Modifier le projet' });
     await expect(form).toBeVisible();
-    await form.getByLabel('Titre*', { exact: true }).fill(renamedTitle);
+    await form.getByLabel('Titre', { exact: true }).fill(renamedTitle);
     // MAIR-1136: the button counts the changed fields.
     await form.getByRole('button', { name: /^Enregistrer \(\d+\)$/ }).click();
 
@@ -265,6 +265,8 @@ test.describe('member with the User role only', () => {
         responsibleId: `user-${users.member.id}`,
         assigneeIds: [`user-${users.member.id}`],
         status: 'todo',
+        // A complete body (every project needs a group since Projects V2), so the refusal is the role's.
+        groupId: 'group-1',
       },
       maxRedirects: 0,
     });

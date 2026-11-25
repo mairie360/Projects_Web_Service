@@ -61,6 +61,15 @@ INSERT INTO task_assignees (task_id, user_id)
 SELECT id, assigned_to FROM tasks WHERE id BETWEEN 1001 AND 1011
 ON CONFLICT DO NOTHING;
 
+-- Every project needs a group since Projects V2: the Responsable (10) and the creator (11) share
+-- group 10, which holds the project the creator duplicates. Without it the creation dialog has no
+-- group to offer and « Dupliquer » is not proposed.
+INSERT INTO groups (id, owner_id, name, description)
+VALUES (10, 10, 'Services techniques', 'Group of the RGAA states')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO group_members (group_id, user_id) VALUES (10, 10), (10, 11) ON CONFLICT DO NOTHING;
+INSERT INTO project_groups (project_id, group_id) VALUES (111, 10) ON CONFLICT DO NOTHING;
+SELECT setval(pg_get_serial_sequence('groups', 'id'), GREATEST((SELECT max(id) FROM groups), 10));
 -- Rows created by a writing state (duplicate) take ids after the seeded ones.
 SELECT setval(pg_get_serial_sequence('users', 'id'), GREATEST((SELECT max(id) FROM users), 100));
 SELECT setval(pg_get_serial_sequence('projects', 'id'), GREATEST((SELECT max(id) FROM projects), 1000));
