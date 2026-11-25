@@ -42,7 +42,8 @@ test.describe('project manager', () => {
     await dialog.getByLabel('Titre', { exact: true }).fill(projectTitle);
     // MAIR-836: the description is optional in the V2 dialog.
     await dialog.getByLabel('Description', { exact: true }).fill('Projet créé par le parcours de bout en bout.');
-    await dialog.getByLabel('Échéance', { exact: true }).fill(dueDateInputValue(30));
+    // The task composer of a later step also has an « Échéance » field: target the project's own one.
+    await dialog.locator('#project-due-date').fill(dueDateInputValue(30));
     // MAIR-1136: the creation goes step by step; « Suivant » moves to « Organisation ».
     await dialog.getByRole('button', { name: 'Suivant', exact: true }).click();
     await expect(dialog.getByText('Étape 2 sur 4 · Organisation')).toBeVisible();
