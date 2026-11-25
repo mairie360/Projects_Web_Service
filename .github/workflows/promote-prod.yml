@@ -35,7 +35,8 @@ jobs:
       package_name: projects-front
       cicd_version: "d667cc1bb6c03356ac23ce4b079b51eb3e76d35e" # v5.15.0
       sha: ${{ inputs.sha }}
-      rgaa_min_rate: ${{ inputs.rgaa_min_rate }}
+      # A dispatch input reaches the call as a string: the reusable input is a number.
+      rgaa_min_rate: ${{ fromJSON(inputs.rgaa_min_rate) }}
     secrets:
       N8N_WEBHOOK_SECRET: ${{ secrets.N8N_WEBHOOK_SECRET }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
