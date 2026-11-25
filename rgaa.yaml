@@ -188,7 +188,7 @@ states:
     route: /
     steps:
       - click: { role: button, name: Nouveau projet }
-      - click: { selector: '[role="dialog"] button:text-is("Suivant")' }
+      - click: { selector: 'button[type="submit"]:text-is("Suivant")' }
       - wait_for: { text: Le titre est obligatoire. }
   # Project page (MAIR-846) and its tabs.
   - id: project-detail
