@@ -55,7 +55,8 @@ test.describe('project manager', () => {
 
     await expect(dialog).toBeHidden();
     // MAIR-836: the « Projet créé » toast names the project and its card shows in the list.
-    await expect(page.getByText(`Projet « ${projectTitle} » créé.`)).toBeVisible();
+    // `exact`: the toast's live region also holds the text, after its « Projet créé » title.
+    await expect(page.getByText(`Projet « ${projectTitle} » créé.`, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: `Ouvrir la fiche du projet ${projectTitle}` })).toBeVisible();
   });
 
@@ -73,7 +74,7 @@ test.describe('project manager', () => {
     await sheet.getByRole('button', { name: 'Suivant' }).click();
     await sheet.getByRole('button', { name: 'Ajouter la tâche' }).click();
     await expect(sheet).toBeHidden();
-    await expect(page.getByText(`Tâche « ${taskTitle} » ajoutée à « ${projectTitle} ».`)).toBeVisible();
+    await expect(page.getByText(`Tâche « ${taskTitle} » ajoutée à « ${projectTitle} ».`, { exact: true })).toBeVisible();
     await expect(details.getByRole('region', { name: 'À faire' }).getByRole('button', { name: `Ouvrir la tâche ${taskTitle}` })).toBeVisible();
   });
 
@@ -204,7 +205,7 @@ test.describe('project manager', () => {
     await expect(reopen.getByRole('menuitem')).toHaveText(['À faire', 'En cours', 'En revue', 'Suspendu']);
     await reopen.getByRole('menuitem', { name: 'En cours' }).click();
 
-    await expect(page.getByText('Projet rouvert')).toBeVisible();
+    await expect(page.getByText('Projet rouvert', { exact: true })).toBeVisible();
     await expect(banner).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Modifier', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Rouvrir', exact: true })).toHaveCount(0);
@@ -224,7 +225,7 @@ test.describe('project manager', () => {
     await form.getByRole('button', { name: /^Enregistrer \(\d+\)$/ }).click();
 
     await expect(form).toBeHidden();
-    await expect(page.getByText('Modifications enregistrées')).toBeVisible();
+    await expect(page.getByText('Modifications enregistrées', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: renamedTitle })).toBeVisible();
     await page.getByRole('navigation', { name: 'Fil d’Ariane' }).getByRole('button', { name: 'Projets' }).click();
     await expect(page.getByRole('button', { name: `Ouvrir la fiche du projet ${renamedTitle}` })).toBeVisible();
