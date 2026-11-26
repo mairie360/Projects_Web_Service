@@ -41,8 +41,9 @@ describe('project form dialogs', () => {
     const nested = form.getByPlaceholderText('Ajouter une tâche...');
     await user.type(nested, 'Tâche non ajoutée encore présente');
     rerender(<CreateProjectModal {...props} verificationRequired={false} confirmedCreationTitle="Titre officiel vérifié" />);
-    expect(form.getByRole('status').textContent).toContain('Titre officiel vérifié');
-    expect(document.activeElement).toBe(form.getByRole('status'));
+    const confirmation = form.getAllByRole('status').find((node) => node.textContent.includes('Titre officiel vérifié'));
+    expect(confirmation).toBeTruthy();
+    expect(document.activeElement).toBe(confirmation);
     expect(nested.value).toBe('Tâche non ajoutée encore présente');
     expect(form.getByRole('textbox', { name: 'Titre', exact: true, hidden: true }).value).toBe('Saisie locale conservée');
     expect(form.getByRole('button', { name: 'Création vérifiée', exact: true }).disabled).toBe(true);

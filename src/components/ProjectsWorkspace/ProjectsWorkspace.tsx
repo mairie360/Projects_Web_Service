@@ -30,7 +30,7 @@ import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE
 export const PAGE_SUBTITLE = 'Pilotez les projets de votre mairie';
 
 export function ProjectsWorkspace({
-  workflowPort,
+  commune, workflowPort,
   saveWorkflowStatuses,
   readCurrentTaskAssignee,
   projectsPage,
@@ -128,7 +128,7 @@ export function ProjectsWorkspace({
   frontHrefs,
   openEditProject,
   logout,
-}: ProjectsController) {
+}: ProjectsController & { /** Commune of the deployment, named in the shared header. */ commune?: string }) {
   const creationReceipt = newProjectReceiptIssues.get('create');
   const verifiesCreationDetail = Boolean(creationReceipt?.verificationId);
   const editedProject = editingProjectId ? projects.find(project => project.id === editingProjectId) : undefined;
@@ -196,6 +196,7 @@ export function ProjectsWorkspace({
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
+        commune={commune}
       >
             {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
             {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}

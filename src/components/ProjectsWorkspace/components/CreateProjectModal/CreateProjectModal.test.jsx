@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { memberOptions, priorityOptions, statusOptions } from '@tests/component/units/project-fixtures';
 import { createProjectFormState } from '@/lib/projectPageState';
 import { CreateProjectModal } from './CreateProjectModal';
+import { completeCreation, creationGroups } from '@tests/component/units/creation-steps';
 
 describe('CreateProjectModal', () => {
   it('opens as a dialog and closes from its header', async () => {
@@ -27,7 +28,7 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
   it('shows the messages under Titre, Groupe and Échéance, focuses Titre and sends nothing', async () => {
     const { onSubmit } = open();
     await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
-    expect(screen.getByText('Étape 1 sur 4 · L’essentiel')).toBeTruthy();
+    expect(screen.getByText('Étape 1 sur 4 · L’essentiel', { selector: 'p[aria-hidden]' })).toBeTruthy();
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText('Le titre est obligatoire.')).toBeTruthy();
     expect(screen.getByText('Le groupe est obligatoire.')).toBeTruthy();
@@ -54,9 +55,9 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
     expect([...new Set(order)]).toEqual(['project-title', 'project-description', 'project-group', 'project-due-date', 'project-responsible', 'project-priority', 'project-status', 'project-assignees', 'project-labels']);
     expect(screen.queryByRole('button', { name: 'Créer le projet' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
-    expect(screen.getByText('Étape 2 sur 4 · Organisation')).toBeTruthy();
+    expect(screen.getByText('Étape 2 sur 4 · Organisation', { selector: 'p[aria-hidden]' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
-    expect(screen.getByText('Étape 3 sur 4 · Tâches')).toBeTruthy();
+    expect(screen.getByText('Étape 3 sur 4 · Tâches', { selector: 'p[aria-hidden]' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
     expect(screen.getByRole('region', { name: 'L’essentiel' })).toBeTruthy();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -69,12 +70,12 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
     const { onSubmit } = open(form);
     expect(screen.queryByRole('button', { name: 'Passer au récapitulatif' })).toBeTruthy();
     await userEvent.type(document.getElementById('project-title'), '{Enter}');
-    expect(screen.getByText('Étape 2 sur 4 · Organisation')).toBeTruthy();
+    expect(screen.getByText('Étape 2 sur 4 · Organisation', { selector: 'p[aria-hidden]' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Précédent' }));
-    expect(screen.getByText('Étape 1 sur 4 · L’essentiel')).toBeTruthy();
+    expect(screen.getByText('Étape 1 sur 4 · L’essentiel', { selector: 'p[aria-hidden]' })).toBeTruthy();
     // The recap holds the whole form: a missing Responsable sends the agent back to « Organisation ».
     await userEvent.click(screen.getByRole('button', { name: 'Passer au récapitulatif' }));
-    expect(screen.getByText('Étape 2 sur 4 · Organisation')).toBeTruthy();
+    expect(screen.getByText('Étape 2 sur 4 · Organisation', { selector: 'p[aria-hidden]' })).toBeTruthy();
     expect(screen.getByText('Choisissez un responsable ou un membre de l’équipe.')).toBeTruthy();
     expect(document.activeElement.id).toBe('project-responsible');
     expect(onSubmit).not.toHaveBeenCalled();
@@ -83,7 +84,7 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
   it('MAIR-1136: the step dashes go back freely and forward only past valid steps', async () => {
     open();
     await userEvent.click(screen.getByRole('button', { name: 'Étape 4 sur 4 : Récapitulatif' }));
-    expect(screen.getByText('Étape 1 sur 4 · L’essentiel')).toBeTruthy();
+    expect(screen.getByText('Étape 1 sur 4 · L’essentiel', { selector: 'p[aria-hidden]' })).toBeTruthy();
     expect(screen.getByText('Le titre est obligatoire.')).toBeTruthy();
   });
 
@@ -91,9 +92,9 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
     const form = { ...createProjectFormState(), title: 'Rénovation du gymnase', groupId: 'group-1', dueDate: '2027-06-30', responsible: 'user-1' };
     open(form);
     await userEvent.click(screen.getByRole('button', { name: 'Passer au récapitulatif' }));
-    expect(screen.getByText('Étape 4 sur 4 · Récapitulatif')).toBeTruthy();
+    expect(screen.getByText('Étape 4 sur 4 · Récapitulatif', { selector: 'p[aria-hidden]' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Modifier L’essentiel' }));
-    expect(screen.getByText('Étape 1 sur 4 · L’essentiel')).toBeTruthy();
+    expect(screen.getByText('Étape 1 sur 4 · L’essentiel', { selector: 'p[aria-hidden]' })).toBeTruthy();
   });
 
   it('closes on Échap or « Annuler » without submitting', async () => {
@@ -107,12 +108,29 @@ describe('CreateProjectModal V2 (MAIR-836)', () => {
   it('does not require a group to edit a project created before groups', async () => {
     const form = { ...createProjectFormState(), title: 'Ancien projet', dueDate: '2027-01-01', responsible: 'user-1' };
     const { onSubmit, update } = open(form, { mode: 'edit', groupOptions: [] });
-    expect(screen.queryByText('Étape 1 sur 4 · L’essentiel')).toBeNull();
+    expect(screen.queryByText('Étape 1 sur 4 · L’essentiel', { selector: 'p[aria-hidden]' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Enregistrer (0)' }).disabled).toBe(true);
     // The parent writes the changes back into `form`.
     update({ ...form, title: 'Ancien projet rénové' });
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer (1)' }));
     expect(onSubmit).toHaveBeenCalledOnce();
     expect(screen.getByText('Modifié')).toBeTruthy();
+  });
+});
+
+describe('MAIR-1226 RGAA', () => {
+  it('7.1: the dialog is a div holding the form, not a form with the dialog role', () => {
+    render(<CreateProjectModal mode="create" form={createProjectFormState()} error="" memberOptions={memberOptions} labelOptions={[]} statusOptions={statusOptions} priorityOptions={priorityOptions} onChange={vi.fn()} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
+    expect(dialog.tagName).toBe('DIV');
+    expect(dialog.querySelector('form')).not.toBeNull();
+  });
+
+  it('7.5: the step region is mounted empty, then announces the next step', async () => {
+    render(<CreateProjectModal mode="create" form={{ ...createProjectFormState(), ...completeCreation }} error="" memberOptions={memberOptions} labelOptions={[]} groupOptions={creationGroups} statusOptions={statusOptions} priorityOptions={priorityOptions} onChange={vi.fn()} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    const region = document.querySelector('[aria-live="polite"].sr-only');
+    expect(region.textContent).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Suivant' }));
+    expect(region.textContent).toBe('Étape 2 sur 4 · Organisation');
   });
 });

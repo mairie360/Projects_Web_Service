@@ -107,6 +107,12 @@ describe('authSessionFromAccess', () => {
     assert.deepEqual(labels, { Admin: ['Administrateur', true], Maire: ['Maire', false], Responsable: ['Responsable', false], User: ['Agent', false], Guest: ['Invité', false] });
   });
 
+  test('MAIR-1226 the shell names the caller from access.user, and falls back to the role label without it', () => {
+    const base = fixtures.projectsPage([]).access;
+    assert.equal(session.authSessionFromAccess({ ...base, role: 'User', user: { id: 'user-2', name: 'Anne Dupont' } }).user.name, 'Anne Dupont');
+    assert.equal(session.authSessionFromAccess({ ...base, role: 'User' }).user.name, 'Agent');
+  });
+
   test('sans réponse du BFF, la session est en chargement et Guest', () => {
     assert.deepEqual(session.authSessionFromAccess(null), { user: { name: 'Chargement…', role: 'Guest' }, role: 'Guest', access: null, isAdmin: false, loading: true, error: null });
     assert.equal(session.authSessionFromAccess(null, { loading: false, error: 'x' }).error, 'x');

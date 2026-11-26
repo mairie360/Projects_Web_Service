@@ -69,6 +69,19 @@ describe('lecture des projets', () => {
     assert.equal(page.access.role, 'Responsable');
   });
 
+  test('MAIR-1226: GET /projects-page keeps the caller name so the shared header shows it', async () => {
+    const body = fixtures.projectsPage([]);
+    body.access = { ...body.access, user: { id: 'user-2', name: 'Anne Dupont' } };
+    bffProject.on('get', '/projects-page', { body });
+
+    const page = await client.getProjectsPage();
+
+    assert.deepEqual(page.access.user, { id: 'user-2', name: 'Anne Dupont' });
+    const { parseProjectsPageReceipt } = requireTs('src/lib/project-page-receipt.ts');
+    assert.equal(parseProjectsPageReceipt(fixtures.projectsPage([])).access.user, undefined);
+    assert.throws(() => parseProjectsPageReceipt({ ...body, access: { ...body.access, user: { id: 'user-2' } } }));
+  });
+
   test('MAIR-569: GET /projects-page keeps the active and archived task counts of bff-project 1.0.0', async () => {
     const project = fixtures.projectListItem({ progress: 75, tasks: { total: 4, completed: 3, active: 1, archived: 3 } });
     bffProject.on('get', '/projects-page', { body: fixtures.projectsPage([project]) });

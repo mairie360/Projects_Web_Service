@@ -4,12 +4,14 @@ import React from 'react';
 import { workflowControl } from '@/components/ProjectsWorkspace/components/StatusDefinitionEditor';
 import { categoryLabels, WORKFLOW_UNAVAILABLE, type ProjectTemplate, type ProjectWorkflowPort } from '@/lib/projectWorkflow';
 import { workflowMessage, readTemplates } from '@/components/ProjectsWorkspace/workflow-helpers';
+import { useAnnouncedText } from '@/lib/use-announced-text';
 
 export function ProjectTemplatePicker({ port, disabled, onChange }: { port?: ProjectWorkflowPort; disabled?: boolean; onChange: (template: ProjectTemplate | undefined) => void }) {
   const [templates, setTemplates] = React.useState<ProjectTemplate[]>([]);
   const [selected, setSelected] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(!!port);
+  const loadingText = useAnnouncedText(loading ? 'Chargement des modèles…' : '');
   const [retry, setRetry] = React.useState(0);
   const id = React.useId();
   React.useEffect(() => {
@@ -29,7 +31,7 @@ export function ProjectTemplatePicker({ port, disabled, onChange }: { port?: Pro
       <option value="">Sans modèle personnalisé</option>{templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}
     </select></label>
     {!port && <p className="text-sm text-[#536171]">{WORKFLOW_UNAVAILABLE}</p>}
-    {loading && <p role="status">Chargement des modèles…</p>}
+    <p role="status" className={loadingText ? 'text-sm' : 'sr-only'}>{loadingText}</p>
     {error && <div role="alert"><p>{error}</p><button type="button" className={workflowControl} onClick={() => { onChange(undefined); setRetry(value => value + 1); }}>Réessayer les modèles</button></div>}
     {preview && <ul aria-label="Statuts du modèle" className="space-y-1 text-sm">{preview.statuses.map(status => <li key={status.id} className="flex gap-2 [overflow-wrap:anywhere]"><span aria-hidden="true" className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: status.color }} />{status.name} · {categoryLabels[status.category]}</li>)}</ul>}
   </section>;

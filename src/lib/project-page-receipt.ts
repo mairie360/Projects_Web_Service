@@ -2,7 +2,8 @@
 import { boolean, choice, list, nullValue, number, optional, ranged, record, text, union } from './receipt-readers';
 const dto2 = choice(["Admin", "Maire", "Responsable", "User", "Guest"]);
 const dto3 = choice(["all", "team", "assigned"]);
-const dto1 = record({ "canCommentTasks": boolean, "canCreateProject": boolean, "canManageProjects": boolean, "canManageTasks": boolean, "canUpdateAssignedTaskStatus": boolean, "role": dto2, "scope": dto3 });
+const dto1User = record({ "id": text, "name": text });
+const dto1 = record({ "canCommentTasks": boolean, "canCreateProject": boolean, "canManageProjects": boolean, "canManageTasks": boolean, "canUpdateAssignedTaskStatus": boolean, "role": dto2, "scope": dto3, "user": optional(dto1User) });
 const dto5 = record({ "label": text, "value": text });
 const dto6 = record({ "label": text, "value": text });
 const dto4 = record({ "priorities": list(dto5), "priority": text, "search": union(text, nullValue), "status": text, "statuses": list(dto6) });

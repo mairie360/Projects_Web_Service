@@ -76,6 +76,8 @@ export function ProjectActionsMenu({
             <MoreIconButton
               ref={triggerRef}
               label={`Actions pour ${project.title}`}
+              // The lib ToolTip describes it: no native title, which vanishes when the pointer moves onto it (RGAA 10.13).
+              title=""
               aria-haspopup="menu"
               aria-expanded={open}
               size="s"

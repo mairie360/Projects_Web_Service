@@ -161,7 +161,7 @@ test.describe('project manager', () => {
 
     await expect(sheet).toBeHidden();
     await expect(page.getByRole('heading', { level: 2, name: editedTaskTitle })).toBeVisible();
-    await page.getByRole('button', { name: `Retour aux tâches de ${projectTitle}` }).click();
+    await page.getByRole('button', { name: new RegExp(`· ${projectTitle}, retour aux tâches$`) }).click();
     await expect(details.getByRole('button', { name: `Ouvrir la tâche ${editedTaskTitle}` })).toBeVisible();
     await expect(details.getByRole('button', { name: `Ouvrir la tâche ${taskTitle}`, exact: true })).toHaveCount(0);
   });
@@ -253,6 +253,15 @@ test.describe('member with the User role only', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Paramètres' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Nouveau projet' })).toHaveCount(0);
+  });
+
+  test('MAIR-1226 sees the shared header with the commune of the deployment', async ({ page, context, baseURL }) => {
+    await signInAs(context, baseURL!, users.member);
+    await page.goto('/');
+
+    const header = page.getByRole('banner');
+    await expect(header).toContainText('Saint-André');
+    await expect(page.getByRole('banner')).toHaveCount(1);
   });
 
   test('is refused when creating a project directly', async ({ request }) => {

@@ -4,6 +4,7 @@ import React from 'react';
 import { StatusDefinitionEditor, workflowControl } from '@/components/ProjectsWorkspace/components/StatusDefinitionEditor';
 import { assertTemplate, sameStatuses, validTemplateStatuses, WORKFLOW_UNVERIFIED, type ProjectTemplate, type ProjectWorkflowPort, type TaskStatusDefinition } from '@/lib/projectWorkflow';
 import { workflowMessage, copyStatuses, readTemplates } from '@/components/ProjectsWorkspace/workflow-helpers';
+import { useAnnouncedText } from '@/lib/use-announced-text';
 
 export function TemplateManagerEditor({ port }: { port: ProjectWorkflowPort }) {
   const [templates, setTemplates] = React.useState<ProjectTemplate[]>([]);
@@ -11,6 +12,7 @@ export function TemplateManagerEditor({ port }: { port: ProjectWorkflowPort }) {
   const [name, setName] = React.useState('');
   const [statuses, setStatuses] = React.useState<TaskStatusDefinition[]>([{ id: 'draft-1', name: 'À faire', color: '#1256a6', category: 'todo' }, { id: 'draft-2', name: 'En cours', color: '#4b908d', category: 'inprogress' }, { id: 'draft-3', name: 'Terminé', color: '#267845', category: 'done' }]);
   const [loading, setLoading] = React.useState(true);
+  const loadingText = useAnnouncedText(loading ? 'Chargement des modèles…' : '');
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState('');
   const [uncertain, setUncertain] = React.useState(false);
@@ -67,12 +69,14 @@ export function TemplateManagerEditor({ port }: { port: ProjectWorkflowPort }) {
   };
   return <form aria-label="Gestion des modèles" onSubmit={event => void save(event)} className="mt-4 min-w-0 space-y-4 rounded-md border border-[#d9d5d0] bg-white p-4">
     <h2 className="font-semibold">Modèles de projet</h2>
-    {loading && <p role="status">Chargement des modèles…</p>}
+    <p role="status" className={loadingText ? undefined : 'sr-only'}>{loadingText}</p>
     {error && <p role="alert" className="text-sm text-[#a40e26] [overflow-wrap:anywhere]">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {uncertain && <p className="text-sm">Le brouillon est conservé. Vérifiez le catalogue avant de reprendre une modification ; une création non vérifiée ne sera pas renvoyée automatiquement.</p>}
     {error && <button type="button" className={workflowControl} disabled={pending || loading} onClick={() => setRetry(value => value + 1)}>Relire le catalogue</button>}
     <fieldset disabled={loading || pending || uncertain} className="min-w-0 space-y-4 border-0 p-0">
+      {/* Named for screen readers: a fieldset without a legend is an unnamed group (RGAA 11.6). */}
+      <legend className="sr-only">Modèle de projet</legend>
       <label htmlFor={`${id}-select`} className="block text-sm">Modèle à modifier<select id={`${id}-select`} value={selected?.id ?? ''} className={`${workflowControl} mt-1 block w-full`} onChange={event => select(event.target.value)}><option value="">Créer un modèle</option>{templates.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
       <label htmlFor={`${id}-name`} className="block text-sm">Nom du modèle<input id={`${id}-name`} value={name} required maxLength={100} className={`${workflowControl} mt-1 block w-full`} onChange={event => setName(event.target.value)} /></label>
       <StatusDefinitionEditor statuses={statuses} onChange={next => setStatuses(next)} />

@@ -195,7 +195,7 @@ test('continuing an unsent nested task cancels a pending card replacement withou
     await view.act(() => { pending = view.props('ProjectsWorkspace').openEditProject(second); });
     await view.waitFor(held.started);
     // The real browser dispatches capture before the nested input handler.
-    const form = view.hostElements((props, text, tag) => tag === 'form' && props.role === 'dialog')[0];
+    const form = view.hostElements((props, text, tag) => tag === 'div' && props.role === 'dialog')[0];
     await view.act(() => form.props.onChangeCapture?.({}));
     await view.fire(props => props.placeholder === 'Ajouter une tâche...', 'onChange', { target: { value: 'Brouillon imbriqué poursuivi' } });
     held.release(); await pending; await view.settle();

@@ -178,6 +178,8 @@ export function TaskDialog({
     >
       <form id={formId} noValidate aria-label={editing ? 'Modifier une tâche' : 'Créer une tâche'} aria-busy={saving} onSubmit={(event) => void submit(event)} className="space-y-5">
         <fieldset disabled={disabled || readOnly} className="min-w-0 space-y-6 border-0 p-0">
+          {/* Named for screen readers: a fieldset without a legend is an unnamed group (RGAA 11.6). */}
+          <legend className="sr-only">Informations de la tâche</legend>
           {editing ? (
             <>
               <EditedSection title="L’essentiel" modified={changed.some((field) => ESSENTIAL.includes(field))}>{essential}</EditedSection>

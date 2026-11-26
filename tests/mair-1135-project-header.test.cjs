@@ -62,8 +62,10 @@ test('MAIR-1135 C5: 32 px between the blocks, 20 px between the indicators, labe
   assert.match(view.html, /<section aria-labelledby="[^"]+" class="space-y-8">/);
   assert.match(view.html, /aria-label="Indicateurs du projet" class="grid grid-cols-2 gap-5 xl:grid-cols-4"/);
   assert.match(view.html, /lg:grid-cols-\[minmax\(0,1fr\)_clamp\(320px,28vw,380px\)\]/);
-  const aside = view.html.match(/<aside[^>]*aria-label="Informations du projet"[\s\S]*?<\/aside>/)[0];
-  assert.match(aside, /Étiquettes du projet/);
-  assert.match(aside, /voirie/);
+  // MAIR-1226: the side column is a section (no complementary landmark inside main, RGAA 9.2).
+  const side = view.html.slice(view.html.search(/<section[^>]*aria-label="Informations du projet"/));
+  assert.match(side, /^<section/);
+  assert.match(side, /Étiquettes du projet/);
+  assert.match(side, /voirie/);
   assert.equal(bffProject.requests.filter((request) => request.method !== 'GET').length, 0);
 });

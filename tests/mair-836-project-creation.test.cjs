@@ -33,7 +33,7 @@ async function openDialog() {
   await view.click('Nouveau projet');
   await view.waitFor(() => view.find('CreateProjectModal').length === 1);
 }
-const submitDialog = () => view.fire((props, _text, tag) => tag === 'form' && props.role === 'dialog', 'onSubmit', { preventDefault() {} });
+const submitDialog = () => view.fire((props, _text, tag) => tag === 'form' && props['data-project-form'] !== undefined, 'onSubmit', { preventDefault() {} });
 // MAIR-1136: a submit before the recap moves to the next step; the fourth one creates.
 async function submitThroughSteps() {
   for (let step = 0; step < 4; step += 1) {

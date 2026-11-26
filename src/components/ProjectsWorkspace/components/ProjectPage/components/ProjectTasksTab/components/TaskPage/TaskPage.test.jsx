@@ -21,7 +21,7 @@ describe('TaskPage (MAIR-1137 C15)', () => {
     const meta = page.getByRole('group', { name: 'Résumé de la tâche' });
     expect(within(meta).getByText('En retard')).toBeTruthy();
     expect(within(meta).getByText('Marie Durand')).toBeTruthy();
-    expect(page.getByRole('complementary', { name: 'Informations de la tâche' }).textContent).toContain(project.title);
+    expect(page.getByRole('region', { name: 'Informations de la tâche' }).textContent).toContain(project.title);
     expect(page.getByText('Aucune description pour l’instant.')).toBeTruthy();
     await user.click(page.getByRole('button', { name: 'Marquer comme terminée' }));
     expect(handlers.onMove).toHaveBeenCalledWith('done');
@@ -30,7 +30,7 @@ describe('TaskPage (MAIR-1137 C15)', () => {
     await user.click(page.getByRole('button', { name: `Actions pour ${task.title}` }));
     await user.click(screen.getByRole('menuitem', { name: 'Dupliquer' }));
     expect(handlers.onDuplicate).toHaveBeenCalled();
-    await user.click(page.getByRole('button', { name: `Retour aux tâches de ${project.title}` }));
+    await user.click(page.getByRole('button', { name: new RegExp(`· ${project.title}, retour aux tâches$`) }));
     expect(handlers.onBack).toHaveBeenCalled();
   });
 
@@ -69,5 +69,36 @@ describe('TaskPage (MAIR-1137 C15)', () => {
     screen.getByRole('menuitemradio', { name: 'En cours' }).focus();
     await user.keyboard('{Enter}');
     expect(onMove).toHaveBeenLastCalledWith('in-progress');
+  });
+});
+
+describe('MAIR-1226 TaskPage RGAA', () => {
+  const render_ = (follow = collaboration()) => {
+    const project = fixtures.projectListItem();
+    const task = fixtures.projectTask();
+    const view = render(<TaskPage task={task} project={project} column="todo" columns={columns} overdue={false} blocked={false} collaboration={follow} onBack={vi.fn()} />);
+    return { ...view, project, task };
+  };
+
+  it('9.2: « Informations de la tâche » is a region, no complementary landmark inside main', () => {
+    render_();
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Informations de la tâche' })).toBeTruthy();
+  });
+
+  it('11.9: the back link is named by its visible text first', () => {
+    const { project } = render_();
+    const back = screen.getByRole('button', { name: new RegExp(`retour aux tâches$`) });
+    expect(back.getAttribute('aria-label').startsWith(back.textContent.trim())).toBe(true);
+    expect(back.textContent).toContain(project.title);
+  });
+
+  it('7.5: the activity loading is written into a status region that already existed', () => {
+    const { rerender, project, task } = render_();
+    const region = screen.getAllByRole('status').find((node) => node.textContent === 'Chargement de l’activité…');
+    expect(region).toBeTruthy();
+    rerender(<TaskPage task={task} project={project} column="todo" columns={columns} overdue={false} blocked={false} collaboration={collaboration(task.id)} onBack={vi.fn()} />);
+    expect(region.isConnected).toBe(true);
+    expect(region.textContent).toBe('');
   });
 });

@@ -976,6 +976,9 @@
           },
           "scope": {
             "$ref": "#/components/schemas/GetProjectsPage200AccessScope"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GetProjectsPage200AccessUser"
           }
         },
         "required": [
@@ -1006,6 +1009,21 @@
           "assigned"
         ],
         "type": "string"
+      },
+      "GetProjectsPage200AccessUser": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
       },
       "GetProjectsPage200Filters": {
         "properties": {
@@ -7149,6 +7167,9 @@
           },
           "scope": {
             "$ref": "#/components/schemas/ProjectsPageResponseAccessScope"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ProjectsPageResponseAccessUser"
           }
         },
         "required": [
@@ -7179,6 +7200,21 @@
           "assigned"
         ],
         "type": "string"
+      },
+      "ProjectsPageResponseAccessUser": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
       },
       "ProjectsPageResponseFilters": {
         "properties": {
@@ -8326,7 +8362,7 @@
   "info": {
     "title": "bff_project",
     "version": "1.0.0",
-    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.5aaf23d390bad9aef084b8207a082a0adb234cac"
+    "x-source-package": "@mairie360/bff-project-openapi@0.0.0-dev.e9037f002c3cc22b76158607a0e956ecbad99ce3"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -32,7 +32,7 @@ async function openPage() {
   await view.waitFor(() => bffProject.calls('/project-groups', 'get').length === 1);
   await view.settle();
 }
-const submitDialog = () => view.fire((props, _text, tag) => tag === 'form' && props.role === 'dialog', 'onSubmit', { preventDefault() {} });
+const submitDialog = () => view.fire((props, _text, tag) => tag === 'form' && props['data-project-form'] !== undefined, 'onSubmit', { preventDefault() {} });
 const step = () => view.props('StepProgress').current;
 
 test('MAIR-1136: the creation goes step by step, skips to the recap and creates from it', async () => {

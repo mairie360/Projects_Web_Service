@@ -76,7 +76,7 @@ export function CreateProjectModal({
   const creationConfirmed = !isEditMode && confirmedCreationTitle !== undefined;
   const submitBlocked = pending || verificationRequired || verificationPending || creationConfirmed || !canSave;
   const overlayRef = React.useRef<HTMLDivElement>(null);
-  const dialogRef = React.useRef<HTMLFormElement>(null);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
   const verificationFeedbackRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
   const feedbackId = React.useId();
@@ -84,6 +84,14 @@ export function CreateProjectModal({
   const groupCount = groupOptions?.length ?? 0;
   // MAIR-1136 (C9): the creation goes step by step; the edit compares with the project it opened on (C13).
   const creation = useCreationSteps(form, groupCount);
+  const stepText = `Étape ${creation.step + 1} sur ${CREATION_STEPS.length} · ${CREATION_STEPS[creation.step]}`;
+  // The step is announced on change only: the dialog title already speaks for the first step.
+  const [announcedStep, setAnnouncedStep] = React.useState('');
+  const firstStep = React.useRef(true);
+  React.useEffect(() => {
+    if (firstStep.current) { firstStep.current = false; return; }
+    setAnnouncedStep(stepText);
+  }, [stepText]);
   const [initialForm] = React.useState(form);
   const changed = isEditMode ? changedProjectFields(form, initialForm) : [];
   const sectionChanged = (section: keyof typeof PROJECT_FORM_SECTIONS) => changed.some((key) => (PROJECT_FORM_SECTIONS[section] as readonly string[]).includes(key));
@@ -165,7 +173,7 @@ export function CreateProjectModal({
     if ((verificationRequired || creationConfirmed) && !pending) verificationFeedbackRef.current?.focus();
   }, [verificationRequired, creationConfirmed, pending]);
 
-  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented || event.nativeEvent.isComposing) return;
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -199,7 +207,8 @@ export function CreateProjectModal({
 
   return (
     <div ref={overlayRef} className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--mairie-overlay-background)]/35 p-4">
-      <form
+      {/* The dialog is a div holding the form: `dialog` is not an allowed role on a form (RGAA 7.1). */}
+      <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
@@ -211,10 +220,9 @@ export function CreateProjectModal({
         onKeyDownCapture={onInteract}
         onPointerDownCapture={onInteract}
         onChangeCapture={onInteract}
-        noValidate
         className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[var(--mairie-radius-l)] bg-[var(--mairie-surface)] shadow-[var(--mairie-shadow)]"
-        onSubmit={submit}
       >
+      <form noValidate data-project-form="" onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-4 border-b border-[var(--mairie-border)] px-5 py-3">
           <h2 id={titleId} className="truncate text-base font-semibold text-[var(--mairie-text)]">
             {isEditMode ? 'Modifier le projet' : 'Nouveau projet'}
@@ -231,7 +239,9 @@ export function CreateProjectModal({
         {!isEditMode && (
           <div className="grid gap-2 border-b border-[var(--mairie-border)] px-5 py-3">
             <StepProgress steps={CREATION_STEPS.map((label, index) => ({ label, optional: index === 2 }))} current={creation.step} onStepChange={pending ? undefined : goToStep} tone="projects" size="s" label="Étapes de la création" />
-            <p aria-live="polite" className="text-xs font-medium text-[var(--mairie-text-muted)]">Étape {creation.step + 1} sur {CREATION_STEPS.length} · {CREATION_STEPS[creation.step]}</p>
+            <p aria-hidden="true" className="text-xs font-medium text-[var(--mairie-text-muted)]">{stepText}</p>
+            {/* Mounted empty with the dialog, then given each step change: a region inserted with its text is not announced (RGAA 7.5). */}
+            <p aria-live="polite" className="sr-only">{announcedStep}</p>
           </div>
         )}
 
@@ -253,6 +263,8 @@ export function CreateProjectModal({
           />
 
           <fieldset disabled={pending} className="grid min-w-0 grid-cols-1 gap-4 border-0 p-0">
+            {/* Named for screen readers: a fieldset without a legend is an unnamed group (RGAA 11.6). */}
+            <legend className="sr-only">{isEditMode ? 'Modification du projet' : 'Création du projet'}</legend>
             {isEditMode ? (
               <>
                 {/* MAIR-1136 (C13): the edit stays on one page, its sections marked « Modifié » once changed. */}
@@ -309,6 +321,7 @@ export function CreateProjectModal({
           onDelete={onDelete}
         />
       </form>
+      </div>
     </div>
   );
 }
