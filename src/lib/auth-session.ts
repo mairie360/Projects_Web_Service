@@ -42,9 +42,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
 };
 
 /**
- * Session affichée par le shell, dérivée uniquement du contrat de BFF_Project : c'est lui qui résout
- * l'utilisateur auprès de BFF User et renvoie son rôle dans `access`. Le contrat n'expose pas l'identité
- * (nom, e-mail), le shell affiche donc le libellé du rôle.
+ * Session shown by the shell, derived from BFF_Project's contract only: `access` carries the caller's role and, when
+ * Core could give their profile, `access.user` with their name. Without it, the shell shows the role's label.
  */
 export function authSessionFromAccess(
   access: ProjectsPageAccess | null,
@@ -53,7 +52,7 @@ export function authSessionFromAccess(
   const role = access?.role ?? "Guest";
 
   return {
-    user: { name: access ? ROLE_LABELS[role] : "Chargement…", role },
+    user: { name: access?.user?.name || (access ? ROLE_LABELS[role] : "Chargement…"), role },
     role,
     access,
     isAdmin: role === "Admin",
