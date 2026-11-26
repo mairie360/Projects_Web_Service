@@ -66,12 +66,12 @@ for (const mode of ['create', 'edit']) {
       assert.equal(pending.started(), 1);
       assert.equal(view.props('CreateProjectModal').pending, true);
       assert.deepEqual(view.props('CreateProjectModal').form, beforeDraft);
-      assert.match(view.html, /<form[^>]*role="dialog"[^>]*aria-busy="true"/);
+      assert.match(view.html, /<div[^>]*role="dialog"[^>]*aria-busy="true"/);
       assert.match(view.html, /<fieldset[^>]*disabled=""/);
       assert.match(view.html, /role="status"[^>]*>Enregistrement en cours/);
       assert.equal(view.hostElements((props, text, tag) => tag === 'button' && text === 'Annuler' && props.disabled).length, 1);
       assert.equal(view.hostElements((props, text, tag) => tag === 'button' && /Fermer la (création|modification) de projet/.test(props['aria-label'] ?? '') && props.disabled).length, 1);
-      await view.fire((props, text, tag) => tag === 'form' && props.role === 'dialog', 'onKeyDown', {
+      await view.fire((props, text, tag) => tag === 'div' && props.role === 'dialog', 'onKeyDown', {
         key: 'Escape', defaultPrevented: false, nativeEvent: { isComposing: false }, preventDefault() {}, stopPropagation() {},
       });
       assert.equal(view.find('CreateProjectModal').length, 1);

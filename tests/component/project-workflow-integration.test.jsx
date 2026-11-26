@@ -51,9 +51,9 @@ describe('workflow adoption by existing project forms', () => {
     await screen.findByRole('option', { name: 'Instruction municipale' });
     fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'template-1' } });
     expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Conseil municipal');
-    fireEvent.submit(screen.getByRole('dialog'));
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form'));
     expect(screen.getByRole('region', { name: 'Tâches' }).textContent).toContain('Instruction municipale');
-    fireEvent.submit(screen.getByRole('dialog'));
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form'));
     expect(JSON.parse(screen.getByTestId('selection').textContent)).toEqual(template);
   });
 });

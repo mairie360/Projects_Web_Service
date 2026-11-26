@@ -101,6 +101,8 @@ export function ProjectTasksTab({
         />
       ) : (
       <>
+      {/* Level 2 between the project title (h1) and the h3 of the columns (RGAA 9.1). */}
+      <h2 className="sr-only">Tâches du projet</h2>
       <TaskToolbar
         search={filters.search}
         assignee={filters.assignee}

@@ -36,7 +36,8 @@ export const ProjectOverview = ({
       <NextTasksPanel tasks={tasks} pendingTaskIds={pendingTaskIds} disabled={disabled} onComplete={onCompleteTask} onOpen={onOpenTask} onShowAll={() => onShowTab('tasks')} />
       <MilestonesPanel {...milestones} disabled={disabled} />
     </div>
-    <aside className="min-w-0 space-y-8" aria-label="Informations du projet">
+    {/* A section, not an aside: a complementary landmark may not sit inside main (RGAA 9.2). */}
+    <section className="min-w-0 space-y-8" aria-label="Informations du projet">
       <Panel title="Informations">
         <ProjectSummary project={project} />
         {project.permissions?.canClose !== false && (
@@ -44,6 +45,6 @@ export const ProjectOverview = ({
         )}
       </Panel>
       <RecentActivityPanel {...activity} onShowAll={() => onShowTab('activity')} />
-    </aside>
+    </section>
   </div>
 );

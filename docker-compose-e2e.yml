@@ -297,6 +297,8 @@ services:
       PORT: 5001
       # Readiness resumes on this isolated frontend origin without following Login.
       LOGIN_FRONT_URL: "${LOGIN_FRONT_URL:-http://login-front.invalid/}"
+      # Commune named in the shared header.
+      COMMUNE_NAME: "Mairie de Saint-André"
       # Public origin of the front, the one its same-origin guards accept on writes: the browser of
       # the journeys reaches it as localhost (see the header), in the stack as on the host.
       PROJECT_FRONT_URL: http://localhost:5001/

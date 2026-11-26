@@ -56,6 +56,8 @@ export const ProjectEditForm = ({
       )}
       {saving && <p role="status" className="text-sm text-[var(--mairie-text-muted)]">Enregistrement du projet…</p>}
       <fieldset disabled={disabled} className="min-w-0 space-y-6 border-0 p-0">
+        {/* Named for screen readers: a fieldset without a legend is an unnamed group (RGAA 11.6). */}
+        <legend className="sr-only">Modification du projet</legend>
         <EditedSection title="L’essentiel" modified={modified('essential')}>
           <TextField id="detail-project-title" label="Titre" value={form.title} required pattern={NO_MARKUP_PATTERN} title={NO_MARKUP_HINT} error={fieldErrors.title} onChange={(event) => onChange({ title: event.target.value })} />
           <TextArea id="detail-project-description" label="Description" value={form.description} rows={4} title={NO_MARKUP_HINT} error={fieldErrors.description} onChange={(event) => { reportMarkupValidity(event.target); onChange({ description: event.target.value }); }} />

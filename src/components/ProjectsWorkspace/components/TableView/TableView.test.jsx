@@ -39,7 +39,7 @@ describe('TableView V2 (MAIR-833)', () => {
     await userEvent.click(checkbox);
     expect(props.onSelectionChange).toHaveBeenCalledWith([item.id], false);
     expect(props.onProjectOpen).not.toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toBe('1 projet sélectionné');
+    expect(screen.getAllByRole('status').map((node) => node.textContent)).toContain('1 projet sélectionné');
   });
 
   it('« Tout sélectionner » is mixed for a partial selection and skips projects that cannot be deleted', async () => {

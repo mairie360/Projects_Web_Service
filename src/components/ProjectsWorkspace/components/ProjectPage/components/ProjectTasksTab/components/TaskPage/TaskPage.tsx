@@ -11,6 +11,7 @@ import { taskAssignees } from '@/components/ProjectsWorkspace/components/Project
 import type { Project, ProjectTask } from '@/types/project';
 import { taskDelayLabel } from '../../task-board-model';
 import { TaskActionsMenu, type TaskMenuColumn } from '../TaskActionsMenu';
+import { useAnnouncedText } from '@/lib/use-announced-text';
 import { TaskFollowUp } from './components/TaskFollowUp';
 
 export interface TaskPageProps {
@@ -44,6 +45,7 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
   const assignee = taskAssignees(task)[0];
   const done = column === 'done';
   const followUpShown = collaboration.taskId === task.id;
+  const activityLoading = useAnnouncedText(followUpShown ? '' : 'Chargement de l’activité…');
   const delay = done ? 'Terminée' : taskDelayLabel(task.dueDate);
 
   React.useEffect(() => {
@@ -55,8 +57,9 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
 
   return (
     <article aria-labelledby={`task-page-title-${task.id}`} className="space-y-6" data-task-page={task.id}>
+      {/* The back link is named by its visible text first (RGAA 11.9). */}
       <nav aria-label="Fil d’Ariane de la tâche" className="flex flex-wrap items-center gap-2 text-sm text-[var(--mairie-text-muted)]">
-        <Button variant="link" tone="neutral" size="s" icon={ArrowLeft} label={`${getProjectNumber(project)} · ${project.title}`} aria-label={`Retour aux tâches de ${project.title}`} type="button" onClick={onBack} />
+        <Button variant="link" tone="neutral" size="s" icon={ArrowLeft} label={`${getProjectNumber(project)} · ${project.title}`} aria-label={`${getProjectNumber(project)} · ${project.title}, retour aux tâches`} type="button" onClick={onBack} />
         <span aria-hidden>/</span>
         <span aria-current="page">Tâche</span>
       </nav>
@@ -99,7 +102,8 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
           </Panel>
           <section aria-label="Activité de la tâche" className="space-y-3">
             <h3 className="text-base font-semibold text-[var(--mairie-text)]">Activité</h3>
-            {followUpShown ? (
+            <p role="status" className={activityLoading ? 'text-sm text-[var(--mairie-text-muted)]' : 'sr-only'}>{activityLoading}</p>
+            {followUpShown && (
               <TaskFollowUp
                 taskTitle={task.title}
                 loading={collaboration.loading}
@@ -112,12 +116,11 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
                 onRefresh={collaboration.refresh}
                 onSubmit={(event) => void collaboration.submit(event, task.id)}
               />
-            ) : (
-              <p role="status" className="text-sm text-[var(--mairie-text-muted)]">Chargement de l’activité…</p>
             )}
           </section>
         </div>
-        <aside aria-label="Informations de la tâche" className="min-w-0">
+        {/* A section, not an aside: a complementary landmark may not sit inside main (RGAA 9.2). */}
+        <section aria-label="Informations de la tâche" className="min-w-0">
           <Panel title="Informations">
             <DescriptionList
               labelWidth={110}
@@ -131,7 +134,7 @@ export function TaskPage({ task, project, column, columns, overdue, blocked, col
               ]}
             />
           </Panel>
-        </aside>
+        </section>
       </div>
     </article>
   );

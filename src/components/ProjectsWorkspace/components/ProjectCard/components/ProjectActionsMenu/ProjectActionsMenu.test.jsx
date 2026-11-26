@@ -82,3 +82,11 @@ describe('ProjectActionsMenu on a closed project (MAIR-1200)', () => {
     expect(screen.queryAllByRole('menuitemradio')).toEqual([]);
   });
 });
+
+describe('MAIR-1226 RGAA 10.13 / 12.11', () => {
+  it('the « … » has the lib tooltip only, no native title that vanishes under the pointer', () => {
+    render(<ProjectActionsMenu project={project} onOpen={vi.fn()} />);
+    const trigger = screen.getByRole('button', { name: 'Actions pour Projet clavier' });
+    expect(trigger.getAttribute('title') ?? '').toBe('');
+  });
+});

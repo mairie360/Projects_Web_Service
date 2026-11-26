@@ -47,7 +47,9 @@ test('the first pass renders the loading state, the next one the projects of GET
 
   assert.equal(view.passes, 1);
   assert.match(view.html, /<h1[^>]*>Projets<\/h1>/);
-  assert.match(view.text(), /Chargement des projets\.\.\./);
+  // Lib 2.6: the Skeleton's status region is mounted first, its label written on the next pass (RGAA 7.5).
+  assert.match(view.html, /role="status"[^>]*aria-live="polite"/);
+  assert.equal(view.props('LoadingLabel').label, 'Chargement des projets...');
   assert.equal(view.find('KanbanBoard').length, 0);
   assert.equal(view.find('AppShell').length, 1);
   assert.doesNotMatch(view.text(), /Nouveau projet/);

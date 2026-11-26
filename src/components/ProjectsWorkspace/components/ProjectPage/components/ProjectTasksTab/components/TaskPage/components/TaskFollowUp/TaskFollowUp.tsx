@@ -4,6 +4,7 @@ import { History, MessageSquare } from 'lucide-react';
 
 import { COMMENT_MAX_LENGTH, NO_MARKUP_HINT, NO_MARKUP_PATTERN } from '@/lib/text-constraints';
 import type { TaskCollaboration } from '@/types/project';
+import { useAnnouncedText } from '@/lib/use-announced-text';
 
 const formatMoment = (value: string) => new Date(value).toLocaleString('fr-FR', { timeZone: getInstanceTimeZone() });
 
@@ -20,11 +21,16 @@ export interface TaskFollowUpProps {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
+/** Loading and sending of the follow-up, in one region mounted before its text (RGAA 7.5). */
+const TaskFollowUpStatus = ({ loading, saving }: { loading: boolean; saving: boolean }) => {
+  const text = useAnnouncedText(loading ? 'Chargement du suivi…' : saving ? 'Envoi du commentaire…' : '');
+  return <p role="status" className={text ? 'text-xs text-[#57606a]' : 'sr-only'}>{text}</p>;
+};
+
 /** "Suivi" of a task: its comments with the comment form, and its change history. */
 export const TaskFollowUp = ({ taskTitle, loading, saving, error, collaboration, canComment, message, onMessageChange, onRefresh, onSubmit }: TaskFollowUpProps) => (
   <div className="mt-3 min-w-0 rounded-md border border-[#d0d7de] bg-[#f6f8fa] p-3">
-    {loading && <p role="status" className="text-xs text-[#57606a]">Chargement du suivi...</p>}
-    {saving && <p role="status" className="text-xs text-[#57606a]">Envoi du commentaire...</p>}
+    <TaskFollowUpStatus loading={loading} saving={saving} />
     {error && <p role="alert" className="text-xs font-medium text-[#cf222e] [overflow-wrap:anywhere]">{error}</p>}
     {error && (
       <button type="button" disabled={loading || saving} className="mt-2 rounded-md border border-[#d0d7de] bg-white px-2 py-1 text-xs font-semibold text-[#24292f] disabled:opacity-50" onClick={onRefresh}>Actualiser le suivi</button>
