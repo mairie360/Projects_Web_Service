@@ -83,6 +83,22 @@ describe("Project page linked task", () => {
     expect(scrollIntoView).toHaveBeenCalledOnce();
   });
 
+  it("MAIR-1230 does not move the focus back to the linked task after returning from another task's page", async () => {
+    const user = userEvent.setup();
+    const other = fixtures.projectTask({ id: "task-2", title: "Plan des voiries" });
+    const props = pageProps();
+    render(<ProjectPage {...props} tasks={[...props.tasks, other]} />);
+    await user.click(backToTasks());
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "Ouvrir la tâche Plan des voiries" }));
+    expect(document.querySelector('[data-task-page="task-2"]')).toBeTruthy();
+    await user.click(backToTasks());
+    expect(document.querySelector("[data-task-page]")).toBeNull();
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+    expect(document.activeElement).not.toBe(document.querySelector('[data-linked-task="task-1"]'));
+  });
+
   it("MAIR-1230 shows the board when the linked task is not in the project", () => {
     render(<ProjectPage {...pageProps()} highlightTaskId="task-404" />);
     expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
