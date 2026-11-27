@@ -15,6 +15,7 @@ const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
 const ProjectsPage = requireTs('src/app/projects-client.tsx').default;
 const { setBrowserFrontUrls } = requireTs('src/lib/front-urls.ts');
+const { projectDueBounds } = requireTs('src/components/ProjectsWorkspace/project-due-range.ts');
 
 const harness = createFrontHarness();
 const { bffProject } = harness;
@@ -61,7 +62,8 @@ test('the first pass renders the loading state, the next one the projects of GET
   assert.equal(bffProject.requests[0].headers.authorization, `Bearer ${fixtures.jwt(fixtures.agents.marie.id)}`);
   // MAIR-1134: the subtitle of the page is the front's.
   assert.match(html, /<p[^>]*>Pilotez les projets de votre mairie<\/p>/);
-  assert.match(html, /<span[^>]*>Projets de mon équipe<\/span>/);
+  // MAIR-1254: the access scope tag is not in the artifact.
+  assert.doesNotMatch(view.text(), /Projets de mon équipe|Tous les projets municipaux|Gérer les modèles/);
   assert.match(view.text(), /Rénovation de l’éclairage public/);
   assert.match(view.text(), /Remplacement des candélabres du centre-ville\./);
   assert.match(view.text(), /Nouveau projet/);
@@ -80,7 +82,7 @@ test('an agent without the creation right sees no "Nouveau projet" button', asyn
   await renderLoadedPage(page);
 
   assert.doesNotMatch(view.text(), /Nouveau projet/);
-  assert.match(view.html, /<span[^>]*>Mes projets assignés<\/span>/);
+  assert.doesNotMatch(view.text(), /Mes projets assignés/);
   assert.equal(view.props('KanbanBoard').onAddProject, undefined);
 });
 
@@ -725,7 +727,7 @@ test('each changed project filter resets to page one while retaining all other q
     () => view.props('ProjectFiltersBar').onSearchChange('Projet'),
     () => view.props('ProjectFiltersBar').onStatusChange('in-progress'),
     () => view.props('ProjectFiltersBar').onPriorityChange('high'),
-    () => view.fire(props => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } }),
+    () => view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance', 'onChange', { target: { value: 'later' } }),
   ];
   for (const change of controls) {
     await view.click(props => props['aria-label'] === 'Suivant');
@@ -736,7 +738,7 @@ test('each changed project filter resets to page one while retaining all other q
     await view.waitFor(() => pageCalls().length === count + 1 && !view.props('ProjectPagination').pending);
     assert.equal(pageCalls().at(-1).page, '1');
   }
-  assert.deepEqual(pageCalls().at(-1), { q: 'Projet', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'kanban', page: '1', limit: '50' });
+  assert.deepEqual(pageCalls().at(-1), { q: 'Projet', status: 'in-progress', priority: 'high', dueAfter: projectDueBounds('later').dueAfter, view: 'kanban', page: '1', limit: '50' });
   const count = pageCalls().length;
   await view.act(() => {
     view.props('ProjectFiltersBar').onSearchChange('Projet');
@@ -868,22 +870,25 @@ const follow = async (taskId = 'task-1') => {
 };
 
 test('search, filters and the grid view reload the page with the declared query parameters', async () => {
-  await renderLoadedPage();
+  // The page keeps its rows on screen through the « En retard » range, read in the current instance day.
+  await renderLoadedPage(fixtures.projectsPage([fixtures.projectListItem({ status: 'in-progress', dueDate: `${projectDueBounds('overdue').dueBefore}T00:00:00.000Z` })]));
 
   await view.act(() => view.props('ProjectFiltersBar').onSearchChange('éclairage'));
-  assert.match(view.html, /<input[^>]*placeholder="Rechercher des projets\.\.\."[^>]*value="éclairage"/);
+  assert.match(view.html, /<input[^>]*placeholder="Rechercher un projet, une étiquette…"[^>]*value="éclairage"/);
   await view.waitFor(() => pageCalls().length === 2);
   assert.equal(pageCalls()[1].q, 'éclairage');
 
   // MAIR-828: the lib FilterSelect is a native select; its "no filter" value maps back to the BFF `all`.
-  await view.fire((props, text, tag) => tag === 'select' && props['aria-label'] === 'Statut', 'onChange', { target: { value: 'in-progress' } });
+  await view.fire((props, text, tag) => tag === 'select' && props['aria-label'] === 'Tous les statuts', 'onChange', { target: { value: 'in-progress' } });
   await view.waitFor(() => pageCalls().length === 3);
   assert.equal(pageCalls()[2].status, 'in-progress');
 
-  await view.fire((props) => props.type === 'date' && props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } });
+  // MAIR-1254: « Échéance » is a menu of ranges sent as the declared `dueBefore` / `dueAfter` bounds.
+  await view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance', 'onChange', { target: { value: 'overdue' } });
   await view.waitFor(() => pageCalls().length === 4);
-  assert.equal(pageCalls()[3].dueBefore, '2026-12-31');
-  assert.equal(view.hostElements((props, text, tag) => tag === 'input' && props['aria-label'] === 'Échéance avant')[0].props.value, '2026-12-31');
+  assert.equal(pageCalls()[3].dueBefore, projectDueBounds('overdue').dueBefore);
+  assert.equal(pageCalls()[3].dueAfter, undefined);
+  assert.equal(view.hostElements((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance')[0].props.value, 'overdue');
 
   await view.act(() => view.props('SegmentedControl').onChange('grid'));
   await view.waitFor(() => pageCalls().length === 5 && view.find('GridView').length === 1);
@@ -1418,7 +1423,7 @@ test('the project page edits the project in its modal, adds a task from its shee
 
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
   const editModal = view.find('Modal').map(modal => modal.props).find(props => props.open);
-  assert.equal(editModal?.title, 'Modifier le projet · #1');
+  assert.equal(editModal?.title, 'Modifier le projet · PRJ-1');
   bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ title: body.title })) }));
   await view.fire((props) => props.id === 'detail-project-title', 'onChange', { target: { value: 'Éclairage LED' } });
   await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier le projet', 'onSubmit');

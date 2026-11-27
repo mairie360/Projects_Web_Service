@@ -23,3 +23,14 @@ BFF_Project) disposent de « Rouvrir », un menu « Rouvrir le projet en » (À 
 le statut choisi en `PATCH` ; le menu de la carte propose le même choix et eux seuls peuvent faire glisser une carte
 clôturée hors de « Terminé ». Une écriture refusée parce que le projet est clôturé (`409` `Project is closed.` du BFF)
 affiche « Ce projet est clôturé : il est en lecture seule. Rouvrez-le pour le modifier. »
+
+## Liste des projets
+
+- En-tête : titre, sous-titre, puis « Paramètres » et « Nouveau projet » (si autorisé). Pas d’étiquette de portée ni
+  de gestion des modèles sur la liste.
+- Filtres sans libellé au-dessus : recherche « Rechercher un projet, une étiquette… », « Tous les statuts », « Toutes
+  les priorités » et « Échéance » (En retard / Ce mois-ci / Plus tard, lus dans le jour de l’instance et envoyés comme
+  bornes inclusives `dueBefore` / `dueAfter` de `GET /projects-page`), « Effacer » tant qu’un filtre est posé.
+- Vues Kanban / Tableau / Grille ; colonnes Kanban À faire, En cours, En revue, Terminé, Suspendu (`on-hold`), quel
+  que soit l’ordre du BFF. Les projets affichent leur clé `PRJ-<n>` (affichage seulement). La liste occupe toute la
+  largeur.

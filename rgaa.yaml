@@ -138,13 +138,13 @@ states:
     as: manager
     route: /?status=in-progress
     steps:
-      - wait_for: { role: combobox, name: Statut }
+      - wait_for: { role: combobox, name: Tous les statuts }
   - id: priority-filter-applied
     description: Board filtered on one priority
     as: manager
     route: /?priority=high
     steps:
-      - wait_for: { role: combobox, name: Priorité }
+      - wait_for: { role: combobox, name: Toutes les priorités }
   - id: search-no-result
     description: Grid view with a search that matches no project (empty state)
     as: manager

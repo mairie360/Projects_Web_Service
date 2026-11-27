@@ -7,6 +7,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
+const { projectDueBounds } = requireTs('src/components/ProjectsWorkspace/project-due-range.ts');
 const harness = createFrontHarness();
 const { bffProject } = harness;
 let view;
@@ -17,16 +18,18 @@ afterEach(() => { view?.unmount(); view = undefined; assert.deepEqual(harness.vi
 const reads = () => bffProject.calls('/projects-page', 'get');
 const pagination = page => ({ page, limit: 50, total: 85, hasNextPage: page === 1 });
 const query = request => Object.fromEntries(request.url.searchParams);
+// MAIR-1254: « Ce mois-ci » is read in the current instance day; the projects stay due within it.
+const dueThisMonth = `${projectDueBounds('this-month').dueAfter}T00:00:00.000Z`;
 
 for (const [operation, refusedRefresh] of [
   ['move', false], ['move', true], ['duplicate', false], ['duplicate', true],
 ]) {
   test(`a pending ${operation} refreshes the current view and intended query, not its captured query (${refusedRefresh ? 'refused refresh' : 'success'})`, async t => {
-    const project = f.projectListItem();
+    const project = f.projectListItem({ dueDate: dueThisMonth });
     bffProject.on('get', '/projects-page', { body: f.projectsPage([project], { pagination: pagination(1) }) });
     view = mount(React.createElement(Page));
     await view.waitFor(html => !html.includes('Chargement des projets'));
-    const confirmed = f.projectListItem({ id: operation === 'duplicate' ? 'project-copy' : project.id, title: 'Éclairage confirmé', status: 'review' });
+    const confirmed = f.projectListItem({ id: operation === 'duplicate' ? 'project-copy' : project.id, title: 'Éclairage confirmé', status: 'review', dueDate: dueThisMonth });
     const method = operation === 'duplicate' ? 'post' : 'patch';
     const path = operation === 'duplicate' ? '/projects/{projectId}/duplicate' : '/projects/{projectId}';
     bffProject.on(method, path, { status: operation === 'duplicate' ? 201 : 200, body: f.projectDetails(confirmed) });
@@ -55,12 +58,12 @@ for (const [operation, refusedRefresh] of [
       view.props('ProjectFiltersBar').onPriorityChange('high');
       view.props('SegmentedControl').onChange('grid');
     });
-    await view.fire(props => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-20' } });
+    await view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance', 'onChange', { target: { value: 'this-month' } });
     await view.waitFor(() => reads().length >= 2 && view.props('ProjectPagination').pagination?.page === 1 && !view.props('ProjectPagination').pending);
     await view.click(props => props['aria-label'] === 'Suivant');
     await view.waitFor(() => view.props('ProjectPagination').pagination?.page === 2);
     const currentQuery = query(reads().at(-1));
-    assert.deepEqual(currentQuery, { q: 'éclairage', status: 'review', priority: 'high', dueBefore: '2026-12-20', view: 'grid', page: '2', limit: '50' });
+    assert.deepEqual(currentQuery, { q: 'éclairage', status: 'review', priority: 'high', ...projectDueBounds('this-month'), view: 'grid', page: '2', limit: '50' });
     const intendedQuery = operation === 'duplicate'
       ? { status: 'all', priority: 'all', view: 'grid', page: '1', limit: '50' }
       : currentQuery;

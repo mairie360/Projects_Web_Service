@@ -20,7 +20,7 @@ describe('ProjectCard V2 (MAIR-829)', () => {
 
   it('shows the key, labels, priority, due date, progress, team and « x/y tâches », without task composer', () => {
     const { container } = card({ id: 'project-14', labels: ['Urbanisme', 'Concertation'], dueDate: '2099-03-30', progress: 40, tasks: { total: 6, completed: 2, active: 4, archived: 0 } });
-    expect(screen.getByText('#14')).toBeTruthy();
+    expect(screen.getByText('PRJ-14')).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Étiquettes du projet' }).textContent).toContain('Concertation');
     expect(screen.getByText('30/03/2099')).toBeTruthy();
     expect(screen.getByText('2/6 tâches')).toBeTruthy();

@@ -1,13 +1,11 @@
 'use client';
 
 import { AccessibleShell } from "@mairie360/lib-components/shell";
-
 import React from 'react';
 import { Alert, ConfirmModal, Skeleton, ToastProvider } from '@mairie360/lib-components/primitives';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ProjectPage } from './components/ProjectPage';
-import { ProjectTemplateManager } from './components/ProjectTemplateManager';
 import { ProjectPagination } from './components/ProjectPagination';
 import { TaskCreationNotice } from './components/TaskCreationNotice';
 import { GridView } from './components/GridView';
@@ -22,6 +20,7 @@ import { VerificationNotice } from './components/VerificationNotice';
 import { WorkspaceLoading } from './components/WorkspaceLoading';
 import { navigateToPage } from '../../lib/navigation';
 import { returnToLogin } from '../../lib/auth-token';
+import { shellUser } from '../../lib/auth-session';
 import type { ProjectsController } from './use-projects-controller';
 import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
@@ -64,8 +63,8 @@ export function ProjectsWorkspace({
   setStatusFilter,
   priorityFilter,
   setPriorityFilter,
-  dueBeforeFilter,
-  setDueBeforeFilter,
+  dueRangeFilter,
+  setDueRangeFilter,
   searchTerm,
   setSearchTerm,
   alert,
@@ -159,7 +158,6 @@ export function ProjectsWorkspace({
         onConfirm={() => void confirmBulkProjectDeletion()}
       />
 
-
       {createProjectOpen && (
         <CreateProjectModal
           key={editingProjectId ?? 'create'}
@@ -193,14 +191,15 @@ export function ProjectsWorkspace({
 
       <AccessibleShell
         activeItem="projects"
-        user={session.user}
+        user={shellUser(session)}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
         commune={commune}
       >
             {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
             {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}
-            <div hidden={!projectsPage && !pageError && !selectedProject} className="mx-auto w-full max-w-[1660px] px-6 py-10 lg:px-14 lg:py-14">
+            {/* The list spans the full content width like the artifact (24 px gutters); the project page keeps its own width. */}
+            <div hidden={!projectsPage && !pageError && !selectedProject} className="w-full p-6">
               {logoutError && <LogoutErrorNotice message={logoutError} onBackToLogin={returnToLogin} />}
               {[...taskCreationStates].filter(([, state]) => state.uncertainTitle).map(([projectId, state]) => (
                 <TaskCreationNotice key={projectId} state={state} onInspect={() => inspectTaskCreation(projectId)} />
@@ -243,6 +242,7 @@ export function ProjectsWorkspace({
 
               {/* MAIR-846: a project opens as a page in place of the list; the list stays mounted (filters, page, drafts). */}
               {selectedProject && (
+                <div className="mx-auto w-full max-w-[1660px]">
                 <ProjectPage
                   project={selectedProject}
                   workflowPort={workflowPort}
@@ -281,24 +281,22 @@ export function ProjectsWorkspace({
                   duplicationVerificationRequired={unverifiedDuplicationSourceIds.has(selectedProject.id)}
                   onDelete={deleteProject}
                 />
+                </div>
               )}
 
               <div hidden={Boolean(selectedProject)}>
                 <WorkspaceHeader
                   title={pageTitle}
                   subtitle={PAGE_SUBTITLE}
-                  scope={projectsPage?.access?.scope}
                   onCreate={canCreateProject ? () => openCreateProject() : undefined}
                   onSettings={() => navigateToPage('settings')}
                 />
-
-                <ProjectTemplateManager role={projectsPage?.access.role} port={workflowPort} />
 
                 <ProjectFiltersBar
                   search={searchTerm}
                   status={statusFilter}
                   priority={priorityFilter}
-                  dueBefore={dueBeforeFilter}
+                  dueRange={dueRangeFilter}
                   statusOptions={statusFilterOptions}
                   priorityOptions={priorityFilterOptions}
                   viewMode={viewMode}
@@ -306,7 +304,9 @@ export function ProjectsWorkspace({
                   onSearchChange={setSearchTerm}
                   onStatusChange={setStatusFilter}
                   onPriorityChange={setPriorityFilter}
-                  onDueBeforeChange={setDueBeforeFilter}
+                  onDueRangeChange={setDueRangeFilter}
+                  filtersActive={filtersActive}
+                  onResetFilters={resetProjectFilters}
                   onViewModeChange={setViewMode}
                 />
 

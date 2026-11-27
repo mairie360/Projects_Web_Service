@@ -79,7 +79,7 @@ test('MAIR-846: opening a project pushes its page URL, the breadcrumb and Back r
   await openPage();
   assert.equal(history.entries[history.index], '?project=project-1');
   const text = view.text();
-  for (const part of ['Projets', '#1', 'Avancement', '1/2 tâches terminées', 'Budget non renseigné', 'Tâches en retard', 'Vue d’ensemble', 'Prochaines tâches', 'Jalons', 'Aucun jalon', 'Informations', 'Activité récente']) {
+  for (const part of ['Projets', 'PRJ-1', 'Avancement', '1/2 tâches terminées', 'Budget non renseigné', 'Tâches en retard', 'Vue d’ensemble', 'Prochaines tâches', 'Jalons', 'Aucun jalon', 'Informations', 'Activité récente']) {
     assert.ok(text.includes(part), part);
   }
   assert.match(view.html, /<div hidden=""><header|<div hidden="">/, 'the list stays mounted, hidden');

@@ -112,3 +112,21 @@ describe('KanbanBoard on a closed project (MAIR-1200)', () => {
     expect(onMoveProject).not.toHaveBeenCalled();
   });
 });
+
+describe('KanbanBoard artifact order (MAIR-1254)', () => {
+  it('MAIR-1254 orders the columns À faire, En cours, En revue, Terminé, Suspendu whatever the BFF order', () => {
+    // The BFF order (on-hold before done) and its labels: the board follows the artifact and the lib labels.
+    const bffColumns = ['todo', 'in-progress', 'review', 'on-hold', 'done'].map((status) => ({ status, label: `BFF ${status}` }));
+    render(<KanbanBoard projects={[fixtures.projectListItem({ status: 'on-hold' })]} columns={bffColumns} />);
+    const titles = screen.getAllByRole('region').map((region) => within(region).getAllByRole('heading', { level: 3 })[0].textContent.split(',')[0]);
+    expect(titles).toEqual(['À faire', 'En cours', 'En revue', 'Terminé', 'Suspendu']);
+  });
+
+  it('MAIR-1254 names the on-hold column « Suspendu »', () => {
+    const item = fixtures.projectListItem({ id: 'project-9', status: 'on-hold' });
+    render(<KanbanBoard projects={[item]} columns={[{ status: 'on-hold', label: 'En pause' }]} />);
+    const column = screen.getByRole('region', { name: /^Suspendu/ });
+    expect(within(column).getByRole('group', { name: item.title })).toBeTruthy();
+    expect(screen.queryByText('En pause')).toBeNull();
+  });
+});

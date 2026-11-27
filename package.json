@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@mairie360/bff-project-openapi": "0.0.0-dev.e9037f002c3cc22b76158607a0e956ecbad99ce3",
-    "@mairie360/lib-components": "2.7.0",
+    "@mairie360/lib-components": "2.8.0",
     "axios": "1.20.0",
     "daisyui": "^5.0.0",
     "next": "16.4.2",

@@ -24,7 +24,7 @@ describe('TableView V2 (MAIR-833)', () => {
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
     expect(headers.slice(1)).toEqual(['Clé', 'Projet', 'Statut', 'Priorité', 'Responsable', 'Échéance', 'Progression', 'Actions']);
     const row = screen.getAllByRole('row')[1];
-    expect(within(row).getByText('#8')).toBeTruthy();
+    expect(within(row).getByText('PRJ-8')).toBeTruthy();
     expect(within(row).getByText('En retard')).toBeTruthy();
     expect(within(row).getByRole('list', { name: 'Étiquettes du projet' }).textContent).toContain('Voirie');
     expect(within(row).getByText(late.responsible.name)).toBeTruthy();

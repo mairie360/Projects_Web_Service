@@ -5,12 +5,14 @@ import type { ProjectsPageQuery } from './bffProjectClient';
 export const projectUrlSchema = {
   q: urlText(200), status: urlChoice(['all', ...Object.values(ProjectStatus)], 'all'),
   priority: urlChoice(['all', ...Object.values(ProjectPriority)], 'all'), dueBefore: urlDate,
+  dueAfter: urlDate,
   view: urlChoice(['kanban', 'grid', 'table'], 'kanban'), page: urlPage,
 };
 export type ProjectPageUrlState = ReturnType<typeof readPageUrlState>;
 export function projectPageQuery(state: ProjectPageUrlState): ProjectsPageQuery {
   return { q: state.q.trim() || undefined, status: state.status as ProjectsPageQuery['status'],
     priority: state.priority as ProjectsPageQuery['priority'], dueBefore: state.dueBefore || undefined,
+    dueAfter: state.dueAfter || undefined,
     view: state.view as ProjectsPageQuery['view'], page: Number(state.page), limit: 50 };
 }
 export function projectQueryKey(state: ProjectPageUrlState) { return JSON.stringify(projectPageQuery(state)); }

@@ -8,6 +8,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const fixtures = require('./support/bff-fixtures.cjs');
 const ProjectsPage = requireTs('src/app/projects-client.tsx').default;
+const { projectDueBounds } = requireTs('src/components/ProjectsWorkspace/project-due-range.ts');
 const harness = createFrontHarness();
 const { bffProject } = harness;
 let view;
@@ -254,7 +255,7 @@ test('retry keeps every active filter and accepts a genuinely empty successful r
     view.props('ProjectFiltersBar').onPriorityChange('high');
     view.props('SegmentedControl').onChange('grid');
   });
-  await view.fire((props) => props['aria-label'] === 'Échéance avant', 'onChange', { target: { value: '2026-12-31' } });
+  await view.fire((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance', 'onChange', { target: { value: 'overdue' } });
   await view.waitFor(() => pageCalls().length === 2);
   failPage();
   await view.act(() => view.props('ProjectFiltersBar').onSearchChange('éclairage public'));
@@ -263,7 +264,7 @@ test('retry keeps every active filter and accepts a genuinely empty successful r
   await retry();
   await view.waitFor(() => !hasRetry());
   assert.deepEqual(Object.fromEntries(pageCalls().at(-1).url.searchParams), {
-    q: 'éclairage public', status: 'in-progress', priority: 'high', dueBefore: '2026-12-31', view: 'grid', page: '1', limit: '50',
+    q: 'éclairage public', status: 'in-progress', priority: 'high', dueBefore: projectDueBounds('overdue').dueBefore, view: 'grid', page: '1', limit: '50',
   });
   assert.match(view.text(), /Aucun projet ne correspond à la recherche ou aux filtres sélectionnés/);
   assert.doesNotMatch(view.text(), /Dernières données reçues|Liste momentanément indisponible|Rénovation de l’éclairage public/);

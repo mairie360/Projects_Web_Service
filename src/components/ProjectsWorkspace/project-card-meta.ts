@@ -21,11 +21,12 @@ export function formatProjectDate(date: string, withYear = true) {
   return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
 }
 
-export function getProjectNumber(project: Project) {
+/** Displayed key of a project, « PRJ-12 » as in the artifact (display only: the id stays the BFF one). */
+export function getProjectNumber(project: Pick<Project, 'id'>) {
   const numericId = Number(project.id);
-  if (Number.isFinite(numericId)) return `#${numericId}`;
+  if (Number.isFinite(numericId)) return `PRJ-${numericId}`;
 
-  return `#${project.id.replace(/\D/g, '').slice(-4) || '1'}`;
+  return `PRJ-${project.id.replace(/\D/g, '').slice(-4) || '1'}`;
 }
 
 /** Status of the lib `StatusBadge` for each project or task status (MAIR-828: one colour per status in every front). */
@@ -46,6 +47,18 @@ export const projectColumnTone = {
   'on-hold': 'warning',
   done: 'success',
 } as const satisfies Record<Project['status'], StatusPillTone>;
+
+/** Order of the Kanban columns in the artifact: À faire, En cours, En revue, Terminé, Suspendu. */
+export const PROJECT_COLUMN_ORDER: readonly Project['status'][] = ['todo', 'in-progress', 'review', 'done', 'on-hold'];
+
+/** The BFF columns in the artifact order (unknown statuses last, in their BFF order). */
+export function orderProjectColumns<T extends { status: Project['status'] }>(columns: readonly T[]): T[] {
+  const rank = (status: Project['status']) => {
+    const index = PROJECT_COLUMN_ORDER.indexOf(status);
+    return index === -1 ? PROJECT_COLUMN_ORDER.length : index;
+  };
+  return [...columns].sort((left, right) => rank(left.status) - rank(right.status));
+}
 
 /** French label of a project or task status, the one the lib `StatusBadge` shows (« En revue »). */
 export const projectStatusLabel = (status: Project['status']) => statuses[projectStatusBadge[status]].label;

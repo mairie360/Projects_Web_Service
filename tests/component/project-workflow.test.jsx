@@ -2,7 +2,6 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectWorkflow } from '@/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow';
-import { ProjectTemplateManager } from '@/components/ProjectsWorkspace/components/ProjectTemplateManager';
 import { ProjectTemplatePicker } from '@/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker';
 
 const statuses = [
@@ -69,25 +68,5 @@ describe('project templates', () => {
     fireEvent.change(screen.getByLabelText('Modèle de projet'), { target: { value: 'model1' } });
     expect(screen.getByRole('list', { name: 'Statuts du modèle' }).textContent).toContain('Validation municipale');
     expect(selected).toEqual(template);
-  });
-
-  it('hides management for every role except responsible and admin', () => {
-    const view = render(<ProjectTemplateManager role="User" port={port()} />);
-    expect(screen.queryByRole('button')).toBeNull();
-    view.rerender(<ProjectTemplateManager role="Maire" port={port()} />);
-    expect(screen.queryByRole('button')).toBeNull();
-    view.rerender(<ProjectTemplateManager role="Responsable" />);
-    expect(screen.getByRole('button', { name: 'Gérer les modèles' }).disabled).toBe(true);
-  });
-
-  it('preserves a template draft when its receipt does not confirm the edited name', async () => {
-    render(<ProjectTemplateManager role="Admin" port={port({ saveTemplate: async () => ({ ...template, revision: 'r2' }) })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Gérer les modèles' }));
-    fireEvent.change(await screen.findByLabelText('Modèle à modifier'), { target: { value: 'model1' } });
-    fireEvent.change(screen.getByLabelText('Nom du modèle'), { target: { value: 'Modèle actualisé' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le modèle' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(/vérifi/i);
-    expect(screen.getByLabelText('Nom du modèle').value).toBe('Modèle actualisé');
-    expect(screen.queryByText('Modèle enregistré.')).toBeNull();
   });
 });

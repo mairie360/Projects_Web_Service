@@ -6,7 +6,6 @@ installReactRuntime();
 const React = require('react');
 const { ProjectWorkflow } = requireTs('src/components/ProjectsWorkspace/components/ProjectPage/components/ProjectWorkflow/ProjectWorkflow.tsx');
 const { ProjectTemplatePicker } = requireTs('src/components/ProjectsWorkspace/components/CreateProjectModal/components/ProjectTemplatePicker/ProjectTemplatePicker.tsx');
-const { ProjectTemplateManager } = requireTs('src/components/ProjectsWorkspace/components/ProjectTemplateManager/ProjectTemplateManager.tsx');
 const statuses = [
   { id: 'status-1', name: 'Demandes reçues', color: '#1256a6', category: 'todo' },
   { id: 'status-2', name: 'Conseil municipal', color: '#4b908d', category: 'inprogress' },
@@ -48,11 +47,3 @@ test('server-view: template selection previews ordered statuses and carries the 
   assert.equal(selected.id, 'template-1');
   assert.equal(selected.revision, 'r1');
 });
-
-for (const role of ['User', 'Guest', 'Maire', undefined]) {
-  test(`server-view: template management is unavailable for role ${role}`, async () => {
-    view = mount(React.createElement(ProjectTemplateManager, { role, port }));
-    await view.settle();
-    assert.doesNotMatch(view.html, /Gérer les modèles|Enregistrer le modèle/);
-  });
-}

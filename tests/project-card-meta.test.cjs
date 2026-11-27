@@ -35,8 +35,8 @@ test('invalid dates remain unavailable instead of normalizing an impossible due 
 });
 
 test('card reference numbers retain numeric IDs and a bounded suffix for opaque IDs', () => {
-  for (const [id, label] of [['42', '#42'], ['007', '#7'], ['0', '#0'],
-    ['project-123456', '#3456'], ['project-0007', '#0007'], ['opaque-project', '#1'], ['Infinity', '#1']]) {
+  for (const [id, label] of [['42', 'PRJ-42'], ['007', 'PRJ-7'], ['0', 'PRJ-0'],
+    ['project-123456', 'PRJ-3456'], ['project-0007', 'PRJ-0007'], ['opaque-project', 'PRJ-1'], ['Infinity', 'PRJ-1']]) {
     assert.equal(getProjectNumber({ id }), label, id);
   }
 });
