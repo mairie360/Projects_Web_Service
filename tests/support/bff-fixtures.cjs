@@ -186,4 +186,12 @@ const archivedTasks = (tasks = []) => ({ tasks, pagination: { page: 1, limit: 10
 // MAIR-880: groups the caller may link a project to (`GET /project-groups`); one group by default.
 const projectGroups = (groups = [{ id: 'group-1', name: 'Services techniques' }]) => ({ groups });
 
-module.exports = { milestone, activityItem, projectActivity, projectMilestones, projectGroups, projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };
+// MAIR-1230: answer of the global search (`GET /search`), results grouped by module.
+const globalSearch = (groups = [
+  { module: 'projects', items: [
+    { kind: 'project', id: 1, title: 'Rénovation de l’éclairage public', excerpt: 'Remplacement des candélabres', parent_id: null, updated_at: '2026-11-20T09:00:00.000Z' },
+    { kind: 'task', id: 2, title: 'Relevé des candélabres', excerpt: null, parent_id: 1, updated_at: '2026-11-21T09:00:00.000Z' },
+  ] },
+], unavailable = []) => ({ groups, unavailable });
+
+module.exports = { globalSearch, milestone, activityItem, projectActivity, projectMilestones, projectGroups, projectTaskStatuses, archivedTasks, agents, people, projectTask, projectListItem, projectDetails, projectsPage, taskComment, taskCollaboration, apiError, jwt };

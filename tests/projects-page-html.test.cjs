@@ -408,15 +408,18 @@ for (const [dueDate, expected, short] of [
   });
 }
 
-test('a task deep link makes the selected BFF task visible and identifiable', async () => {
+test('MAIR-1230 a task deep link opens the page of the selected BFF task, then highlights it on the board', async () => {
   harness.location.search = '?project=project-1&task=task-2';
   bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails() });
   await renderLoadedPage();
   await view.waitFor(() => view.find('ProjectPage').length === 1 && view.props('ProjectPage').highlightTaskId === 'task-2');
 
+  assert.match(view.html, /data-task-page="task-2"/);
+  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
+  await view.act(() => view.props('TaskPage').onBack());
+  assert.doesNotMatch(view.html, /data-task-page=/);
   assert.match(view.html, /data-linked-task="task-2"/);
   assert.match(view.html, /aria-current="true"/);
-  assert.equal(bffProject.calls('/projects/{projectId}', 'get').length, 1);
 });
 
 test('mair_1197 a messaging link with bare ids opens the project and its task through their public ids', async () => {
@@ -428,7 +431,7 @@ test('mair_1197 a messaging link with bare ids opens the project and its task th
   const reads = bffProject.calls('/projects/{projectId}', 'get');
   assert.equal(reads.length, 1);
   assert.equal(reads[0].pathParams.projectId, 'project-1');
-  assert.match(view.html, /data-linked-task="task-2"/);
+  assert.match(view.html, /data-task-page="task-2"/);
   assert.doesNotMatch(view.text(), /Lien de projet invalide|La tâche demandée est introuvable/);
 });
 

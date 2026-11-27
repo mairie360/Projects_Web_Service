@@ -1,7 +1,6 @@
 'use client';
 
 import { AccessibleShell } from "@mairie360/lib-components/shell";
-
 import React from 'react';
 import { Alert, ConfirmModal, Skeleton, ToastProvider } from '@mairie360/lib-components/primitives';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -22,6 +21,7 @@ import { VerificationNotice } from './components/VerificationNotice';
 import { WorkspaceLoading } from './components/WorkspaceLoading';
 import { navigateToPage } from '../../lib/navigation';
 import { returnToLogin } from '../../lib/auth-token';
+import { globalSearchSource } from '../../lib/global-search';
 import type { ProjectsController } from './use-projects-controller';
 import type { Project } from '@/types/project';
 import { NEW_PROJECT_TASK_VERIFICATION_MESSAGE, NEW_PROJECT_VERIFICATION_MESSAGE, PROJECT_VERIFICATION_MESSAGE } from '../../lib/projectReceiptVerification';
@@ -196,7 +196,7 @@ export function ProjectsWorkspace({
         user={session.user}
         onLogout={() => void logout()}
         hrefs={{ ...frontHrefs, projects: frontHrefs.projects ?? '/' }}
-        commune={commune}
+        commune={commune} searchSource={globalSearchSource}
       >
             {/* MAIR-846: a project reached by its URL shows as soon as its detail is in, even before the list. */}
             {!projectsPage && !pageError && !selectedProject && <WorkspaceLoading />}

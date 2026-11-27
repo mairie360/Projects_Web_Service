@@ -39,13 +39,24 @@ function pageProps() {
   };
 }
 
-// MAIR-846: the project is a page; a linked task (`?project=…&task=…`) opens « Tâches » and is centred once.
+// MAIR-846: the project is a page; a linked task (`?project=…&task=…`) opens « Tâches ».
+// MAIR-1230: the linked task (a result of the header search, a messaging or dashboard link) opens on its own page;
+// back on the board, its card is centred and focused once.
 describe("Project page linked task", () => {
-  it("opens the tasks tab, centres and focuses the linked task once", () => {
+  const backToTasks = () => screen.getByRole("button", { name: /retour aux tâches$/ });
+
+  it("MAIR-1230 opens the tasks tab on the linked task's page, then centres and focuses its card once back on the board", async () => {
+    const user = userEvent.setup();
     const focus = vi.spyOn(HTMLElement.prototype, "focus");
     render(<ProjectPage {...pageProps()} />);
     expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector('[data-task-page="task-1"]')).toBeTruthy();
+    expect(document.querySelector("[data-linked-task]")).toBeNull();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    await user.click(backToTasks());
     const task = document.querySelector('[data-linked-task="task-1"]');
+    expect(document.querySelector("[data-task-page]")).toBeNull();
     expect(task.getAttribute("aria-current")).toBe("true");
     expect(scrollIntoView).toHaveBeenCalledOnce();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
@@ -53,18 +64,30 @@ describe("Project page linked task", () => {
     expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
-  it("waits for the linked task to arrive and does not jump back on unrelated task refreshes", () => {
+  it("MAIR-1230 waits for the linked task to arrive and does not jump back on unrelated task refreshes", async () => {
+    const user = userEvent.setup();
     const props = pageProps();
     const { rerender } = render(<ProjectPage {...props} tasks={[]} />);
     expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-task-page]")).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
 
     rerender(<ProjectPage {...props} />);
+    expect(document.querySelector('[data-task-page="task-1"]')).toBeTruthy();
+
+    await user.click(backToTasks());
     expect(scrollIntoView).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(document.querySelector("[data-linked-task]"));
 
     rerender(<ProjectPage {...props} tasks={props.tasks.map(task => ({ ...task }))} />);
     expect(scrollIntoView).toHaveBeenCalledOnce();
+  });
+
+  it("MAIR-1230 shows the board when the linked task is not in the project", () => {
+    render(<ProjectPage {...pageProps()} highlightTaskId="task-404" />);
+    expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("[data-task-page]")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Relevé des candélabres" })).toBeTruthy();
   });
 
   it("opens an ordinary project on its overview with the focus on its title", () => {

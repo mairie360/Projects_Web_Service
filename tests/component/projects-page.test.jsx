@@ -643,7 +643,8 @@ describe("Projects page", () => {
     expect(screen.getByRole("radiogroup", { name: "Vue des projets" })).toBeTruthy();
   });
 
-  it("opens the requested BFF-backed project and highlights its task", async () => {
+  it("MAIR-1230 opens the requested BFF-backed project on its task's page, then highlights the task on the board", async () => {
+    const user = userEvent.setup();
     const project = fixtures.projectListItem();
     const task = fixtures.projectTask();
     vi.mocked(getProjectsPage).mockResolvedValue(fixtures.projectsPage([project]));
@@ -652,12 +653,15 @@ describe("Projects page", () => {
 
     const { container } = render(<ProjectsPage />);
 
-    // MAIR-846: the link opens the project page on its « Tâches » tab.
+    // MAIR-846: the link opens the project page on its « Tâches » tab; MAIR-1230: on the task's own page.
     expect(await screen.findByRole("heading", { name: project.title, level: 1 })).toBeTruthy();
     expect(getProjectDetails).toHaveBeenCalledExactlyOnceWith(project.id);
     expect(screen.getByRole("tab", { name: /^Tâches/ }).getAttribute("aria-selected")).toBe("true");
+    expect(container.querySelector(`[data-task-page="${task.id}"]`)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: task.title, level: 2 })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /retour aux tâches$/ }));
     expect(container.querySelector(`[data-linked-task="${task.id}"]`)).toBeTruthy();
-    expect(within(screen.getByRole("tabpanel")).getByText(task.title)).toBeTruthy();
     await waitFor(() => {
       expect(document.activeElement).toBe(container.querySelector(`[data-linked-task="${task.id}"]`));
     });

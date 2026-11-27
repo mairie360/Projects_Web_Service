@@ -127,7 +127,7 @@ test('pending duplicate and refused refresh compose across views without losing 
 
 test('a refused duplication preserves active filters and does not trigger a follow-up read', async () => {
   await open();
-  await view.fire((p) => p.type === 'search', 'onChange', { target: { value: 'éclairage' } });
+  await view.fire((p) => p.type === 'search' && p.role !== 'combobox', 'onChange', { target: { value: 'éclairage' } });
   await view.waitFor(() => view.props('ProjectFiltersBar').search === 'éclairage');
   await view.settle();
   harness.bffProject.on('post', duplicatePath, refused());

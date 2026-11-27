@@ -143,7 +143,9 @@ export function ProjectPage({
   };
   const tabsId = React.useId();
   // MAIR-1137 (C15): the task whose page is shown in « Tâches » (from the board, the list or « Prochaines tâches »).
-  const [viewedTaskId, setViewedTaskId] = React.useState<string | null>(null);
+  // A task reached by its link (`?project=…&task=…`, e.g. a result of the header search) opens on its page; until
+  // its project's tasks are in, or when the project does not hold it, the board shows instead.
+  const [viewedTaskId, setViewedTaskId] = React.useState<string | null>(highlightTaskId ?? null);
   const viewTask = (taskId: string) => {
     showTab('tasks');
     setViewedTaskId(taskId);
@@ -163,7 +165,7 @@ export function ProjectPage({
   const [publishError, setPublishError] = React.useState('');
   const members = useProjectMembers(project);
   const collaboration = useTaskCollaboration({ projectId: project.id, tasks });
-  const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks);
+  const { contentRef, highlightedTaskRef } = useLinkedTaskScroll(highlightTaskId, filters.filteredTasks, viewedTaskId);
   const taskProjectIdRef = React.useRef(project.id);
   const officialProjectRef = React.useRef<Project | null>(null);
   const titleId = React.useId();
