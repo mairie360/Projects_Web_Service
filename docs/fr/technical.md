@@ -53,7 +53,15 @@ compatible `1.1.21`, avec l’intégrité vérifiée sur le registre, conformém
 [l’avis amont](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 Aucun seuil d’audit, workflow ou contrôle de sécurité n’est assoupli.
 
-Le paquet est épinglé à `@mairie360/lib-components@2.3.0` (MAIR-1133, listé dans
+**Recherche globale (lib 2.7).** `AccessibleShell` reçoit `searchSource={globalSearchSource}`
+(`src/lib/global-search.ts`, le `createBffSearchSource()` de la lib créé une seule fois) :
+le champ de l’en-tête liste les résultats de tous les modules depuis `GET /search` sur la
+même origine, que le proxy de contrat transmet à BFF_Project avec la session. Un résultat
+ouvre son module à partir des `hrefs` du shell ; pour ce module, un projet donne
+`?project=<id>` et une tâche `?project=<id>&task=<id>` (voir les liens profonds plus bas).
+Le paquet est désormais épinglé à `@mairie360/lib-components@2.7.0`.
+
+Le paquet était épinglé à `@mairie360/lib-components@2.3.0` (MAIR-1133, listé dans
 `tests/fixtures/shared-ui-releases.json` avec les empreintes de ses fichiers). Son
 `AccessibleShell` est le cadre blanc de la 2.3 (Sidebar repliée ou dépliée par son
 bouton « Replier », Header blanc avec le `Counter` rond sur la cloche) et, depuis la
@@ -263,7 +271,7 @@ Ces chemins de données sont exposés à la même origine par le proxy; les page
 | `/` | [src/app/page.tsx](../../src/app/page.tsx) |
 | `/profile` et sous-chemins | [src/middleware.ts](../../src/middleware.ts) redirige vers Settings |
 
-`/?project=<id>&task=<id>` ouvre la page d’un projet, sur son onglet « Tâches » avec la tâche mise en avant quand `task` est donné ([src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Les deux formes d’identifiant sont acceptées : les identifiants publics du BFF (`project-38`, `task-79`, utilisés par le Dashboard) et les nombres seuls des liens `#` de la messagerie (`38`, `79`), qui reçoivent leur préfixe avant l’appel au BFF ; un nombre seul qui n’est pas un identifiant positif donne « Lien de projet invalide ».
+`/?project=<id>&task=<id>` ouvre la page d’un projet, sur son onglet « Tâches » avec la page de la tâche ouverte quand `task` est donné (de retour sur le tableau, sa carte est mise en avant et reçoit le focus ; [src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Les deux formes d’identifiant sont acceptées : les identifiants publics du BFF (`project-38`, `task-79`, utilisés par le Dashboard) et les nombres seuls des liens `#` de la messagerie (`38`, `79`), qui reçoivent leur préfixe avant l’appel au BFF ; un nombre seul qui n’est pas un identifiant positif donne « Lien de projet invalide ».
 
 | Méthode | Route locale | Source |
 | --- | --- | --- |

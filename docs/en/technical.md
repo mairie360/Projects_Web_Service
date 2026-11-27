@@ -52,7 +52,15 @@ The unchanged CI audit exposed the transitive tooling dependency
 [the upstream advisory](https://github.com/advisories/GHSA-qhr7-859c-m2p7).
 No audit threshold, workflow or security policy is relaxed.
 
-The package is pinned to published `@mairie360/lib-components@2.3.0` (MAIR-1133,
+**Global search (lib 2.7).** `AccessibleShell` receives `searchSource={globalSearchSource}`
+(`src/lib/global-search.ts`, the lib `createBffSearchSource()` created once): the header
+field lists the results of every module from the same-origin `GET /search`, which the
+contract proxy forwards to BFF_Project with the session. A result opens its module from
+the shell `hrefs`; for this module, a project result is `?project=<id>` and a task
+result `?project=<id>&task=<id>` (see the deep links below). The package is now pinned
+to `@mairie360/lib-components@2.7.0`.
+
+The package was pinned to published `@mairie360/lib-components@2.3.0` (MAIR-1133,
 listed in `tests/fixtures/shared-ui-releases.json` with its artifact hashes). Its
 `AccessibleShell` is the white 2.3 frame (Sidebar folded or unfolded by its
 « Replier » button, white Header with the round `Counter` on the bell) and, since
@@ -254,7 +262,7 @@ These data paths are exposed at the same origin through the proxy; Next.js pages
 | `/` | [src/app/page.tsx](../../src/app/page.tsx) |
 | `/profile` and subpaths | [src/middleware.ts](../../src/middleware.ts) redirects to Settings |
 
-`/?project=<id>&task=<id>` opens a project page, on its « Tâches » tab with the task highlighted when `task` is given ([src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Both forms of id are accepted: the public ids of the BFF (`project-38`, `task-79`, used by the Dashboard) and the bare numbers of the messaging `#` links (`38`, `79`), which get their prefix before the BFF is called; a bare number that is not a positive id answers « Lien de projet invalide ».
+`/?project=<id>&task=<id>` opens a project page, on its « Tâches » tab with the task's own page open when `task` is given (back on the board, its card is highlighted and focused; [src/lib/projectDeepLink.ts](../../src/lib/projectDeepLink.ts)). Both forms of id are accepted: the public ids of the BFF (`project-38`, `task-79`, used by the Dashboard) and the bare numbers of the messaging `#` links (`38`, `79`), which get their prefix before the BFF is called; a bare number that is not a positive id answers « Lien de projet invalide ».
 
 | Method | Local route | Source |
 | --- | --- | --- |
