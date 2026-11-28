@@ -3,7 +3,7 @@
 import { AvatarStack, PriorityPill, ProgressMeter, StatusBadge, StatusPill, TagList } from '@mairie360/lib-components/primitives';
 import { CalendarDays } from 'lucide-react';
 
-import { formatProjectDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
+import { formatProjectDueDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
 import { ProjectActionsMenu } from './components/ProjectActionsMenu';
 import type { ProjectCardProps } from './project-card-types';
 
@@ -73,7 +73,7 @@ export function ProjectCard({
         <span className="inline-flex items-center gap-1">
           <CalendarDays aria-hidden className="h-4 w-4 shrink-0" strokeWidth={1.8} />
           <span className="sr-only">Échéance : </span>
-          {formatProjectDate(project.dueDate)}
+          {formatProjectDueDate(project.dueDate)}
         </span>
       </div>
 

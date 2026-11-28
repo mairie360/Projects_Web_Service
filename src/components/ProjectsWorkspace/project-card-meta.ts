@@ -1,4 +1,4 @@
-import { statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
+import { formatShortDate, statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
 import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import type { Project } from '../../types/project';
 
@@ -19,6 +19,15 @@ export function formatProjectDate(date: string, withYear = true) {
   }
 
   return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
+}
+
+/**
+ * MAIR-1254: due date of a project card as in the artifact, « 30 mars 2027 » (lib `formatShortDate`); an absent or
+ * impossible date keeps the wording of `formatProjectDate` (« Sans échéance », « Échéance invalide »).
+ */
+export function formatProjectDueDate(date: string) {
+  const numeric = formatProjectDate(date);
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(numeric) ? formatShortDate(date.trim()) : numeric;
 }
 
 /** Displayed key of a project, « PRJ-12 » as in the artifact (display only: the id stays the BFF one). */

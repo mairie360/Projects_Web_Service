@@ -30,4 +30,4 @@ closed card can be dragged out of « Terminé » by them only. A write refused b
   les priorités » and « Échéance » (En retard / Ce mois-ci / Plus tard, read in the instance day and sent as the
   inclusive `dueBefore` / `dueAfter` bounds of `GET /projects-page`), « Effacer » while one is set.
 - Views Kanban / Tableau / Grille; Kanban columns À faire, En cours, En revue, Terminé, Suspendu (`on-hold`), whatever
-  the order the BFF lists them in. Projects show their key as `PRJ-<n>` (display only). The list spans the full width.
+  the order the BFF lists them in. Projects show their key as `PRJ-<n>` (display only). Cards (Kanban, grid) show the due date as « 30 mars 2027 » (MAIR-1254); the table and the sheet keep « 30/03/2027 ». The list spans the full width.

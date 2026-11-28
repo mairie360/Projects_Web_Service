@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { requireTs } = require('./support/typescript.cjs');
 const { statuses } = require('@mairie360/lib-components/primitives');
-const { formatProjectDate, getProjectNumber, projectStatusBadge, projectStatusLabel } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
+const { formatProjectDate, formatProjectDueDate, getProjectNumber, projectStatusBadge, projectStatusLabel } = requireTs('src/components/ProjectsWorkspace/project-card-meta.ts');
 
 // MAIR-828: the statuses take the lib colours and French labels, no local colour table any more.
 test('each published project status maps to its lib status and label', () => {
@@ -39,4 +39,13 @@ test('card reference numbers retain numeric IDs and a bounded suffix for opaque 
     ['project-123456', 'PRJ-3456'], ['project-0007', 'PRJ-0007'], ['opaque-project', 'PRJ-1'], ['Infinity', 'PRJ-1']]) {
     assert.equal(getProjectNumber({ id }), label, id);
   }
+});
+
+test('MAIR-1254 a project card reads its due date as in the artifact, « 30 mars 2027 »', () => {
+  assert.equal(formatProjectDueDate('2027-03-30'), '30 mars 2027');
+  assert.equal(formatProjectDueDate('2026-01-01'), '1 janv. 2026');
+  assert.equal(formatProjectDueDate('2026-12-05'), '5 déc. 2026');
+  assert.equal(formatProjectDueDate(''), 'Sans échéance');
+  assert.equal(formatProjectDueDate('2026-02-30'), 'Échéance invalide');
+  assert.equal(formatProjectDueDate('demain'), 'Échéance invalide');
 });

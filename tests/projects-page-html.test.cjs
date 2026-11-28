@@ -118,7 +118,7 @@ test('desktop and mobile navigation expose only active modules and keep Settings
     const [mobile] = view.find('Sidebar');
     assert.ok(mobile, 'the mobile drawer renders the shared sidebar');
     assert.deepEqual(mobile.props.items.map(item => item.id),
-      ['dashboard', 'projects', 'messages', 'training', 'calendar', 'admin', 'settings']);
+      ['dashboard', 'projects', 'calendar', 'messages', 'training', 'admin', 'settings']);
     assert.equal(mobile.props.items.find(item => item.id === 'admin').adminOnly, true);
     assert.equal(mobile.props.isAdmin, isAdmin);
     assert.equal(mobile.props.activeItem, 'projects');
@@ -369,19 +369,20 @@ test('a project deep link loads the authorized detail even when absent from the 
   assert.equal(view.props('ProjectPage').highlightTaskId, null);
 });
 
-for (const [dueDate, expected, short] of [
+// MAIR-1254: project cards (Kanban, grid) read the artifact's long date; the table and the sheet keep dd/mm/yyyy.
+for (const [dueDate, expected, card] of [
   ['', 'Sans échéance', 'Sans échéance'],
   ['   ', 'Sans échéance', 'Sans échéance'],
   ['incorrect', 'Échéance invalide', 'Échéance invalide'],
   ['2026-02-29', 'Échéance invalide', 'Échéance invalide'],
-  ['2024-02-29T00:00:00.000Z', '29/02/2024', '29/02'],
+  ['2024-02-29T00:00:00.000Z', '29/02/2024', '29 févr. 2024'],
 ]) {
   test(`deadline presentation across real project views and task editors: ${JSON.stringify(dueDate)}`, async () => {
     const project = fixtures.projectListItem({ dueDate });
     const task = fixtures.projectTask({ dueDate });
     bffProject.on('get', '/projects/{projectId}', { body: fixtures.projectDetails(project, [task]) });
     await renderLoadedPage(fixtures.projectsPage([project]));
-    assert.ok(view.text().includes(short));
+    assert.ok(view.text().includes(card));
 
     for (const [value, component] of [['grid', 'GridView'], ['table', 'TableView'], ['kanban', 'KanbanBoard']]) {
       const count = pageCalls().length;
@@ -389,7 +390,7 @@ for (const [dueDate, expected, short] of [
       await view.waitFor(() => pageCalls().length === count + 1 && view.find(component).length === 1);
       // MAIR-833: the table shows « En retard » instead of a past due date (Figma F1 1.2).
       const late = value === 'table' && dueDate.startsWith('2024-');
-      assert.ok(view.text().includes(late ? 'En retard' : value === 'kanban' ? short : expected));
+      assert.ok(view.text().includes(late ? 'En retard' : value === 'table' ? expected : card));
       assert.doesNotMatch(view.text(), /undefined|Invalid Date/);
     }
 

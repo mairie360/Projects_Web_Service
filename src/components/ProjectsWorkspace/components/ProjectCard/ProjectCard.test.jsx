@@ -22,7 +22,9 @@ describe('ProjectCard V2 (MAIR-829)', () => {
     const { container } = card({ id: 'project-14', labels: ['Urbanisme', 'Concertation'], dueDate: '2099-03-30', progress: 40, tasks: { total: 6, completed: 2, active: 4, archived: 0 } });
     expect(screen.getByText('PRJ-14')).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Étiquettes du projet' }).textContent).toContain('Concertation');
-    expect(screen.getByText('30/03/2099')).toBeTruthy();
+    // MAIR-1254: the artifact's long due date.
+    expect(screen.getByText('30 mars 2099')).toBeTruthy();
+    expect(screen.queryByText('30/03/2099')).toBeNull();
     expect(screen.getByText('2/6 tâches')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Progression' }).getAttribute('aria-valuenow')).toBe('40');
     expect(container.textContent).not.toMatch(/Ajouter une tâche|En retard/);

@@ -32,5 +32,5 @@ affiche « Ce projet est clôturé : il est en lecture seule. Rouvrez-le pour le
   les priorités » et « Échéance » (En retard / Ce mois-ci / Plus tard, lus dans le jour de l’instance et envoyés comme
   bornes inclusives `dueBefore` / `dueAfter` de `GET /projects-page`), « Effacer » tant qu’un filtre est posé.
 - Vues Kanban / Tableau / Grille ; colonnes Kanban À faire, En cours, En revue, Terminé, Suspendu (`on-hold`), quel
-  que soit l’ordre du BFF. Les projets affichent leur clé `PRJ-<n>` (affichage seulement). La liste occupe toute la
+  que soit l’ordre du BFF. Les projets affichent leur clé `PRJ-<n>` (affichage seulement). Les cartes (Kanban, grille) affichent l’échéance « 30 mars 2027 » (MAIR-1254) ; le tableau et la fiche gardent « 30/03/2027 ». La liste occupe toute la
   largeur.
