@@ -30,12 +30,14 @@ export function formatProjectDueDate(date: string) {
   return /^\d{2}\/\d{2}\/\d{4}$/.test(numeric) ? formatShortDate(date.trim()) : numeric;
 }
 
-/** Displayed key of a project, « PRJ-12 » as in the artifact (display only: the id stays the BFF one). */
+/**
+ * Displayed key of a project, « PRJ-12 » as in the artifact (display only: the id stays the BFF one). MAIR-1254: at
+ * least two digits, « PRJ-09 » like the artifact's keys.
+ */
 export function getProjectNumber(project: Pick<Project, 'id'>) {
   const numericId = Number(project.id);
-  if (Number.isFinite(numericId)) return `PRJ-${numericId}`;
-
-  return `PRJ-${project.id.replace(/\D/g, '').slice(-4) || '1'}`;
+  const digits = Number.isFinite(numericId) ? String(numericId) : project.id.replace(/\D/g, '').slice(-4) || '1';
+  return `PRJ-${digits.padStart(2, '0')}`;
 }
 
 /** Status of the lib `StatusBadge` for each project or task status (MAIR-828: one colour per status in every front). */

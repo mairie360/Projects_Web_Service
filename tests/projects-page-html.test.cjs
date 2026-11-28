@@ -1424,7 +1424,7 @@ test('the project page edits the project in its modal, adds a task from its shee
 
   await view.click((props, text, tag) => tag === 'button' && text === 'Modifier');
   const editModal = view.find('Modal').map(modal => modal.props).find(props => props.open);
-  assert.equal(editModal?.title, 'Modifier le projet · PRJ-1');
+  assert.equal(editModal?.title, 'Modifier le projet · PRJ-01');
   bffProject.on('patch', '/projects/{projectId}', ({ body }) => ({ body: fixtures.projectDetails(fixtures.projectListItem({ title: body.title })) }));
   await view.fire((props) => props.id === 'detail-project-title', 'onChange', { target: { value: 'Éclairage LED' } });
   await view.fire((props, text, tag) => tag === 'form' && props['aria-label'] === 'Modifier le projet', 'onSubmit');

@@ -74,7 +74,7 @@ test('MAIR-1254 orders the Kanban columns like the artifact and labels on-hold Â
   const onHold = columnHtml('on-hold');
   assert.match(onHold, /Suspendu/);
   assert.match(onHold, /Square du marchÃ©/);
-  assert.match(onHold, /PRJ-3/);
+  assert.match(onHold, /PRJ-03/);
 });
 
 test('MAIR-1254 shows the PRJ-<n> key instead of #<n>', async () => {

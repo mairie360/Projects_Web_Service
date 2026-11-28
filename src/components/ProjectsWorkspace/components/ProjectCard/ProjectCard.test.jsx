@@ -44,4 +44,17 @@ describe('ProjectCard V2 (MAIR-829)', () => {
     unmount();
     expect(card({ status: 'review' }).container.textContent).not.toContain('En revue');
   });
+
+  // MAIR-1254 (design-match, artifact card): a two-digit key, and the due date pushed to the right of the priority
+  // and « En retard » group.
+  it('MAIR-1254 shows PRJ-09 and the due date on the right of priority and « En retard »', () => {
+    const { container } = card({ id: 'project-9', dueDate: '2020-01-15', status: 'review' });
+    expect(screen.getByText('PRJ-09')).toBeTruthy();
+    const meta = container.querySelector('[data-project-card-meta]');
+    expect(meta.className).toContain('justify-between');
+    const [left, right] = meta.children;
+    expect(left.textContent).toMatch(/En retard/);
+    expect(right.textContent).toContain('15 janv. 2020');
+    expect(right.textContent).not.toMatch(/En retard/);
+  });
 });
