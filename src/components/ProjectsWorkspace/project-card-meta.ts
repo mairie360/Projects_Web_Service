@@ -1,4 +1,4 @@
-import { statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
+import { formatShortDate, statuses, type Status, type StatusPillTone } from '@mairie360/lib-components/primitives';
 import { getInstanceTimeZone } from '@mairie360/lib-components/shared';
 import type { Project } from '../../types/project';
 
@@ -21,11 +21,23 @@ export function formatProjectDate(date: string, withYear = true) {
   return withYear ? `${day}/${month}/${year}` : `${day}/${month}`;
 }
 
-export function getProjectNumber(project: Project) {
-  const numericId = Number(project.id);
-  if (Number.isFinite(numericId)) return `#${numericId}`;
+/**
+ * MAIR-1254: due date of a project card as in the artifact, « 30 mars 2027 » (lib `formatShortDate`); an absent or
+ * impossible date keeps the wording of `formatProjectDate` (« Sans échéance », « Échéance invalide »).
+ */
+export function formatProjectDueDate(date: string) {
+  const numeric = formatProjectDate(date);
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(numeric) ? formatShortDate(date.trim()) : numeric;
+}
 
-  return `#${project.id.replace(/\D/g, '').slice(-4) || '1'}`;
+/**
+ * Displayed key of a project, « PRJ-12 » as in the artifact (display only: the id stays the BFF one). MAIR-1254: at
+ * least two digits, « PRJ-09 » like the artifact's keys.
+ */
+export function getProjectNumber(project: Pick<Project, 'id'>) {
+  const numericId = Number(project.id);
+  const digits = Number.isFinite(numericId) ? String(numericId) : project.id.replace(/\D/g, '').slice(-4) || '1';
+  return `PRJ-${digits.padStart(2, '0')}`;
 }
 
 /** Status of the lib `StatusBadge` for each project or task status (MAIR-828: one colour per status in every front). */
@@ -46,6 +58,18 @@ export const projectColumnTone = {
   'on-hold': 'warning',
   done: 'success',
 } as const satisfies Record<Project['status'], StatusPillTone>;
+
+/** Order of the Kanban columns in the artifact: À faire, En cours, En revue, Terminé, Suspendu. */
+export const PROJECT_COLUMN_ORDER: readonly Project['status'][] = ['todo', 'in-progress', 'review', 'done', 'on-hold'];
+
+/** The BFF columns in the artifact order (unknown statuses last, in their BFF order). */
+export function orderProjectColumns<T extends { status: Project['status'] }>(columns: readonly T[]): T[] {
+  const rank = (status: Project['status']) => {
+    const index = PROJECT_COLUMN_ORDER.indexOf(status);
+    return index === -1 ? PROJECT_COLUMN_ORDER.length : index;
+  };
+  return [...columns].sort((left, right) => rank(left.status) - rank(right.status));
+}
 
 /** French label of a project or task status, the one the lib `StatusBadge` shows (« En revue »). */
 export const projectStatusLabel = (status: Project['status']) => statuses[projectStatusBadge[status]].label;

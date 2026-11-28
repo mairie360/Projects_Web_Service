@@ -4,7 +4,7 @@ import React from 'react';
 import { KanbanColumn } from '@mairie360/lib-components/primitives';
 
 import { ProjectCard } from '../ProjectCard';
-import { projectColumnTone, projectStatusTargets } from '../../project-card-meta';
+import { orderProjectColumns, projectColumnTone, projectStatusLabel, projectStatusTargets } from '../../project-card-meta';
 import { COLLAPSED_PROJECT_COLUMNS_KEY, useCollapsedColumns } from '../../use-collapsed-columns';
 import type { Project } from '@/types/project';
 
@@ -81,13 +81,14 @@ export function KanbanBoard({
       <p id={instructionsId} className="sr-only">
         Glissez une carte vers une autre colonne pour changer son statut. Au clavier ou sur mobile, utilisez « Changer le statut » dans le menu Actions du projet.
       </p>
-      {columns.map((column) => {
+      {/* The artifact order (À faire, En cours, En revue, Terminé, Suspendu) and the lib status labels (« Suspendu »). */}
+      {orderProjectColumns(columns).map((column) => {
         const columnProjects = projects.filter((project) => project.status === column.status);
 
         return (
           <KanbanColumn
             key={column.status}
-            title={column.label}
+            title={projectStatusLabel(column.status)}
             tone={projectColumnTone[column.status]}
             count={columnProjects.length}
             onAdd={onAddProject ? () => onAddProject(column.status) : undefined}

@@ -8,7 +8,7 @@ describe('ProjectPageHeader (MAIR-846)', () => {
   it('shows the breadcrumb, the title first, the meta line and the description, without the labels (MAIR-1135)', () => {
     const shown = project({ dueDate: '2020-01-15', status: 'in-progress' });
     render(<ProjectPageHeader project={shown} titleId="t" onBack={vi.fn()} />);
-    expect(screen.getByRole('navigation', { name: 'Fil d’Ariane' }).textContent).toMatch(/Projets\/#/);
+    expect(screen.getByRole('navigation', { name: 'Fil d’Ariane' }).textContent).toMatch(/Projets\/PRJ-\d+/);
     const title = screen.getByRole('heading', { level: 1 });
     expect(title.id).toBe('t');
     const meta = screen.getByRole('group', { name: 'Résumé du projet' });

@@ -7,7 +7,7 @@ Les paramètres d’URL sont bornés et validés. Le bouton retour/avancer resta
 | Module | Contexte d’URL |
 | --- | --- |
 | Paramètres | `tab` (six sections) |
-| Projets | `q`, `status`, `priority`, `dueBefore`, `view`, `page` |
+| Projets | `q`, `status`, `priority`, `dueBefore`, `dueAfter` (bornes du filtre « Échéance »), `view`, `page` |
 | Calendrier | `date`, `view`, lien `event` préservé |
 | Messagerie | `conversation` |
 | Formation historique | `q`, `category`, `status`, lien de cours préservé |

@@ -114,9 +114,9 @@ test('métadonnées des cartes projet : initiales, dates et numéro affiché', (
   assert.deepEqual(Object.keys(meta.projectStatusBadge), ['todo', 'in-progress', 'review', 'on-hold', 'done']);
   assert.equal(meta.formatProjectDate('2026-12-15'), '15/12/2026');
   assert.equal(meta.formatProjectDate('2026-12-15', false), '15/12');
-  assert.equal(meta.getProjectNumber({ id: '42' }), '#42');
-  assert.equal(meta.getProjectNumber({ id: 'project-2026-0815' }), '#0815');
-  assert.equal(meta.getProjectNumber({ id: 'projet' }), '#1');
+  assert.equal(meta.getProjectNumber({ id: '42' }), 'PRJ-42');
+  assert.equal(meta.getProjectNumber({ id: 'project-2026-0815' }), 'PRJ-0815');
+  assert.equal(meta.getProjectNumber({ id: 'projet' }), 'PRJ-01');
 });
 
 test('jeton stocké : normalisation, effacement et stockage inaccessible', () => {

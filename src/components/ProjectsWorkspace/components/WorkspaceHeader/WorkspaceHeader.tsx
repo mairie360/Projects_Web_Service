@@ -1,32 +1,25 @@
 import { Settings } from 'lucide-react';
-import { Button, CreateButton, PageHeader, Tag } from '@mairie360/lib-components/primitives';
-
-export type ProjectAccessScope = 'all' | 'team' | 'assigned' | string;
-
-export const accessScopeLabel = (scope: ProjectAccessScope) =>
-  scope === 'all' ? 'Tous les projets municipaux' : scope === 'team' ? 'Projets de mon équipe' : 'Mes projets assignés';
+import { Button, CreateButton, PageHeader } from '@mairie360/lib-components/primitives';
 
 export interface WorkspaceHeaderProps {
   title: string;
   subtitle: string;
-  scope?: ProjectAccessScope;
   onCreate?: () => void;
   onSettings: () => void;
 }
 
-/** The lib PageHeader (MAIR-828): title, access scope, « Nouveau projet » (when allowed) and « Paramètres ». */
-export const WorkspaceHeader = ({ title, subtitle, scope, onCreate, onSettings }: WorkspaceHeaderProps) => (
+/** The lib PageHeader (MAIR-828): title, subtitle, then « Paramètres » and « Nouveau projet » (when allowed), as in the artifact. */
+export const WorkspaceHeader = ({ title, subtitle, onCreate, onSettings }: WorkspaceHeaderProps) => (
   <section className="border-b border-[var(--mairie-border)] pb-6">
     <PageHeader
       title={title}
       subtitle={subtitle}
       actions={(
         <>
-          {onCreate && <CreateButton label="Nouveau projet" onClick={onCreate} />}
           <Button label="Paramètres" variant="outline" tone="neutral" icon={Settings} onClick={onSettings} />
+          {onCreate && <CreateButton label="Nouveau projet" onClick={onCreate} />}
         </>
       )}
     />
-    {scope && <Tag className="mt-3" label={accessScopeLabel(scope)} />}
   </section>
 );

@@ -3,7 +3,7 @@
 import { AvatarStack, PriorityPill, ProgressMeter, StatusBadge, StatusPill, TagList } from '@mairie360/lib-components/primitives';
 import { CalendarDays } from 'lucide-react';
 
-import { formatProjectDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
+import { formatProjectDueDate, getProjectNumber, isProjectOverdue, projectStatusBadge } from '../../project-card-meta';
 import { ProjectActionsMenu } from './components/ProjectActionsMenu';
 import type { ProjectCardProps } from './project-card-types';
 
@@ -67,13 +67,16 @@ export function ProjectCard({
         <TagList label="Étiquettes du projet" items={project.labels} size="s" className="mt-3" />
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[var(--mairie-text)]">
-        <PriorityPill level={project.priority} />
-        {overdue && <StatusPill label="En retard" tone="danger" dot />}
-        <span className="inline-flex items-center gap-1">
+      {/* MAIR-1254 (artifact): priority and « En retard » on the left, the due date pushed to the right. */}
+      <div data-project-card-meta className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--mairie-text)]">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <PriorityPill level={project.priority} />
+          {overdue && <StatusPill label="En retard" tone="danger" dot />}
+        </span>
+        <span className="inline-flex items-center gap-1 text-[var(--mairie-muted)]">
           <CalendarDays aria-hidden className="h-4 w-4 shrink-0" strokeWidth={1.8} />
           <span className="sr-only">Échéance : </span>
-          {formatProjectDate(project.dueDate)}
+          {formatProjectDueDate(project.dueDate)}
         </span>
       </div>
 

@@ -20,9 +20,11 @@ describe('ProjectCard V2 (MAIR-829)', () => {
 
   it('shows the key, labels, priority, due date, progress, team and « x/y tâches », without task composer', () => {
     const { container } = card({ id: 'project-14', labels: ['Urbanisme', 'Concertation'], dueDate: '2099-03-30', progress: 40, tasks: { total: 6, completed: 2, active: 4, archived: 0 } });
-    expect(screen.getByText('#14')).toBeTruthy();
+    expect(screen.getByText('PRJ-14')).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Étiquettes du projet' }).textContent).toContain('Concertation');
-    expect(screen.getByText('30/03/2099')).toBeTruthy();
+    // MAIR-1254: the artifact's long due date.
+    expect(screen.getByText('30 mars 2099')).toBeTruthy();
+    expect(screen.queryByText('30/03/2099')).toBeNull();
     expect(screen.getByText('2/6 tâches')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Progression' }).getAttribute('aria-valuenow')).toBe('40');
     expect(container.textContent).not.toMatch(/Ajouter une tâche|En retard/);
@@ -41,5 +43,18 @@ describe('ProjectCard V2 (MAIR-829)', () => {
     expect(container.textContent).toContain('En revue');
     unmount();
     expect(card({ status: 'review' }).container.textContent).not.toContain('En revue');
+  });
+
+  // MAIR-1254 (design-match, artifact card): a two-digit key, and the due date pushed to the right of the priority
+  // and « En retard » group.
+  it('MAIR-1254 shows PRJ-09 and the due date on the right of priority and « En retard »', () => {
+    const { container } = card({ id: 'project-9', dueDate: '2020-01-15', status: 'review' });
+    expect(screen.getByText('PRJ-09')).toBeTruthy();
+    const meta = container.querySelector('[data-project-card-meta]');
+    expect(meta.className).toContain('justify-between');
+    const [left, right] = meta.children;
+    expect(left.textContent).toMatch(/En retard/);
+    expect(right.textContent).toContain('15 janv. 2020');
+    expect(right.textContent).not.toMatch(/En retard/);
   });
 });

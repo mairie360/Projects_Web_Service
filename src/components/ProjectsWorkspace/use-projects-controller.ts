@@ -3,6 +3,7 @@ import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow
 import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '../../lib/page-return';
 import { projectStatusLabel, projectStatusTargets } from './project-card-meta';
+import { matchesProjectDueBounds, projectDueBounds, projectDueCustomLabel, projectDueRange, type ProjectDueRange } from './project-due-range';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -67,6 +68,7 @@ type RefreshProjectsOptions = {
   status?: string;
   priority?: string;
   dueBefore?: string;
+  dueAfter?: string;
   view?: ViewMode;
   page?: number;
   silent?: boolean;
@@ -78,6 +80,7 @@ type ProjectQueryState = {
   status: string;
   priority: string;
   dueBefore: string;
+  dueAfter: string;
   view: ViewMode;
 };
 
@@ -166,6 +169,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   const [statusFilter, setStatusFilter] = useState(initialReceipt?.query.status ?? 'all');
   const [priorityFilter, setPriorityFilter] = useState(initialReceipt?.query.priority ?? 'all');
   const [dueBeforeFilter, setDueBeforeFilter] = useState(initialReceipt?.query.dueBefore ?? '');
+  const [dueAfterFilter, setDueAfterFilter] = useState(initialReceipt?.query.dueAfter ?? '');
   const [searchTerm, setSearchTerm] = useState(initialReceipt?.query.q ?? '');
   const pageUrl = usePageUrlState(projectUrlSchema);
   const urlInitialized = useRef(Boolean(initialReceipt));
@@ -182,7 +186,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
   // Async writes must read the latest event-owned query, not a render captured
   // before their response. UI state remains the owner of the displayed controls.
   const queryRef = useRef<ProjectQueryState>({
-    search: initialReceipt?.query.q ?? '', status: initialReceipt?.query.status ?? 'all', priority: initialReceipt?.query.priority ?? 'all', dueBefore: initialReceipt?.query.dueBefore ?? '', view: (initialReceipt?.query.view as ViewMode) ?? 'kanban',
+    search: initialReceipt?.query.q ?? '', status: initialReceipt?.query.status ?? 'all', priority: initialReceipt?.query.priority ?? 'all', dueBefore: initialReceipt?.query.dueBefore ?? '', dueAfter: initialReceipt?.query.dueAfter ?? '', view: (initialReceipt?.query.view as ViewMode) ?? 'kanban',
   });
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -282,11 +286,11 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
         project.description.toLowerCase().includes(normalizedSearch) ||
         project.labels.some((label) => label.toLowerCase().includes(normalizedSearch));
 
-      const matchesDueDate = !dueBeforeFilter || project.dueDate.slice(0, 10) <= dueBeforeFilter;
+      const matchesDueDate = matchesProjectDueBounds(project.dueDate, { dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter });
 
       return matchesStatus && matchesPriority && matchesSearch && matchesDueDate;
     });
-  }, [dueBeforeFilter, priorityFilter, projects, searchTerm, statusFilter]);
+  }, [dueAfterFilter, dueBeforeFilter, priorityFilter, projects, searchTerm, statusFilter]);
 
   const refreshProjectsPage = useCallback(
     async (options: RefreshProjectsOptions = {}) => {
@@ -298,6 +302,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       const nextStatus = options.status ?? query.status;
       const nextPriority = options.priority ?? query.priority;
       const nextDueBefore = options.dueBefore ?? query.dueBefore;
+      const nextDueAfter = options.dueAfter ?? query.dueAfter;
       const nextView = options.view ?? query.view;
       const nextPage = options.page ?? requestedPageRef.current;
       pageReadPendingRef.current = true;
@@ -311,6 +316,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
             status: nextStatus as Project['status'] | 'all',
             priority: nextPriority as Project['priority'] | 'all',
             dueBefore: nextDueBefore || undefined,
+            dueAfter: nextDueAfter || undefined,
             view: nextView,
             page: nextPage,
             limit: 50,
@@ -349,7 +355,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     if (!pageUrl.ready) return;
     const nextQuery = {
       search: pageUrl.state.q, status: pageUrl.state.status, priority: pageUrl.state.priority,
-      dueBefore: pageUrl.state.dueBefore, view: pageUrl.state.view as ViewMode,
+      dueBefore: pageUrl.state.dueBefore, dueAfter: pageUrl.state.dueAfter, view: pageUrl.state.view as ViewMode,
     };
     const nextPage = Number(pageUrl.state.page);
     const filtersChanged = Object.entries(nextQuery).some(([key, value]) => queryRef.current[key as keyof ProjectQueryState] !== value);
@@ -361,6 +367,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       setStatusFilter(nextQuery.status);
       setPriorityFilter(nextQuery.priority);
       setDueBeforeFilter(nextQuery.dueBefore);
+      setDueAfterFilter(nextQuery.dueAfter);
       setViewMode(nextQuery.view);
     } else if (requestedPageRef.current !== nextPage) {
       prepareQueryChange(false);
@@ -370,7 +377,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       void refreshProjectsPage({ page: nextPage, signal: controller.signal });
     }
     urlInitialized.current = true;
-  }, [pageUrl.ready, pageUrl.state.q, pageUrl.state.status, pageUrl.state.priority, pageUrl.state.dueBefore, pageUrl.state.view, pageUrl.state.page, refreshProjectsPage]);
+  }, [pageUrl.ready, pageUrl.state.q, pageUrl.state.status, pageUrl.state.priority, pageUrl.state.dueBefore, pageUrl.state.dueAfter, pageUrl.state.view, pageUrl.state.page, refreshProjectsPage]);
 
   useEffect(() => {
     if (!pageUrl.ready) return;
@@ -378,7 +385,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       // Paging owns its immediate read; only filter changes drive this debounce.
       const currentQueryKey = projectQueryKey({
         q: searchTerm, status: statusFilter, priority: priorityFilter,
-        dueBefore: dueBeforeFilter, view: viewMode, page: String(requestedPageRef.current),
+        dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter, view: viewMode, page: String(requestedPageRef.current),
       });
       if (initialQueryRef.current === currentQueryKey) return;
       initialQueryRef.current = null;
@@ -393,7 +400,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       navigationReadRef.current?.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [pageUrl.ready, refreshProjectsPage, dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]);
+  }, [pageUrl.ready, refreshProjectsPage, dueAfterFilter, dueBeforeFilter, priorityFilter, searchTerm, statusFilter, viewMode]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -460,12 +467,15 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     setPriorityFilter(value);
     pageUrl.update({ priority: value, page: '1' });
   };
-  const changeDueBeforeFilter = (value: string) => {
-    if (value === queryRef.current.dueBefore) return;
+  // « Échéance »: one choice sets both bounds in a single URL update, so it costs one read.
+  const changeDueRangeFilter = (range: ProjectDueRange) => {
+    const { dueBefore, dueAfter } = projectDueBounds(range);
+    if (dueBefore === queryRef.current.dueBefore && dueAfter === queryRef.current.dueAfter) return;
     prepareQueryChange(true);
-    queryRef.current = { ...queryRef.current, dueBefore: value };
-    setDueBeforeFilter(value);
-    pageUrl.update({ dueBefore: value, page: '1' });
+    queryRef.current = { ...queryRef.current, dueBefore, dueAfter };
+    setDueBeforeFilter(dueBefore);
+    setDueAfterFilter(dueAfter);
+    pageUrl.update({ dueBefore, dueAfter, page: '1' });
   };
   const changeViewMode = (value: ViewMode) => {
     if (value === queryRef.current.view) return;
@@ -477,13 +487,14 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
 
   const resetProjectFilters = () => {
     setSelectedProjectIds(new Set());
-    pageUrl.update({ q: '', status: 'all', priority: 'all', dueBefore: '', page: '1' });
+    pageUrl.update({ q: '', status: 'all', priority: 'all', dueBefore: '', dueAfter: '', page: '1' });
     requestedPageRef.current = 1;
-    queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '' };
+    queryRef.current = { ...queryRef.current, search: '', status: 'all', priority: 'all', dueBefore: '', dueAfter: '' };
     setSearchTerm('');
     setStatusFilter('all');
     setPriorityFilter('all');
     setDueBeforeFilter('');
+    setDueAfterFilter('');
   };
 
   const showInfo = (message: string) => {
@@ -1181,7 +1192,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       try {
         await refreshProjectsPage(editingProjectId
           ? { silent: true, throwOnError: true }
-          : { search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true, throwOnError: true });
+          : { search: '', status: 'all', priority: 'all', dueBefore: '', dueAfter: '', page: 1, silent: true, throwOnError: true });
         if (editingProjectId) setAlert({ type: 'success', message: `Projet "${details.project.title}" modifié.` });
         else setFeedback({ title: 'Projet créé', message: `Projet « ${details.project.title} » créé.` });
       } catch (error) {
@@ -1215,7 +1226,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
       applyConfirmedProject(details, true);
 
       resetProjectFilters();
-      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', page: 1, silent: true });
+      await refreshProjectsPage({ search: '', status: 'all', priority: 'all', dueBefore: '', dueAfter: '', page: 1, silent: true });
       setAlert({ type: 'success', message: `Projet "${details.project.title}" dupliqué.` });
     } catch (error) {
       if (error instanceof NewProjectReceiptVerificationRequiredError) showInfo(error.message);
@@ -1686,8 +1697,9 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     setStatusFilter: changeStatusFilter,
     priorityFilter,
     setPriorityFilter: changePriorityFilter,
-    dueBeforeFilter,
-    setDueBeforeFilter: changeDueBeforeFilter,
+    dueRangeFilter: projectDueRange({ dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter }),
+    dueCustomLabel: projectDueCustomLabel({ dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter }),
+    setDueRangeFilter: changeDueRangeFilter,
     searchTerm,
     setSearchTerm: changeSearchTerm,
     alert,
@@ -1716,7 +1728,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     feedback,
     clearFeedback,
     resetProjectFilters,
-    filtersActive: Boolean(searchTerm.trim()) || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueBeforeFilter),
+    filtersActive: Boolean(searchTerm.trim()) || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(dueBeforeFilter) || Boolean(dueAfterFilter),
     retryProjectsPage,
     changeProjectPage,
     openCreateProject,

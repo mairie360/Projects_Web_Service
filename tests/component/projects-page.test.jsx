@@ -505,7 +505,7 @@ describe("Projects page", () => {
     await user.click(screen.getByRole("menuitem", { name: "Dupliquer" }));
     expect(await screen.findByText("Duplication du projet en cours…")).toBeTruthy();
     await user.click(screen.getByRole("radio", { name: "Grille" }));
-    await user.type(screen.getByPlaceholderText("Rechercher des projets..."), "éclairage");
+    await user.type(screen.getByPlaceholderText("Rechercher un projet, une étiquette…"), "éclairage");
     await waitFor(() => {
       const query = getProjectsPage.mock.calls.at(-1)[0];
       expect(query.view).toBe("grid");
@@ -522,7 +522,7 @@ describe("Projects page", () => {
     await waitFor(() => expect(screen.queryByText("Duplication du projet en cours…")).toBeNull());
     const expectedQuery = { q: undefined, status: "all", priority: "all", dueBefore: undefined, view: "grid", page: 1, limit: 50 };
     expect(getProjectsPage.mock.calls.at(-1)[0]).toEqual(expectedQuery);
-    expect(screen.getByPlaceholderText("Rechercher des projets...").value).toBe("");
+    expect(screen.getByPlaceholderText("Rechercher un projet, une étiquette…").value).toBe("");
     expect(screen.getByRole("radio", { name: "Grille" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("button", { name: `Ouvrir la fiche du projet ${copy.title}` })).toBeTruthy();
     if (refusedRefresh) {
@@ -637,8 +637,9 @@ describe("Projects page", () => {
     // The view switch never moves: its own row, left aligned, whatever the screen width.
     expect([...toolbar.classList].some((name) => /flex-row/.test(name))).toBe(false);
     expect(toolbar.lastElementChild).toBe(screen.getByRole("radiogroup", { name: "Vue des projets" }));
-    expect(searchContainer.classList.contains("md:min-w-[280px]")).toBe(true);
-    expect(searchContainer.classList.contains("2xl:min-w-[240px]")).toBe(true);
+    // MAIR-1254: the artifact search field grows from 260 px up to 360 px.
+    expect(searchContainer.classList.contains("md:min-w-[260px]")).toBe(true);
+    expect(searchContainer.classList.contains("md:max-w-[360px]")).toBe(true);
     expect(searchContainer.classList.contains("md:flex-1")).toBe(true);
     expect(screen.getByRole("radiogroup", { name: "Vue des projets" })).toBeTruthy();
   });

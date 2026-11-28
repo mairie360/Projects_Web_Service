@@ -61,6 +61,15 @@ export function authSessionFromAccess(
   };
 }
 
+/**
+ * User shown by the shared header: since lib-components 2.8 it prints the role under the name, so it gets the French
+ * role label once the BFF answered, and none when the name already is that label (no Core profile).
+ */
+export function shellUser(session: Pick<AuthSession, "user" | "role" | "access">) {
+  const role = session.access ? ROLE_LABELS[session.role] : undefined;
+  return { ...session.user, role: role && role !== session.user.name ? role : undefined };
+}
+
 /** Charge la session via `GET /projects-page?limit=1` quand la page n'a pas déjà la réponse du BFF. */
 export function useAuthSession() {
   const [session, setSession] = useState<AuthSession>(() => authSessionFromAccess(null));

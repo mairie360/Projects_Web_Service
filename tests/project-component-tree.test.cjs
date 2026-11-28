@@ -11,7 +11,7 @@ const workspace = 'src/components/ProjectsWorkspace';
 // through their folder (`./components/<Name>`), never a sub-sub-component.
 test('MAIR-608 the workspace, the dialogs and the card compose their direct sub-components through their folders', () => {
   const tree = {
-    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectPage', 'ProjectTemplateManager', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
+    [`${workspace}/ProjectsWorkspace.tsx`]: ['WorkspaceHeader', 'ProjectFiltersBar', 'WorkspaceLoading', 'LogoutErrorNotice', 'VerificationNotice', 'PageReadError', 'ProjectPagination', 'KanbanBoard', 'GridView', 'TableView', 'CreateProjectModal', 'ProjectPage', 'TaskCreationNotice', 'ProjectsEmptyState', 'FeedbackToast'],
     [`${workspace}/components/CreateProjectModal/CreateProjectModal.tsx`]: ['CreateProjectFeedback', 'CreateProjectFooter', 'ProjectMainFields', 'ProjectSideFields', 'ProjectTemplatePicker'],
     // MAIR-846: the project page — header, metrics, tabs (overview, tasks) and the edit modal.
     [`${workspace}/components/ProjectPage/ProjectPage.tsx`]: ['ProjectPageHeader', 'ProjectMetrics', 'ProjectOverview', 'DetailRefreshAlert', 'ProjectTasksTab', 'ProjectPlanningTab', 'ProjectTeamTab', 'ProjectActivityTab', 'ProjectEditForm', 'ProjectWorkflow'],
