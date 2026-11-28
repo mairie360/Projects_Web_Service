@@ -41,6 +41,19 @@ export function projectDueRange(bounds: ProjectDueBounds, now = new Date()): Pro
   }) ?? '';
 }
 
+const frenchDay = (day: string) => day.split('-').reverse().join('/');
+
+/**
+ * Label of bounds that no range stands for today (a shared link, or a range kept past its day), so the « Échéance »
+ * control shows the dates that still filter the list; `''` when there is no bound or a range matches.
+ */
+export function projectDueCustomLabel(bounds: ProjectDueBounds, now = new Date()): string {
+  if (!bounds.dueBefore && !bounds.dueAfter) return '';
+  if (projectDueRange(bounds, now)) return '';
+  if (bounds.dueBefore && bounds.dueAfter) return `Du ${frenchDay(bounds.dueAfter)} au ${frenchDay(bounds.dueBefore)}`;
+  return bounds.dueBefore ? `Jusqu’au ${frenchDay(bounds.dueBefore)}` : `À partir du ${frenchDay(bounds.dueAfter)}`;
+}
+
 /** Whether a `YYYY-MM-DD` due date lies within the bounds (both inclusive, as the API compares them). */
 export function matchesProjectDueBounds(dueDate: string, bounds: ProjectDueBounds) {
   if (!bounds.dueBefore && !bounds.dueAfter) return true;

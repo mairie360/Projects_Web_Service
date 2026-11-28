@@ -12,7 +12,7 @@ const React = require('react');
 const { createFrontHarness } = require('./support/front-harness.cjs');
 const f = require('./support/bff-fixtures.cjs');
 const Page = requireTs('src/app/projects-client.tsx').default;
-const { projectDueBounds, projectDueRange, matchesProjectDueBounds } = requireTs('src/components/ProjectsWorkspace/project-due-range.ts');
+const { projectDueBounds, projectDueRange, projectDueCustomLabel, matchesProjectDueBounds } = requireTs('src/components/ProjectsWorkspace/project-due-range.ts');
 
 const harness = createFrontHarness();
 const { bffProject } = harness;
@@ -132,4 +132,25 @@ test('MAIR-1254 business journey: a created project is found in « À faire » w
   assert.match(view.text(), /Tous les statuts : À faire/);
   assert.match(columnHtml('todo'), /PRJ-16/);
   assert.match(view.text(), /Effacer/);
+});
+
+test('MAIR-1254 bounds that match no « Échéance » range are named by their dates', () => {
+  const now = new Date('2026-11-27T10:00:00Z');
+  assert.equal(projectDueCustomLabel({ dueBefore: '', dueAfter: '' }, now), '');
+  for (const range of ['overdue', 'this-month', 'later']) assert.equal(projectDueCustomLabel(projectDueBounds(range, now), now), '', range);
+  assert.equal(projectDueCustomLabel({ dueBefore: '2026-12-31', dueAfter: '' }, now), 'Jusqu’au 31/12/2026');
+  assert.equal(projectDueCustomLabel({ dueBefore: '', dueAfter: '2027-01-15' }, now), 'À partir du 15/01/2027');
+  assert.equal(projectDueCustomLabel({ dueBefore: '2026-11-30', dueAfter: '2026-11-01' }, now), 'Du 01/11/2026 au 30/11/2026');
+  // A « Ce mois-ci » kept past its day no longer matches the range and shows its dates.
+  assert.equal(projectDueCustomLabel(projectDueBounds('this-month', now), new Date('2026-11-28T10:00:00Z')), 'Du 27/11/2026 au 30/11/2026');
+});
+
+test('MAIR-1254 a restored link with custom due bounds shows them in « Échéance » and keeps sending them', async () => {
+  harness.location.search = '?dueBefore=2099-12-31';
+  await renderPage();
+  assert.equal(pageCalls()[0].dueBefore, '2099-12-31');
+  const due = view.hostElements((props, _text, tag) => tag === 'select' && props['aria-label'] === 'Échéance')[0];
+  assert.equal(due.props.value, 'custom');
+  assert.match(view.text(), /Jusqu’au 31\/12\/2099/);
+  assert.match(view.text(), /Effacer/, 'the active filter can be cleared');
 });

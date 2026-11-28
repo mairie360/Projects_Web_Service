@@ -57,4 +57,21 @@ describe('ProjectFiltersBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Effacer' }));
     expect(handlers.onResetFilters).toHaveBeenCalledTimes(1);
   });
+
+  it('MAIR-1254 shows bounds that match no range as the selected « Échéance » option, without reporting it', () => {
+    const handlers = renderBar({ dueCustomLabel: 'Jusqu’au 31/12/2026' });
+    const due = screen.getByRole('combobox', { name: 'Échéance' });
+    expect(due.value).toBe('custom');
+    expect(screen.getByRole('option', { name: 'Jusqu’au 31/12/2026' }).selected).toBe(true);
+    fireEvent.change(due, { target: { value: 'custom' } });
+    expect(handlers.onDueRangeChange).not.toHaveBeenCalled();
+    fireEvent.change(due, { target: { value: 'later' } });
+    expect(handlers.onDueRangeChange).toHaveBeenCalledWith('later');
+  });
+
+  it('MAIR-1254 has no custom « Échéance » option without custom bounds', () => {
+    renderBar({ dueRange: 'overdue' });
+    expect(screen.getByRole('combobox', { name: 'Échéance' }).value).toBe('overdue');
+    expect(screen.queryByRole('option', { name: /^Jusqu’au|^Du |^À partir du/ })).toBeNull();
+  });
 });

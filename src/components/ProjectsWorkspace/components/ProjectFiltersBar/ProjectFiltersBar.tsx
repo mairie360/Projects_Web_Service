@@ -6,6 +6,8 @@ import { Button, FilterSelect, SearchField, SegmentedControl } from '@mairie360/
 import type { FilterOption, ViewMode } from '@/lib/projectPageState';
 import { PROJECT_DUE_OPTIONS, type ProjectDueRange } from '../../project-due-range';
 
+const CUSTOM_DUE = 'custom';
+
 const ALL = 'all';
 const viewIcons: Record<ViewMode, LucideIcon> = { kanban: Kanban, grid: Grid3X3, table: List };
 /** Order of the view switch in the artifact: Kanban, Tableau, Grille. */
@@ -25,6 +27,8 @@ export interface ProjectFiltersBarProps {
   status: string;
   priority: string;
   dueRange: ProjectDueRange;
+  /** Bounds no range stands for (« Du … au … »), shown as the selected « Échéance » option; `''` / absent otherwise. */
+  dueCustomLabel?: string;
   statusOptions: FilterOption[];
   priorityOptions: FilterOption[];
   viewMode: ViewMode;
@@ -60,7 +64,7 @@ function LibFilter({ label, value, options, onChange }: { label: string; value: 
  * Kanban/Tableau/Grille switch, all lib-components (MAIR-828, MAIR-1134).
  */
 export const ProjectFiltersBar = ({
-  search, status, priority, dueRange, statusOptions, priorityOptions, viewMode, views, filtersActive = false,
+  search, status, priority, dueRange, dueCustomLabel = '', statusOptions, priorityOptions, viewMode, views, filtersActive = false,
   onSearchChange, onStatusChange, onPriorityChange, onDueRangeChange, onViewModeChange, onResetFilters,
 }: ProjectFiltersBarProps) => (
   <section className="border-b border-[var(--mairie-border)] py-6" aria-label="Filtres des projets">
@@ -84,9 +88,9 @@ export const ProjectFiltersBar = ({
           <FilterSelect
             label="Échéance"
             allLabel="Toutes les échéances"
-            value={dueRange}
-            options={PROJECT_DUE_OPTIONS}
-            onChange={(next) => onDueRangeChange(next as ProjectDueRange)}
+            value={dueCustomLabel ? CUSTOM_DUE : dueRange}
+            options={dueCustomLabel ? [{ value: CUSTOM_DUE, label: dueCustomLabel }, ...PROJECT_DUE_OPTIONS] : PROJECT_DUE_OPTIONS}
+            onChange={(next) => { if (next !== CUSTOM_DUE) onDueRangeChange(next as ProjectDueRange); }}
           />
           {filtersActive && onResetFilters && (
             <Button variant="ghost" tone="neutral" icon={X} label="Effacer" onClick={onResetFilters} />

@@ -3,7 +3,7 @@ import { publishedProjectWorkflowPort } from '../../lib/publishedProjectWorkflow
 import { WORKFLOW_STATUS_SAVE_PENDING, WORKFLOW_TASK_WRITE_PENDING, WORKFLOW_TASKS_UNVERIFIED, WORKFLOW_UNAVAILABLE, WorkflowWriteRefusedError, type ProjectTemplate, type ProjectWorkflowPort, type ProjectWorkflowSnapshot, type StatusMigration, type TaskStatusDefinition } from '../../lib/projectWorkflow';
 import { subscribePageReturn } from '../../lib/page-return';
 import { projectStatusLabel, projectStatusTargets } from './project-card-meta';
-import { matchesProjectDueBounds, projectDueBounds, projectDueRange, type ProjectDueRange } from './project-due-range';
+import { matchesProjectDueBounds, projectDueBounds, projectDueCustomLabel, projectDueRange, type ProjectDueRange } from './project-due-range';
 
 import { loginCurrentAgentSource, selectableCurrentAgent, type CurrentAgentSource } from '../../lib/current-agent';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1698,6 +1698,7 @@ export function useProjectsController({ currentAgentSource, initial, workflowPor
     priorityFilter,
     setPriorityFilter: changePriorityFilter,
     dueRangeFilter: projectDueRange({ dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter }),
+    dueCustomLabel: projectDueCustomLabel({ dueBefore: dueBeforeFilter, dueAfter: dueAfterFilter }),
     setDueRangeFilter: changeDueRangeFilter,
     searchTerm,
     setSearchTerm: changeSearchTerm,

@@ -63,7 +63,7 @@ export function ProjectsWorkspace({
   setStatusFilter,
   priorityFilter,
   setPriorityFilter,
-  dueRangeFilter,
+  dueRangeFilter, dueCustomLabel,
   setDueRangeFilter,
   searchTerm,
   setSearchTerm,
@@ -296,7 +296,7 @@ export function ProjectsWorkspace({
                   search={searchTerm}
                   status={statusFilter}
                   priority={priorityFilter}
-                  dueRange={dueRangeFilter}
+                  dueRange={dueRangeFilter} dueCustomLabel={dueCustomLabel}
                   statusOptions={statusFilterOptions}
                   priorityOptions={priorityFilterOptions}
                   viewMode={viewMode}

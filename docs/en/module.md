@@ -28,6 +28,7 @@ closed card can be dragged out of « Terminé » by them only. A write refused b
   template management on the list.
 - Filters without labels above them: search « Rechercher un projet, une étiquette… », « Tous les statuts », « Toutes
   les priorités » and « Échéance » (En retard / Ce mois-ci / Plus tard, read in the instance day and sent as the
-  inclusive `dueBefore` / `dueAfter` bounds of `GET /projects-page`), « Effacer » while one is set.
+  inclusive `dueBefore` / `dueAfter` bounds of `GET /projects-page`; bounds of a link that match no range show as
+  « Du … au … » / « Jusqu’au … » / « À partir du … »), « Effacer » while one is set.
 - Views Kanban / Tableau / Grille; Kanban columns À faire, En cours, En revue, Terminé, Suspendu (`on-hold`), whatever
   the order the BFF lists them in. Projects show their key as `PRJ-<n>` (display only). Cards (Kanban, grid) show the due date as « 30 mars 2027 » (MAIR-1254); the table and the sheet keep « 30/03/2027 ». The list spans the full width.
