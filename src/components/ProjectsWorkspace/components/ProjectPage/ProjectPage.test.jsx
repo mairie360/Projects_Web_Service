@@ -13,7 +13,7 @@ describe('ProjectPage', () => {
   it('shows the breadcrumb, header, metrics and tabs of the mockup, on « Vue d’ensemble »', () => {
     render(<ProjectPage project={project({ permissions: editable })} {...base} onClose={vi.fn()} {...handlers()} />);
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('navigation', { name: 'Fil d’Ariane' }).textContent).toContain('#');
+    expect(screen.getByRole('navigation', { name: 'Fil d’Ariane' }).textContent).toMatch(/PRJ-\d+/);
     expect(screen.getByRole('heading', { level: 1, name: 'Rénovation de l’éclairage public' })).toBeTruthy();
     for (const label of ['Avancement', 'Échéance', 'Budget engagé', 'Tâches en retard']) expect(within(screen.getByRole('region', { name: 'Indicateurs du projet' })).getByText(label)).toBeTruthy();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Vue d’ensemble', 'Tâches1', 'Planning', 'Équipe2', 'Documents', 'Activité']);
@@ -70,7 +70,7 @@ describe('ProjectPage', () => {
     render(<ProjectPage project={project({ permissions: editable, group: null })} {...base} groupOptions={[{ value: 'group-1', label: 'Voirie' }]} onClose={vi.fn()} {...handlers()} onUpdateProject={onUpdateProject} />);
     expect(screen.getByText('Sans groupe')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Modifier' }));
-    const dialog = screen.getByRole('dialog', { name: /^Modifier le projet · #/ });
+    const dialog = screen.getByRole('dialog', { name: /^Modifier le projet · PRJ-\d+/ });
     // MAIR-1136 (C13): nothing changed yet, nothing to save.
     expect(within(dialog).getByRole('button', { name: 'Enregistrer (0)' }).disabled).toBe(true);
     await user.type(within(dialog).getByLabelText(/^Titre/), ' bis');
